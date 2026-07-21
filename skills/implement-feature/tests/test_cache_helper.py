@@ -62,7 +62,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV18Tests(unittest.TestCase):
+class LedgerCacheV21Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -167,7 +167,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
         registration = {
-            "schema_version": "8.0.0",
+            "schema_version": "9.0.0",
             "bundle_sha256": hashlib.sha256(b"bundle-fixture").hexdigest(),
             "execution_scope_fingerprint": "0" * 64,
             "authorization_fingerprint": "0" * 64,
@@ -305,7 +305,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "specs": specs,
         }
         evidence = {
-            "stale_claim_takeover_permission": "granted-by-authorized-user",
+            "stale_claim_takeover_permission": "granted",
             "takeover_reason": "verified-stale",
             "evidence": f"takeover://verified-stale/{old_root_id}",
             "transaction_id": "a" * 32,
@@ -458,7 +458,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                     if row["record_kind"] == "owned-operation-result"
                     and row["owner"] == "gitstack"
                     and row["owner_operation"] == "wait"
-                    and row["normalized"]["disposition"] == "pending-warning"
+                    and row["normalized"]["disposition"] == "warning-required"
                 ]
                 self.assertEqual(len(pending), 1)
                 request["input"]["prior_pending_result"] = pending[0]
@@ -487,7 +487,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                     "relationship": "predecessor",
                     "owner": "gitstack",
                     "result_fingerprint": request["input"]["prior_pending_result"]["result_fingerprint"],
-                    "required_disposition": "pending-warning",
+                    "required_disposition": "warning-required",
                 }
                 if owner == "gitstack" and operation == "warning"
                 else {
@@ -750,7 +750,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             or self.task_assignment_fingerprint,
             "state": state,
             "outcome": (
-                "pull-request-ready-for-merge-but-not-merged"
+                "pull-request-ready-for-merge"
                 if state == "merge-ready"
                 else None
             ),
@@ -818,7 +818,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 }
             )
         return {
-            "type": "managed-checkouts-observed",
+            "type": "checkouts-observed",
             "task_key": self.task_key,
             "task_ref": "app-task://worker-232",
             "managed_checkouts": managed_checkouts,
@@ -853,7 +853,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                         "diagnostic_set_fingerprint": CACHE_RUNTIME.request_fingerprint([]),
                     }
                     manifest = {
-                        "schema_version": "4.0.0",
+                        "schema_version": "5.0.0",
                         "operation": "baseline-validation",
                         "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
                         "argv_fingerprint": plan["projected_argv_fingerprint"],
@@ -873,7 +873,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                         },
                     }
                     receipt = {
-                        "schema_version": "4.0.0",
+                        "schema_version": "5.0.0",
                         "status": "passed",
                         "manifest_sha256": manifest["manifest_sha256"],
                         "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
@@ -896,7 +896,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                         }
                     )
         return {
-            "type": "implementation-baseline-accepted",
+            "type": "baseline-accepted",
             "expected_generation": state["generation"],
             "expected_state_fingerprint": state["content_fingerprint"],
             "expected_claim_fingerprint": state["claim"]["fingerprint"],
@@ -935,7 +935,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_dependency_wait_binds_and_restores_the_exact_resume_phase(self) -> None:
         self.bootstrap_active_task()
         started = {
-            "type": "task-dependency-wait-started",
+            "type": "dependency-wait-started",
             "task_key": self.task_key,
             "resume_state": "implementing",
             "reason": "waiting for a root-owned transition",
@@ -951,7 +951,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         wrong = self.apply(
             [
                 {
-                    "type": "task-dependency-wait-resolved",
+                    "type": "dependency-wait-resolved",
                     "task_key": self.task_key,
                     "resume_state": "validating",
                     "evidence_ref": "app-task://root-a/dependency-resolved",
@@ -965,7 +965,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "task-dependency-wait-resolved",
+                    "type": "dependency-wait-resolved",
                     "task_key": self.task_key,
                     "resume_state": "implementing",
                     "evidence_ref": "app-task://root-a/dependency-resolved",
@@ -1142,10 +1142,10 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "type": "gate-observed",
             "task_key": self.task_key,
             "delivery_key": None,
-            "gate": "dependency-integration",
+            "gate": "dependencies-merged",
             "state": "passed",
             "binding_key": None,
-            "evidence_ref": "proof://dependency-integration",
+            "evidence_ref": "proof://dependencies-merged",
         }
         with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "schema is invalid"):
             CACHE_RUNTIME.apply_event(
@@ -1157,7 +1157,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 copy.deepcopy(state), stale, datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
             )
         self.apply([event])
-        self.assertEqual(self.state()["gates"][0]["gate"], "dependency-integration")
+        self.assertEqual(self.state()["gates"][0]["gate"], "dependencies-merged")
 
     def test_review_provider_mutation_guard_is_cas_bound_append_only_and_replay_safe(self) -> None:
         self.bootstrap_active_task()
@@ -1297,7 +1297,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         # delayed replays remain no-ops while the effective resume phase is
         # preserved; new authority cannot be reserved with the stale packet.
         self.apply([{
-            "type": "task-dependency-wait-started",
+            "type": "dependency-wait-started",
             "task_key": self.task_key,
             "resume_state": "implementing",
             "reason": "persisting review result",
@@ -1308,7 +1308,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply([start], operation_id=self.next_operation_id())
         self.apply([result], operation_id=self.next_operation_id())
         self.apply([{
-            "type": "task-dependency-wait-resolved",
+            "type": "dependency-wait-resolved",
             "task_key": self.task_key,
             "resume_state": "implementing",
             "evidence_ref": "app-task://root-a/review-resumed",
@@ -1361,14 +1361,14 @@ class LedgerCacheV18Tests(unittest.TestCase):
         }
         self.apply([
             {
-                "type": "task-dependency-wait-started", "task_key": self.task_key,
+                "type": "dependency-wait-started", "task_key": self.task_key,
                 "resume_state": "implementing", "reason": "persisting a state-changing result",
                 "summary_ref": "app-task://worker-232/transition-bookkeeping",
                 "evidence_ref": "app-task://root-a/transition-wait",
             },
             transition_result,
             {
-                "type": "task-dependency-wait-resolved", "task_key": self.task_key,
+                "type": "dependency-wait-resolved", "task_key": self.task_key,
                 "resume_state": "implementing", "evidence_ref": "app-task://root-a/transition-resolved",
             },
             self.task_event(state="validating"),
@@ -1474,7 +1474,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def prepare_review_polling_state(self) -> tuple[dict, dict]:
         self.bootstrap_active_task()
         revision = self.observe_revision()
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         return self.state(), revision
 
     def observe_revision(
@@ -1728,8 +1728,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
 
     def start_clean_review(self, revision: dict) -> None:
-        if self.state()["tasks"][0]["state"] != "review-polling":
-            self.apply([self.task_event(state="review-polling")])
+        if self.state()["tasks"][0]["state"] != "review-wait":
+            self.apply([self.task_event(state="review-wait")])
         controller = parse_result(self.controller_next())
         if controller.get("packet_template", {}).get("operation") == {
             "owner": "autoreview",
@@ -1855,7 +1855,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "validation-nonregression-observed",
+                    "type": "nonregression-observed",
                     "task_key": self.task_key,
                     "delivery_key": delivery["delivery_key"],
                     "validation_key": plan["validation_key"],
@@ -1941,7 +1941,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "task-terminal-sealed",
+                    "type": "task-sealed",
                     "task_key": self.task_key,
                     "revision_set_key": revision_set,
                     "seal_fingerprint": seal_fingerprint,
@@ -1957,7 +1957,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "terminal-handoff-recorded",
+                    "type": "handoff-recorded",
                     "task_key": self.task_key,
                     "seal_fingerprint": seal_fingerprint,
                     "handoff_kind": "pull-request-ready",
@@ -1973,7 +1973,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "portfolio-terminal-verified",
+                    "type": "portfolio-verified",
                     "verification_fingerprint": verification,
                     "evidence_ref": "proof://portfolio-terminal/232",
                 },
@@ -2036,12 +2036,12 @@ class LedgerCacheV18Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v18_offline_and_read_only(self) -> None:
+    def test_doctor_is_v21_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "20.0.0")
+        self.assertEqual(version, "21.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -2051,7 +2051,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_controller_registry_fixture_is_exhaustive_strict_and_bounded(self) -> None:
         fixture = json.loads(
-            (SKILL_ROOT / "tests/fixtures/controller-replay-v2.json").read_text()
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v3.json").read_text()
         )
         self.assertFalse((SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").exists())
         CACHE_RUNTIME.validate_controller_registry()
@@ -2072,8 +2072,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.assertEqual(actual, fixture["registry"])
         self.assertEqual(CACHE_RUNTIME.CONTROLLER_TASK_STATE_ACTIONS, fixture["visible_task_states"])
         self.assertEqual(len(actual), fixture["metrics"]["registry_actions"])
-        self.assertEqual(CACHE_RUNTIME.CONTROLLER_PROJECTION_SCHEMA_VERSION, "2.0.0")
-        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TEMPLATE_SCHEMA_VERSION, "2.0.0")
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_PROJECTION_SCHEMA_VERSION, "3.0.0")
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TEMPLATE_SCHEMA_VERSION, "3.0.0")
         self.assertEqual(CACHE_RUNTIME.LEDGER_SCHEMA_VERSION, fixture["ledger_schema_version"])
         self.assertEqual(CACHE_RUNTIME.REGISTRATION_SCHEMA_VERSION, fixture["registration_schema_version"])
         self.assertFalse(any("merge" in action and action != "steer-mergeability" for action, *_ in actual))
@@ -2162,7 +2162,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_gitstack_request_wait_clean_and_findings_change_controller_and_gate(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.assertEqual(parse_result(self.controller_next())["action"], "execute-gitstack-request")
         self.record_mock_owned_result(
             owner="gitstack", operation="request", outcome="created",
@@ -2181,7 +2181,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_gitstack_findings_route_to_review_fix(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="findings", facts={"request_receipt": {"identity": "findings"}})
         self.assertEqual(parse_result(self.controller_next())["action"], "steer-review-fix")
@@ -2191,7 +2191,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.record_mock_owned_result(
             owner="autoreview", operation="run-phase", outcome="terminal-clean"
         )
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         _, findings_result, _ = self.record_mock_owned_result(
             owner="gitstack", operation="wait", outcome="findings",
@@ -2265,7 +2265,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_gitstack_timeout_requires_warning_before_warning_only_gate(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         receipt = {"identity": "timeout-request"}
         _, pending_result, _ = self.record_mock_owned_result(
@@ -2297,7 +2297,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_recovered_request_advances_to_wait_and_never_requests_again(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         original, started = self.start_mock_owned_operation("gitstack", "request")
         self.record_mock_mutation_reconciliation(
             original, started, effective_operation="request", effective_outcome="created",
@@ -2307,7 +2307,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_recovered_warning_advances_and_never_warns_again(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         _, pending, _ = self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="pending-at-deadline")
         original, started = self.start_mock_owned_operation(
@@ -2321,12 +2321,12 @@ class LedgerCacheV18Tests(unittest.TestCase):
         gate_result = CACHE_RUNTIME.owned_gate_result(
             self.state(), self.state()["tasks"][0], self.state()["tasks"][0]["deliveries"][0], "codex-review",
         )
-        self.assertEqual(gate_result["normalized"]["disposition"], "timeout-accepted")
+        self.assertEqual(gate_result["normalized"]["disposition"], "warned-timeout")
 
     def test_terminal_reconciliation_appends_supersession_and_conflicting_result_fails(self) -> None:
         self.bootstrap_active_task(); self.observe_revision()
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         receipt = {"identity": "correlation-request"}
         _, failed, _ = self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="request-correlation-failure", facts={"request_receipt": receipt})
@@ -2374,7 +2374,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.record_mock_owned_result(
             owner="autoreview", operation="run-phase", outcome="terminal-clean"
         )
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(
             owner="gitstack", operation="request", outcome="created"
         )
@@ -2386,7 +2386,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "source_result_fingerprint": findings["result_fingerprint"],
         }
         self.apply([{
-            "type": "autoreview-hosted-finding-obligated",
+            "type": "hosted-finding-obligated",
             "task_key": self.task_key,
             "delivery_key": "dotagents",
             "obligation_ref": descriptor["hosted_obligation_ref"],
@@ -2412,7 +2412,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.record_mock_owned_result(
             owner="autoreview", operation="run-phase", outcome="terminal-clean"
         )
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(
             owner="gitstack", operation="request", outcome="created"
         )
@@ -2424,7 +2424,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "source_result_fingerprint": findings["result_fingerprint"],
         }
         self.apply([{
-            "type": "autoreview-hosted-finding-obligated",
+            "type": "hosted-finding-obligated",
             "task_key": self.task_key,
             "delivery_key": "dotagents",
             "obligation_ref": descriptor["hosted_obligation_ref"],
@@ -2477,7 +2477,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.record_mock_owned_result(
             owner="autoreview", operation="run-phase", outcome="terminal-clean"
         )
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
         _, findings, _ = self.record_mock_owned_result(
             owner="gitstack", operation="wait", outcome="findings"
@@ -2487,7 +2487,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "source_result_fingerprint": findings["result_fingerprint"],
         }
         self.apply([{
-            "type": "autoreview-hosted-finding-obligated",
+            "type": "hosted-finding-obligated",
             "task_key": self.task_key,
             "delivery_key": "dotagents",
             "obligation_ref": descriptor["hosted_obligation_ref"],
@@ -2531,7 +2531,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         prior["prior_result_effect"] = {
             "relationship": "predecessor", "owner": "autoreview",
             "result_fingerprint": "e" * 64,
-            "required_disposition": "pending-warning",
+            "required_disposition": "warning-required",
         }
         for mutate in (
             lambda row: row["prior_result_effect"].update(owner="gitstack"),
@@ -2595,7 +2595,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_controller_replays_every_visible_phase_and_aggregates_concurrent_tasks(self) -> None:
         self.bootstrap_active_task()
         fixture = json.loads(
-            (SKILL_ROOT / "tests/fixtures/controller-replay-v2.json").read_text()
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v3.json").read_text()
         )
         base = self.state()
         decisions: list[tuple[str, str]] = []
@@ -2728,7 +2728,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.ledger_root.mkdir(parents=True, exist_ok=True)
         markdown.write_text("# stale active ledger\n")
         result = self.create(check=False)
-        error = self.error(result, "unsupported-active-ledger")
+        error = self.error(result, "unsupported-ledger")
         self.assertEqual(
             error["details"]["ledger"],
             os.path.abspath(os.fspath(markdown)),
@@ -2752,6 +2752,31 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 5)
         self.assertEqual(legacy.read_bytes(), before)
+
+    def test_schema15_rejects_retired_permission_without_rewrite(self) -> None:
+        self.acquire()
+        self.create()
+        state = self.state()
+        state["authorization"]["visible_app_task_permission"] = (
+            "granted-by-authorized-user"
+        )
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        self.ledger.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+        before = self.ledger.read_bytes()
+
+        result = self.run_cache(
+            "--json",
+            "ledger",
+            "read",
+            "--ledger",
+            str(self.ledger),
+            "--projection",
+            "status",
+            check=False,
+        )
+
+        self.error(result, "integrity-failure")
+        self.assertEqual(self.ledger.read_bytes(), before)
 
     def test_apply_is_cas_idempotent_strict_and_does_not_record_noops(self) -> None:
         self.acquire()
@@ -2900,7 +2925,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             {"type": "portfolio-goal-activated", "goal_evidence_ref": "app-task://root-a/goal", "objective_fingerprint": objective},
             {
                 "type": "gate-observed", "task_key": self.task_key, "delivery_key": None,
-                "gate": "dependency-integration", "state": "passed", "binding_key": None,
+                "gate": "dependencies-merged", "state": "passed", "binding_key": None,
                 "evidence_ref": "proof://premature-gate",
             },
             {
@@ -2929,7 +2954,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         ])
         evidence = "planning://baseline-required/232"
         self.apply([{
-            "type": "portfolio-preimplementation-aborted",
+            "type": "preimplementation-aborted",
             "reason": "The declared validation has no provably read-only baseline projection.",
             "task_stop_evidence": [{
                 "task_key": self.task_key,
@@ -3039,7 +3064,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "delivery-preflight-observed",
+                    "type": "preflight-observed",
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "github_repository": "example/dotagents",
@@ -3193,7 +3218,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                     "type": "gate-observed",
                     "task_key": self.task_key,
                     "delivery_key": None,
-                    "gate": "scope-acceptance",
+                    "gate": "scope",
                     "state": "passed",
                     "binding_key": revision_set,
                     "evidence_ref": "proof://scope/first",
@@ -3204,7 +3229,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         projection = parse_result(self.read_projection("status"))
         task = projection["tasks"][0]
         self.assertNotEqual(second["revision_key"], first["revision_key"])
-        self.assertNotIn("scope-acceptance", task["gates"])
+        self.assertNotIn("scope", task["gates"])
         self.assertIn("dotagents:missing-current-review", task["terminal_blockers"])
         self.assertEqual(projection["warnings"], [])
 
@@ -3272,7 +3297,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                     "type": "autoreview-lineage-reset-authorized",
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
-                    "authority": "granted-by-authorized-user",
+                    "authority": "granted",
                     "reason": "the canonical rebased patch changed semantically",
                     "evidence_ref": "owner://lineage-reset/1",
                     "prior_evidence_fingerprint": prior["evidence_fingerprint"],
@@ -3346,7 +3371,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "finding_set_ref": str(finding_set),
             "finding_set_fingerprint": finding_set_fingerprint,
         }
-        event = {"type": "autoreview-hosted-finding-obligated", "task_key": self.task_key, "delivery_key": "dotagents", "obligation": obligation}
+        event = {"type": "hosted-finding-obligated", "task_key": self.task_key, "delivery_key": "dotagents", "obligation": obligation}
         self.apply([event])
         _, arguments = self.autoreview_controller_projection()
         next_action = arguments["autoreview_projection"]
@@ -3360,7 +3385,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         return
         revision = self.observe_revision()
         self.observe_delivery(revision)
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         state = self.state()
         started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
         request_receipt = self.request_receipt(revision, request_key="run-timeout", comment_id=9001, created_at="2026-07-18T12:00:00Z")
@@ -3408,7 +3433,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "failure_kind": None,
             "provider_error_code": None,
             "observation_fingerprint": hashlib.sha256(b"pending-timeout").hexdigest(),
-            "disposition": "timeout-accepted",
+            "disposition": "warned-timeout",
             "finding_count": 0,
             "finding_comment_ids": [],
             "evidence_ref": "github-review://233/pending",
@@ -3464,7 +3489,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             CACHE_RUNTIME.review_warnings(state),
             [
                 {
-                    "code": "codex-review-timeout-accepted",
+                    "code": "codex-review-warned-timeout",
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
@@ -3573,7 +3598,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                                 "observation_fingerprint": hashlib.sha256(
                                     f"warning-{warning_index}".encode()
                                 ).hexdigest(),
-                                "disposition": "timeout-accepted",
+                                "disposition": "warned-timeout",
                                 "finding_count": 0,
                                 "finding_comment_ids": [],
                                 "warning_ref": (
@@ -3915,7 +3940,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             }, "committed": True, "published": True, "evidence_ref": "fixture://monitored-pr-237/delivery",
         }])
         self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
 
         request_receipt = self.request_receipt(
             revision, comment_id=run["request_comment_id"], request_key=run["request_key"],
@@ -3957,13 +3982,13 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.pass_terminal_gates(revision)
         seal = parse_result(self.read_projection("terminal"))["tasks"][0]
         self.apply([{
-            "type": "task-terminal-sealed", "task_key": self.task_key,
+            "type": "task-sealed", "task_key": self.task_key,
             "revision_set_key": seal["revision_set_key"], "seal_fingerprint": seal["seal_candidate_fingerprint"],
             "evidence_ref": "fixture://monitored-pr-237/seal",
         }])
         sealed = self.state()["tasks"][0]
         self.apply([{
-            "type": "terminal-handoff-recorded", "task_key": self.task_key,
+            "type": "handoff-recorded", "task_key": self.task_key,
             "seal_fingerprint": sealed["seal"]["seal_fingerprint"], "handoff_kind": "pull-request-ready",
             "authority": "external-merge-required", "evidence_ref": revision["pr_url"],
             "next_action": "Human may merge after final inspection.",
@@ -4018,7 +4043,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
         return
         finding_revision = self.observe_revision(head="a" * 40)
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         request_receipt = self.request_receipt(finding_revision, request_key="run-findings")
         self.apply([
             {
@@ -4120,7 +4145,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
         return
         revision = self.observe_revision()
-        self.apply([self.task_event(state="review-polling")])
+        self.apply([self.task_event(state="review-wait")])
         request_receipt = self.request_receipt(revision, request_key="provider-comment-findings")
         self.apply([{
             "type": "review-wait-started", "task_key": self.task_key,
@@ -4168,7 +4193,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 CACHE_RUNTIME.validate_review_outcome(
                     binding,
                     "waiting",
-                    "timeout-accepted",
+                    "warned-timeout",
                     None,
                     None,
                     None,
@@ -4229,7 +4254,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 "failure_kind": None,
                 "provider_error_code": None,
                 "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
-                "disposition": "timeout-accepted",
+                "disposition": "warned-timeout",
                 "finding_count": 0,
                 "finding_comment_ids": [],
                 "evidence_ref": "github-review://233/late-pending",
@@ -4271,13 +4296,13 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "post-terminal-drift-recorded",
+                    "type": "terminal-drift-recorded",
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "seal_fingerprint": task["seal"]["seal_fingerprint"],
                     "drift_fingerprint": hashlib.sha256(b"head-drift").hexdigest(),
                     "reason": "The PR head changed after terminal verification.",
-                    "evidence_ref": "git://post-terminal-drift/233",
+                    "evidence_ref": "git://terminal-drift/233",
                 }
             ]
         )
@@ -4291,12 +4316,12 @@ class LedgerCacheV18Tests(unittest.TestCase):
         sealed = self.make_terminal_sealed_state()
         seal_fingerprint = sealed["tasks"][0]["seal"]["seal_fingerprint"]
         prior_observation = copy.deepcopy(sealed["tasks"][0]["current_observation"])
-        late = self.task_event(state="terminal-sealed")
+        late = self.task_event(state="sealed")
 
         self.apply([late])
         state = self.state()
         task = state["tasks"][0]
-        self.assertEqual(task["state"], "terminal-sealed")
+        self.assertEqual(task["state"], "sealed")
         self.assertEqual(task["seal"]["seal_fingerprint"], seal_fingerprint)
         self.assertEqual(task["current_observation"], prior_observation)
         self.assertIsNotNone(task["post_terminal_drift"])
@@ -4313,7 +4338,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         sealed = self.make_terminal_sealed_state()
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
         ordinary_events = {
-            "managed-checkouts-observed",
+            "checkouts-observed",
             "task-observed",
             "revision-observed",
             "delivery-observed",
@@ -4323,7 +4348,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "review-observed",
             "review-reconciled",
             "gate-observed",
-            "task-terminal-sealed",
+            "task-sealed",
         }
         for event_type in sorted(ordinary_events):
             with self.subTest(event_type=event_type):
@@ -4344,13 +4369,13 @@ class LedgerCacheV18Tests(unittest.TestCase):
         sealed = self.make_terminal_sealed_state()
         seal_fingerprint = sealed["tasks"][0]["seal"]["seal_fingerprint"]
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        stages = [("terminal-sealed", copy.deepcopy(sealed))]
+        stages = [("sealed", copy.deepcopy(sealed))]
 
         handed_off = copy.deepcopy(sealed)
         CACHE_RUNTIME.apply_event(
             handed_off,
             self.bind_decision_event({
-                "type": "terminal-handoff-recorded",
+                "type": "handoff-recorded",
                 "task_key": self.task_key,
                 "seal_fingerprint": seal_fingerprint,
                 "handoff_kind": "pull-request-ready",
@@ -4368,7 +4393,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         CACHE_RUNTIME.apply_event(
             verified,
             self.bind_decision_event({
-                "type": "portfolio-terminal-verified",
+                "type": "portfolio-verified",
                 "verification_fingerprint": verification,
                 "evidence_ref": "proof://portfolio-terminal/232",
             }, verified),
@@ -4398,7 +4423,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 changed = CACHE_RUNTIME.apply_event(
                     stage,
                     self.bind_decision_event({
-                        "type": "post-terminal-drift-recorded",
+                        "type": "terminal-drift-recorded",
                         "task_key": self.task_key,
                         "delivery_key": "dotagents",
                         "seal_fingerprint": seal_fingerprint,
@@ -4406,7 +4431,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                             f"head-drift-{stage_name}".encode()
                         ).hexdigest(),
                         "reason": f"The PR head changed during {stage_name}.",
-                        "evidence_ref": f"git://post-terminal-drift/{stage_name}",
+                        "evidence_ref": f"git://terminal-drift/{stage_name}",
                     }, stage),
                     now,
                 )
@@ -4428,13 +4453,13 @@ class LedgerCacheV18Tests(unittest.TestCase):
         CACHE_RUNTIME.apply_event(
             state,
             self.bind_decision_event({
-                "type": "post-terminal-drift-recorded",
+                "type": "terminal-drift-recorded",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "seal_fingerprint": seal_fingerprint,
                 "drift_fingerprint": hashlib.sha256(b"pre-completion-drift").hexdigest(),
                 "reason": "The PR head changed before terminal handoff was recorded.",
-                "evidence_ref": "git://post-terminal-drift/pre-completion",
+                "evidence_ref": "git://terminal-drift/pre-completion",
             }, state),
             now,
         )
@@ -4443,7 +4468,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             CACHE_RUNTIME.apply_event(
                 state,
                 self.bind_decision_event({
-                    "type": "terminal-handoff-recorded",
+                    "type": "handoff-recorded",
                     "task_key": self.task_key,
                     "seal_fingerprint": seal_fingerprint,
                     "handoff_kind": "pull-request-ready",
@@ -4539,7 +4564,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             ],
         }
         evidence = {
-            "stale_claim_takeover_permission": "granted-by-authorized-user",
+            "stale_claim_takeover_permission": "granted",
             "takeover_reason": "verified-stale",
             "evidence": "takeover://verified-stale/root-old",
             "transaction_id": "a" * 32,
@@ -4576,7 +4601,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         plan = delivery["validation_plan"][0]
         attempt_id = "c" * 32
         reservation = {
-            "type": "execution-command-reserved",
+            "type": "command-reserved",
             "task_key": self.task_key,
             "delivery_key": delivery["delivery_key"],
             "attempt_id": attempt_id,
@@ -4592,7 +4617,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         duplicate = self.apply([reservation], check=False)
         self.assertEqual(duplicate.returncode, 4)
         launch = {
-            "type": "execution-command-launch-observed",
+            "type": "command-launched",
             "task_key": self.task_key,
             "delivery_key": delivery["delivery_key"],
             "attempt_id": attempt_id,
@@ -4601,7 +4626,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         }
         self.apply([launch])
         cancel = {
-            "type": "execution-command-cancellation-authorized",
+            "type": "command-cancel-authorized",
             "task_key": self.task_key,
             "delivery_key": delivery["delivery_key"],
             "attempt_id": attempt_id,
@@ -4610,7 +4635,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         }
         self.apply([cancel])
         terminal = {
-            "type": "execution-command-terminal-observed",
+            "type": "command-finished",
             "task_key": self.task_key,
             "delivery_key": delivery["delivery_key"],
             "attempt_id": attempt_id,
@@ -4946,9 +4971,9 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
         projected = CACHE_RUNTIME.diagnostics_projection(timeout_accepted)
         provider = projected["tasks"][0]["deliveries"][0]["review_operation"]
-        self.assertEqual(provider["disposition"], "timeout-accepted")
+        self.assertEqual(provider["disposition"], "warned-timeout")
         self.assertFalse(provider["blocking"])
-        self.assertIn("timeout-accepted", provider["display_result"])
+        self.assertIn("warned-timeout", provider["display_result"])
 
         cleanup_failed = copy.deepcopy(base)
         cleanup_failed["tasks"][0]["deliveries"][0]["command_attempts"] = [
@@ -4991,20 +5016,20 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "post-terminal-drift-recorded",
+                    "type": "terminal-drift-recorded",
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "seal_fingerprint": task["seal"]["seal_fingerprint"],
                     "drift_fingerprint": hashlib.sha256(b"diagnostic-drift").hexdigest(),
                     "reason": "The exact PR head changed after terminal verification.",
-                    "evidence_ref": "git://post-terminal-drift/diagnostics",
+                    "evidence_ref": "git://terminal-drift/diagnostics",
                 }
             ]
         )
         invalidated = parse_result(self.read_projection("diagnostics"))
         self.assertEqual(invalidated["terminal_verification"], "invalidated")
         self.assertTrue(invalidated["blocking"])
-        self.assertIn("post-terminal-drift", invalidated["blocking_reasons"])
+        self.assertIn("terminal-drift", invalidated["blocking_reasons"])
 
     def test_diagnostics_read_is_pure_bounded_and_fail_closed(self) -> None:
         self.bootstrap_active_task()
@@ -5022,7 +5047,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             for path in self.cache_root.rglob("*")
             if path.is_file() and not path.is_symlink()
         }
-        self.assertEqual(payload["projection_schema_version"], "1.0.0")
+        self.assertEqual(payload["projection_schema_version"], "2.0.0")
         self.assertEqual(payload["ledger_schema_version"], "15.0.0")
         self.assertEqual(payload["generation"], before_state["generation"])
         self.assertEqual(payload["content_fingerprint"], before_state["content_fingerprint"])

@@ -3,7 +3,7 @@
 Load this reference before preparing a source bundle or executing delivery
 preflight, worker validation, or AutoReview through a command manifest.
 `scripts/execution-manifest` is the shipped standard-library Python artifact;
-its schema version is `4.0.0` and its CLI version is `4.0.0`.
+its schema version is `5.0.0` and its CLI version is `5.0.0`.
 
 ## Boundary
 
@@ -76,7 +76,7 @@ required, resolves literal argv and tool records, copies `bundle_sha256`, and
 generates argv, gate, and manifest fingerprints. Receipts contain observations
 only; callers author none of their fields.
 
-These are hard-cut `4.0.0` exact-object schemas. There are no aliases, command
+These are hard-cut `5.0.0` exact-object schemas. There are no aliases, command
 string inputs, migrations, or legacy packet readers.
 
 `validation.parameters.argv` is a nonempty literal string array. A string
@@ -117,7 +117,7 @@ The supervisor censuses descendants and group membership through kernel process
 metadata and signals only identities it can match safely. Timeout,
 root-authorized cancellation, output limit, and claim loss commit their typed
 transition before TERM/KILL/reap/rescan cleanup. An escaped or unverifiable
-process produces `cleanup-failed` and `owner-required`.
+process produces `cleanup-failed` and `needs-owner`.
 
 Terminal statuses are `passed`, `failed`, `timed-out`, `cancelled`,
 `output-limit`, `interrupted`, and `cleanup-failed`. A verified exit observed

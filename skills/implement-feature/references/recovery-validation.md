@@ -124,9 +124,9 @@ to record terminal drift only; it never replaces the sealed observation/result,
 reopens the Goal, or regrants authority.
 
 Before seal, apply a changed definitive capability observation through
-`delivery-preflight-observed`; its new preflight key invalidates delivery and
+`preflight-observed`; its new preflight key invalidates delivery and
 task-set bindings. After seal, never apply that event: record the changed key
-only through `post-terminal-drift-recorded` and block archive.
+only through `terminal-drift-recorded` and block archive.
 
 For `portfolio_goal_state=pending`, first repair and observe the root title,
 then apply `root-title-observed`. Adopt a matching Goal observed in the pass or,
@@ -189,7 +189,7 @@ If the waiter result remains pending, compare its observation time with the
 immutable 45-minute deadline. Before the deadline, continue observing the
 already-launched call; do not start another. At or after the deadline, require
 the persistent PR warning, then record the one final
-`waiting/timeout-accepted` observation with its `warning_ref`. The root Goal
+`waiting/warned-timeout` observation with its `warning_ref`. The root Goal
 remains active, the claim remains unchanged, and closeout continues. A
 missing request, access or provider failure, findings, or missing warning is a
 blocker. Never create a review schedule, pause a Goal, arm a heartbeat, or
@@ -200,11 +200,11 @@ relaunch the provider waiter. Old-revision waits remain inert history.
 Resume at the first incomplete closeout stage without requiring a later stage:
 
 1. A task with all current proof but no seal may apply
-   `task-terminal-sealed`.
+   `task-sealed`.
 2. An unchanged seal without terminal handoff may apply
-   `terminal-handoff-recorded` from current delivery proof.
+   `handoff-recorded` from current delivery proof.
 3. Once all tasks have terminal handoffs, independently reverify and apply
-   `portfolio-terminal-verified`.
+   `portfolio-verified`.
 4. A verified portfolio with active root Goal may complete and read it back,
    then apply `portfolio-goal-completed`; already-completed matching evidence is
    adopted once and derives `portfolio_goal_state=complete`.
@@ -215,7 +215,7 @@ Resume at the first incomplete closeout stage without requiring a later stage:
 These are closeout transitions, not implementation resume. Never repair or
 resume implementation during this interrupted completion transition. If any terminal fact
 changed after a seal or root Goal completion, apply
-`post-terminal-drift-recorded`. It preserves irreversible root Goal history, blocks
+`terminal-drift-recorded`. It preserves irreversible root Goal history, blocks
 portfolio verification or archive, and requires owner action or a fresh run.
 
 ## Prepared Takeover Without Candidate State

@@ -7,11 +7,11 @@ only registration inputs and root event families.
 
 ## Registration Inputs
 
-Registration schema is exactly `8.0.0`. Supply:
+Registration schema is exactly `9.0.0`. Supply:
 
 | input | phase-specific contract |
 | --- | --- |
-| `schema_version` | Exact registration schema `8.0.0`. |
+| `schema_version` | Exact registration schema `9.0.0`. |
 | `bundle_sha256` | Exact immutable execution-bundle bytes. |
 | `execution_scope_fingerprint` | Complete deliveries, paths, and validation plans. |
 | `authorization_fingerprint` | Execution scope, permission evidence, and GitStack installation fingerprint. |

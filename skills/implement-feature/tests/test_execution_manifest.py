@@ -17,7 +17,7 @@ from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "execution-manifest"
-REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v4.json"
+REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v5.json"
 loader = importlib.machinery.SourceFileLoader("execution_manifest_script", str(SCRIPT))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -34,7 +34,7 @@ class ExecutionManifestTests(unittest.TestCase):
         source = root / "source.md"
         source.write_bytes("Café\n".encode())
         request = {
-            "schema_version": "4.0.0",
+            "schema_version": "5.0.0",
             "template": False,
             "root_task_ref": "task:test",
             "entries": [
@@ -74,7 +74,7 @@ class ExecutionManifestTests(unittest.TestCase):
         allowed = allowed or []
         expected = expected or []
         return {
-            "schema_version": "4.0.0",
+            "schema_version": "5.0.0",
             "template": False,
             "command_id": "focused-validation",
             "operation": "validation",
@@ -92,7 +92,7 @@ class ExecutionManifestTests(unittest.TestCase):
 
     def baseline_request(self, repo: Path, argv: list[str]) -> dict[str, object]:
         return {
-            "schema_version": "4.0.0",
+            "schema_version": "5.0.0",
             "template": False,
             "command_id": "baseline-validation",
             "operation": "baseline-validation",
@@ -155,7 +155,7 @@ class ExecutionManifestTests(unittest.TestCase):
                 {"entry_id": "unicode", "kind": "issue", "source_ref": "issue:2", "snapshot_path": str(unicode_file)},
                 {"entry_id": "empty", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(empty)},
             ]
-            request = {"schema_version": "4.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
+            request = {"schema_version": "5.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
             first = cli.prepare_bundle(request)
             second = cli.prepare_bundle({**request, "entries": list(reversed(entries))})
             self.assertEqual(first["bundle_sha256"], second["bundle_sha256"])
@@ -394,7 +394,7 @@ class ExecutionManifestTests(unittest.TestCase):
             )
             fake_gh.chmod(0o755)
             request = {
-                "schema_version": "4.0.0", "template": False,
+                "schema_version": "5.0.0", "template": False,
                 "command_id": "delivery-preflight", "operation": "delivery-preflight",
                 "owner": "root", "cwd": None, "parameters": {"input": str(packet)},
                 "dependency_files": [],
@@ -419,7 +419,7 @@ class ExecutionManifestTests(unittest.TestCase):
             (root / "autoreview-next.json").write_text("{}\n")
             _, bundle = self.make_bundle(root)
             request = {
-                "schema_version": "4.0.0", "template": False,
+                "schema_version": "5.0.0", "template": False,
                 "command_id": "autoreview-dry-run", "operation": "autoreview",
                 "owner": "worker", "cwd": str(repo),
                 "parameters": {
@@ -448,7 +448,7 @@ class ExecutionManifestTests(unittest.TestCase):
             self.write_json(
                 request,
                 {
-                    "schema_version": "4.0.0",
+                    "schema_version": "5.0.0",
                     "template": False,
                     "root_task_ref": "task:fixture",
                     "entries": [{"entry_id": "source", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(source)}],
@@ -704,7 +704,7 @@ class ExecutionManifestTests(unittest.TestCase):
             cli.append_attempt(
                 attempt_path,
                 {
-                    "schema_version": "4.0.0",
+                    "schema_version": "5.0.0",
                     "attempt_id": attempt_id,
                     "manifest_sha256": manifest["manifest_sha256"],
                     "command_id": manifest["command_id"],

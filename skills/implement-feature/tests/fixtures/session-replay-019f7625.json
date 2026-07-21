@@ -120,7 +120,7 @@
     }
   },
   "registration": {
-    "schema_version": "5.0.0",
+    "schema_version": "9.0.0",
     "root_task_ref": "codex-task:019f761a-59b5-74b3-97a3-f24f01dadc93",
     "root_checkout": "__ROOT_CHECKOUT__",
     "objective": "Deliver Feature Spec ambrogio-dev/yn-ai-workflows#231 \"Workflow Routing Contract Alignment\" through an open, non-draft, merge-ready-but-unmerged pull request against the discovered default branch, satisfying validation, autoreview, current-revision Codex review, CI when configured, integration, tracker closeout, repository rules, and Goal closeout.",
@@ -169,7 +169,7 @@
       "events": [
         {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "session-replay:root-title-observed"},
         {"type": "portfolio-goal-activated", "goal_evidence_ref": "__ROOT_GOAL_EVIDENCE__", "objective_fingerprint": "95d0985e28887b0ef0c098bf28dfe8929b6b84dc6d63cf670f0413a04a9cf764"},
-        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "dependency-integration", "state": "passed", "binding_key": null, "evidence_ref": "upstream-223=merged:188977f0b81eab60f3c06b5c80aab0eebea9d2e2"}
+        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "dependencies-merged", "state": "passed", "binding_key": null, "evidence_ref": "upstream-223=merged:188977f0b81eab60f3c06b5c80aab0eebea9d2e2"}
       ]
     },
     {
@@ -177,7 +177,7 @@
       "operation_id": "00000000000000000000000000000003",
       "events": [
         {
-          "type": "managed-checkouts-observed",
+          "type": "checkouts-observed",
           "task_key": "workflow-routing-contract-alignment-231",
           "task_ref": "019f7625-d192-7341-8025-6e4e96d7873c",
           "managed_checkouts": [
@@ -227,8 +227,8 @@
           "attention_reason": null,
           "summary_ref": null
         },
-        {"type": "task-dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review launch authority", "summary_ref": "session-replay:first-root-transition-wait", "evidence_ref": "session-replay:first-root-transition-wait-started"},
-        {"type": "task-dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:first-root-transition-wait-resolved"},
+        {"type": "dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review launch authority", "summary_ref": "session-replay:first-root-transition-wait", "evidence_ref": "session-replay:first-root-transition-wait-started"},
+        {"type": "dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:first-root-transition-wait-resolved"},
         {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:initial-head"},
         {
           "type": "delivery-observed",
@@ -275,10 +275,10 @@
       "name": "final-proof-and-review",
       "operation_id": "00000000000000000000000000000007",
       "events": [
-        {"type": "task-dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review disposition", "summary_ref": "session-replay:second-root-transition-wait", "evidence_ref": "session-replay:second-root-transition-wait-started"},
-        {"type": "task-dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:second-root-transition-wait-resolved"},
-        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "scope-acceptance", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "scope-and-acceptance=passed"},
-        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "integration-validation", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "cross-package-integration=passed"},
+        {"type": "dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review disposition", "summary_ref": "session-replay:second-root-transition-wait", "evidence_ref": "session-replay:second-root-transition-wait-started"},
+        {"type": "dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:second-root-transition-wait-resolved"},
+        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "scope", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "scope-and-acceptance=passed"},
+        {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "integration", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "cross-package-integration=passed"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "focused-validation", "state": "passed", "binding_key": "__FINAL_DELIVERY_EVIDENCE_KEY__", "evidence_ref": "focused-FE=160"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "full-validation", "state": "passed", "binding_key": "__FINAL_DELIVERY_EVIDENCE_KEY__", "evidence_ref": "BE=126;FE=793;worker=850;typecheck-and-lint=passed"},
         {"type": "autoreview-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "evidence": {"lineage_id": "1111111111111111111111111111111111111111111111111111111111111111", "parent_evidence_fingerprint": null, "evidence_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222", "review_phase": "full", "terminal_state": "terminal-clean", "head_sha": "1536a00568460e9229abc99e16396cef405bc04b", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "target_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333", "changed_files": ["apps/web/src/workflows/router.ts"], "full_reviews": 1, "fix_verifications": 0, "open_findings": [], "prompt_characters": 12000, "elapsed_seconds": 60, "evidence_ref": "session-replay:autoreview-clean"}},
@@ -297,15 +297,15 @@
       "name": "task-seal-and-handoff",
       "operation_id": "00000000000000000000000000000008",
       "events": [
-        {"type": "task-terminal-sealed", "task_key": "workflow-routing-contract-alignment-231", "revision_set_key": "__FINAL_REVISION_SET_KEY__", "seal_fingerprint": "__SEAL_FINGERPRINT__", "evidence_ref": "session-replay:current-proof-sealed"},
-        {"type": "terminal-handoff-recorded", "task_key": "workflow-routing-contract-alignment-231", "seal_fingerprint": "__SEAL_FINGERPRINT__", "handoff_kind": "pull-request-ready", "authority": "external-merge-required", "evidence_ref": "terminal:pr=233;head=1536a00568460e9229abc99e16396cef405bc04b;review=5012214550;ci=29653701167,29653701181", "next_action": "external owner may merge PR #233; GitHub then closes armed issues"}
+        {"type": "task-sealed", "task_key": "workflow-routing-contract-alignment-231", "revision_set_key": "__FINAL_REVISION_SET_KEY__", "seal_fingerprint": "__SEAL_FINGERPRINT__", "evidence_ref": "session-replay:current-proof-sealed"},
+        {"type": "handoff-recorded", "task_key": "workflow-routing-contract-alignment-231", "seal_fingerprint": "__SEAL_FINGERPRINT__", "handoff_kind": "pull-request-ready", "authority": "external-merge-required", "evidence_ref": "terminal:pr=233;head=1536a00568460e9229abc99e16396cef405bc04b;review=5012214550;ci=29653701167,29653701181", "next_action": "external owner may merge PR #233; GitHub then closes armed issues"}
       ]
     },
     {
       "name": "portfolio-terminal-verification",
       "operation_id": "00000000000000000000000000000009",
       "events": [
-        {"type": "portfolio-terminal-verified", "verification_fingerprint": "__PORTFOLIO_VERIFICATION_FINGERPRINT__", "evidence_ref": "session-replay:portfolio-terminal-proof"}
+        {"type": "portfolio-verified", "verification_fingerprint": "__PORTFOLIO_VERIFICATION_FINGERPRINT__", "evidence_ref": "session-replay:portfolio-terminal-proof"}
       ]
     },
     {

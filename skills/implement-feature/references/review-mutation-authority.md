@@ -41,9 +41,9 @@ correlation failure. Legacy/plain requests are rejected and never reposted.
 The review deadline is immutable and exactly request start plus 45 minutes.
 Launch after expiry performs exactly one zero-timeout check. There is no reset,
 extension, repost, retry, or second waiter. `pending-at-deadline` is only
-`pending-warning`; it cannot pass the gate. The separately started GitStack
+`warning-required`; it cannot pass the gate. The separately started GitStack
 warning operation must record the canonical persistent warning for the same
-request/revision lineage before normalized state becomes `timeout-accepted`.
+request/revision lineage before normalized state becomes `warned-timeout`.
 Provider failure routes to reconciliation or authorized owner attention, never
 another waiter.
 

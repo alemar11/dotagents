@@ -40,7 +40,7 @@ fail closed.
 
 ## Atomic Acceptance
 
-The root submits exactly one `implementation-baseline-accepted` CAS containing
+The root submits exactly one `baseline-accepted` CAS containing
 every registered `(task_key, delivery_key, validation_key)` tuple. The CAS binds
 the current generation, state and claim fingerprints, execution-scope
 fingerprint, exact manifest and receipt byte SHA-256 values, checkout identity,
@@ -60,21 +60,21 @@ lifecycle Goal and allow workers to enter `implementing`.
 ## Existing Debt And Non-Regression
 
 `clean-required` accepts no baseline diagnostics. The only debt exception is
-`unchanged-outside-scope-allowed`: a closed adapter may record pre-existing
+`unchanged-outside-scope`: a closed adapter may record pre-existing
 diagnostics outside the delivery's allowed paths. Final validation passes only
 when every such canonical diagnostic and file-content fingerprint is unchanged,
 all in-scope diagnostics are gone, and adapter, tool/version, authored argv,
 projected argv, and policy identities still match. Tool or command drift
 invalidates the authorization/baseline; it is never recaptured during the run.
 
-Before `scope-acceptance`, record canonical changed paths for the current
+Before `scope`, record canonical changed paths for the current
 revision, require no untracked paths, require every change inside registered
 scope, and require AutoReview's review scope to equal that exact set.
 
 ## Preimplementation Stop
 
 When baseline preparation or acceptance cannot complete, stop/archive every
-baseline-only task and apply `portfolio-preimplementation-aborted` with complete
+baseline-only task and apply `preimplementation-aborted` with complete
 task-stop evidence. It proves Goal state is still pending, no delivery revision,
 provider/AutoReview authority, review, gate, source mutation, or partial
 baseline acceptance exists, and each checkout still has its baseline revision

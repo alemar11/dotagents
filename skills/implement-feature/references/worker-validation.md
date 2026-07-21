@@ -10,7 +10,7 @@ checkout/revision binding. One command id permits one physical attempt.
 Focused and full validation must satisfy the registered non-regression policy.
 Every in-scope diagnostic is gone. The only permitted outside-scope debt is the
 exact baseline diagnostic and file-content set accepted under
-`unchanged-outside-scope-allowed`; any changed diagnostic, content, adapter,
+`unchanged-outside-scope`; any changed diagnostic, content, adapter,
 tool, argv, or policy fails.
 
 Record canonical changed paths, require no untracked paths, keep every path in

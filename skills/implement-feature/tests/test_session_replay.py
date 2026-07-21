@@ -421,7 +421,7 @@ class SessionReplayTests(unittest.TestCase):
             permission = "user-message://schema12-replay-authorized"
             objective = "Implement replay Feature Spec with CI when configured"
             registration = {
-                "schema_version": "8.0.0",
+                "schema_version": "9.0.0",
                 "bundle_sha256": bundle_sha,
                 "execution_scope_fingerprint": execution_scope,
                 "authorization_fingerprint": fingerprint({
@@ -476,7 +476,7 @@ class SessionReplayTests(unittest.TestCase):
                 "--operation-id", "10000000000000000000000000000001",
                 "--registration-file", str(packet("registration", registration)),
             )
-            self.assertEqual(created["version"], "20.0.0")
+            self.assertEqual(created["version"], "21.0.0")
 
             head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
             tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()
@@ -491,7 +491,7 @@ class SessionReplayTests(unittest.TestCase):
             binding_events = [
                 {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://replay-root/title"},
                 {
-                    "type": "managed-checkouts-observed", "task_key": "replay-spec",
+                    "type": "checkouts-observed", "task_key": "replay-spec",
                     "task_ref": "app-task://replay-worker",
                     "managed_checkouts": [{
                         "delivery_key": "replay", "repository": claim["repositories"][0],
@@ -538,7 +538,7 @@ class SessionReplayTests(unittest.TestCase):
                 "diagnostic_set_fingerprint": fingerprint([]),
             }
             manifest = {
-                "schema_version": "4.0.0", "operation": "baseline-validation",
+                "schema_version": "5.0.0", "operation": "baseline-validation",
                 "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
                 "argv_fingerprint": plan["projected_argv_fingerprint"],
                 "execution_policy": {
@@ -556,7 +556,7 @@ class SessionReplayTests(unittest.TestCase):
                 },
             }
             receipt = {
-                "schema_version": "4.0.0", "status": "passed",
+                "schema_version": "5.0.0", "status": "passed",
                 "manifest_sha256": manifest["manifest_sha256"],
                 "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
                 "baseline_observation": observation,
@@ -564,7 +564,7 @@ class SessionReplayTests(unittest.TestCase):
             manifest_path = packet("baseline-manifest", manifest)
             receipt_path = packet("baseline-receipt", receipt)
             baseline_event = {
-                "type": "implementation-baseline-accepted",
+                "type": "baseline-accepted",
                 "expected_generation": state["generation"],
                 "expected_state_fingerprint": state["content_fingerprint"],
                 "expected_claim_fingerprint": claim["fingerprint"],
@@ -828,7 +828,7 @@ class SessionReplayTests(unittest.TestCase):
                 ],
             }
             registration = materialize(fixture["registration"], replacements)
-            self.assertEqual(registration["schema_version"], "5.0.0")
+            self.assertEqual(registration["schema_version"], "9.0.0")
             self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
             self.assertNotIn("repository", registration["sources"][0])
             self.assertNotIn("target_branch", registration["sources"][0])
@@ -938,7 +938,7 @@ class SessionReplayTests(unittest.TestCase):
                     )
                     self.assertEqual(
                         terminal_before_verification["phase"],
-                        "portfolio-verification-ready",
+                        "verification-ready",
                     )
                     replacements["__PORTFOLIO_VERIFICATION_FINGERPRINT__"] = (
                         terminal_before_verification[
@@ -1041,7 +1041,7 @@ class SessionReplayTests(unittest.TestCase):
                         delivery_status["revision_key"], final_revision_key
                     )
                     self.assertEqual(
-                        task_status["gates"], {"dependency-integration": "passed"}
+                        task_status["gates"], {"dependencies-merged": "passed"}
                     )
                     self.assertEqual(delivery_status["gates"], {})
                     self.assertIn(
@@ -1097,7 +1097,7 @@ class SessionReplayTests(unittest.TestCase):
                     )
                     self.assertTrue(terminal_after_verification["portfolio_verified"])
                     self.assertEqual(
-                        terminal_after_verification["phase"], "portfolio-goal-ready"
+                        terminal_after_verification["phase"], "goal-ready"
                     )
 
             self.assertIsNotNone(final_batch_command)
@@ -1114,7 +1114,7 @@ class SessionReplayTests(unittest.TestCase):
             self.assertEqual(task["task_title"], facts["task_title"])
             self.assertEqual(task["state"], "merge-ready")
             self.assertEqual(
-                task["outcome"], "pull-request-ready-for-merge-but-not-merged"
+                task["outcome"], "pull-request-ready-for-merge"
             )
             self.assertEqual(len(task["deliveries"]), 1)
             delivery = task["deliveries"][0]
@@ -1197,12 +1197,12 @@ class SessionReplayTests(unittest.TestCase):
             task_closeout_generation = next(
                 item["generation"]
                 for item in operations
-                if "terminal-handoff-recorded" in item["event_types"]
+                if "handoff-recorded" in item["event_types"]
             )
             verification_generation = next(
                 item["generation"]
                 for item in operations
-                if "portfolio-terminal-verified" in item["event_types"]
+                if "portfolio-verified" in item["event_types"]
             )
             portfolio_closeout_generation = next(
                 item["generation"]

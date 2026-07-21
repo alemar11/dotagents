@@ -1,9 +1,9 @@
 {
-  "schema_version": "2.0.0",
-  "controller_schema_version": "2.0.0",
-  "template_schema_version": "2.0.0",
+  "schema_version": "3.0.0",
+  "controller_schema_version": "3.0.0",
+  "template_schema_version": "3.0.0",
   "ledger_schema_version": "15.0.0",
-  "registration_schema_version": "8.0.0",
+  "registration_schema_version": "9.0.0",
   "registry": [
     ["reconcile-command-attempt", 1, "operation-recovery", "root-orchestrator", "execution-command", 3],
     ["execute-gitstack-mutation-reconciliation", 2, "operation-recovery", "root-orchestrator", "owned-operation", 3],
@@ -42,12 +42,12 @@
     "implementing": "steer-implementation",
     "validating": "steer-validation",
     "draft-pr": "steer-publication",
-    "marking-ready-for-review": "steer-ready-transition",
+    "readying-pr": "steer-ready-transition",
     "fixing-review": "steer-review-fix",
     "ci": "steer-ci",
-    "preparing-tracker-closeout": "steer-tracker-closeout",
-    "checking-mergeability": "steer-mergeability",
-    "terminal-sealed": "steer-mergeability"
+    "tracker-closeout": "steer-tracker-closeout",
+    "mergeability": "steer-mergeability",
+    "sealed": "steer-mergeability"
   },
   "metrics": {
     "registry_actions": 31,

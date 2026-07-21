@@ -42,7 +42,7 @@ path invalidates the transient cache. Reload only the current response's
 complete set. A file change between response validation and action execution
 is stale authority and fails closed. Never preload a later phase.
 
-## Controller 2.0.0 Envelope
+## Controller 3.0.0 Envelope
 
 Every response has exactly `ok`, `command`, `controller_schema_version`,
 `tool_version`, `ledger_schema_version`, `ledger`, `portfolio_key`, `root_id`,

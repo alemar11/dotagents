@@ -29,7 +29,7 @@ claiming scope, creating run state, or creating a task.
 
 The mandatory authorization step discloses this exact model and adaptive
 thinking policy. A grant of
-`visible_app_task_permission=granted-by-authorized-user` therefore supplies the
+`visible_app_task_permission=granted` therefore supplies the
 explicit user request required to pass the model and thinking arguments.
 
 ## Per-Spec Thinking Resolution

@@ -21,12 +21,12 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "20.0.0"
+__version__ = "21.0.0"
 LEDGER_SCHEMA_VERSION = "15.0.0"
-REGISTRATION_SCHEMA_VERSION = "8.0.0"
-DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "1.0.0"
-CONTROLLER_PROJECTION_SCHEMA_VERSION = "2.0.0"
-CONTROLLER_TEMPLATE_SCHEMA_VERSION = "2.0.0"
+REGISTRATION_SCHEMA_VERSION = "9.0.0"
+DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "2.0.0"
+CONTROLLER_PROJECTION_SCHEMA_VERSION = "3.0.0"
+CONTROLLER_TEMPLATE_SCHEMA_VERSION = "3.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -53,8 +53,8 @@ RETIRED_MANAGED_EVENT_TYPES = {
     "autoreview-attempt-observed", "autoreview-observed",
 }
 READ_ARCHIVE_REASONS = {"terminal", "preimplementation-abort", "legacy-cutover"}
-CLAIM_SCHEMA_VERSION = "7.0.0"
-TAKEOVER_SCHEMA_VERSION = "3.0.0"
+CLAIM_SCHEMA_VERSION = "8.0.0"
+TAKEOVER_SCHEMA_VERSION = "4.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
 RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -69,7 +69,7 @@ TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
 RETAINED_LEGACY_GROUP = "legacy-cutover-2026-07-17"
-TAKEOVER_PERMISSION = "granted-by-authorized-user"
+TAKEOVER_PERMISSION = "granted"
 TAKEOVER_REASONS = {"verified-stale"}
 ROOT_TITLES = {
     "single": "👨🏻‍💻 Feature Orchestrator",
@@ -83,21 +83,21 @@ TASK_STATES = {
     "implementing",
     "validating",
     "draft-pr",
-    "marking-ready-for-review",
-    "review-polling",
+    "readying-pr",
+    "review-wait",
     "fixing-review",
     "ci",
-    "preparing-tracker-closeout",
-    "checking-mergeability",
+    "tracker-closeout",
+    "mergeability",
     "dependency-wait",
-    "terminal-sealed",
+    "sealed",
     "blocked",
     "needs-owner",
     "merge-ready",
     "failed",
 }
 ACTIVE_TASK_STATES = TASK_STATES - {
-    "pending", "created", "dependency-wait", "terminal-sealed", "merge-ready", "failed"
+    "pending", "created", "dependency-wait", "sealed", "merge-ready", "failed"
 }
 DEPENDENCY_WAIT_RESUME_STATES = ACTIVE_TASK_STATES - {"blocked", "needs-owner"}
 TASK_TRANSITIONS = {
@@ -108,7 +108,7 @@ TASK_TRANSITIONS = {
         for state in ACTIVE_TASK_STATES
     },
     "dependency-wait": {"dependency-wait"},
-    "terminal-sealed": {"terminal-sealed"},
+    "sealed": {"sealed"},
     "merge-ready": {"merge-ready"},
     "failed": {"failed"},
 }
@@ -116,28 +116,28 @@ EVENT_TYPES = {
     "root-title-observed",
     "portfolio-goal-activated",
     "portfolio-goal-completed",
-    "managed-checkouts-observed",
-    "implementation-baseline-accepted",
-    "validation-nonregression-observed",
+    "checkouts-observed",
+    "baseline-accepted",
+    "nonregression-observed",
     "delivery-scope-observed",
-    "portfolio-preimplementation-aborted",
-    "delivery-preflight-observed",
-    "execution-command-reserved",
-    "execution-command-launch-observed",
-    "execution-command-cancellation-authorized",
-    "execution-command-terminal-observed",
+    "preimplementation-aborted",
+    "preflight-observed",
+    "command-reserved",
+    "command-launched",
+    "command-cancel-authorized",
+    "command-finished",
     "task-observed",
-    "task-dependency-wait-started",
-    "task-dependency-wait-resolved",
+    "dependency-wait-started",
+    "dependency-wait-resolved",
     "source-moved",
     "revision-observed",
     "delivery-observed",
-    "autoreview-hosted-finding-obligated",
+    "hosted-finding-obligated",
     "gate-observed",
-    "task-terminal-sealed",
-    "terminal-handoff-recorded",
-    "portfolio-terminal-verified",
-    "post-terminal-drift-recorded",
+    "task-sealed",
+    "handoff-recorded",
+    "portfolio-verified",
+    "terminal-drift-recorded",
 }
 TASK_OBSERVATION_FIELDS = {
     "observation_kind",
@@ -164,16 +164,16 @@ TASK_OBSERVATION_MARKER_FIELDS = (
     "latest_tool_marker_id",
 )
 TASK_OBSERVATION_BOUND_EVENTS = {
-    "execution-command-reserved",
-    "execution-command-cancellation-authorized",
-    "task-dependency-wait-started",
-    "task-dependency-wait-resolved",
+    "command-reserved",
+    "command-cancel-authorized",
+    "dependency-wait-started",
+    "dependency-wait-resolved",
     "gate-observed",
 }
-TASK_STATIC_GATES = {"dependency-integration"}
+TASK_STATIC_GATES = {"dependencies-merged"}
 TASK_REVISION_SET_GATES = {
-    "scope-acceptance",
-    "integration-validation",
+    "scope",
+    "integration",
     "domain-closeout",
 }
 DELIVERY_REVISION_GATES = {
@@ -928,7 +928,7 @@ def canonical_active_ledger(value: str) -> Path:
     path = canonical_claim_ledger(value)
     if path.suffix != ".json":
         raise CacheError(
-            "unsupported-active-ledger",
+            "unsupported-ledger",
             "active Markdown ledgers are unsupported; create a new JSON run state",
             2,
             {"ledger": str(path)},
@@ -1441,7 +1441,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
             validation_keys: set[str] = set()
             adapter_policies = {
                 "clean-exit-v1": "clean-required",
-                "prettier-check-v1": "unchanged-outside-scope-allowed",
+                "prettier-check-v1": "unchanged-outside-scope",
             }
             for validation_index, validation_raw_item in enumerate(validation_raw):
                 validation_field = f"{delivery_field}.validation_plan[{validation_index}]"
@@ -1797,7 +1797,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         if value["portfolio"]["key"] != ledger.stem:
             raise CacheError("integrity-failure", "run-state path identity mismatch", 5)
         exact_object(value["claim"], {"fingerprint"}, "run_state.claim")
-        exact_object(
+        authorization = exact_object(
             value["authorization"],
             {
                 "visible_app_task_permission", "evidence_ref", "bundle_sha256",
@@ -1805,6 +1805,12 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             },
             "run_state.authorization",
         )
+        if authorization["visible_app_task_permission"] != "granted":
+            raise CacheError(
+                "integrity-failure",
+                "run-state visible App task permission is invalid",
+                5,
+            )
         exact_object(
             value["goal"],
             {
@@ -2477,11 +2483,11 @@ def owned_operation_warnings(state: dict[str, Any]) -> list[dict[str, Any]]:
         if (
             row["record_kind"] == "owned-operation-result"
             and row["owner"] == "gitstack"
-            and row["normalized"]["disposition"] == "timeout-accepted"
+            and row["normalized"]["disposition"] == "warned-timeout"
         ):
             warnings.append(
                 {
-                    "code": "codex-review-timeout-accepted",
+                    "code": "codex-review-warned-timeout",
                     "task_key": row["binding"]["task_key"],
                     "delivery_key": row["binding"]["delivery_key"],
                     "revision_key": row["binding"]["revision_key"],
@@ -2497,7 +2503,7 @@ def task_dispatch_ready(state: dict[str, Any], task: dict[str, Any]) -> bool:
         or state["goal"]["state"] != "active"
     ):
         return False
-    dependency = current_gate(state, task, "dependency-integration")
+    dependency = current_gate(state, task, "dependencies-merged")
     if not dependency or dependency["state"] != "passed":
         return False
     return all(delivery["preflight_key"] for delivery in task["deliveries"])
@@ -2543,7 +2549,7 @@ def delivery_proof_blockers(
     revision = delivery["revision"]
     pr = delivery["pr"]
     if pr is None:
-        blockers.append("missing-pull-request")
+        blockers.append("missing-pr")
     elif (
         pr["state"] != "open"
         or pr["is_draft"]
@@ -2558,7 +2564,7 @@ def delivery_proof_blockers(
         or pr["base_ref"] != revision["base_ref"]
         or pr["merge_base_sha"] != revision["merge_base_sha"]
     ):
-        blockers.append("pull-request-not-ready")
+        blockers.append("pr-not-ready")
     if not delivery["committed"] or not delivery["published"]:
         blockers.append("delivery-not-published")
     if delivery["tracker_dirty_after_revision_key"] is not None:
@@ -2574,12 +2580,12 @@ def task_proof_blockers(state: dict[str, Any], task: dict[str, Any]) -> list[str
         blockers.append("missing-task-title-evidence")
     if task["task_ref"] is None or task["managed_checkouts_evidence_ref"] is None:
         blockers.append("missing-managed-checkout-map")
-    dependency = current_gate(state, task, "dependency-integration")
+    dependency = current_gate(state, task, "dependencies-merged")
     if not dependency or dependency["state"] != "passed":
-        blockers.append("gate:dependency-integration")
+        blockers.append("gate:dependencies-merged")
     revision_set = current_revision_set_key(task)
     if revision_set is None:
-        blockers.append("missing-current-revision-set")
+        blockers.append("missing-revision-set")
     for gate in sorted(TASK_REVISION_SET_GATES):
         if gate == "domain-closeout" and not task["requires_domain_closeout"]:
             continue
@@ -2682,7 +2688,7 @@ def task_terminal_blockers(
     if terminal_handoff(state, task) is None:
         blockers.append("missing-terminal-handoff")
     if task["post_terminal_drift"] is not None:
-        blockers.append("post-terminal-drift")
+        blockers.append("terminal-drift")
     if require_task_state and task["state"] != "merge-ready":
         blockers.append("task-not-merge-ready")
     return blockers
@@ -2886,7 +2892,7 @@ def diagnostic_mergeability_projection(
     if evidence_state == "stale" or gate["evidence_state"] == "stale":
         stale_reasons.append("mergeability-stale")
     if current and pr["is_draft"]:
-        incomplete_reasons.append("pull-request-draft")
+        incomplete_reasons.append("draft-pr")
     if current and raw_merge_state == "unknown":
         incomplete_reasons.append("mergeability-provider-unknown")
     return (
@@ -3046,7 +3052,7 @@ def diagnostics_projection(state: dict[str, Any]) -> dict[str, Any]:
         elif task["state"] != "merge-ready":
             task_incomplete.append(f"task-state-{task['state']}")
         if task["post_terminal_drift"] is not None:
-            task_blocking.append("post-terminal-drift")
+            task_blocking.append("terminal-drift")
         task_blocking = bounded_diagnostic_reasons(
             task_blocking, "task.blocking_reasons"
         )
@@ -3074,7 +3080,7 @@ def diagnostics_projection(state: dict[str, Any]) -> dict[str, Any]:
         portfolio_stale.extend(task_stale)
 
     if portfolio_drifted:
-        portfolio_blocking.append("post-terminal-drift")
+        portfolio_blocking.append("terminal-drift")
     portfolio_blocking = bounded_diagnostic_reasons(
         portfolio_blocking, "diagnostics.blocking_reasons"
     )
@@ -3154,12 +3160,12 @@ def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
     if state["goal"]["state"] != "complete":
         blockers.append("portfolio-goal-not-complete")
     if drifted:
-        blockers.append("post-terminal-drift")
+        blockers.append("terminal-drift")
     phase = (
         "drifted" if drifted else
         "archive-ready" if archive_ready else
-        "portfolio-goal-ready" if verified else
-        "portfolio-verification-ready" if verification_candidate is not None else
+        "goal-ready" if verified else
+        "verification-ready" if verification_candidate is not None else
         "running"
     )
     return {
@@ -3549,7 +3555,7 @@ def new_state(
         },
         "claim": {"fingerprint": claim["fingerprint"]},
         "authorization": {
-            "visible_app_task_permission": "granted-by-authorized-user",
+            "visible_app_task_permission": "granted",
             "evidence_ref": registration["permission_evidence_ref"],
             "bundle_sha256": registration["bundle_sha256"],
             "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
@@ -3797,9 +3803,9 @@ def source_move_blockers(
     state: dict[str, Any], task: dict[str, Any]
 ) -> list[str]:
     blockers: list[str] = []
-    dependency = current_gate(state, task, "dependency-integration")
+    dependency = current_gate(state, task, "dependencies-merged")
     if not dependency or dependency["state"] != "passed":
-        blockers.append("gate:dependency-integration")
+        blockers.append("gate:dependencies-merged")
     for gate in sorted(TASK_REVISION_SET_GATES):
         if gate == "domain-closeout" and not task["requires_domain_closeout"]:
             continue
@@ -3861,9 +3867,9 @@ def validate_baseline_row(state: dict[str, Any], raw: Any, field: str) -> tuple[
         raise CacheError("state-conflict", f"{field} lacks a managed checkout", 4)
     manifest = baseline_artifact(row["manifest_file"], row["manifest_bytes_sha256"], f"{field}.manifest_file")
     receipt = baseline_artifact(row["receipt_file"], row["receipt_bytes_sha256"], f"{field}.receipt_file")
-    if manifest.get("schema_version") != "4.0.0" or manifest.get("operation") != "baseline-validation":
+    if manifest.get("schema_version") != "5.0.0" or manifest.get("operation") != "baseline-validation":
         raise CacheError("state-conflict", f"{field} manifest is not baseline v4", 4)
-    if receipt.get("schema_version") != "4.0.0" or receipt.get("status") != "passed":
+    if receipt.get("schema_version") != "5.0.0" or receipt.get("status") != "passed":
         raise CacheError("state-conflict", f"{field} receipt is not a passed baseline v4 receipt", 4)
     if receipt.get("manifest_sha256") != manifest.get("manifest_sha256"):
         raise CacheError("state-conflict", f"{field} receipt is bound to another manifest", 4)
@@ -3964,7 +3970,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         )
         return True
 
-    if event_type == "implementation-baseline-accepted":
+    if event_type == "baseline-accepted":
         event = exact_object(
             raw,
             {
@@ -4013,7 +4019,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         nonempty(event["evidence_ref"], "evidence_ref")
         return True
 
-    if event_type == "portfolio-preimplementation-aborted":
+    if event_type == "preimplementation-aborted":
         event = exact_object(raw, {"type", "reason", "task_stop_evidence", "evidence_ref"}, event_type)
         if state["goal"]["state"] != "pending" or any(task["implementation_baseline"] == "accepted" for task in state["tasks"]):
             raise CacheError("state-conflict", "preimplementation abort is no longer available", 4)
@@ -4053,7 +4059,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         }
         return True
 
-    if event_type == "portfolio-terminal-verified":
+    if event_type == "portfolio-verified":
         event = exact_object(raw, {"type", "verification_fingerprint", "evidence_ref"}, event_type)
         if state["goal"]["state"] != "active":
             raise CacheError("state-conflict", "portfolio verification requires an active root Goal", 4)
@@ -4104,13 +4110,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     task = task_by_key(state, task_key)
 
     command_event_types = {
-        "execution-command-reserved",
-        "execution-command-launch-observed",
-        "execution-command-cancellation-authorized",
-        "execution-command-terminal-observed",
+        "command-reserved",
+        "command-launched",
+        "command-cancel-authorized",
+        "command-finished",
     }
     if task["implementation_baseline"] != "accepted" and event_type not in {
-        "managed-checkouts-observed", "task-observed", *command_event_types,
+        "checkouts-observed", "task-observed", *command_event_types,
     }:
         raise CacheError("state-conflict", "worker is baseline-only before atomic implementation baseline acceptance", 4)
 
@@ -4123,8 +4129,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
 
     if task["seal"] is not None and event_type not in {
         "task-observed",
-        "terminal-handoff-recorded",
-        "post-terminal-drift-recorded",
+        "handoff-recorded",
+        "terminal-drift-recorded",
     }:
         details = (
             {"reason": "reconciliation-after-terminal-seal"}
@@ -4139,7 +4145,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if not TRANSACTION_ID_RE.fullmatch(attempt_id):
             raise CacheError("invalid-input", "attempt_id must be 32 lowercase hex characters", 2)
         existing = next((item for item in delivery["command_attempts"] if item["attempt_id"] == attempt_id), None)
-        if event_type == "execution-command-reserved":
+        if event_type == "command-reserved":
             event = exact_object(
                 raw,
                 {
@@ -4185,7 +4191,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             return True
         if existing is None:
             raise CacheError("state-conflict", "command attempt is not reserved", 4)
-        if event_type == "execution-command-launch-observed":
+        if event_type == "command-launched":
             event = exact_object(raw, {"type", "task_key", "delivery_key", "attempt_id", "attempt_fingerprint", "evidence_ref"}, event_type)
             canonical_fingerprint(event["attempt_fingerprint"], "attempt_fingerprint")
             if existing["state"] == "launch-released" and existing["evidence_ref"] == event["evidence_ref"]:
@@ -4194,7 +4200,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 raise CacheError("state-conflict", "command launch observation is out of order", 4)
             existing.update({"state": "launch-released", "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"), "recorded_at": observed_at})
             return True
-        if event_type == "execution-command-cancellation-authorized":
+        if event_type == "command-cancel-authorized":
             event = exact_object(
                 raw,
                 {
@@ -4248,7 +4254,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             task["attention_reason"] = f"command-{event['status']}"
         return True
 
-    if event_type == "managed-checkouts-observed":
+    if event_type == "checkouts-observed":
         event = exact_object(raw, {"type", "task_key", "task_ref", "managed_checkouts", "evidence_ref"}, event_type)
         task_ref = nonempty(event["task_ref"], "task_ref")
         if task_ref == state["portfolio"]["root_task_ref"]:
@@ -4299,7 +4305,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             delivery["managed_checkout"] = normalized[delivery["delivery_key"]]
         return True
 
-    if event_type == "validation-nonregression-observed":
+    if event_type == "nonregression-observed":
         event = exact_object(
             raw,
             {
@@ -4489,7 +4495,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             )
         if task["implementation_baseline"] != "accepted" and state_value != "created":
             raise CacheError("state-conflict", "baseline-only worker cannot leave created state", 4)
-        if state_value in {"dependency-wait", "merge-ready", "terminal-sealed"}:
+        if state_value in {"dependency-wait", "merge-ready", "sealed"}:
             raise CacheError("invalid-input", "task-observed cannot perform managed transitions", 2)
         if state_value not in TASK_STATES or state_value not in TASK_TRANSITIONS[task["state"]]:
             raise CacheError("state-conflict", f"invalid task transition: {task['state']} -> {state_value}", 4)
@@ -4514,7 +4520,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         task.update(candidate)
         return changed
 
-    if event_type == "task-dependency-wait-started":
+    if event_type == "dependency-wait-started":
         event = exact_object(
             raw,
             {
@@ -4540,7 +4546,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         task["state"] = "dependency-wait"
         return True
 
-    if event_type == "task-dependency-wait-resolved":
+    if event_type == "dependency-wait-resolved":
         event = exact_object(
             raw,
             {
@@ -4563,15 +4569,15 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return True
 
     if event_type in {
-        "delivery-preflight-observed", "revision-observed", "delivery-observed",
-        "autoreview-hosted-finding-obligated",
+        "preflight-observed", "revision-observed", "delivery-observed",
+        "hosted-finding-obligated",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
     else:
         delivery = None
 
-    if event_type == "delivery-preflight-observed":
+    if event_type == "preflight-observed":
         event = exact_object(
             raw,
             {
@@ -4792,7 +4798,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         tracker_delivery["tracker_dirty_after_revision_key"] = dirty_revision
         return True
 
-    if event_type == "autoreview-hosted-finding-obligated":
+    if event_type == "hosted-finding-obligated":
         event = exact_object(
             raw,
             {"type", "task_key", "delivery_key", "obligation_ref", "source_result_fingerprint", "evidence_ref"},
@@ -4875,7 +4881,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 scoped_delivery is not None
                 and (owned := owned_gate_result(state, task, scoped_delivery, "codex-review")) is not None
                 and owned["normalized"]["gate_state"] == "passed"
-                and owned["normalized"]["disposition"] in {"accepted", "timeout-accepted"}
+                and owned["normalized"]["disposition"] in {"accepted", "warned-timeout"}
             )
         ):
             raise CacheError(
@@ -4896,7 +4902,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 row["validation_key"] for row in scoped_delivery["nonregression_validations"]
             } != {row["validation_key"] for row in scoped_delivery["validation_plan"]}:
                 raise CacheError("state-conflict", "validation gate lacks complete baseline nonregression evidence", 4)
-        if gate == "scope-acceptance" and event["state"] == "passed":
+        if gate == "scope" and event["state"] == "passed":
             for candidate_delivery in task["deliveries"]:
                 scope = candidate_delivery["scope_observation"]
                 revision = candidate_delivery["revision"]
@@ -4946,7 +4952,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             state["gates"].append(candidate)
         return True
 
-    if event_type == "task-terminal-sealed":
+    if event_type == "task-sealed":
         event = exact_object(
             raw,
             {
@@ -4967,10 +4973,10 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
             "sealed_at": observed_at,
         }
-        task["state"] = "terminal-sealed"
+        task["state"] = "sealed"
         return True
 
-    if event_type == "terminal-handoff-recorded":
+    if event_type == "handoff-recorded":
         event = exact_object(
             raw,
             {
@@ -4981,7 +4987,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         )
         seal = task["seal"]
         if (
-            task["state"] != "terminal-sealed"
+            task["state"] != "sealed"
             or seal is None
             or task["post_terminal_drift"] is not None
         ):
@@ -5017,10 +5023,10 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "handoff history bound reached", 4)
         state["handoffs"].append(candidate)
         task["state"] = "merge-ready"
-        task["outcome"] = "pull-request-ready-for-merge-but-not-merged"
+        task["outcome"] = "pull-request-ready-for-merge"
         return True
 
-    if event_type == "post-terminal-drift-recorded":
+    if event_type == "terminal-drift-recorded":
         event = exact_object(
             raw,
             {
@@ -5071,7 +5077,7 @@ def create_ledger(args: argparse.Namespace) -> dict[str, Any]:
         legacy = ledger.with_suffix(".md")
         if legacy.exists():
             raise CacheError(
-                "unsupported-active-ledger",
+                "unsupported-ledger",
                 "active Markdown ledger blocks the hard-cut JSON identity",
                 2,
                 {"ledger": str(legacy)},
@@ -5234,7 +5240,7 @@ _owned_result_rows("gitstack", "request", {"created": ("pending", None, None, "w
 _owned_result_rows("gitstack", "wait", {
     "clean": ("accepted", "codex-review", "passed", "advance"),
     "findings": ("fix-required", "codex-review", "failed", "fix-findings"),
-    "pending-at-deadline": ("pending-warning", "codex-review", "pending", "post-warning"),
+    "pending-at-deadline": ("warning-required", "codex-review", "pending", "post-warning"),
     "request-correlation-failure": ("needs-owner", "codex-review", "failed", "repair-request-lineage"),
     "provider-failure": ("needs-owner", "codex-review", "failed", "authorized-owner-reconciliation"),
 })
@@ -5244,8 +5250,8 @@ for _operation, _outcomes in {
 }.items():
     _owned_result_rows("gitstack", _operation, {outcome: ("recorded", None, None, "advance") for outcome in _outcomes})
 _owned_result_rows("gitstack", "warning", {
-    "posted": ("timeout-accepted", "codex-review", "passed", "advance"),
-    "recognized-existing": ("timeout-accepted", "codex-review", "passed", "advance"),
+    "posted": ("warned-timeout", "codex-review", "passed", "advance"),
+    "recognized-existing": ("warned-timeout", "codex-review", "passed", "advance"),
 })
 _owned_result_rows("gitstack", "reconcile-mutation", {
     "completed-from-readback": ("recorded", None, None, "advance"),
@@ -5317,7 +5323,7 @@ def owner_validation_descriptor(
         if prior_effect["owner"] != owner:
             raise CacheError("integrity-failure", "owner validation prior owner is invalid", 5)
         if (prior_effect["relationship"], prior_effect["required_disposition"]) not in {
-            ("predecessor", "pending-warning"),
+            ("predecessor", "warning-required"),
             ("supersedes", "needs-owner"),
         }:
             raise CacheError("integrity-failure", "owner validation prior relationship is invalid", 5)
@@ -5727,21 +5733,21 @@ CONTROLLER_ACTIONS: dict[str, dict[str, Any]] = {
         "rank": 20, "phase": "baseline-task-setup", "owner": "root-orchestrator",
         "packet_kind": "app-operation", "executor": "root-orchestrator",
         "inputs": [controller_input("task_creation_results", "array", "app-readback", "complete-app-managed-task-identities")],
-        "events": ["managed-checkouts-observed", "task-observed"], "completion": "all-selected-baseline-tasks-are-bound",
+        "events": ["checkouts-observed", "task-observed"], "completion": "all-selected-baseline-tasks-are-bound",
         "contracts": [("worker", "references/worker.md"), ("app-control-plane-delays", "references/app-control-plane-delays.md"), ("packets-task", "references/packets-task.md")],
     },
     "observe-baseline-tasks": {
         "rank": 30, "phase": "baseline-task-setup", "owner": "root-orchestrator",
         "packet_kind": "app-operation", "executor": "root-orchestrator",
         "inputs": [controller_input("task_observations", "array", "direct-task-readback", "complete-full-read-and-checkout-evidence")],
-        "events": ["managed-checkouts-observed", "task-observed"], "completion": "all-baseline-task-bindings-are-current",
+        "events": ["checkouts-observed", "task-observed"], "completion": "all-baseline-task-bindings-are-current",
         "contracts": [("worker", "references/worker.md"), ("app-control-plane-delays", "references/app-control-plane-delays.md"), ("packets-task", "references/packets-task.md")],
     },
     "complete-implementation-baseline": {
         "rank": 40, "phase": "baseline-validation", "owner": "root-orchestrator",
         "packet_kind": "worker-phase", "executor": "visible-task",
         "inputs": [controller_input("baseline_receipts", "array", "execution-manifest", "complete-registered-baseline-receipt-set")],
-        "events": ["implementation-baseline-accepted", "portfolio-preimplementation-aborted"],
+        "events": ["baseline-accepted", "preimplementation-aborted"],
         "completion": "atomic-baseline-is-accepted-or-preimplementation-aborted",
         "contracts": [("baseline-validation", "references/baseline-validation.md"), ("worker", "references/worker.md"), ("packets-task", "references/packets-task.md")],
     },
@@ -5756,7 +5762,7 @@ CONTROLLER_ACTIONS: dict[str, dict[str, Any]] = {
         "rank": 1, "phase": "operation-recovery", "owner": "root-orchestrator",
         "packet_kind": "execution-command", "executor": "visible-task",
         "inputs": [controller_input("command_observation", "object", "execution-manifest", "same-attempt-terminal-or-cleanup-evidence")],
-        "events": ["execution-command-launch-observed", "execution-command-cancellation-authorized", "execution-command-terminal-observed"],
+        "events": ["command-launched", "command-cancel-authorized", "command-finished"],
         "completion": "selected-command-attempt-is-terminal",
         "contracts": [("worker", "references/worker.md"), ("recovery-validation", "references/recovery-validation.md"), ("packets-task", "references/packets-task.md")],
     },
@@ -5833,7 +5839,7 @@ CONTROLLER_ACTIONS: dict[str, dict[str, Any]] = {
         "rank": 100, "phase": "delivery-gates", "owner": "root-orchestrator",
         "packet_kind": "ledger-event", "executor": "root-orchestrator",
         "inputs": [controller_input("gate_evidence", "array", "visible-task-and-provider-readback", "current-scope-bound-gate-evidence")],
-        "events": ["gate-observed", "delivery-scope-observed", "validation-nonregression-observed"],
+        "events": ["gate-observed", "delivery-scope-observed", "nonregression-observed"],
         "completion": "current-required-gate-evidence-is-recorded",
         "contracts": [("gates", "references/gates.md"), ("packets-gates", "references/packets-gates.md")],
     },
@@ -5841,21 +5847,21 @@ CONTROLLER_ACTIONS: dict[str, dict[str, Any]] = {
         "rank": 110, "phase": "task-closeout", "owner": "root-orchestrator",
         "packet_kind": "ledger-event", "executor": "root-orchestrator",
         "inputs": [controller_input("seal_evidence_ref", "string", "independent-terminal-verification", "nonempty-current-proof-reference")],
-        "events": ["task-terminal-sealed"], "completion": "task-is-sealed-at-current-revision-set",
+        "events": ["task-sealed"], "completion": "task-is-sealed-at-current-revision-set",
         "contracts": [("worker-closeout", "references/worker-closeout.md"), ("packets-closeout", "references/packets-closeout.md")],
     },
     "record-terminal-handoff": {
         "rank": 111, "phase": "task-closeout", "owner": "root-orchestrator",
         "packet_kind": "ledger-event", "executor": "root-orchestrator",
         "inputs": [controller_input("handoff_evidence", "object", "current-terminal-proof", "exact-pr-ready-external-merge-handoff")],
-        "events": ["terminal-handoff-recorded"], "completion": "unchanged-seal-has-terminal-handoff",
+        "events": ["handoff-recorded"], "completion": "unchanged-seal-has-terminal-handoff",
         "contracts": [("worker-closeout", "references/worker-closeout.md"), ("packets-closeout", "references/packets-closeout.md")],
     },
     "verify-portfolio": {
         "rank": 120, "phase": "portfolio-closeout", "owner": "root-orchestrator",
         "packet_kind": "ledger-event", "executor": "root-orchestrator",
         "inputs": [controller_input("verification_evidence_ref", "string", "independent-terminal-verification", "nonempty-portfolio-proof-reference")],
-        "events": ["portfolio-terminal-verified"], "completion": "portfolio-terminal-verification-is-durable",
+        "events": ["portfolio-verified"], "completion": "portfolio-terminal-verification-is-durable",
         "contracts": [("worker-closeout", "references/worker-closeout.md"), ("packets-closeout", "references/packets-closeout.md")],
     },
     "complete-root-goal": {
@@ -5927,14 +5933,14 @@ for _phase_action in (
 
 CONTROLLER_ACTION_TRANSITIONS: dict[str, list[dict[str, Any]]] = {
     "observe-root-title": [{"result": "recorded", "event_types": ["root-title-observed"], "next_phase": "baseline-task-setup"}],
-    "dispatch-baseline-tasks": [{"result": "recorded", "event_types": ["managed-checkouts-observed", "task-observed"], "next_phase": "baseline-task-setup"}],
-    "observe-baseline-tasks": [{"result": "recorded", "event_types": ["managed-checkouts-observed", "task-observed"], "next_phase": "baseline-validation"}],
+    "dispatch-baseline-tasks": [{"result": "recorded", "event_types": ["checkouts-observed", "task-observed"], "next_phase": "baseline-task-setup"}],
+    "observe-baseline-tasks": [{"result": "recorded", "event_types": ["checkouts-observed", "task-observed"], "next_phase": "baseline-validation"}],
     "complete-implementation-baseline": [
-        {"result": "accepted", "event_types": ["implementation-baseline-accepted"], "next_phase": "goal-activation"},
-        {"result": "aborted", "event_types": ["portfolio-preimplementation-aborted"], "next_phase": "preimplementation-aborted"},
+        {"result": "accepted", "event_types": ["baseline-accepted"], "next_phase": "goal-activation"},
+        {"result": "aborted", "event_types": ["preimplementation-aborted"], "next_phase": "preimplementation-aborted"},
     ],
     "activate-root-goal": [{"result": "activated", "event_types": ["portfolio-goal-activated"], "next_phase": "scheduling"}],
-    "reconcile-command-attempt": [{"result": "reconciled", "event_types": ["execution-command-launch-observed", "execution-command-cancellation-authorized", "execution-command-terminal-observed"], "next_phase": "current-task-phase"}],
+    "reconcile-command-attempt": [{"result": "reconciled", "event_types": ["command-launched", "command-cancel-authorized", "command-finished"], "next_phase": "current-task-phase"}],
     "reconcile-autoreview-operation": [
         {"outcome": "terminal-clean", "next_phase": "delivery-gates"},
         {"outcome": "terminal-composite-clean", "next_phase": "delivery-gates"},
@@ -5975,10 +5981,10 @@ CONTROLLER_ACTION_TRANSITIONS: dict[str, list[dict[str, Any]]] = {
     "execute-gitstack-reply": [{"outcome": "posted", "next_phase": "delivery-review-resolution"}, {"outcome": "recognized-existing", "next_phase": "delivery-review-resolution"}],
     "execute-gitstack-resolve": [{"outcome": "resolved", "next_phase": "delivery-gates"}, {"outcome": "already-resolved", "next_phase": "delivery-gates"}],
     "execute-gitstack-terminal-reconciliation": [{"outcome": "clean-verified", "next_phase": "delivery-gates"}, {"outcome": "findings-verified", "next_phase": "review-fix"}],
-    "apply-current-gate-evidence": [{"result": "recorded", "event_types": ["gate-observed", "delivery-scope-observed", "validation-nonregression-observed"], "next_phase": "current-task-phase"}],
-    "seal-task": [{"result": "sealed", "event_types": ["task-terminal-sealed"], "next_phase": "task-closeout"}],
-    "record-terminal-handoff": [{"result": "recorded", "event_types": ["terminal-handoff-recorded"], "next_phase": "portfolio-closeout"}],
-    "verify-portfolio": [{"result": "verified", "event_types": ["portfolio-terminal-verified"], "next_phase": "portfolio-closeout"}],
+    "apply-current-gate-evidence": [{"result": "recorded", "event_types": ["gate-observed", "delivery-scope-observed", "nonregression-observed"], "next_phase": "current-task-phase"}],
+    "seal-task": [{"result": "sealed", "event_types": ["task-sealed"], "next_phase": "task-closeout"}],
+    "record-terminal-handoff": [{"result": "recorded", "event_types": ["handoff-recorded"], "next_phase": "portfolio-closeout"}],
+    "verify-portfolio": [{"result": "verified", "event_types": ["portfolio-verified"], "next_phase": "portfolio-closeout"}],
     "complete-root-goal": [{"result": "completed", "event_types": ["portfolio-goal-completed"], "next_phase": "portfolio-archive"}],
     "release-and-archive": [{"result": "completed", "event_types": [], "next_phase": "terminal"}],
     "steer-implementation": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "implementation-or-validation"}],
@@ -6021,12 +6027,12 @@ CONTROLLER_TASK_STATE_ACTIONS = {
     "implementing": "steer-implementation",
     "validating": "steer-validation",
     "draft-pr": "steer-publication",
-    "marking-ready-for-review": "steer-ready-transition",
+    "readying-pr": "steer-ready-transition",
     "fixing-review": "steer-review-fix",
     "ci": "steer-ci",
-    "preparing-tracker-closeout": "steer-tracker-closeout",
-    "checking-mergeability": "steer-mergeability",
-    "terminal-sealed": "steer-mergeability",
+    "tracker-closeout": "steer-tracker-closeout",
+    "mergeability": "steer-mergeability",
+    "sealed": "steer-mergeability",
 }
 
 
@@ -6445,8 +6451,8 @@ def validate_controller_response(value: Any) -> dict[str, Any]:
 def derive_controller_projection(ledger: Path, state: dict[str, Any]) -> dict[str, Any]:
     validate_controller_registry()
     if state["closeout"]["post_terminal_drift"] is not None:
-        blocker = {"code": "post-terminal-drift", "scope": "portfolio", "recovery": "authorized-owner-fresh-run"}
-        return controller_non_action_response(ledger, state, "blocked", "post-terminal-drift", [blocker], target=controller_target("closeout"))
+        blocker = {"code": "terminal-drift", "scope": "portfolio", "recovery": "authorized-owner-fresh-run"}
+        return controller_non_action_response(ledger, state, "blocked", "terminal-drift", [blocker], target=controller_target("closeout"))
 
     ordered_tasks = sorted(state["tasks"], key=lambda row: (row["source_id"], row["task_key"]))
     for task in ordered_tasks:
@@ -6554,7 +6560,7 @@ def derive_controller_projection(ledger: Path, state: dict[str, Any]) -> dict[st
                     )
                 if (
                     descriptor["action"] == "reply"
-                    and task["state"] == "review-polling"
+                    and task["state"] == "review-wait"
                     and followup["source_binding"]["revision_key"] != delivery["revision"]["revision_key"]
                 ):
                     return controller_action_response(
@@ -6562,12 +6568,12 @@ def derive_controller_projection(ledger: Path, state: dict[str, Any]) -> dict[st
                         controller_target("delivery", task, delivery), task, delivery,
                         {"evidence_descriptors": [descriptor]},
                     )
-            if delivery["revision"] is not None and task["state"] in {"review-polling", "fixing-review", "ci", "preparing-tracker-closeout", "checking-mergeability"}:
+            if delivery["revision"] is not None and task["state"] in {"review-wait", "fixing-review", "ci", "tracker-closeout", "mergeability"}:
                 gitstack_results = owned_results_for_delivery(state, task, delivery, owner="gitstack")
                 gate_result = owned_gate_result(state, task, delivery, "codex-review")
                 if gate_result is not None:
                     disposition = gate_result["normalized"]["disposition"]
-                    if disposition == "pending-warning":
+                    if disposition == "warning-required":
                         return controller_action_response(
                             ledger, state, "execute-gitstack-warning",
                             controller_target("delivery", task, delivery), task, delivery,
@@ -6596,15 +6602,15 @@ def derive_controller_projection(ledger: Path, state: dict[str, Any]) -> dict[st
                     return controller_action_response(ledger, state, "execute-gitstack-wait" if requested else "execute-gitstack-request", controller_target("delivery", task, delivery), task, delivery)
 
     waiting = [task for task in ordered_tasks if task["state"] == "dependency-wait"]
-    runnable = [task for task in ordered_tasks if task["state"] not in {"dependency-wait", "terminal-sealed", "merge-ready"}]
+    runnable = [task for task in ordered_tasks if task["state"] not in {"dependency-wait", "sealed", "merge-ready"}]
     if waiting and not runnable:
         return controller_non_action_response(ledger, state, "waiting", "dependency-wait", [], target=controller_target("portfolio"))
     if all(task["state"] == "merge-ready" for task in ordered_tasks):
-        return controller_non_action_response(ledger, state, "terminal", "pull-request-ready-for-merge-but-not-merged", [])
+        return controller_non_action_response(ledger, state, "terminal", "pull-request-ready-for-merge", [])
     phase_candidates: list[tuple[int, str, dict[str, Any]]] = []
     for task in ordered_tasks:
         action = CONTROLLER_TASK_STATE_ACTIONS.get(task["state"])
-        if task["state"] == "review-polling":
+        if task["state"] == "review-wait":
             has_findings = any(
                 result is not None and result["normalized"]["disposition"] == "fix-required"
                 for result in (

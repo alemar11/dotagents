@@ -4,7 +4,7 @@ This file is the canonical owner of terminal sequencing, the no-merge boundary,
 and post-terminal behavior.
 
 The only successful App result is
-`pull-request-ready-for-merge-but-not-merged`.
+`pull-request-ready-for-merge`.
 
 After root-title revalidation, execute the closeout sequence below.
 

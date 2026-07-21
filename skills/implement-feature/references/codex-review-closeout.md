@@ -36,9 +36,9 @@ Use the schema-15 owned journal sequence:
 3. Clean advances the gate; findings route to repair; proven correlation
    failure routes to terminal reconciliation; provider failure requires exact
    reconciliation or owner attention.
-4. `pending-at-deadline` remains `pending-warning`. Run the separately started
+4. `pending-at-deadline` remains `warning-required`. Run the separately started
    owner `warning` operation once. Only its same-lineage recorded result becomes
-   `timeout-accepted` and may pass the warning-only review gate.
+   `warned-timeout` and may pass the warning-only review gate.
 
 Never repost a request, restart or extend a deadline, launch a second waiter,
 or treat missing provider acknowledgment as correlation failure. A recognized
@@ -71,8 +71,8 @@ operation and remains separately gated.
 ## Terminal Handoff Only
 
 An in-flight fixed review wait retains the active claim and creates no handoff
-or release. `terminal-handoff-recorded` is terminal-only after
-`task-terminal-sealed`; it binds the unchanged seal and
+or release. `handoff-recorded` is terminal-only after
+`task-sealed`; it binds the unchanged seal and
 `external-merge-required` authority. After all task handoffs, the root verifies
 the portfolio, completes its Goal, then releases and archives. A later GitHub
 workflow owns merge and post-merge closure.

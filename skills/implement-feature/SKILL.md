@@ -27,7 +27,7 @@ permission, claim, artifacts, tasks, Goals, or mutation.
 
 After read-only intake succeeds, use the exact disclosure and fixed answers in
 `references/options.md`. Continue only with
-`visible_app_task_permission=granted-by-authorized-user`. The grant binds the
+`visible_app_task_permission=granted`. The grant binds the
 exact bundle, repository, path, validation, tool, and execution-scope
 fingerprints. Denial or silence creates nothing. Drift before implementation is
 `authorization-stale`; an undeclared path after implementation starts is
@@ -54,9 +54,9 @@ this explicit visible-task grant.
   Codex review, configured CI or explicit `not-configured`, integration,
   tracker-closeout, branch-rule, approval, mergeability, and merge-queue
   eligibility proof. Pending or unknown evidence blocks except the exact
-  warning-backed 45-minute `timeout-accepted` review result.
+  warning-backed 45-minute `warned-timeout` review result.
 - The only successful task result is
-  `pull-request-ready-for-merge-but-not-merged`. Never enqueue, merge, deploy,
+  `pull-request-ready-for-merge`. Never enqueue, merge, deploy,
   release, or perform post-merge closure. A later merge request starts a
   separate GitHub workflow.
 

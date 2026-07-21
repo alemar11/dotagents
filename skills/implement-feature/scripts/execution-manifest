@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-__version__ = "4.0.0"
-SCHEMA_VERSION = "4.0.0"
+__version__ = "5.0.0"
+SCHEMA_VERSION = "5.0.0"
 MAX_PACKET_BYTES = 1024 * 1024
 MAX_OUTPUT_BYTES = 128 * 1024
 COMMAND_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -34,7 +34,7 @@ SHELL_OPERATORS = {"|", "||", "&", "&&", ";", "<", ">", ">>", "2>", "2>>"}
 SHELL_WRAPPERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell", "pwsh"}
 OPERATIONS = {"delivery-preflight", "baseline-validation", "validation", "autoreview"}
 BASELINE_ADAPTERS = {"clean-exit-v1", "prettier-check-v1"}
-BASELINE_POLICIES = {"clean-required", "unchanged-outside-scope-allowed"}
+BASELINE_POLICIES = {"clean-required", "unchanged-outside-scope"}
 CONTROL_TIMEOUT_SECONDS = 30
 TERMINAL_STATUSES = {
     "passed", "failed", "timed-out", "cancelled", "output-limit",
@@ -467,7 +467,7 @@ def git_output(cwd: Path, git_path: str, *args: str) -> bytes:
         raise ManifestError(
             "control-command-timeout",
             f"managed checkout observation timed out: {' '.join(args)}",
-            "owner-required",
+            "needs-owner",
             4,
         ) from exc
     if result.returncode:
@@ -529,7 +529,7 @@ def baseline_projection(argv: list[str]) -> tuple[list[str], str, str]:
         projected = ["--check" if token == "--write" else token for token in argv]
         if "--check" not in projected:
             projected.append("--check")
-        return projected, "prettier-check-v1", "unchanged-outside-scope-allowed"
+        return projected, "prettier-check-v1", "unchanged-outside-scope"
     first = names[0]
     safe = (
         first in {"pytest", "cargo", "go", "npm", "pnpm", "yarn"}
@@ -848,7 +848,7 @@ def tracked_snapshot(cwd: Path, git_path: str) -> dict[str, str]:
         raise ManifestError(
             "control-command-timeout",
             "write observation timed out",
-            "owner-required",
+            "needs-owner",
             4,
         ) from exc
     if result.returncode != 0:
@@ -960,7 +960,7 @@ def platform_process_rows() -> dict[int, tuple[int, int, str]]:
     raise ManifestError(
         "process-identity-unverifiable",
         "this platform has no supported process census",
-        "owner-required",
+        "needs-owner",
         4,
     )
 
@@ -1120,7 +1120,7 @@ def signal_owned_group(
         raise ManifestError(
             "process-identity-unverifiable",
             "owned process identities cannot be matched safely",
-            "owner-required",
+            "needs-owner",
             4,
         )
     if verified:
@@ -1129,7 +1129,7 @@ def signal_owned_group(
         except ProcessLookupError:
             pass
     if escaped:
-        raise ManifestError("process-group-escaped", "a command descendant escaped its owned process group", "owner-required", 4)
+        raise ManifestError("process-group-escaped", "a command descendant escaped its owned process group", "needs-owner", 4)
     return members, identities
 
 
@@ -1262,7 +1262,7 @@ def run_manifest(
     start_identity = process_start_identity(pid)
     if start_identity is None:
         os.close(release_write)
-        raise ManifestError("process-identity-unverifiable", "launcher identity cannot be recorded", "owner-required", 4)
+        raise ManifestError("process-identity-unverifiable", "launcher identity cannot be recorded", "needs-owner", 4)
     process = {
         "pid": pid,
         "pgid": pgid,
@@ -1345,7 +1345,7 @@ def run_manifest(
                     or not isinstance(cancellation["authorization_fingerprint"], str)
                     or not HEX64_RE.fullmatch(cancellation["authorization_fingerprint"])
                 ):
-                    raise ManifestError("cancellation-unauthorized", "cancellation authorization is invalid", "owner-required", 4)
+                    raise ManifestError("cancellation-unauthorized", "cancellation authorization is invalid", "needs-owner", 4)
                 requested_status = "cancelled"
                 append_attempt(
                     attempt_path,
@@ -1625,7 +1625,7 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
     )
     for field in ("attempt_id", "controller_session_id"):
         if not isinstance(attempt[field], str) or not re.fullmatch(r"[0-9a-f]{32}", attempt[field]):
-            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "owner-required")
+            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "needs-owner")
     for field in ("attempt_file", "lease_file"):
         absolute_path(attempt[field], f"receipt {field}", existing=True)
     nonempty(attempt["boot_identity"], "receipt boot identity")
@@ -1633,23 +1633,23 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
         try:
             parse_timestamp(attempt[field])
         except (TypeError, ValueError) as exc:
-            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "owner-required") from exc
+            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "needs-owner") from exc
     process = exact_object(
         attempt["process"],
         {"pid", "pgid", "process_start_identity"},
         "receipt process",
     )
     if any(not isinstance(process[field], int) or process[field] <= 0 for field in ("pid", "pgid")):
-        raise ManifestError("receipt-invalid", "receipt process identity is invalid", "owner-required")
+        raise ManifestError("receipt-invalid", "receipt process identity is invalid", "needs-owner")
     if not isinstance(process["process_start_identity"], str) or not HEX64_RE.fullmatch(process["process_start_identity"]):
-        raise ManifestError("receipt-invalid", "receipt process start identity is invalid", "owner-required")
+        raise ManifestError("receipt-invalid", "receipt process start identity is invalid", "needs-owner")
     cleanup = exact_object(
         attempt["cleanup"],
         {"term_sent_at", "kill_sent_at", "verified_at", "remaining_pids", "error_code"},
         "receipt cleanup",
     )
     if not isinstance(cleanup["remaining_pids"], list) or any(not isinstance(pid, int) or pid <= 0 for pid in cleanup["remaining_pids"]):
-        raise ManifestError("receipt-invalid", "receipt cleanup pids are invalid", "owner-required")
+        raise ManifestError("receipt-invalid", "receipt cleanup pids are invalid", "needs-owner")
     captures = exact_object(receipt["output_capture"], {"stdout", "stderr"}, "receipt output_capture")
     for name in ("stdout", "stderr"):
         capture = exact_object(
@@ -1658,15 +1658,15 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
             f"receipt output_capture.{name}",
         )
         if capture["limit_bytes"] != manifest["execution_policy"][f"{name}_limit_bytes"]:
-            raise ManifestError("receipt-invalid", "receipt output limit differs from manifest", "owner-required")
+            raise ManifestError("receipt-invalid", "receipt output limit differs from manifest", "needs-owner")
         if any(not isinstance(capture[field], int) or capture[field] < 0 for field in ("observed_bytes", "stored_bytes")):
-            raise ManifestError("receipt-invalid", "receipt output byte counts are invalid", "owner-required")
+            raise ManifestError("receipt-invalid", "receipt output byte counts are invalid", "needs-owner")
         if capture["stored_bytes"] > capture["limit_bytes"] or capture["observed_bytes"] < capture["stored_bytes"]:
-            raise ManifestError("receipt-invalid", "receipt output byte counts conflict", "owner-required")
+            raise ManifestError("receipt-invalid", "receipt output byte counts conflict", "needs-owner")
         if not isinstance(capture["observed_sha256"], str) or not HEX64_RE.fullmatch(capture["observed_sha256"]):
-            raise ManifestError("receipt-invalid", "receipt output digest is invalid", "owner-required")
+            raise ManifestError("receipt-invalid", "receipt output digest is invalid", "needs-owner")
         if not isinstance(capture["truncated"], bool) or capture["truncated"] != (capture["observed_bytes"] > capture["limit_bytes"]):
-            raise ManifestError("receipt-invalid", "receipt output truncation evidence conflicts", "owner-required")
+            raise ManifestError("receipt-invalid", "receipt output truncation evidence conflicts", "needs-owner")
     absolute_path(receipt["cwd_observed"], "receipt cwd")
     if receipt["argv_fingerprint"] != manifest["argv_fingerprint"]:
         raise ManifestError("receipt-invalid", "receipt argv does not match", "run-command-again")
@@ -1784,7 +1784,7 @@ def reuse_receipt(manifest: dict[str, Any], prior: dict[str, Any]) -> dict[str, 
 def read_attempt(path_value: str, manifest: dict[str, Any]) -> list[dict[str, Any]]:
     path = absolute_path(path_value, "attempt file", existing=True)
     if path.stat().st_size > MAX_PACKET_BYTES:
-        raise ManifestError("attempt-invalid", "attempt journal exceeds 1 MiB", "owner-required", 4)
+        raise ManifestError("attempt-invalid", "attempt journal exceeds 1 MiB", "needs-owner", 4)
     events: list[dict[str, Any]] = []
     try:
         for line in path.read_text().splitlines():
@@ -1795,15 +1795,15 @@ def read_attempt(path_value: str, manifest: dict[str, Any]) -> list[dict[str, An
                 or value.get("manifest_sha256") != manifest["manifest_sha256"]
                 or value.get("command_id") != manifest["command_id"]
             ):
-                raise ManifestError("attempt-invalid", "attempt journal identity is invalid", "owner-required", 4)
+                raise ManifestError("attempt-invalid", "attempt journal identity is invalid", "needs-owner", 4)
             events.append(value)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ManifestError("attempt-invalid", "attempt journal is unreadable", "owner-required", 4) from exc
+        raise ManifestError("attempt-invalid", "attempt journal is unreadable", "needs-owner", 4) from exc
     if not events or events[0].get("transition") != "prepared":
-        raise ManifestError("attempt-invalid", "attempt journal lacks its durable reservation", "owner-required", 4)
+        raise ManifestError("attempt-invalid", "attempt journal lacks its durable reservation", "needs-owner", 4)
     attempt_id = events[0].get("attempt_id")
     if any(event.get("attempt_id") != attempt_id for event in events):
-        raise ManifestError("attempt-invalid", "attempt journal changes identity", "owner-required", 4)
+        raise ManifestError("attempt-invalid", "attempt journal changes identity", "needs-owner", 4)
     return events
 
 
@@ -1908,12 +1908,12 @@ def authorize_cancellation(
 ) -> dict[str, Any]:
     events = read_attempt(attempt_path, validate_manifest(manifest))
     if reason not in {"root-authorized", "claim-lost", "root-monitor-degraded"}:
-        raise ManifestError("cancellation-unauthorized", "cancellation reason is invalid", "owner-required", 4)
+        raise ManifestError("cancellation-unauthorized", "cancellation reason is invalid", "needs-owner", 4)
     if not HEX64_RE.fullmatch(authorization_fingerprint):
-        raise ManifestError("cancellation-unauthorized", "cancellation fingerprint is invalid", "owner-required", 4)
+        raise ManifestError("cancellation-unauthorized", "cancellation fingerprint is invalid", "needs-owner", 4)
     ledger = read_json(ledger_path, "cancellation ledger")
     if ledger.get("schema_version") != "15.0.0" or ledger.get("content_fingerprint") != authorization_fingerprint:
-        raise ManifestError("cancellation-unauthorized", "cancellation ledger identity is stale", "owner-required", 4)
+        raise ManifestError("cancellation-unauthorized", "cancellation ledger identity is stale", "needs-owner", 4)
     authorities = [
         command
         for task in ledger.get("tasks", []) if isinstance(task, dict)
@@ -1925,7 +1925,7 @@ def authorize_cancellation(
         and command.get("cancellation_reason") == reason
     ]
     if len(authorities) != 1:
-        raise ManifestError("cancellation-unauthorized", "ledger does not authorize this cancellation", "owner-required", 4)
+        raise ManifestError("cancellation-unauthorized", "ledger does not authorize this cancellation", "needs-owner", 4)
     if any(event.get("transition") == "terminal-observed" for event in events):
         raise ManifestError("attempt-terminal", "terminal command cannot be cancelled", "read-terminal-receipt", 4)
     receipt = absolute_path(receipt_path, "receipt")
@@ -1939,7 +1939,7 @@ def authorize_cancellation(
     }
     if cancel_path.exists():
         if read_json(str(cancel_path), "cancellation authorization") != value:
-            raise ManifestError("cancellation-conflict", "cancellation authorization conflicts", "owner-required", 4)
+            raise ManifestError("cancellation-conflict", "cancellation authorization conflicts", "needs-owner", 4)
     else:
         descriptor = os.open(cancel_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:

@@ -208,7 +208,7 @@ def run_app_preclaim_fixture(
     if root_goal_state == "blocked":
         return "new-root-required", observations, mutations
     observations.append("authorization")
-    if permission != "granted-by-authorized-user":
+    if permission != "granted":
         return "permission-denied", observations, mutations
     observations.extend(["snapshot", "delivery-preflight", "intake"])
     if not bundle_ready:
@@ -378,7 +378,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(token, authority)
         self.assertIn("references/review-mutation-authority.md", self.read("scripts/ledger-cache"))
-        self.assertIn("task-terminal-sealed", packets)
+        self.assertIn("task-sealed", packets)
         self.assertIn("AutoReview 3.0.0", autoreview)
         self.assertNotIn("review-provider-mutation-observed", packets)
         self.assertNotIn("autoreview-attempt-observed", packets)
@@ -464,8 +464,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             row = next(line for line in options.splitlines() if line.startswith(f"| `{field}`"))
             for value in (
                 "not-requested",
-                "granted-by-authorized-user",
-                "denied-by-authorized-user",
+                "granted",
+                "denied",
             ):
                 self.assertIn(value, row)
         self.assertIn("This file owns every user-controlled App orchestration field", options)
@@ -517,13 +517,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn(
             "| 1 | `Start implementation (Recommended)` | Use this workflow "
             "for the ready specs found in this run. | "
-            "`granted-by-authorized-user` |",
+            "`granted` |",
             options,
         )
         self.assertIn(
             "| 2 | `Cancel` | Stop here without starting implementation or "
             "changing anything. | "
-            "`denied-by-authorized-user` |",
+            "`denied` |",
             options,
         )
         fixed_answers = re.findall(r"^\| ([12]) \|", options, re.MULTILINE)
@@ -827,10 +827,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("control-plane", options)
         self.assertNotIn("control-plane", packets)
 
-        self.assertIn('__version__ = "20.0.0"', cache_helper)
+        self.assertIn('__version__ = "21.0.0"', cache_helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', cache_helper)
         self.assertIn(
-            '__version__ = "4.0.0"', self.read("scripts/execution-manifest")
+            '__version__ = "5.0.0"', self.read("scripts/execution-manifest")
         )
         self.assertIn(
             'VERSION = "3.0.0"',
@@ -878,11 +878,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             '"autoreview_projection"', '"reservation_event"',
         ):
             self.assertNotIn(retired, helper)
-        self.assertIn('CONTROLLER_PROJECTION_SCHEMA_VERSION = "2.0.0"', helper)
-        self.assertIn('CONTROLLER_TEMPLATE_SCHEMA_VERSION = "2.0.0"', helper)
+        self.assertIn('CONTROLLER_PROJECTION_SCHEMA_VERSION = "3.0.0"', helper)
+        self.assertIn('CONTROLLER_TEMPLATE_SCHEMA_VERSION = "3.0.0"', helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', helper)
-        self.assertIn('__version__ = "20.0.0"', helper)
-        self.assertIn('REGISTRATION_SCHEMA_VERSION = "8.0.0"', helper)
+        self.assertIn('__version__ = "21.0.0"', helper)
+        self.assertIn('REGISTRATION_SCHEMA_VERSION = "9.0.0"', helper)
         self.assertIn("owned-operation-started", helper)
         self.assertIn("validate_owned_artifact", helper)
         for retired_runtime in (
@@ -1066,9 +1066,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertLess(sizes(controller_route), sizes(loaded))
         self.assertLessEqual(len(controller_route) - 1, 3)
 
-        self.assertIn('__version__ = "20.0.0"', self.read("scripts/ledger-cache"))
+        self.assertIn('__version__ = "21.0.0"', self.read("scripts/ledger-cache"))
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', self.read("scripts/ledger-cache"))
-        self.assertIn('__version__ = "4.0.0"', self.read("scripts/execution-manifest"))
+        self.assertIn('__version__ = "5.0.0"', self.read("scripts/execution-manifest"))
         self.assertIn('VERSION = "3.0.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
         self.assertIn('PROTOCOL_VERSION = "2.0.0"', (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text())
         self.assertIn('__version__ = "6.0.0"', (REPO / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py").read_text())
@@ -1349,7 +1349,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(token, options)
         self.assertIn(
-            "visible_app_task_permission=granted-by-authorized-user", skill
+            "visible_app_task_permission=granted", skill
         )
         self.assertIn("fixed model, reasoning policy, and execution flow", options)
         self.assertIn("Generic delegation, worker assignment, or subagent authority never supplies", skill)
@@ -1462,7 +1462,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def test_app_has_one_fixed_successful_conclusion_and_never_merges(self) -> None:
         runtime = self.runtime_text()
         skill = " ".join(self.read("SKILL.md").split())
-        fixed = "pull-request-ready-for-merge-but-not-merged"
+        fixed = "pull-request-ready-for-merge"
         for relative in (
             "SKILL.md",
             "references/options.md",
@@ -1500,7 +1500,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("`proposed-spec:<...>` refs", delivery)
         self.assertIn("one exact-byte snapshot", skill)
         self.assertIn("planning-required", skill)
-        self.assertIn("unsupported-app-delivery-target", skill)
+        self.assertIn("unsupported-delivery-target", skill)
         self.assertIn("no claim, ledger, Goal, task, tracker write, or source mutation", skill)
         self.assertNotIn("$plan-feature", self.runtime_text())
         self.assertIn("mandatory `## Feature Dependencies` table", delivery)
@@ -1624,7 +1624,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("repositories and managed checkouts", worker)
         self.assertIn("acceptance criteria", worker)
         self.assertIn("validation", worker)
-        self.assertIn("pull-request-ready-for-merge-but-not-merged", worker)
+        self.assertIn("pull-request-ready-for-merge", worker)
         self.assertIn("objective_fingerprint", packets)
         self.assertIn("portfolio-goal-activated", packets)
         self.assertIn("portfolio-goal-completed", packets)
@@ -1709,7 +1709,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn(token, normalized_closeout)
         self.assertIn("entire tuple matches", closeout)
         self.assertIn("immutable exact\n   45-minute deadline", closeout)
-        for token in ("`pending-at-deadline`", "`pending-warning`", "`timeout-accepted`", "zero-timeout"):
+        for token in ("`pending-at-deadline`", "`warning-required`", "`warned-timeout`", "zero-timeout"):
             self.assertIn(token, normalized_closeout)
         authority = self.read("references/review-mutation-authority.md")
         self.assertIn("exactly request start plus 45 minutes", authority)
@@ -1868,8 +1868,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "phase-specific inputs and evidence",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "20.0.0"', helper)
-        self.assertIn("unsupported-active-ledger", helper)
+        self.assertIn('__version__ = "21.0.0"', helper)
+        self.assertIn("unsupported-ledger", helper)
         self.assertNotIn("review-authority", helper)
         for removed in (
             "references/ledger.md",
@@ -1880,7 +1880,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v20_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v21_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = "\n".join(
             self.read(path)
@@ -1894,12 +1894,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "20.0.0"',
+            '__version__ = "21.0.0"',
             'LEDGER_SCHEMA_VERSION = "15.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "8.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "9.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("Registration schema is exactly `8.0.0`", packets)
+        self.assertIn("Registration schema is exactly `9.0.0`", packets)
         self.assertIn(
             "claim-identical Git common directories",
             packets,
@@ -1954,7 +1954,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             match = re.fullmatch(r"\| `([^`]+)` \| (.+) \|", line)
             if match:
                 event_type = match.group(1)
-                if event_type in runtime_fields or event_type == "execution-command-terminal-observed":
+                if event_type in runtime_fields or event_type == "command-finished":
                     self.assertNotIn(event_type, packet_fields)
                     packet_fields[event_type] = {match.group(2).strip()}
         retired = set(ast.literal_eval(next(
@@ -1969,6 +1969,64 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )))
         self.assertEqual(set(packet_fields), event_types - retired)
         self.assertTrue(all(packet_fields.values()))
+
+    def test_behavior_vocabulary_hard_cut_has_no_retired_values(self) -> None:
+        replacements = {
+            "pull-request-ready-for-merge-but-not-merged": "pull-request-ready-for-merge",
+            "codex-review-timeout-accepted": "codex-review-warned-timeout",
+            "timeout-accepted": "warned-timeout",
+            "pending-warning": "warning-required",
+            "review-polling": "review-wait",
+            "granted-by-authorized-user": "granted",
+            "denied-by-authorized-user": "denied",
+            "marking-ready-for-review": "readying-pr",
+            "preparing-tracker-closeout": "tracker-closeout",
+            "checking-mergeability": "mergeability",
+            "task-terminal-sealed": "task-sealed",
+            "terminal-sealed": "sealed",
+            "unchanged-outside-scope-allowed": "unchanged-outside-scope",
+            "managed-checkouts-observed": "checkouts-observed",
+            "implementation-baseline-accepted": "baseline-accepted",
+            "validation-nonregression-observed": "nonregression-observed",
+            "portfolio-preimplementation-aborted": "preimplementation-aborted",
+            "delivery-preflight-observed": "preflight-observed",
+            "execution-command-reserved": "command-reserved",
+            "execution-command-launch-observed": "command-launched",
+            "execution-command-cancellation-authorized": "command-cancel-authorized",
+            "execution-command-terminal-observed": "command-finished",
+            "task-dependency-wait-started": "dependency-wait-started",
+            "task-dependency-wait-resolved": "dependency-wait-resolved",
+            "autoreview-hosted-finding-obligated": "hosted-finding-obligated",
+            "terminal-handoff-recorded": "handoff-recorded",
+            "portfolio-terminal-verified": "portfolio-verified",
+            "post-terminal-drift-recorded": "terminal-drift-recorded",
+            "post-terminal-drift": "terminal-drift",
+            "dependency-integration": "dependencies-merged",
+            "scope-acceptance": "scope",
+            "integration-validation": "integration",
+            "unsupported-app-delivery-target": "unsupported-delivery-target",
+            "gitstack-installation-mismatch": "gitstack-mismatch",
+            "delivery-preflight-failed": "preflight-failed",
+            "unsupported-active-ledger": "unsupported-ledger",
+            "owner-required": "needs-owner",
+            "pull-request-draft": "draft-pr",
+            "pull-request-not-ready": "pr-not-ready",
+            "missing-pull-request": "missing-pr",
+            "missing-current-revision-set": "missing-revision-set",
+            "portfolio-goal-ready": "goal-ready",
+            "portfolio-verification-ready": "verification-ready",
+        }
+        runtime_paths = [
+            REPO / "AGENTS.md",
+            ROOT / "SKILL.md",
+            ROOT / "agents/openai.yaml",
+            *sorted((ROOT / "references").glob("*.md")),
+            *sorted(path for path in (ROOT / "scripts").iterdir() if path.is_file()),
+        ]
+        runtime = "\n".join(path.read_text() for path in runtime_paths)
+        for retired, current in replacements.items():
+            self.assertNotIn(retired, runtime, retired)
+            self.assertIn(current, runtime, current)
 
     def test_autoreview_producer_and_ledger_import_one_protocol_file(self) -> None:
         producer = self.read("../autoreview/scripts/autoreview")
@@ -2049,10 +2107,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
         module = ast.parse(helper)
         expected = {
-            "TASK_STATIC_GATES": {"dependency-integration"},
+            "TASK_STATIC_GATES": {"dependencies-merged"},
             "TASK_REVISION_SET_GATES": {
-                "scope-acceptance",
-                "integration-validation",
+                "scope",
+                "integration",
                 "domain-closeout",
             },
             "DELIVERY_REVISION_GATES": {
@@ -2110,13 +2168,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         compact_runtime = " ".join(runtime.split())
         self.assertIn("stale_claim_takeover_permission", runtime)
         self.assertIn("--takeover-permission", helper)
-        self.assertIn("granted-by-authorized-user", helper)
+        self.assertIn("granted", helper)
         self.assertIn("--expected-task-termination", helper)
         self.assertIn("--expected-task-adoption", helper)
         self.assertIn("recover-takeover", combined)
         self.assertIn("stale heartbeat alone", runtime.lower())
         self.assertIn("five-minute stale threshold", compact_runtime)
-        self.assertIn('SCHEMA_VERSION = "7.0.0"', helper)
+        self.assertIn('SCHEMA_VERSION = "8.0.0"', helper)
         self.assertIn(
             "Do not import, migrate, rename, dual-read, dual-write, retire, or delete",
             compact_runtime,
@@ -2227,7 +2285,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             (
                 True,
                 True,
-                "denied-by-authorized-user",
+                "denied",
                 True,
                 "permission-denied",
                 ["surface", "authorization"],
@@ -2235,7 +2293,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             (
                 True,
                 True,
-                "granted-by-authorized-user",
+                "granted",
                 False,
                 "planning-required",
                 ["surface", "authorization", "snapshot", "delivery-preflight", "intake"],
@@ -2266,7 +2324,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         outcome, observations, mutations = run_app_preclaim_fixture(
             surface_available=True,
-            permission="granted-by-authorized-user",
+            permission="granted",
             bundle_ready=True,
         )
         self.assertEqual(outcome, "accepted")
@@ -2565,12 +2623,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         states = self.read("references/packets-task.md").split("Task states are", 1)[1].split(".\n", 1)[0]
         self.assertLess(
-            states.index("`marking-ready-for-review`"),
-            states.index("`review-polling`"),
+            states.index("`readying-pr`"),
+            states.index("`review-wait`"),
         )
         self.assertLess(
-            states.index("`preparing-tracker-closeout`"),
-            states.index("`checking-mergeability`"),
+            states.index("`tracker-closeout`"),
+            states.index("`mergeability`"),
         )
         self.assertNotIn("`marking-ready`", states)
         self.assertIn("domain-closeout", gates)

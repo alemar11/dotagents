@@ -2,12 +2,12 @@
 
 ## Authorization And Managed Checkout
 
-Require `visible_app_task_permission=granted-by-authorized-user` before CLAIM.
+Require `visible_app_task_permission=granted` before CLAIM.
 The disclosed grant covers the fixed inspect-through-ready flow for the
 accepted bundle, not scope expansion, merge, release, deployment, post-merge
 closure, or target-repository instruction changes.
 
-Before edits, apply one `managed-checkouts-observed` event containing every
+Before edits, apply one `checkouts-observed` event containing every
 registered delivery exactly once. Require an App-managed isolated checkout,
 matching repository, target branch, Git top-level, baseline revision/tree,
 clean-status and execution-scope fingerprints, and isolation proof for every delivery. Missing, duplicated, shared, unmanaged, or
@@ -20,7 +20,7 @@ implementation authority exists before that acceptance.
 
 ## Static Dispatch Gates
 
-`dependency-integration` is `task-static`: dispatch only after every cross-Spec
+`dependencies-merged` is `task-static`: dispatch only after every cross-Spec
 dependency is merged; merge-ready is unfinished. Registered preflight is typed
 delivery state, not another gate. Neither requires a PR revision.
 
@@ -34,7 +34,7 @@ than a no-op validation result.
 Registration binds each delivery's passed GitHub/default-base capability,
 `ci_availability`, `preflight_key`, and evidence ref. Only `configured` or
 `not-configured` is valid; incomplete inspection blocks before CLAIM. Before
-seal, `delivery-preflight-observed` may replace it; after seal, only
+seal, `preflight-observed` may replace it; after seal, only
 post-terminal drift may record change.
 
 For each delivery's current exact repository, PR number and URL, head SHA, base
@@ -44,7 +44,7 @@ ref, and merge-base SHA require:
   repository's currently discovered default branch;
 - `codex-review`: mandatory current-revision GitStack owned result normalized
   as `accepted`, or an exact 45-minute pending result followed by the same-
-  lineage persistent-warning result normalized as `timeout-accepted`;
+  lineage persistent-warning result normalized as `warned-timeout`;
 - `ci`, only when `ci_availability=configured`: at least one applicable run or
   status context on the exact head SHA and every required applicable result
   successful;
@@ -60,7 +60,7 @@ fingerprint must bind the current bundle, checkout cwd, exact argv, pinned
 tools/dependencies, write policy, and outputs. A pre-call manifest or finding
 validation failure is not a gate result and consumes no AutoReview budget.
 Focused/full validation additionally require one current
-`validation-nonregression-observed` row per registered validation plan. Exact
+`nonregression-observed` row per registered validation plan. Exact
 outside-scope baseline diagnostics and content hashes may remain only under the
 registered debt policy; all in-scope diagnostics must be gone and command/tool
 identity must be unchanged.
@@ -81,14 +81,14 @@ terminal.
 
 The delivery evidence key hashes current revision and preflight keys. The task
 revision-set key contains every delivery evidence key. Bind
-`scope-acceptance`, `integration-validation`, and optional `domain-closeout` to
+`scope`, `integration`, and optional `domain-closeout` to
 that set; bind `focused-validation`, `full-validation`, and `autoreview` per
 delivery key. Partial sets fail.
 
 The `autoreview` gate requires a request-correlated AutoReview owned result
 normalized as terminal clean for the current revision/checkout binding;
 repository or scope drift starts a new lineage.
-`scope-acceptance` additionally requires current canonical changed paths for
+`scope` additionally requires current canonical changed paths for
 every delivery, no untracked paths, complete non-regression evidence, and exact
 equality with each AutoReview target's review scope. An undeclared path is
 `needs-owner`, never a late formatting permission request.
@@ -140,12 +140,12 @@ later merge. GitHub sources cannot use `source-moved`.
 Closeout must not be circular. Use this order:
 
 1. Prove every applicable static, delivery-revision, and task-revision-set gate
-   at the current complete revision set; apply `task-terminal-sealed`.
-2. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+   at the current complete revision set; apply `task-sealed`.
+2. Apply `handoff-recorded` with the unchanged seal fingerprint,
    `pull-request-ready` kind, fixed `external-merge-required` authority, and
    next action.
 3. After all tasks, independently reverify current proof and apply
-   `portfolio-terminal-verified`.
+   `portfolio-verified`.
 4. Complete and read back the root Goal; apply `portfolio-goal-completed`.
 5. Release and archive through `cache-lifecycle.md`.
 
@@ -155,13 +155,13 @@ handoff. Neither the root nor a task merges, performs
 post-merge verification, or closes hosted tracker items.
 
 Review request has no skip; every delivery-revision review gate is mandatory.
-`timeout-accepted` passes only that gate and is never equivalent to a clean
+`warned-timeout` passes only that gate and is never equivalent to a clean
 verdict. It cannot override CI, mergeability, branch rules, approvals, or any
 repository-required review state. Surface its warning in terminal evidence, and
 require the later merge workflow to re-check late Codex findings.
 
 After a task seal or Goal completion, changed terminal evidence is recorded only
-through `post-terminal-drift-recorded`. It records portfolio drift, blocks
+through `terminal-drift-recorded`. It records portfolio drift, blocks
 portfolio verification or archive, and does not reopen Goals
 or resume implementation. Report the owner action; a later correction requires
 a separately authorized fresh run.

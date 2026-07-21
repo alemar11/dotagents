@@ -25,7 +25,7 @@ remain blocking.
 ## Active And Archived State
 
 Keep resumable ledger-schema `15.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v20 is the
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v21 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
@@ -39,7 +39,7 @@ For an in-flight review wait, retain active JSON, the complete typed request
 receipt, and the exact claim/fingerprint.
 Keep the root Goal active and do not release ownership. If the exact
 request remains pending at its 45-minute deadline, record the persistent PR
-warning and continue under `timeout-accepted`; do not schedule another check or
+warning and continue under `warned-timeout`; do not schedule another check or
 create a nonterminal handoff. A root replaced by authorized takeover stops.
 Dependency-only waits also retain claim and state, return the exact
 external action, and require explicit same-root resume; do not fabricate a
@@ -48,7 +48,7 @@ until that retained claim binds registration.
 
 After the terminal projection passes each staged readiness check, every task is
 sealed and its terminal handoff is
-recorded, `portfolio-terminal-verified` passes, the root Goal completion is read
+recorded, `portfolio-verified` passes, the root Goal completion is read
 back and recorded, and current evidence remains unchanged, run exactly:
 
 ```text
@@ -56,7 +56,7 @@ scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-
 scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-Under lock, release requires claim schema `7.0.0`, exact ownership, and an
+Under lock, release requires claim schema `8.0.0`, exact ownership, and an
 archive-ready terminal projection before receipt or claim deletion. Rejection
 leaves claim and ledger unchanged.
 Every bounded command attempt must be terminal with verified cleanup;
@@ -68,7 +68,7 @@ fingerprint, path, and the ledger's exact terminal evidence, not Markdown.
 Archive consumes the receipt; interruption remains recoverable.
 
 If baseline preparation/acceptance cannot continue, first apply the verified
-`portfolio-preimplementation-aborted` event from `baseline-validation.md`, then
+`preimplementation-aborted` event from `baseline-validation.md`, then
 run the same two commands with `--release-reason preimplementation-abort` and
 `ledger archive --reason preimplementation-abort`, using the exact abort
 evidence ref. This path never creates, completes, or synthesizes a Goal.

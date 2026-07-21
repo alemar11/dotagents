@@ -12,8 +12,8 @@ This file owns every user-controlled App orchestration field.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent for one visible task per executable Feature Spec using the fixed model, reasoning policy, and execution flow. |
-| `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to replace complete verified-stale claim scopes and adopt their task refs. |
+| `visible_app_task_permission` | `not-requested`, `granted`, `denied` | `not-requested` | Run-scoped consent for one visible task per executable Feature Spec using the fixed model, reasoning policy, and execution flow. |
+| `stale_claim_takeover_permission` | `not-requested`, `granted`, `denied` | `not-requested` | Run-scoped consent to replace complete verified-stale claim scopes and adopt their task refs. |
 
 ## Standard Run Authorization
 
@@ -55,8 +55,8 @@ Then use one `request_user_input`:
 
 | Order | Label | Description | Canonical value |
 | --- | --- | --- | --- |
-| 1 | `Start implementation (Recommended)` | Use this workflow for the ready specs found in this run. | `granted-by-authorized-user` |
-| 2 | `Cancel` | Stop here without starting implementation or changing anything. | `denied-by-authorized-user` |
+| 1 | `Start implementation (Recommended)` | Use this workflow for the ready specs found in this run. | `granted` |
+| 2 | `Cancel` | Stop here without starting implementation or changing anything. | `denied` |
 
 Define only these answers. The App owns the free-form response; it is never an
 implicit grant. Ask after the runtime surface gate and complete read-only
@@ -81,9 +81,9 @@ insufficient.
 ## Fixed Policy And Bundle Data
 
 The successful outcome is always
-`pull-request-ready-for-merge-but-not-merged`; current-revision Codex review is
+`pull-request-ready-for-merge`; current-revision Codex review is
 always requested, with only an evidenced 45-minute pending timeout eligible for
-`timeout-accepted`; execution always uses one visible task per Feature Spec,
+`warned-timeout`; execution always uses one visible task per Feature Spec,
 App-managed worktrees, and at most three nonterminal tasks. These are invariants,
 not options.
 

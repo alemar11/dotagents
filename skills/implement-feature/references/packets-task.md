@@ -8,21 +8,21 @@ families' phase-specific inputs and evidence.
 
 | event | phase-specific inputs and evidence |
 | --- | --- |
-| `managed-checkouts-observed` | Task identity plus the complete registered delivery checkout map and evidence. |
-| `implementation-baseline-accepted` | Current CAS/scope binding, every registered baseline manifest and receipt byte digest, and acceptance evidence. |
-| `portfolio-preimplementation-aborted` | Closed reason, complete task-stop evidence, unchanged-checkout proof, and abort evidence. |
-| `delivery-preflight-observed` | Exact delivery/GitHub/branch/default-base identity, definitive CI availability, preflight key, and evidence. |
-| `execution-command-reserved` | Delivery, one-attempt command/manifest/policy identity, attempt/receipt refs, current task observation, and evidence. |
-| `execution-command-launch-observed` | Same attempt identity, durable launch fingerprint, and evidence. |
-| `execution-command-cancellation-authorized` | Same attempt, closed cancellation reason, current observation, and evidence. |
-| `execution-command-terminal-observed` | Same attempt, closed terminal status, receipt digest when applicable, cleanup verdict, and evidence. |
+| `checkouts-observed` | Task identity plus the complete registered delivery checkout map and evidence. |
+| `baseline-accepted` | Current CAS/scope binding, every registered baseline manifest and receipt byte digest, and acceptance evidence. |
+| `preimplementation-aborted` | Closed reason, complete task-stop evidence, unchanged-checkout proof, and abort evidence. |
+| `preflight-observed` | Exact delivery/GitHub/branch/default-base identity, definitive CI availability, preflight key, and evidence. |
+| `command-reserved` | Delivery, one-attempt command/manifest/policy identity, attempt/receipt refs, current task observation, and evidence. |
+| `command-launched` | Same attempt identity, durable launch fingerprint, and evidence. |
+| `command-cancel-authorized` | Same attempt, closed cancellation reason, current observation, and evidence. |
+| `command-finished` | Same attempt, closed terminal status, receipt digest when applicable, cleanup verdict, and evidence. |
 | `task-observed` | Exact `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `observation`, `state`, `outcome`, `attention_reason`, `summary_ref`, and bounded direct full-read evidence. |
-| `task-dependency-wait-started` | Exact current resume phase, reason/summary, current observation, and evidence. |
-| `task-dependency-wait-resolved` | Same bound resume phase, current observation, and evidence. |
+| `dependency-wait-started` | Exact current resume phase, reason/summary, current observation, and evidence. |
+| `dependency-wait-resolved` | Same bound resume phase, current observation, and evidence. |
 | `revision-observed` | Exact `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, delivery/task binding, and evidence. |
 | `delivery-observed` | Current revision key, exact PR lifecycle object, committed/published truth, and evidence. |
 | `source-moved` | Exact task, predeclared from/to refs, unchanged source fingerprint, tracker repository, prerequisite revision-set key, and evidence. |
-| `autoreview-hosted-finding-obligated` | Delivery, obligation ref, source result fingerprint, and evidence. |
+| `hosted-finding-obligated` | Delivery, obligation ref, source result fingerprint, and evidence. |
 
 The managed checkout map contains every delivery exactly once and binds
 repository, absolute App checkout/Git top-level, target branch, baseline
@@ -36,9 +36,9 @@ valid only for interrupted or cleanup-failed controller loss. One command id
 never receives another physical attempt.
 
 Task states are `created`, `implementing`, `validating`, `draft-pr`,
-`marking-ready-for-review`, `review-polling`, `fixing-review`, `ci`,
-`preparing-tracker-closeout`, `checking-mergeability`, `dependency-wait`,
-`terminal-sealed`, `merge-ready`, `blocked`, `needs-owner`, and `failed`.
+`readying-pr`, `review-wait`, `fixing-review`, `ci`,
+`tracker-closeout`, `mergeability`, `dependency-wait`,
+`sealed`, `merge-ready`, `blocked`, `needs-owner`, and `failed`.
 Before baseline acceptance, a task remains `created`.
 
 The PR object binds repository identities, number/URL, lifecycle/draft,

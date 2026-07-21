@@ -64,7 +64,7 @@ the recorded task identity.
 ## Report
 
 The fixed successful outcome is
-`pull-request-ready-for-merge-but-not-merged`.
+`pull-request-ready-for-merge`.
 
 After required full reads, freshness validation, ledger reconciliation, and
 event application, visible packets are presentation-only: never suppress

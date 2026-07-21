@@ -22,9 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "15.0.0"
-SCHEMA_VERSION = "7.0.0"
-TAKEOVER_TRANSACTION_SCHEMA_VERSION = "3.0.0"
+__version__ = "16.0.0"
+SCHEMA_VERSION = "8.0.0"
+TAKEOVER_TRANSACTION_SCHEMA_VERSION = "4.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
 RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 LEDGER_CACHE_PATH = Path(__file__).resolve().with_name("ledger-cache")
@@ -36,7 +36,7 @@ FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
 GLOBAL_SOURCE_RE = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$")
-TAKEOVER_PERMISSION = "granted-by-authorized-user"
+TAKEOVER_PERMISSION = "granted"
 TAKEOVER_REASONS = {"verified-stale"}
 STALE_AFTER_SECONDS = 300
 HEARTBEAT_INTERVAL_SECONDS = 60

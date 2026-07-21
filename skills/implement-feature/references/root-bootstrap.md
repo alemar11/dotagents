@@ -42,14 +42,14 @@ Prepare and verify the delivery-preflight manifest before authorization.
 Require authenticated GitHub push/PR capability plus readable lifecycle,
 default-base, mergeability/conflicts, repository policy, and definitive CI
 classification `configured|not-configured`. Unknown capability returns
-`delivery-preflight-failed` with no artifacts. `not-configured` is valid.
+`preflight-failed` with no artifacts. `not-configured` is valid.
 
 Validate stable refs, the complete acyclic graphs, earlier-only dependencies,
 one executable owner per `(repository,target_branch_name)`, repository and path
 scope, validation adapters, acceptance criteria, integration gates, local
 tracker destinations, domain-closeout ownership, and fixed model profiles.
 Missing or contradictory execution evidence is `planning-required`. An
-explicit non-App target is `unsupported-app-delivery-target`. Never repair or
+explicit non-App target is `unsupported-delivery-target`. Never repair or
 mutate the source artifacts.
 
 Sort ready candidates by canonical claim/task source id. Greedily select within
@@ -72,7 +72,7 @@ mutation. Qualify local refs with their Git common directory. A live overlap is
 contract in `run-state.md` and never permits partial replacement.
 
 After claim, synchronously run the cache doctor and fixed 180-day prune once in
-root. Then create one schema-7 registration packet through
+root. Then create one schema-9 registration packet through
 `packets-registration.md`, create schema-15 state, set and observe the derived
 root title, and enter the controller loop. Goal state remains internal
 `pending`; do not call `create_goal` yet.

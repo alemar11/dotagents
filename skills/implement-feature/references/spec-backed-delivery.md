@@ -116,7 +116,7 @@ Require:
   authorization. Each entry binds a stable validation/command id, authored argv
   fingerprint, closed adapter/policy, projected read-only argv fingerprint, and
   pinned tool/version identity fingerprint. Only `prettier-check-v1` with
-  `unchanged-outside-scope-allowed` and `clean-exit-v1` with `clean-required`
+  `unchanged-outside-scope` and `clean-exit-v1` with `clean-required`
   are valid; any command without a provably read-only projection is
   `planning-required` and its authored mutating form is never run;
 - named integration gates for multi-repository work;
@@ -137,7 +137,7 @@ upstream Feature Spec must be verified merged with integration proof before
 dispatch.
 
 `non_app_delivery_target` or any other explicit non-App marker aborts as
-`unsupported-app-delivery-target`. Retired delivery targets, delivery
+`unsupported-delivery-target`. Retired delivery targets, delivery
 permissions, review requirements or skips, worker actions, parallelization,
 repository-layout copies, PR-count strategies, completion methods, closeout
 enums, and issue-mutation permissions are invalid structured input. Merge

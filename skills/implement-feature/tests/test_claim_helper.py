@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV18Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV21Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_assignment_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV18Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV21Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -197,7 +197,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout
         checkout_event = {
-            "type": "managed-checkouts-observed",
+            "type": "checkouts-observed",
             "task_key": helper.task_key,
             "task_ref": "app-task://worker-232",
             "managed_checkouts": [
@@ -283,7 +283,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "thinking_reason": "default-medium-fixture",
                     "task_assignment_fingerprint": (
                         hashlib.sha256(
-            CACHE_TEST_RUNTIME.LedgerCacheV18Tests.task_assignment_objective.encode()
+            CACHE_TEST_RUNTIME.LedgerCacheV21Tests.task_assignment_objective.encode()
                         ).hexdigest()
                         if source_recorded
                         else "none"
@@ -388,7 +388,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--ledger-ref",
             str(ledger or self.ledger),
             "--takeover-permission",
-            "granted-by-authorized-user",
+            "granted",
             "--takeover-reason",
             "verified-stale",
             "--evidence",
@@ -425,7 +425,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "15.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "16.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -1029,7 +1029,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             acquired["claim"]["repository_checkouts"][0]["checkout"],
             str(self.repo.resolve()),
         )
-        self.assertEqual(acquired["claim"]["schema_version"], "7.0.0")
+        self.assertEqual(acquired["claim"]["schema_version"], "8.0.0")
         self.assertNotIn("execution_adapter", acquired["claim"])
 
     def test_bare_repository_local_source_ref_is_rejected(self) -> None:
@@ -1069,7 +1069,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "--expected-root-id",
                 "root-a",
                 "--takeover-permission",
-                "granted-by-authorized-user",
+                "granted",
                 "--takeover-reason",
                 "verified-stale",
                 "--expected-claim-fingerprint",
@@ -1089,7 +1089,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         takeover_evidence = takeover["claim"]["takeover_evidence"]
         self.assertEqual(
             takeover_evidence["stale_claim_takeover_permission"],
-            "granted-by-authorized-user",
+            "granted",
         )
         self.assertEqual(
             takeover_evidence["replaced_claims"][0]["task_termination_evidence"],
@@ -1197,7 +1197,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--expected-root-id",
             "root-a",
             "--takeover-permission",
-            "granted-by-authorized-user",
+            "granted",
             "--takeover-reason",
             "verified-stale",
             "--expected-claim-fingerprint",
@@ -1249,7 +1249,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "--expected-root-id",
                 "root-a",
                 "--takeover-permission",
-                "granted-by-authorized-user",
+                "granted",
                 "--takeover-reason",
                 "verified-stale",
                 "--expected-claim-fingerprint",
@@ -1289,7 +1289,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--expected-root-id",
             "root-a",
             "--takeover-permission",
-            "granted-by-authorized-user",
+            "granted",
             "--takeover-reason",
             "verified-stale",
             "--expected-claim-fingerprint",
@@ -1328,7 +1328,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--expected-root-id",
             "root-a",
             "--takeover-permission",
-            "granted-by-authorized-user",
+            "granted",
             "--takeover-reason",
             "verified-stale",
             "--expected-claim-fingerprint",
@@ -1367,7 +1367,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--expected-root-id",
             "root-a",
             "--takeover-permission",
-            "granted-by-authorized-user",
+            "granted",
             "--takeover-reason",
             "verified-stale",
             "--expected-claim-fingerprint",
@@ -1956,7 +1956,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(error.exception.code, "state-conflict")
 
     def test_previous_claim_schemas_fail_closed_without_mutation(self) -> None:
-        for schema_version in ("3.0.0", "4.0.0", "5.0.0", "6.0.0"):
+        for schema_version in ("3.0.0", "4.0.0", "5.0.0", "6.0.0", "7.0.0"):
             with self.subTest(schema_version=schema_version):
                 if self.claim_root.exists():
                     for path in self.claim_root.iterdir():

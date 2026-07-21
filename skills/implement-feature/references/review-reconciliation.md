@@ -18,7 +18,7 @@ all of these stored values agree with GitStack's machine result:
 - no prior reconciliation exists.
 
 Never reconcile unbound or legacy plain requests, head drift, stale or
-mismatched-head evidence, pending or timeout-accepted results, findings,
+mismatched-head evidence, pending or warned-timeout results, findings,
 provider terminal errors, ambiguous evidence, or API, authentication, and
 configuration failures.
 
@@ -71,5 +71,5 @@ PR `ambrogio-dev/yn-ai-workflows#237`, head
 `03dca5ad3e5603be343c9b927e372e25f5671f1e`, plain request comment
 `5016644000`, and provider `outcome=clean` comment `5016657271` are non-executable
 motivating metadata. That schema-5/plain-request incident is never imported,
-migrated, adopted, or repaired. Executable replay uses only schema-8 state, a
+migrated, adopted, or repaired. Executable replay uses only schema-15 state, a
 valid typed exact-head request receipt, and a simulated correlation defect.

@@ -15,7 +15,7 @@ No external or provider operation occurs.
 
 Missing trustworthy App provenance is `unsupported-runtime`. Any missing,
 symlinked, escaped, substituted, malformed, wrong-version, or hash-mismatched
-artifact is `gitstack-installation-mismatch`. Both stop with zero side effects.
+artifact is `gitstack-mismatch`. Both stop with zero side effects.
 Carry the complete evidence plus fingerprint into registration; it is immutable
 recovery evidence, not caller authority. Never accept GitStack 8 or a version
 range.

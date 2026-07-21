@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v20 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v21 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -15,8 +15,8 @@ missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
 Active state accepts only ledger schema `15.0.0` created from registration
-schema `8.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
-invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
+schema `9.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+invalid paths, and invalid transitions block as `unsupported-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
 
@@ -58,7 +58,7 @@ preflight state, paths, tracker moves, checkout, PR/revision, compact AutoReview
 chain, review, and gates.
 No managed `(repository, checkout)` pair may serve two Specs.
 
-Bind the complete isolated checkout map with `managed-checkouts-observed`
+Bind the complete isolated checkout map with `checkouts-observed`
 before work passes `created`; bind task lifecycle with `task-observed`. Each
 checkout also binds baseline tree, clean-status fingerprint, and the registered
 execution-scope fingerprint.
@@ -67,7 +67,7 @@ execution-scope fingerprint.
 truth to it. The events are distinct, not aliases.
 
 Registration seeds the passed preflight. Before seal,
-`delivery-preflight-observed` may replace it with another definitive
+`preflight-observed` may replace it with another definitive
 `configured|not-configured` result; unknown inspection blocks and preserves the
 last valid state. At most three tasks are nonterminal. Scheduling, review
 deadlines, closeout, and next actions are derived; dependencies require merge,
@@ -81,7 +81,7 @@ fingerprint. Before baseline acceptance,
 tasks are baseline-only in `created`; no delivery/review/provider/AutoReview/gate
 event is legal and no external root Goal exists.
 
-`implementation-baseline-accepted` is one all-delivery/all-validation CAS. It
+`baseline-accepted` is one all-delivery/all-validation CAS. It
 must match current generation, state, claim, and scope fingerprints and exact
 manifest/receipt byte hashes, with every registered tuple present exactly once.
 The helper validates checkout/revision/tree/status, command/adapter/policy/tool
@@ -91,9 +91,9 @@ changes any task to `accepted`. Rejection leaves every task pending.
 ## Bounded Command Journal
 
 Each delivery retains at most 64 one-attempt command records. The closed events
-are `execution-command-reserved`, `execution-command-launch-observed`,
-`execution-command-cancellation-authorized`, and
-`execution-command-terminal-observed`. They persist reservation, durable launch
+are `command-reserved`, `command-launched`,
+`command-cancel-authorized`, and
+`command-finished`. They persist reservation, durable launch
 release, root cancellation authority, and terminal receipt/cleanup evidence
 only. Lease heartbeats, process census churn, and raw output stay in
 execution-manifest artifacts and never consume ledger operations.
@@ -107,7 +107,7 @@ output limit, interruption, and cleanup failure. Cleanup-failed blocks dispatch,
 seal, claim release, archival, and takeover.
 
 Only complete acceptance permits root Goal creation/activation and an
-implementation transition. `portfolio-preimplementation-aborted` is the sole
+implementation transition. `preimplementation-aborted` is the sole
 typed early closeout after registration; it requires complete task-stop and
 unchanged-checkout proof and the absence of Goal, delivery, provider,
 AutoReview, review, gate, and partial-acceptance state.
@@ -164,17 +164,17 @@ Schema-15 operation history appends `owned-operation-started` and
 revision/checkout binding; results additionally store the complete owner result
 as opaque evidence and a closed disposition/gate/recovery projection. Clean,
 findings, provider failure, and correlation failure come only from GitStack's
-request-correlated result validator. Deadline pending remains `pending-warning`
-until the same-lineage warning result is recorded as `timeout-accepted`. It
+request-correlated result validator. Deadline pending remains `warning-required`
+until the same-lineage warning result is recorded as `warned-timeout`. It
 passes only the review gate and is never clean. Superseding terminal
 reconciliation appends history and never rewrites the failed observation.
 
 ## Typed Dependency Wait
 
-Only the root writes dependency state. `task-dependency-wait-started` requires
+Only the root writes dependency state. `dependency-wait-started` requires
 an active root Goal and binds `resume_state` to the task's exact current active
 phase, plus bounded reason, summary, and evidence refs. It moves the task to
-`dependency-wait`. `task-dependency-wait-resolved` requires the same bound
+`dependency-wait`. `dependency-wait-resolved` requires the same bound
 `resume_state`, restores only that phase, and clears the current wait. Repeated
 turns never promote a dependency wait to `blocked`. Do not add authority tokens,
 deadlines, leases, or host recovery to these events.
@@ -195,22 +195,22 @@ terminal.
 Closeout has one irreversible order:
 
 1. Require every applicable current static, delivery-revision, and
-   task-revision-set gate; apply `task-terminal-sealed` for the exact complete
+   task-revision-set gate; apply `task-sealed` for the exact complete
    delivery revision set.
-2. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+2. Apply `handoff-recorded` with the unchanged seal fingerprint,
    `pull-request-ready` kind, external authority, and next merge action.
 3. After every task passes those stages, independently reverify current
-   external truth and apply `portfolio-terminal-verified`.
+   external truth and apply `portfolio-verified`.
 4. Call the root Goal through `update_goal` with `status=complete`, read it back,
    then apply `portfolio-goal-completed`.
 5. Reverify archive eligibility, release the claim as terminal, and archive
    through `cache-lifecycle.md`.
 
 The terminal projection exposes each stage without requiring a later one.
-`terminal-handoff-recorded` is terminal-only, never monitoring/dependency wait.
+`handoff-recorded` is terminal-only, never monitoring/dependency wait.
 
 From seal onward, changed terminal truth permits only
-`post-terminal-drift-recorded`; it blocks terminal handoff, verification, and
+`terminal-drift-recorded`; it blocks terminal handoff, verification, and
 archive. Never reopen the root Goal. Correction needs owner action and a
 separately authorized fresh run.
 
@@ -240,14 +240,14 @@ reject absolute/backslash/empty/parent traversal.
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and
 `terminal` reports staged closeout, review-timeout warnings, and archive
-readiness. Their shapes remain unchanged in v20. `diagnostics` schema `1.0.0`
+readiness. Their shapes remain unchanged in v21. `diagnostics` schema `2.0.0`
 is the root's user-facing read model. It binds generation/fingerprint, preserves
 typed evidence in raw fields, and adds qualified display fields. It derives
 `terminal_verification=invalidated|clean|incomplete`; only unchanged
 archive-ready proof is `clean`. Revision evidence uses
 `evidence_state=current|stale|incomplete`; blocking/reasons stay derived.
 Provider `merge_state=clean` renders as `conflict-free`, and
-`waiting/timeout-accepted` remains warning-only. Reads are pure and bounded by
+`waiting/warned-timeout` remains warning-only. Reads are pure and bounded by
 existing state limits.
 
 Callers compare the immutable review deadline with their observed
@@ -256,7 +256,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `15.0.0`, any registration schema before `8.0.0`, or any
+JSON schema before `15.0.0`, any registration schema before `9.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
