@@ -12,12 +12,28 @@ This file owns every user-controlled App orchestration field.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted`, `denied` | `not-requested` | Run-scoped consent for one visible task per executable Feature Spec using the fixed model, reasoning policy, and execution flow. |
+| `visible_app_task_permission` | `not-requested`, `granted`, `denied` | `not-requested` | Run-scoped consent for one visible task per executable Feature Spec using the fixed model, reasoning policy, and execution flow, resolved from an explicit imperative invocation or the standard question. |
 | `stale_claim_takeover_permission` | `not-requested`, `granted`, `denied` | `not-requested` | Run-scoped consent to replace complete verified-stale claim scopes and adopt their task refs. |
+
+## Invocation Resolution
+
+Resolve `visible_app_task_permission=granted` without another question when the
+owner's current request explicitly invokes `$implement-feature` and directly
+orders it to implement or execute an identified durable Feature Spec or bundle.
+After successful intake, bind that grant to the exact accepted snapshot and
+execution-scope fingerprint. The required disclosure and deterministic scope
+summary still precede CLAIM; they inform the owner and do not require a second
+confirmation.
+
+Leave the field `not-requested` when the owner only mentions the skill, asks a
+question, requests inspection or planning, states a condition without ordering
+implementation, or merely permits tasks, workers, delegation, or subagents.
+Those task-surface permissions may reinforce an implementation request but do
+not supply one. Resolve an explicit stop or cancellation as `denied`.
 
 ## Standard Run Authorization
 
-For `visible_app_task_permission=not-requested`, state this exact disclosure:
+After successful intake and preflight, always state this exact disclosure:
 
 > Each executable Feature Spec is one feature; one plan may create multiple
 > visible tasks. The scope summary immediately below lists every repository,
@@ -45,7 +61,10 @@ adapter, policy, and pinned tool/version identity. Do not include mutable output
 or let the caller select an adapter/policy. If the summary cannot be complete,
 return `planning-required` without asking.
 
-Then use one `request_user_input`:
+Render the deterministic scope summary immediately after the disclosure. When
+the invocation already resolved `visible_app_task_permission=granted`, do not
+call `request_user_input`; continue to CLAIM with the bound grant. When the field
+remains `not-requested`, use one `request_user_input`:
 
 | UI field | Exact value |
 | --- | --- |
@@ -59,10 +78,11 @@ Then use one `request_user_input`:
 | 2 | `Cancel` | Stop here without starting implementation or changing anything. | `denied` |
 
 Define only these answers. The App owns the free-form response; it is never an
-implicit grant. Ask after the runtime surface gate and complete read-only
-intake/preflight, but before CLAIM. Denial or no answer aborts
-without artifacts. The grant never changes target-repository instructions;
-model policy stays fixed by `task-model-policy.md`.
+implicit grant. Ask only after the runtime surface gate and complete read-only
+intake/preflight, but before CLAIM, and only when permission remains
+`not-requested`. Denial or no answer aborts without artifacts. The grant never
+changes target-repository instructions; model policy stays fixed by
+`task-model-policy.md`.
 
 This is the only normal-run permission question. Later source/scope/tool/argv
 drift returns `authorization-stale` before implementation; a newly required

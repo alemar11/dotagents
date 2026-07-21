@@ -73,9 +73,12 @@ scope, and require AutoReview's review scope to equal that exact set.
 
 ## Preimplementation Stop
 
-When baseline preparation or acceptance cannot complete, stop/archive every
-baseline-only task and apply `preimplementation-aborted` with complete
-task-stop evidence. It proves Goal state is still pending, no delivery revision,
+When baseline preparation or acceptance cannot complete, first stop every
+baseline-only task and obtain complete terminal-or-idle task-stop evidence;
+stopped does not mean archived. While every original App-managed checkout still
+exists, apply `preimplementation-aborted`. Only after that event is accepted may
+the root call `set_thread_archived` for those tasks, release the claim, and
+archive the ledger. It proves Goal state is still pending, no delivery revision,
 provider/AutoReview authority, review, gate, source mutation, or partial
 baseline acceptance exists, and each checkout still has its baseline revision
 and a status fingerprint proving no Git-visible changes. Release with the typed

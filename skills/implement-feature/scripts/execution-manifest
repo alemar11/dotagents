@@ -225,7 +225,7 @@ def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
         )
     absolute_path(value["cwd"], "command manifest cwd")
     validate_literal_argv(value["argv"])
-    if value["argv_fingerprint"] != fingerprint({"cwd": value["cwd"], "argv": value["argv"]}):
+    if value["argv_fingerprint"] != fingerprint({"argv": value["argv"]}):
         raise ManifestError("manifest-hash-mismatch", "command argv fingerprint does not match", "prepare-command-again")
     if not isinstance(value["bundle_sha256"], str) or not HEX64_RE.fullmatch(value["bundle_sha256"]):
         raise ManifestError("manifest-schema-invalid", "command bundle fingerprint is invalid", "prepare-command-again")
@@ -763,7 +763,7 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
                     "adapter": adapter,
                     "policy": policy,
                     "execution_scope_fingerprint": scope_fingerprint,
-                    "authored_argv_fingerprint": fingerprint({"cwd": str(cwd), "argv": authored_argv}),
+                    "authored_argv_fingerprint": fingerprint({"argv": authored_argv}),
                     "checkout_identity": checkout_identity(cwd, str(git), require_clean=True),
                 }
         else:
@@ -817,7 +817,7 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
         "baseline": baseline,
         "execution_policy": dict(EXECUTION_POLICIES[operation]),
     }
-    manifest["argv_fingerprint"] = fingerprint({"cwd": manifest["cwd"], "argv": argv})
+    manifest["argv_fingerprint"] = fingerprint({"argv": argv})
     manifest["gate_fingerprint"] = gate_fingerprint(manifest)
     manifest["manifest_sha256"] = manifest_fingerprint(manifest)
     return manifest
@@ -1186,6 +1186,15 @@ def terminate_owned_group(
     }, identities
 
 
+def command_environment(manifest: dict[str, Any]) -> dict[str, str]:
+    environment = os.environ.copy()
+    command_directory = str(Path(manifest["argv"][0]).parent)
+    tool_directories = [str(Path(tool["resolved_path"]).parent) for tool in manifest["tools"]]
+    pinned_directories = list(dict.fromkeys([command_directory, *tool_directories]))
+    environment["PATH"] = os.pathsep.join(pinned_directories + [environment.get("PATH", "")])
+    return environment
+
+
 def run_manifest(
     manifest: dict[str, Any],
     receipt_path: str,
@@ -1214,9 +1223,7 @@ def run_manifest(
     receipt.parent.mkdir(parents=True, exist_ok=True)
     stdout_path = receipt.with_suffix(receipt.suffix + ".stdout")
     stderr_path = receipt.with_suffix(receipt.suffix + ".stderr")
-    environment = os.environ.copy()
-    pinned_directories = list(dict.fromkeys(str(Path(tool["resolved_path"]).parent) for tool in manifest["tools"]))
-    environment["PATH"] = os.pathsep.join(pinned_directories + [environment.get("PATH", "")])
+    environment = command_environment(manifest)
     policy = manifest["execution_policy"]
     attempt_path = receipt.with_suffix(receipt.suffix + ".attempt.jsonl")
     lease_path = receipt.with_suffix(receipt.suffix + ".lease.json")
@@ -1554,7 +1561,7 @@ def run_manifest(
             for name, row in streams.items()
         },
         "cwd_observed": str(cwd.resolve()),
-        "argv_fingerprint": fingerprint({"cwd": str(cwd), "argv": manifest["argv"]}),
+        "argv_fingerprint": fingerprint({"argv": manifest["argv"]}),
         "tools": [{"tool_id": row["tool_id"], "resolved_path": row["resolved_path"], "sha256": row["sha256"], "version": row["version"]} for row in manifest["tools"]],
         "stdout": file_record(stdout_path, source_kind="command-output", source_ref="stdout"),
         "stderr": file_record(stderr_path, source_kind="command-output", source_ref="stderr"),
@@ -1755,7 +1762,7 @@ def refresh_tools(manifest: dict[str, Any]) -> dict[str, Any]:
         replacements[tool["resolved_path"]] = candidate["resolved_path"]
         refreshed["tools"][index] = candidate
     refreshed["argv"] = [replacements.get(token, token) for token in refreshed["argv"]]
-    refreshed["argv_fingerprint"] = fingerprint({"cwd": refreshed["cwd"], "argv": refreshed["argv"]})
+    refreshed["argv_fingerprint"] = fingerprint({"argv": refreshed["argv"]})
     refreshed["gate_fingerprint"] = gate_fingerprint(refreshed)
     refreshed["manifest_sha256"] = manifest_fingerprint(refreshed)
     return refreshed

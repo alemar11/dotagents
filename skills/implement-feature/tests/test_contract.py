@@ -207,12 +207,12 @@ def run_app_preclaim_fixture(
         return "unsupported-runtime", observations, mutations
     if root_goal_state == "blocked":
         return "new-root-required", observations, mutations
-    observations.append("authorization")
-    if permission != "granted":
-        return "permission-denied", observations, mutations
     observations.extend(["snapshot", "delivery-preflight", "intake"])
     if not bundle_ready:
         return "planning-required", observations, mutations
+    observations.append("authorization")
+    if permission != "granted":
+        return "permission-denied", observations, mutations
     mutations.extend(
         [
             "atomic-claim",
@@ -470,7 +470,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 self.assertIn(value, row)
         self.assertIn("This file owns every user-controlled App orchestration field", options)
 
-    def test_standard_authorization_prompt_is_exact_and_user_friendly(self) -> None:
+    def test_standard_authorization_resolution_and_prompt_are_exact(self) -> None:
         skill = self.read("SKILL.md")
         options = self.read("references/options.md")
         disclosure = (
@@ -507,8 +507,26 @@ class ImplementFeatureContractTests(unittest.TestCase):
             line.removeprefix("> ") for line in options.splitlines()
         )
         normalized_options = " ".join(normalized_options.split())
-        self.assertIn("exact disclosure and fixed answers", normalized_skill)
+        self.assertIn("exact disclosure and authorization resolution", normalized_skill)
+        self.assertIn(
+            "imperative owner invocation that explicitly directs `$implement-feature`",
+            normalized_skill,
+        )
         self.assertIn(disclosure, normalized_options)
+        self.assertIn("## Invocation Resolution", options)
+        self.assertIn(
+            "directly orders it to implement or execute an identified durable "
+            "Feature Spec or bundle",
+            normalized_options,
+        )
+        self.assertIn(
+            "do not call `request_user_input`; continue to CLAIM",
+            normalized_options,
+        )
+        self.assertIn(
+            "merely permits tasks, workers, delegation, or subagents",
+            normalized_options,
+        )
         self.assertIn("| Header | `Start work?` |", options)
         self.assertIn(
             "| Question id | `visible_app_task_permission` |", options
@@ -1352,7 +1370,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "visible_app_task_permission=granted", skill
         )
         self.assertIn("fixed model, reasoning policy, and execution flow", options)
-        self.assertIn("Generic delegation, worker assignment, or subagent authority never supplies", skill)
+        self.assertIn(
+            "Generic delegation, worker assignment, subagent authority, or "
+            "permission to create tasks alone never supplies",
+            skill,
+        )
 
     def test_cache_maintenance_is_root_owned_bounded_and_after_claim(self) -> None:
         skill = self.read("SKILL.md")
@@ -1418,6 +1440,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("ledger's exact terminal evidence", normalized_lifecycle)
         self.assertIn("permits only `terminal` and", lifecycle)
         self.assertIn("`preimplementation-abort`", lifecycle)
+        baseline = self.read("references/baseline-validation.md")
+        abort = baseline.split("## Preimplementation Stop", 1)[1]
+        self.assertLess(abort.index("task-stop evidence"), abort.index("`preimplementation-aborted`"))
+        self.assertLess(abort.index("`preimplementation-aborted`"), abort.index("`set_thread_archived`"))
+        preimplementation = lifecycle.split("If baseline preparation/acceptance cannot continue", 1)[1]
+        self.assertLess(preimplementation.index("`preimplementation-aborted`"), preimplementation.index("`set_thread_archived`"))
+        self.assertLess(preimplementation.index("`set_thread_archived`"), preimplementation.index("--release-reason preimplementation-abort"))
         self.assertIn("Frozen archive-v1 entries remain readable evidence", normalized_ledger)
         self.assertIn("deterministic Markdown audit report is rendered only during archival", normalized_ledger)
 
@@ -2288,7 +2317,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 "denied",
                 True,
                 "permission-denied",
-                ["surface", "authorization"],
+                ["surface", "snapshot", "delivery-preflight", "intake", "authorization"],
             ),
             (
                 True,
@@ -2296,7 +2325,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 "granted",
                 False,
                 "planning-required",
-                ["surface", "authorization", "snapshot", "delivery-preflight", "intake"],
+                ["surface", "snapshot", "delivery-preflight", "intake"],
             ),
         )
         for surface, goal_surface, permission, ready, expected, observations in cases:
@@ -2330,7 +2359,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertEqual(outcome, "accepted")
         self.assertEqual(
             observations,
-            ["surface", "authorization", "snapshot", "delivery-preflight", "intake"],
+            ["surface", "snapshot", "delivery-preflight", "intake", "authorization"],
         )
         self.assertEqual(
             mutations,

@@ -68,7 +68,9 @@ fingerprint, path, and the ledger's exact terminal evidence, not Markdown.
 Archive consumes the receipt; interruption remains recoverable.
 
 If baseline preparation/acceptance cannot continue, first apply the verified
-`preimplementation-aborted` event from `baseline-validation.md`, then
+`preimplementation-aborted` event from `baseline-validation.md` while every
+original App-managed checkout still exists. Then call `set_thread_archived` for
+the stopped baseline-only tasks, and only then
 run the same two commands with `--release-reason preimplementation-abort` and
 `ledger archive --reason preimplementation-abort`, using the exact abort
 evidence ref. This path never creates, completes, or synthesizes a Goal.

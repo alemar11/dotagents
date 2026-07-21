@@ -25,15 +25,19 @@ in `references/gitstack-installation-parity.md` using the exact bundled-skill
 path supplied by the App/system skill catalog. Failure stops before source reads,
 permission, claim, artifacts, tasks, Goals, or mutation.
 
-After read-only intake succeeds, use the exact disclosure and fixed answers in
-`references/options.md`. Continue only with
-`visible_app_task_permission=granted`. The grant binds the
-exact bundle, repository, path, validation, tool, and execution-scope
-fingerprints. Denial or silence creates nothing. Drift before implementation is
+After read-only intake succeeds, use the exact disclosure and authorization
+resolution in `references/options.md`. An imperative owner invocation that
+explicitly directs `$implement-feature` to implement or execute an identified
+Feature Spec or bundle resolves `visible_app_task_permission=granted`; show the
+complete scope summary and continue without asking a redundant question. When
+implementation intent remains absent or ambiguous, use the fixed answers and
+continue only after a grant. The grant binds the exact bundle, repository, path,
+validation, tool, and execution-scope fingerprints. Denial, or silence when a
+question is required, creates nothing. Drift before implementation is
 `authorization-stale`; an undeclared path after implementation starts is
-`needs-owner`. Never ask again, recapture, or widen scope.
-Generic delegation, worker assignment, or subagent authority never supplies
-this explicit visible-task grant.
+`needs-owner`. Never ask again, recapture, or widen scope. Generic delegation,
+worker assignment, subagent authority, or permission to create tasks alone
+never supplies the implementation grant.
 
 ## Immutable Safety Contract
 

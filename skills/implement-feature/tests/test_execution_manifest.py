@@ -213,6 +213,34 @@ class ExecutionManifestTests(unittest.TestCase):
                 cli.run_manifest(manifest, str(root / "stale-receipt.json"))
             self.assertIn(error.exception.code, {"baseline-checkout-dirty", "manifest-stale"})
 
+    def test_baseline_argv_fingerprints_do_not_depend_on_checkout_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first_root = root / "first"
+            second_root = root / "second"
+            first_root.mkdir()
+            second_root.mkdir()
+            first_repo = self.make_repo(first_root)
+            second_repo = self.make_repo(second_root)
+            _, bundle = self.make_bundle(root)
+            tool = self.make_prettier(root, "raise SystemExit(0)\n")
+            argv = [str(tool), "--check", "."]
+
+            first = cli.prepare_command(self.baseline_request(first_repo, argv), bundle)
+            second = cli.prepare_command(self.baseline_request(second_repo, argv), bundle)
+
+            self.assertEqual(
+                first["baseline"]["authored_argv_fingerprint"],
+                second["baseline"]["authored_argv_fingerprint"],
+            )
+            self.assertEqual(first["argv_fingerprint"], second["argv_fingerprint"])
+            self.assertNotEqual(first["cwd"], second["cwd"])
+            self.assertNotEqual(first["manifest_sha256"], second["manifest_sha256"])
+            self.assertNotEqual(
+                first["baseline"]["checkout_identity"]["checkout"],
+                second["baseline"]["checkout_identity"]["checkout"],
+            )
+
     def test_baseline_detects_git_visible_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -328,6 +356,19 @@ class ExecutionManifestTests(unittest.TestCase):
             malformed["receipt_sha256"] = cli.fingerprint({key: item for key, item in malformed.items() if key != "receipt_sha256"})
             with self.assertRaises(cli.ManifestError):
                 cli.reuse_receipt(manifest, malformed)
+
+    def test_command_environment_keeps_the_selected_executable_ahead_of_git(self) -> None:
+        manifest = {
+            "argv": ["/opt/toolchain/bin/python3", "-m", "unittest"],
+            "tools": [
+                {"tool_id": "git", "resolved_path": "/usr/bin/git"},
+                {"tool_id": "validation-command", "resolved_path": "/opt/toolchain/bin/python3"},
+            ],
+        }
+        path = cli.command_environment(manifest)["PATH"].split(os.pathsep)
+        self.assertEqual(path[0], "/opt/toolchain/bin")
+        self.assertEqual(path[1], "/usr/bin")
+        self.assertEqual(path.count("/opt/toolchain/bin"), 1)
 
     def test_undeclared_write_fails_and_dependency_drift_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

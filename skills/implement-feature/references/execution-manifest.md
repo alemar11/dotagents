@@ -149,6 +149,9 @@ Preparation resolves each helper, executable, and relevant dependency and
 records source kind/ref, exact path, real path, size, SHA-256, and observed
 version. Execution rechecks those values before launch. Missing tools return
 `tool-missing`; changed bytes or versions return `tool-digest-mismatch`.
+The selected command executable's directory is first in the child `PATH`, ahead
+of supporting tools such as Git, so `#!/usr/bin/env` subprocesses cannot silently
+select a different runtime than the registered validation command.
 
 If a pinned path moves, use `command refresh-tools`. It emits a new immutable
 manifest only when source, digest, and version are unchanged. It rejects an

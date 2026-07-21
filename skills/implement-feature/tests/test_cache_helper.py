@@ -2140,6 +2140,16 @@ class LedgerCacheV21Tests(unittest.TestCase):
             with self.assertRaises(CACHE_RUNTIME.CacheError, msg=mutation):
                 CACHE_RUNTIME.validate_controller_response(candidate)
 
+    def test_controller_accepts_claim_safe_double_hyphen_portfolio_key(self) -> None:
+        self.ledger = self.ledger_root / "feature-slug--bundle-prefix.json"
+        self.acquire()
+        self.create()
+
+        result = parse_result(self.controller_next())
+
+        self.assertEqual(result["portfolio_key"], "feature-slug--bundle-prefix")
+        self.assertEqual(result["action"], "observe-root-title")
+
     def test_schema15_owned_start_is_single_use_and_autoreview_result_drives_gate(self) -> None:
         self.bootstrap_active_task()
         revision = self.observe_revision()
@@ -2959,7 +2969,7 @@ class LedgerCacheV21Tests(unittest.TestCase):
             "task_stop_evidence": [{
                 "task_key": self.task_key,
                 "task_ref": "app-task://worker-232",
-                "evidence_ref": "app-task://worker-232/archived",
+                "evidence_ref": "app-task://worker-232/stopped-idle",
             }],
             "evidence_ref": evidence,
         }])

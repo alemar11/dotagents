@@ -45,6 +45,10 @@ validation_plan
 Each nonempty `validation_plan[]` row supplies validation and command ids,
 adapter/policy, authored/projected argv fingerprints, tool-identity fingerprint,
 and execution-policy fingerprint exactly as validated by the typed template.
+The argv fingerprints intentionally bind only the literal authored or projected
+argv so registration can precede App checkout creation. The managed checkout,
+cwd, and checkout identity remain separately bound by task registration,
+command-manifest identity, baseline observation, and atomic acceptance.
 
 Keys and slug are lower-kebab. GitHub identity is `owner/repository`; CI is
 `configured|not-configured`. Source, task, profile, repository, dependency,

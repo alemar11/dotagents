@@ -10,7 +10,7 @@ families' phase-specific inputs and evidence.
 | --- | --- |
 | `checkouts-observed` | Task identity plus the complete registered delivery checkout map and evidence. |
 | `baseline-accepted` | Current CAS/scope binding, every registered baseline manifest and receipt byte digest, and acceptance evidence. |
-| `preimplementation-aborted` | Closed reason, complete task-stop evidence, unchanged-checkout proof, and abort evidence. |
+| `preimplementation-aborted` | Closed reason, complete stopped-but-not-yet-archived task evidence, live unchanged-checkout proof, and abort evidence. |
 | `preflight-observed` | Exact delivery/GitHub/branch/default-base identity, definitive CI availability, preflight key, and evidence. |
 | `command-reserved` | Delivery, one-attempt command/manifest/policy identity, attempt/receipt refs, current task observation, and evidence. |
 | `command-launched` | Same attempt identity, durable launch fingerprint, and evidence. |

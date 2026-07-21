@@ -17,7 +17,7 @@ facts already present in that snapshot:
 - Load `app-control-plane-delays.md` only when an App task identity/title or
   root Goal observation is already delayed or ambiguous.
 - Load `options.md` and `task-model-policy.md` only after intake and preflight
-  succeed and authorization is ready to ask.
+  succeed and authorization is ready to resolve.
 - After authorization is granted, load `run-state.md`, `cache-lifecycle.md`, and
   `packets-registration.md` for claim, maintenance, and registration.
 
@@ -61,8 +61,9 @@ wait. Never serialize, force-bind, or schedule around a duplicate executable
 
 ## Authorization, Claim, And Registration
 
-Render the deterministic complete scope summary and ask the single question
-owned by `options.md`. A grant binds the exact execution-scope fingerprint.
+Render the deterministic complete scope summary. Resolve an explicit imperative
+invocation through `options.md`; ask its single question only when permission
+remains `not-requested`. A grant binds the exact execution-scope fingerprint.
 
 Carry the verified GitStack installation evidence and fingerprint during
 registration. Run `active-root-claim --json doctor`, canonicalize repository and source

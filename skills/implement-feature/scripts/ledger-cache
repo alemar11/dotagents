@@ -4043,11 +4043,18 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 checkout = delivery["managed_checkout"]
                 if checkout is None:
                     continue
+                checkout_path = Path(checkout["checkout"])
+                if not checkout_path.is_dir():
+                    raise CacheError(
+                        "state-conflict",
+                        "preimplementation abort requires the original managed checkout before task archival",
+                        4,
+                    )
                 status = subprocess.run(
-                    ["git", "-C", checkout["checkout"], "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+                    ["git", "-C", str(checkout_path), "status", "--porcelain=v2", "--untracked-files=all", "-z"],
                     capture_output=True,
                 )
-                head = subprocess.run(["git", "-C", checkout["checkout"], "rev-parse", "HEAD"], text=True, capture_output=True)
+                head = subprocess.run(["git", "-C", str(checkout_path), "rev-parse", "HEAD"], text=True, capture_output=True)
                 if status.returncode or status.stdout or head.returncode or head.stdout.strip() != checkout["baseline_revision"]:
                     raise CacheError("state-conflict", "preimplementation abort checkout was mutated", 4)
             task["implementation_baseline"] = "planning-required"
@@ -6337,7 +6344,7 @@ def validate_controller_response(value: Any) -> dict[str, Any]:
         or not controller_type_matches(value["target"], "target")
         or not controller_type_matches(value["ledger"], "absolute-path")
         or not isinstance(value["portfolio_key"], str)
-        or not LOWER_KEBAB_RE.fullmatch(value["portfolio_key"])
+        or not ID_RE.fullmatch(value["portfolio_key"])
         or not controller_type_matches(value["root_id"], "identifier")
         or not isinstance(value["blockers"], list)
         or not isinstance(value["allowed_transitions"], list)
