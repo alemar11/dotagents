@@ -120,12 +120,13 @@
     }
   },
   "registration": {
-    "schema_version": "9.0.0",
+    "schema_version": "10.0.0",
     "root_task_ref": "codex-task:019f761a-59b5-74b3-97a3-f24f01dadc93",
     "root_checkout": "__ROOT_CHECKOUT__",
     "objective": "Deliver Feature Spec ambrogio-dev/yn-ai-workflows#231 \"Workflow Routing Contract Alignment\" through an open, non-draft, merge-ready-but-unmerged pull request against the discovered default branch, satisfying validation, autoreview, current-revision Codex review, CI when configured, integration, tracker closeout, repository rules, and Goal closeout.",
     "objective_fingerprint": "95d0985e28887b0ef0c098bf28dfe8929b6b84dc6d63cf670f0413a04a9cf764",
     "permission_evidence_ref": "session-replay:authorized-visible-app-task-permission",
+    "execution_manifest_evidence": "__EXECUTION_MANIFEST_EVIDENCE__",
     "repositories": "__REPOSITORIES__",
     "repository_checkouts": "__REPOSITORY_CHECKOUTS__",
     "sources": [

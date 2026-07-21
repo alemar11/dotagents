@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "22.0.0"
+__version__ = "23.0.0"
 LEDGER_SCHEMA_VERSION = "15.0.0"
-REGISTRATION_SCHEMA_VERSION = "9.0.0"
+REGISTRATION_SCHEMA_VERSION = "10.0.0"
 DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "2.0.0"
 CONTROLLER_PROJECTION_SCHEMA_VERSION = "3.0.0"
 CONTROLLER_TEMPLATE_SCHEMA_VERSION = "3.0.0"
@@ -598,6 +598,22 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def execution_manifest_installation_evidence() -> dict[str, str]:
+    path = Path(__file__).resolve().with_name("execution-manifest")
+    if path.is_symlink() or not path.is_file():
+        raise CacheError(
+            "unsupported-runtime",
+            f"execution-manifest installation is unavailable or unsafe: {path}",
+            3,
+        )
+    evidence = {
+        "schema_version": "execution-manifest-installation:v1",
+        "path": str(path),
+        "sha256": sha256_file(path),
+    }
+    return {**evidence, "fingerprint": request_fingerprint(evidence)}
 
 
 def sync_directory(path: Path) -> None:
@@ -1266,6 +1282,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         "objective_fingerprint",
         "permission_evidence_ref",
         "gitstack_installation_evidence",
+        "execution_manifest_evidence",
         "repositories",
         "repository_checkouts",
         "sources",
@@ -1316,6 +1333,40 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     evidence_fingerprint = evidence_payload.pop("fingerprint")
     if request_fingerprint(evidence_payload) != evidence_fingerprint:
         raise CacheError("invalid-input", "GitStack installation evidence fingerprint does not match", 2)
+    execution_manifest_evidence = exact_object(
+        registration["execution_manifest_evidence"],
+        {"schema_version", "path", "sha256", "fingerprint"},
+        "registration.execution_manifest_evidence",
+    )
+    if execution_manifest_evidence["schema_version"] != "execution-manifest-installation:v1":
+        raise CacheError(
+            "invalid-input",
+            "execution-manifest installation evidence schema is unsupported",
+            2,
+        )
+    execution_manifest_evidence["path"] = canonical_absolute_path(
+        execution_manifest_evidence["path"],
+        "registration.execution_manifest_evidence.path",
+    )
+    for field in ("sha256", "fingerprint"):
+        canonical_fingerprint(
+            execution_manifest_evidence[field],
+            f"registration.execution_manifest_evidence.{field}",
+        )
+    manifest_payload = dict(execution_manifest_evidence)
+    manifest_fingerprint = manifest_payload.pop("fingerprint")
+    if request_fingerprint(manifest_payload) != manifest_fingerprint:
+        raise CacheError(
+            "invalid-input",
+            "execution-manifest installation evidence fingerprint does not match",
+            2,
+        )
+    if execution_manifest_evidence != execution_manifest_installation_evidence():
+        raise CacheError(
+            "state-conflict",
+            "registration execution-manifest evidence is stale",
+            4,
+        )
     repositories = registration["repositories"]
     checkouts = registration["repository_checkouts"]
     if repositories != claim["repositories"] or checkouts != claim["repository_checkouts"]:
@@ -1703,7 +1754,8 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         raise CacheError("state-conflict", "registration execution scope fingerprint does not match", 4)
     if request_fingerprint(
         {"execution_scope_fingerprint": execution_scope_fingerprint, "permission_evidence_ref": permission,
-         "gitstack_installation_fingerprint": evidence_fingerprint}
+         "gitstack_installation_fingerprint": evidence_fingerprint,
+         "execution_manifest_fingerprint": manifest_fingerprint}
     ) != authorization_fingerprint:
         raise CacheError("state-conflict", "registration authorization fingerprint does not match", 4)
     return {
@@ -1716,6 +1768,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         "objective_fingerprint": objective_fingerprint,
         "permission_evidence_ref": permission,
         "gitstack_installation_evidence": gitstack_evidence,
+        "execution_manifest_evidence": execution_manifest_evidence,
         "repositories": repositories,
         "repository_checkouts": checkouts,
         "sources": normalized_sources,

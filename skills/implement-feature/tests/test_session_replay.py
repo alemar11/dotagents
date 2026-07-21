@@ -31,6 +31,19 @@ EXPECTED_ROLLOUTS = {
 }
 
 
+def execution_manifest_evidence() -> dict[str, str]:
+    path = (SKILL_ROOT / "scripts/execution-manifest").resolve()
+    value = {
+        "schema_version": "execution-manifest-installation:v1",
+        "path": str(path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+    value["fingerprint"] = hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return value
+
+
 def revision_key(
     repository: str,
     pr_number: int,
@@ -421,13 +434,14 @@ class SessionReplayTests(unittest.TestCase):
             permission = "user-message://schema12-replay-authorized"
             objective = "Implement replay Feature Spec with CI when configured"
             registration = {
-                "schema_version": "9.0.0",
+                "schema_version": "10.0.0",
                 "bundle_sha256": bundle_sha,
                 "execution_scope_fingerprint": execution_scope,
                 "authorization_fingerprint": fingerprint({
                     "execution_scope_fingerprint": execution_scope,
                     "permission_evidence_ref": permission,
                     "gitstack_installation_fingerprint": "1" * 64,
+                    "execution_manifest_fingerprint": "3" * 64,
                 }),
                 "root_task_ref": "app-task://replay-root",
                 "root_checkout": str(repository),
@@ -439,6 +453,12 @@ class SessionReplayTests(unittest.TestCase):
                     "plugin_root": "/installed/gitstack/6.0.0", "loaded_skill_path": "/installed/gitstack/6.0.0/skills/github-review-threads/SKILL.md",
                     "manifest_version": "6.0.0", "package_version": "6.0.0", "cli_version": "6.0.0",
                     "cli_sha256": "2" * 64, "fingerprint": "1" * 64,
+                },
+                "execution_manifest_evidence": {
+                    "schema_version": "execution-manifest-installation:v1",
+                    "path": str(SKILL_ROOT / "scripts/execution-manifest"),
+                    "sha256": "3" * 64,
+                    "fingerprint": "3" * 64,
                 },
                 "repositories": claim["repositories"],
                 "repository_checkouts": claim["repository_checkouts"],
@@ -464,10 +484,12 @@ class SessionReplayTests(unittest.TestCase):
             }
             evidence = registration["gitstack_installation_evidence"]
             evidence["fingerprint"] = fingerprint({key: value for key, value in evidence.items() if key != "fingerprint"})
+            registration["execution_manifest_evidence"] = execution_manifest_evidence()
             registration["authorization_fingerprint"] = fingerprint({
                 "execution_scope_fingerprint": execution_scope,
                 "permission_evidence_ref": permission,
                 "gitstack_installation_fingerprint": evidence["fingerprint"],
+                "execution_manifest_fingerprint": registration["execution_manifest_evidence"]["fingerprint"],
             })
             created = invoke(
                 LEDGER_CACHE,
@@ -476,7 +498,7 @@ class SessionReplayTests(unittest.TestCase):
                 "--operation-id", "10000000000000000000000000000001",
                 "--registration-file", str(packet("registration", registration)),
             )
-            self.assertEqual(created["version"], "22.0.0")
+            self.assertEqual(created["version"], "23.0.0")
 
             head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
             tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()
@@ -826,9 +848,10 @@ class SessionReplayTests(unittest.TestCase):
                 "__ROOT_GOAL_COMPLETION_EVIDENCE__": facts[
                     "root_goal_completion_evidence_ref"
                 ],
+                "__EXECUTION_MANIFEST_EVIDENCE__": execution_manifest_evidence(),
             }
             registration = materialize(fixture["registration"], replacements)
-            self.assertEqual(registration["schema_version"], "9.0.0")
+            self.assertEqual(registration["schema_version"], "10.0.0")
             self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
             self.assertNotIn("repository", registration["sources"][0])
             self.assertNotIn("target_branch", registration["sources"][0])

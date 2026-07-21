@@ -7,20 +7,21 @@ only registration inputs and root event families.
 
 ## Registration Inputs
 
-Registration schema is exactly `9.0.0`. Supply:
+Registration schema is exactly `10.0.0`. Supply:
 
 | input | phase-specific contract |
 | --- | --- |
-| `schema_version` | Exact registration schema `9.0.0`. |
+| `schema_version` | Exact registration schema `10.0.0`. |
 | `bundle_sha256` | Exact immutable execution-bundle bytes. |
 | `execution_scope_fingerprint` | Complete deliveries, paths, and validation plans. |
-| `authorization_fingerprint` | Execution scope, permission evidence, and GitStack installation fingerprint. |
+| `authorization_fingerprint` | Execution scope, permission evidence, GitStack installation fingerprint, and execution-manifest installation fingerprint. |
 | `root_task_ref` | Calling App task identity. |
 | `root_checkout` | Calling App task absolute checkout. |
 | `objective` | Fresh portfolio Goal text containing exact `CI when configured`. |
 | `objective_fingerprint` | Digest of the exact objective. |
 | `permission_evidence_ref` | Exact grant evidence. |
 | `gitstack_installation_evidence` | Complete verified `gitstack-installation-parity:v1` evidence. |
+| `execution_manifest_evidence` | Exact `execution-manifest-installation:v1` sibling-helper path, SHA-256, and fingerprint from this bootstrap epoch. |
 | `repositories` | Sorted claim-identical Git common directories. |
 | `repository_checkouts` | Complete, exact `{git_common_dir, checkout}` claim map. |
 | `sources` | Nonempty canonical task-source records. |
@@ -54,6 +55,12 @@ Keys and slug are lower-kebab. GitHub identity is `owner/repository`; CI is
 `configured|not-configured`. Source, task, profile, repository, dependency,
 delivery, and claim scope are immutable. Registration derives the stable root
 title and internal Goal state `pending`.
+
+`ledger create` independently derives the current sibling
+`scripts/execution-manifest` evidence and rejects a missing, copied, or stale
+registration before ledger or App-task creation. A fresh start must rebuild this
+evidence and every authorization fingerprint; prior-epoch packets are never
+valid bootstrap inputs.
 
 ## Root Events
 

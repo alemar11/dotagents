@@ -105,7 +105,11 @@ control-plane-unrecoverable and the typed preimplementation retirement in
 `baseline-validation.md` accepts. Do not ask for a separate `start over`
 request. A recoverable run still requires an explicit request to abandon it;
 ambiguous evidence blocks. Only after archive verification may the invocation
-re-enter the normal bootstrap as one fresh run with new identities.
+re-enter the normal bootstrap as one fresh run with new identities. A fresh run
+reuses only revalidated immutable source inputs; it creates an empty transient
+bootstrap workspace and regenerates every derived packet, manifest, receipt,
+fingerprint, claim, ledger, task, and checkout identity under the currently
+loaded installation.
 
 Return state-derived source, task, root Goal, managed-checkout, changed-path,
 validation, commit, PR/revision, review, CI, tracker/domain-closeout,

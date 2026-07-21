@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v22 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v23 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -15,7 +15,7 @@ missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
 Active state accepts only ledger schema `15.0.0` created from registration
-schema `9.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+schema `10.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -245,7 +245,7 @@ reject absolute/backslash/empty/parent traversal.
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and
 `terminal` reports staged closeout, review-timeout warnings, and archive
-readiness. Their shapes remain unchanged in v22. `diagnostics` schema `2.0.0`
+readiness. Their shapes remain unchanged in v23. `diagnostics` schema `2.0.0`
 is the root's user-facing read model. It binds generation/fingerprint, preserves
 typed evidence in raw fields, and adds qualified display fields. It derives
 `terminal_verification=invalidated|clean|incomplete`; only unchanged
@@ -261,7 +261,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `15.0.0`, any registration schema before `9.0.0`, or any
+JSON schema before `15.0.0`, any registration schema before `10.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses

@@ -116,8 +116,12 @@ authorizes an automatic fresh start.
 Then perform exactly one sequence: retire the old run through
 `preimplementation-aborted`, archive remaining tasks, release its claim,
 archive and verify its ledger, and re-enter the normal bootstrap with new claim,
-ledger, task, and checkout identities. Never reset state in place, reuse the
-retired task, or describe the old run as restarted. If the fresh baseline fails,
+ledger, task, and checkout identities. Start from a new empty transient
+bootstrap directory. Revalidate immutable source inputs, but discard and
+regenerate every derived registration, request, manifest, receipt, preflight,
+fingerprint, and control-plane identity with the currently loaded installation.
+Never reset state in place, reuse the retired task, reuse a prior bootstrap
+artifact, or describe the old run as restarted. If the fresh baseline fails,
 stop normally; never start over again automatically in the same invocation.
 
 A still-recoverable eligible run continues by default. Only an explicit owner

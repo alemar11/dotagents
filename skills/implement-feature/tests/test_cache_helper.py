@@ -62,7 +62,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV22Tests(unittest.TestCase):
+class LedgerCacheV23Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -167,7 +167,7 @@ class LedgerCacheV22Tests(unittest.TestCase):
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
         registration = {
-            "schema_version": "9.0.0",
+            "schema_version": "10.0.0",
             "bundle_sha256": hashlib.sha256(b"bundle-fixture").hexdigest(),
             "execution_scope_fingerprint": "0" * 64,
             "authorization_fingerprint": "0" * 64,
@@ -177,6 +177,7 @@ class LedgerCacheV22Tests(unittest.TestCase):
             "objective_fingerprint": hashlib.sha256(objective.encode()).hexdigest(),
             "permission_evidence_ref": "user-message://authorized-visible-tasks",
             "gitstack_installation_evidence": self.gitstack_installation_evidence(),
+            "execution_manifest_evidence": CACHE_RUNTIME.execution_manifest_installation_evidence(),
             "repositories": claim["repositories"],
             "repository_checkouts": claim["repository_checkouts"],
             "sources": [
@@ -268,6 +269,7 @@ class LedgerCacheV22Tests(unittest.TestCase):
                 "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
                 "permission_evidence_ref": registration["permission_evidence_ref"],
                 "gitstack_installation_fingerprint": registration["gitstack_installation_evidence"]["fingerprint"],
+                "execution_manifest_fingerprint": registration["execution_manifest_evidence"]["fingerprint"],
             }
         )
 
@@ -2036,12 +2038,12 @@ class LedgerCacheV22Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v22_offline_and_read_only(self) -> None:
+    def test_doctor_is_v23_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "22.0.0")
+        self.assertEqual(version, "23.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -2667,6 +2669,32 @@ class LedgerCacheV22Tests(unittest.TestCase):
         self.assertEqual(state["portfolio"]["repositories"], claim["repositories"])
         self.assertEqual(state["claim"]["fingerprint"], claim["fingerprint"])
         self.assertEqual(len(state["operations"]), 1)
+
+    def test_create_rejects_prior_registration_schema_and_stale_execution_manifest(self) -> None:
+        claim = self.acquire()
+
+        prior_schema = self.registration_for(claim)
+        prior_schema["schema_version"] = "9.0.0"
+        rejected = self.create(registration=prior_schema, check=False)
+        error = self.error(rejected, "invalid-input")
+        self.assertIn("registration schema is unsupported", error["message"])
+        self.assertFalse(self.ledger.exists())
+
+        stale = self.registration_for(claim)
+        stale_evidence = stale["execution_manifest_evidence"]
+        stale_evidence["sha256"] = hashlib.sha256(b"retired-execution-manifest").hexdigest()
+        stale_evidence["fingerprint"] = CACHE_RUNTIME.request_fingerprint(
+            {
+                key: value
+                for key, value in stale_evidence.items()
+                if key != "fingerprint"
+            }
+        )
+        self.refresh_registration_fingerprints(stale)
+        rejected = self.create(registration=stale, check=False)
+        error = self.error(rejected, "state-conflict")
+        self.assertIn("execution-manifest evidence is stale", error["message"])
+        self.assertFalse(self.ledger.exists())
 
     def test_objective_requires_conditional_ci_on_create_and_read(self) -> None:
         self.acquire()

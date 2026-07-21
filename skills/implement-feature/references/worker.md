@@ -37,8 +37,12 @@ root/background execution. One multi-repository Spec remains one visible task.
 
 Workers report evidence; only root changes portfolio state. Workers never use
 Goal tools, renew claims, manage siblings, release/archive, merge, deploy, or
-close post-merge work. Internal agents inherit the same task, checkout, scope,
-and authority.
+close post-merge work. Workers must never create, fork, message, rename, pin,
+archive, or otherwise manage another visible App task. In particular, never
+call `codex_app__create_thread`, `codex_app__fork_thread`,
+`codex_app__send_message_to_thread`, or any App task lifecycle tool. Internal
+agents, when explicitly authorized, remain non-visible inside the same task,
+checkout, scope, and authority.
 
 For root-owned advancement, wait in the exact phase; root alone records and
 resolves the typed wait. Elapsed turns create no replacement lifecycle.
@@ -56,7 +60,9 @@ AutoReview, emit gates, or use Goal tools until root reports atomic baseline
 acceptance and Goal activation. After activation, perform only the phase
 selected by the controller and its loaded procedure contract. Execute each
 manifest through its one bounded attempt. Work only in managed checkouts and
-stop on scope, identity, authority, or evidence drift.
+stop on scope, identity, authority, or evidence drift. Never create, fork,
+message, rename, pin, archive, or manage another visible App task; internal
+agents remain non-visible within this task and checkout.
 
 Deliver this fixed prompt through `codex_app__send_message_to_thread` only to
 the recorded task identity.

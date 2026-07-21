@@ -4,6 +4,14 @@ This file owns the complete pre-registration order. It applies only after the
 runtime surface and installed GitStack parity gates in `SKILL.md` pass and before
 the ledger exists.
 
+Each entry into this bootstrap is a new bootstrap epoch. Create a new empty
+transient directory before producing any derived artifact. Revalidated exact
+immutable source snapshot bytes may be reused as inputs. Never copy, reopen, or
+reuse derived registration JSON, a command request, execution manifest, receipt,
+preflight result, fingerprint, claim, ledger, or task/checkout identity from a
+prior or retired epoch. Regenerate all derived artifacts with the currently
+loaded skill and helper installation.
+
 ## Closed Contract Selection
 
 Build one read-only source snapshot, then select the full bootstrap set from
@@ -66,14 +74,16 @@ invocation through `options.md`; ask its single question only when permission
 remains `not-requested`. A grant binds the exact execution-scope fingerprint.
 
 Carry the verified GitStack installation evidence and fingerprint during
-registration. Run `active-root-claim --json doctor`, canonicalize repository and source
+registration. Derive `execution_manifest_evidence` from the sibling
+`scripts/execution-manifest` path and current file bytes in this epoch; bind its
+fingerprint into authorization. Run `active-root-claim --json doctor`, canonicalize repository and source
 identities, and acquire the complete portfolio claim before cache or ledger
 mutation. Qualify local refs with their Git common directory. A live overlap is
 `needs-owner`; a stale conflict follows the separately authorized takeover
 contract in `run-state.md` and never permits partial replacement.
 
 After claim, synchronously run the cache doctor and fixed 180-day prune once in
-root. Then create one schema-9 registration packet through
+root. Then create one schema-10 registration packet through
 `packets-registration.md`, create schema-15 state, set and observe the derived
 root title, and enter the controller loop. Goal state remains internal
 `pending`; do not call `create_goal` yet.

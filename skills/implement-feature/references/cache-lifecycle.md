@@ -25,7 +25,7 @@ remain blocking.
 ## Active And Archived State
 
 Keep resumable ledger-schema `15.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v22 is the
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v23 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
