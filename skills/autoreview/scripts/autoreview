@@ -32,7 +32,7 @@ sys.modules[OPERATION_SPEC.name] = owned_operation
 sys.modules.setdefault("autoreview_protocol", protocol)
 OPERATION_SPEC.loader.exec_module(owned_operation)
 
-VERSION = "3.0.0"
+VERSION = "4.0.0"
 
 MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
 INVALID_OUTPUT_PREVIEW_BYTES = 2048
@@ -1783,10 +1783,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--evidence-output", help="Write a validated review-chain evidence envelope.")
     parser.add_argument("--prior-evidence", help="Prior review-chain evidence envelope.")
     parser.add_argument("--finding-file", help="Canonical accepted/rejected finding intake for fix verification.")
-    parser.add_argument("--reservation-file", help="Protocol-derived Implement Feature reservation packet.")
-    parser.add_argument("--attempt-file", help="Append-only managed attempt journal.")
-    parser.add_argument("--candidate-output", help="Quarantined current-schema evidence candidate.")
-    parser.add_argument("--operation-output", help="Write the exact ingest operation for interrupted-apply recovery.")
     parser.add_argument(
         "--heartbeat-seconds",
         type=positive_int,
@@ -1805,30 +1801,9 @@ def positive_int(value: str) -> int:
 
 
 def managed_owner(repo: Path) -> dict[str, Any] | None:
-    root = Path.home() / ".cache/dotagents/skills/implement-feature/ledgers"
-    if not root.is_dir():
-        return None
-    resolved = str(repo.resolve())
-    matches: list[dict[str, Any]] = []
-    for path in sorted(root.glob("*.json")):
-        try:
-            state = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(state, dict) or state.get("schema_version") != "9.0.0":
-            continue
-        for task in state.get("tasks", []):
-            for delivery in task.get("deliveries", []):
-                checkout = delivery.get("managed_checkout")
-                if isinstance(checkout, dict) and checkout.get("checkout") == resolved:
-                    matches.append({"ledger": str(path), "task_key": task.get("task_key"), "delivery_key": delivery.get("delivery_key")})
-    if len(matches) > 1:
-        raise AutoreviewError(
-            "managed checkout ownership is ambiguous",
-            code="managed-checkout-ambiguous",
-            recovery="needs-owner",
-        )
-    return matches[0] if matches else None
+    # Implement Feature v1 journals ordinary AutoReview invocations externally.
+    # AutoReview never discovers caller authority from another skill's state.
+    return None
 
 
 def load_attempt_journal(path: Path) -> list[dict[str, Any]]:
@@ -1917,6 +1892,7 @@ def attempt_record(
 
 
 def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
+    return None
     if not args.reservation_file:
         owner = managed_owner(repo_root())
         if owner is not None:
@@ -2127,30 +2103,11 @@ def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
 
 
 def ledger_apply_events(reservation: dict[str, Any], events: list[dict[str, Any]], operation_id: str, *, dry_run: bool) -> dict[str, Any]:
-    ledger = Path(reservation["ledger"])
-    state = json.loads(ledger.read_text())
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-        json.dump(events, handle, sort_keys=True, separators=(",", ":"))
-        events_path = Path(handle.name)
-    command = [
-        str(Path(__file__).resolve().parents[2] / "implement-feature/scripts/ledger-cache"),
-        "--json", "ledger", "apply", "--ledger", str(ledger), "--root-id", reservation["root_id"],
-        "--expected-claim-fingerprint", reservation["expected_claim_fingerprint"],
-        "--expected-generation", str(state["generation"]), "--expected-state-fingerprint", state["content_fingerprint"],
-        "--operation-id", operation_id, "--events-file", str(events_path),
-    ]
-    if dry_run:
-        command.append("--dry-run")
-    try:
-        result = subprocess.run(command, text=True, capture_output=True)
-        payload = json.loads(result.stdout) if result.stdout else {}
-        if result.returncode:
-            raise AutoreviewError(
-                f"managed ledger apply failed: {payload}", code="ledger-preflight-failed", recovery="needs-owner"
-            )
-        return payload
-    finally:
-        events_path.unlink(missing_ok=True)
+    raise AutoreviewError(
+        "caller-state mutation from AutoReview is retired; journal the ordinary AutoReview invocation in the composing workflow",
+        code="caller-state-bridge-retired",
+        recovery="use-ordinary-autoreview",
+    )
 
 
 def operation_parser() -> argparse.ArgumentParser:
@@ -2189,23 +2146,11 @@ def _write_operation_json(path_value: str, value: dict[str, Any]) -> None:
 
 
 def _operation_bridge(request_file: str, request: dict[str, Any], command: str) -> dict[str, Any]:
-    bridge = Path(__file__).resolve().parents[2] / "implement-feature/scripts/ledger-cache"
-    if not bridge.is_file() or bridge.is_symlink() or not os.access(bridge, os.X_OK):
-        raise AutoreviewError("installation-owned operation bridge is unavailable", code="operation-authority-unavailable", recovery="needs-owner")
-    call = [str(bridge), "--json", "operation", command, "--owner", "autoreview", "--request-file", request_file, "--ledger", request["authority"]["ledger"]]
-    result = subprocess.run(call, text=True, capture_output=True)
-    try:
-        payload = json.loads(result.stdout) if result.stdout else None
-    except json.JSONDecodeError as exc:
-        raise AutoreviewError("operation bridge returned invalid output", code="operation-authority-invalid", recovery="needs-owner") from exc
-    if result.returncode or not isinstance(payload, dict) or payload.get("ok") is not True:
-        raise AutoreviewError("operation bridge rejected the request", code="operation-authority-rejected", recovery="derive-next-action-again")
-    receipt_value = payload.get("data", payload).get("start_receipt")
-    try:
-        receipt_request = request if request["operation"] == "run-phase" else owned_operation.validate_started_operation(request["started_operation"])["request"]
-        return owned_operation.validate_start_receipt(receipt_value, receipt_request)
-    except owned_operation.OperationError as exc:
-        raise AutoreviewError(str(exc), code="operation-authority-invalid", recovery="needs-owner") from exc
+    raise AutoreviewError(
+        "managed operation bridging is retired; journal the ordinary AutoReview invocation in the composing workflow",
+        code="caller-state-bridge-retired",
+        recovery="use-ordinary-autoreview",
+    )
 
 
 def _operation_attempt_facts(attempt_file: str, evidence_value: dict[str, Any] | None) -> dict[str, Any]:
@@ -2328,7 +2273,20 @@ def main(argv: list[str] | None = None) -> int:
     if positional_probe and positional_probe[0] == "findings":
         return run_findings_command(raw_argv)
     if positional_probe and positional_probe[0] == "operation":
-        return run_operation_command(raw_argv)
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "managed operation commands are retired; journal the ordinary AutoReview invocation in the composing workflow",
+                    "error_code": "caller-state-bridge-retired",
+                    "recovery": "use-ordinary-autoreview",
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     args = parse_args(raw_argv)
     if args.version:
         print(f"autoreview {VERSION}")

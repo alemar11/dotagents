@@ -66,12 +66,11 @@ scope remain equivalent; otherwise explicit lineage-reset authority is
 required. A new lineage starts with `full`; never disguise semantic target
 drift as a fix delta.
 
-Managed Implement Feature runs derive every action through `ledger-cache
-controller next`. They apply the exact `reserve-autoreview-action` event, then
-pass only the resulting `launch-autoreview-action` controller envelope as the
-reservation file. They do not accept caller-selected mode, phase, prompt, or
-evidence parent. Publication facts attach to the existing clean committed
-revision and do not reset lineage.
+Composing workflows invoke the ordinary AutoReview surface with an exact
+committed target and may journal that request and result in their own state
+store. AutoReview never discovers authority from or writes into a caller's
+state. Publication facts attach to the existing clean committed revision and
+do not reset lineage.
 
 ## Bounded Invalid-Output Recovery
 

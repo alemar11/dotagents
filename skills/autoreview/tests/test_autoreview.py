@@ -105,7 +105,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 3.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 4.0.0")
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -971,7 +971,7 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertNotIsInstance(rejected.exception, cli.ReviewOutputError)
         self.assertEqual(rejected.exception.code, "review-output-identity-drift")
 
-    def test_managed_checkout_without_reservation_fails_before_review_launch(self) -> None:
+    def test_retired_implement_feature_cache_does_not_control_review(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             repo = home / "managed-checkout"
@@ -1000,36 +1000,37 @@ class AutoreviewContractTests(unittest.TestCase):
             stderr = io.StringIO()
             with mock.patch.dict(os.environ, {"HOME": str(home)}):
                 with mock.patch.object(cli, "repo_root", return_value=repo):
-                    with mock.patch.object(cli, "run_review") as run_review:
+                    with mock.patch.object(cli, "run_review", return_value=0) as run_review:
                         with contextlib.redirect_stderr(stderr):
                             code = cli.main(["--json"])
-            self.assertEqual(code, 2)
-            self.assertFalse(run_review.called)
-            payload = json.loads(stderr.getvalue())
-            self.assertEqual(payload["error_code"], "owned-operation-required")
-            self.assertIn("model_call_started=false", payload["error"])
+            self.assertEqual(code, 0)
+            self.assertTrue(run_review.called)
+            self.assertEqual(stderr.getvalue(), "")
 
-    def test_managed_reservation_hard_cuts_legacy_and_open_envelopes(self) -> None:
+    def test_retired_operation_surface_rejects_before_artifact_writes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name, payload in (
-                ("legacy", {"command": "autoreview.next", "action": "full"}),
-                (
-                    "open",
-                    {
-                        "ok": True,
-                        "command": "controller.next",
-                        "controller_schema_version": "1.0.0",
-                        "unexpected": "caller-selected-phase",
-                    },
-                ),
-            ):
-                path = root / f"{name}.json"
-                path.write_text(json.dumps(payload))
-                args = cli.parse_args(["--reservation-file", str(path)])
-                with self.assertRaises(cli.AutoreviewError) as rejected:
-                    cli.load_managed_reservation(args)
-                self.assertEqual(rejected.exception.code, "reservation-invalid")
+            output = root / "must-not-exist.json"
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = cli.main(
+                    [
+                        "--json",
+                        "operation",
+                        "prepare",
+                        "--controller-envelope-file",
+                        str(root / "missing-controller.json"),
+                        "--input-file",
+                        str(root / "missing-input.json"),
+                        "--request-output",
+                        str(output),
+                    ]
+                )
+            self.assertEqual(code, 2)
+            payload = json.loads(stderr.getvalue())
+            self.assertEqual(payload["error_code"], "caller-state-bridge-retired")
+            self.assertEqual(payload["recovery"], "use-ordinary-autoreview")
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

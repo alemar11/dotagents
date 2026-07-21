@@ -124,10 +124,10 @@ web search, not the Codex engine transfer.
 
 `[Medium][Edge case]` In two monitored runs, the reviewer returned a result
 that said the review failed but did not name any actual problem, so the helper
-could not safely use it. For managed Implement Feature reviews, the helper may
-ask the same reviewer once to return the required shape, with the same code and
-review scope. If that one repair also fails, it stops and asks the owner; it
-never guesses a finding or calls the invalid result clean.
+could not safely use it. The helper never guesses a finding or calls an invalid
+result clean. A composing workflow may journal the ordinary invocation and
+apply its own bounded recovery policy without giving AutoReview access to the
+caller's state store.
 
 The validated JSON result uses canonical option values:
 
@@ -186,9 +186,6 @@ scripts/autoreview --mode commit --commit HEAD
 scripts/autoreview --json doctor
 scripts/autoreview --json findings template --finding-source codex-review --output /tmp/autoreview-finding-draft.json
 scripts/autoreview --json findings prepare --input /tmp/autoreview-finding-draft.json --output /tmp/autoreview-findings.json
-scripts/autoreview --json operation prepare --controller-envelope-file /tmp/controller.json --input-file /tmp/autoreview-input.json --request-output /tmp/autoreview-request.json
-scripts/autoreview --json operation execute --request-file /tmp/autoreview-request.json --attempt-file /tmp/autoreview-attempt.jsonl --candidate-output /tmp/autoreview-candidate.json --result-output /tmp/autoreview-result.json
-scripts/autoreview --json operation reconcile --request-file /tmp/autoreview-reconcile-request.json --attempt-file /tmp/autoreview-attempt.jsonl --candidate-output /tmp/autoreview-candidate.json --result-output /tmp/autoreview-result.json
 ```
 
 Useful options:
@@ -204,13 +201,9 @@ Useful options:
 - `--review-phase`, `--prior-evidence`, `--finding-file`, and
   `--evidence-output`: create or continue the committed-branch evidence chain
   documented in `references/evidence-chain.md`.
-- `operation prepare|validate-request|execute|reconcile|validate-result` is the
-  managed hard-cut surface. AutoReview 3.0.0 owns
-  `autoreview-operation-request:v1` and `autoreview-operation-result:v1`.
-  Preparation and validation are read-only. Execution obtains a generic live
-  started receipt immediately before a model phase; reconciliation reads the
-  same attempt journal and never launches again. Retired managed controller
-  reservation packets are rejected before model launch.
+- Composing workflows call the ordinary AutoReview surface. They may journal
+  the exact invocation and result externally, but AutoReview never reads or
+  mutates another skill's state, claim, controller, or cache.
 - `findings template|prepare`: emit a strict draft without caller-generated ids,
   then validate authoritative fields and generate canonical ids locally. These
   operations never call Codex or consume review budget.
