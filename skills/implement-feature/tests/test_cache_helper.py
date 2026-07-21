@@ -62,7 +62,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV21Tests(unittest.TestCase):
+class LedgerCacheV22Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -2036,12 +2036,12 @@ class LedgerCacheV21Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v21_offline_and_read_only(self) -> None:
+    def test_doctor_is_v22_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "21.0.0")
+        self.assertEqual(version, "22.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -2969,7 +2969,14 @@ class LedgerCacheV21Tests(unittest.TestCase):
             "task_stop_evidence": [{
                 "task_key": self.task_key,
                 "task_ref": "app-task://worker-232",
-                "evidence_ref": "app-task://worker-232/stopped-idle",
+                "stop_state": "unavailable",
+                "evidence_ref": "app-task://worker-232/not-found-after-retries",
+            }],
+            "checkout_dispositions": [{
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "disposition": "present-clean",
+                "evidence_ref": "git://worker-232/checkout-clean",
             }],
             "evidence_ref": evidence,
         }])
@@ -2984,6 +2991,154 @@ class LedgerCacheV21Tests(unittest.TestCase):
         ))["archives"][0]
         self.assertEqual(archived["archive_reason"], "preimplementation-abort")
         self.assertFalse(self.ledger.exists())
+
+    def test_preimplementation_abort_retires_a_removed_checkout_without_resetting_state(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        state = self.state()
+        delivery = state["tasks"][0]["deliveries"][0]
+        checkout = delivery["managed_checkout"]
+        assert checkout is not None
+        removed = self.home / "removed-app-worktree"
+        checkout["checkout"] = str(removed)
+        checkout["git_top_level"] = str(removed)
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        self.ledger.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+        evidence = "restart://preimplementation/removed-checkout"
+        self.apply([{
+            "type": "preimplementation-aborted",
+            "reason": "Retire the preimplementation run before starting a fresh run.",
+            "task_stop_evidence": [{
+                "task_key": self.task_key,
+                "task_ref": "app-task://worker-232",
+                "stop_state": "idle",
+                "evidence_ref": "app-task://worker-232/stopped-idle",
+            }],
+            "checkout_dispositions": [{
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "disposition": "removed",
+                "evidence_ref": "app-task://worker-232/worktree-removed",
+            }],
+            "evidence_ref": evidence,
+        }])
+        retired = self.state()
+        self.assertEqual(retired["goal"]["state"], "pending")
+        self.assertEqual(retired["tasks"][0]["implementation_baseline"], "planning-required")
+        self.assertEqual(retired["tasks"][0]["deliveries"][0]["managed_checkout"]["checkout"], str(removed))
+        self.release(reason="preimplementation-abort", evidence=evidence)
+        archived = parse_result(self.run_cache(
+            "--json", "ledger", "archive", "--ledger", str(self.ledger),
+            "--root-id", "root-a", "--reason", "preimplementation-abort",
+            "--evidence-ref", evidence,
+        ))["archives"][0]
+        self.assertEqual(archived["archive_reason"], "preimplementation-abort")
+
+    def test_preimplementation_abort_rejects_removed_checkout_with_advanced_branch(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        state = self.state()
+        checkout = state["tasks"][0]["deliveries"][0]["managed_checkout"]
+        assert checkout is not None
+        checkout["checkout"] = str(self.home / "removed-app-worktree")
+        checkout["git_top_level"] = checkout["checkout"]
+        checkout["baseline_revision"] = subprocess.run(
+            ["git", "-C", str(REPOSITORY), "rev-parse", "HEAD^"],
+            text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        self.ledger.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+        event = {
+            "type": "preimplementation-aborted",
+            "reason": "Retire the preimplementation run.",
+            "task_stop_evidence": [{
+                "task_key": self.task_key, "task_ref": "app-task://worker-232",
+                "stop_state": "idle", "evidence_ref": "app-task://worker-232/stopped-idle",
+            }],
+            "checkout_dispositions": [{
+                "task_key": self.task_key, "delivery_key": "dotagents",
+                "disposition": "removed", "evidence_ref": "app-task://worker-232/worktree-removed",
+            }],
+            "evidence_ref": "restart://preimplementation/advanced-branch",
+        }
+        error = self.error(self.apply([event], check=False), "state-conflict")
+        self.assertIn("branch advanced", error["message"])
+
+    def test_preimplementation_abort_supports_a_task_that_was_never_created(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([{
+            "type": "root-title-observed",
+            "title": "👨🏻‍💻 Feature Orchestrator",
+            "evidence_ref": "app-task://root-a/title",
+        }])
+        evidence = "restart://preimplementation/not-created"
+        self.apply([{
+            "type": "preimplementation-aborted",
+            "reason": "Retire before App task creation completed.",
+            "task_stop_evidence": [{
+                "task_key": self.task_key,
+                "task_ref": None,
+                "stop_state": "not-created",
+                "evidence_ref": "app-task://worker/not-created",
+            }],
+            "checkout_dispositions": [{
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "disposition": "not-bound",
+                "evidence_ref": "app-task://worker/checkout-not-bound",
+            }],
+            "evidence_ref": evidence,
+        }])
+        self.assertEqual(self.state()["tasks"][0]["implementation_baseline"], "planning-required")
+        self.release(reason="preimplementation-abort", evidence=evidence)
+
+    def test_preimplementation_abort_rejects_incomplete_or_false_checkout_dispositions(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        stop = {
+            "task_key": self.task_key,
+            "task_ref": "app-task://worker-232",
+            "stop_state": "idle",
+            "evidence_ref": "app-task://worker-232/stopped-idle",
+        }
+        incomplete = {
+            "type": "preimplementation-aborted",
+            "reason": "Retire the preimplementation run.",
+            "task_stop_evidence": [stop],
+            "checkout_dispositions": [],
+            "evidence_ref": "restart://preimplementation/incomplete-dispositions",
+        }
+        error = self.error(self.apply([incomplete], check=False), "state-conflict")
+        self.assertIn("lacks complete checkout dispositions", error["message"])
+
+        false_removed = copy.deepcopy(incomplete)
+        false_removed["checkout_dispositions"] = [{
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "disposition": "removed",
+            "evidence_ref": "app-task://worker-232/worktree-removed",
+        }]
+        false_removed["evidence_ref"] = "restart://preimplementation/false-removed"
+        error = self.error(self.apply([false_removed], check=False), "state-conflict")
+        self.assertIn("removed checkout still exists", error["message"])
+        self.assertEqual(self.state()["tasks"][0]["implementation_baseline"], "pending")
 
     def test_not_configured_ci_is_reported_and_never_accepts_a_ci_gate(self) -> None:
         self.acquire()

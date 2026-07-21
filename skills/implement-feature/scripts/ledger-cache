@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "21.0.0"
+__version__ = "22.0.0"
 LEDGER_SCHEMA_VERSION = "15.0.0"
 REGISTRATION_SCHEMA_VERSION = "9.0.0"
 DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "2.0.0"
@@ -4020,43 +4020,155 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return True
 
     if event_type == "preimplementation-aborted":
-        event = exact_object(raw, {"type", "reason", "task_stop_evidence", "evidence_ref"}, event_type)
+        event = exact_object(
+            raw,
+            {"type", "reason", "task_stop_evidence", "checkout_dispositions", "evidence_ref"},
+            event_type,
+        )
         if state["goal"]["state"] != "pending" or any(task["implementation_baseline"] == "accepted" for task in state["tasks"]):
             raise CacheError("state-conflict", "preimplementation abort is no longer available", 4)
-        if any(
-            delivery["revision"] is not None
-            for task in state["tasks"] for delivery in task["deliveries"]
-        ) or state["gates"] or any(
-            row["record_kind"] in {"owned-operation-started", "owned-operation-result"}
-            for row in state["operations"]
+        deliveries = [
+            delivery
+            for task in state["tasks"]
+            for delivery in task["deliveries"]
+        ]
+        owned_operations = [
+            operation
+            for operation in state["operations"]
+            if operation["record_kind"].startswith("owned-operation")
+        ]
+        if (
+            any(
+                delivery["revision"] is not None
+                or delivery["pr"] is not None
+                or delivery["committed"]
+                or delivery["published"]
+                or delivery["hosted_obligations"]
+                or delivery["command_attempts"]
+                for delivery in deliveries
+            )
+            or state["gates"]
+            or state["handoffs"]
+            or owned_operations
         ):
             raise CacheError("state-conflict", "preimplementation abort found mutation authority or delivery evidence", 4)
+        if any(task["state"] not in {"pending", "created", "blocked", "failed"} for task in state["tasks"]):
+            raise CacheError("state-conflict", "preimplementation abort found an implementation-phase task", 4)
         stops = event["task_stop_evidence"]
         if not isinstance(stops, list) or len(stops) != len(state["tasks"]):
             raise CacheError("state-conflict", "preimplementation abort lacks complete task-stop evidence", 4)
         for task, stop in zip(sorted(state["tasks"], key=lambda item: item["task_key"]), stops):
-            stop = exact_object(stop, {"task_key", "task_ref", "evidence_ref"}, "task_stop_evidence")
+            stop = exact_object(
+                stop,
+                {"task_key", "task_ref", "stop_state", "evidence_ref"},
+                "task_stop_evidence",
+            )
             if stop["task_key"] != task["task_key"] or stop["task_ref"] != task["task_ref"]:
                 raise CacheError("state-conflict", "preimplementation task-stop identity changed", 4)
+            allowed_stop_states = (
+                {"not-created"}
+                if task["task_ref"] is None
+                else {"idle", "archived", "failed", "unavailable"}
+            )
+            if stop["stop_state"] not in allowed_stop_states:
+                raise CacheError("state-conflict", "preimplementation task-stop state is invalid", 4)
             nonempty(stop["evidence_ref"], "task_stop_evidence.evidence_ref")
-            for delivery in task["deliveries"]:
-                checkout = delivery["managed_checkout"]
-                if checkout is None:
-                    continue
+        dispositions = event["checkout_dispositions"]
+        expected_dispositions = [
+            (task["task_key"], delivery["delivery_key"], task, delivery)
+            for task in sorted(state["tasks"], key=lambda item: item["task_key"])
+            for delivery in sorted(task["deliveries"], key=lambda item: item["delivery_key"])
+        ]
+        if not isinstance(dispositions, list) or len(dispositions) != len(expected_dispositions):
+            raise CacheError("state-conflict", "preimplementation abort lacks complete checkout dispositions", 4)
+        for raw_disposition, (task_key, delivery_key, task, delivery) in zip(dispositions, expected_dispositions):
+            disposition = exact_object(
+                raw_disposition,
+                {"task_key", "delivery_key", "disposition", "evidence_ref"},
+                "checkout_dispositions",
+            )
+            if disposition["task_key"] != task_key or disposition["delivery_key"] != delivery_key:
+                raise CacheError("state-conflict", "preimplementation checkout disposition identity changed", 4)
+            nonempty(disposition["evidence_ref"], "checkout_dispositions.evidence_ref")
+            checkout = delivery["managed_checkout"]
+            if disposition["disposition"] == "not-bound":
+                if checkout is not None:
+                    raise CacheError("state-conflict", "preimplementation checkout is bound but reported not-bound", 4)
+                continue
+            if checkout is None:
+                raise CacheError("state-conflict", "preimplementation checkout disposition lacks a managed checkout", 4)
+            checkout_path = Path(checkout["checkout"])
+            if disposition["disposition"] == "present-clean":
+                if checkout_path.is_symlink() or not checkout_path.is_dir():
+                    raise CacheError("state-conflict", "preimplementation checkout is not present and safe", 4)
+                commands = {
+                    "git_top_level": ["git", "-C", str(checkout_path), "rev-parse", "--show-toplevel"],
+                    "repository": ["git", "-C", str(checkout_path), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                    "target_branch": ["git", "-C", str(checkout_path), "branch", "--show-current"],
+                    "head": ["git", "-C", str(checkout_path), "rev-parse", "HEAD"],
+                    "tree": ["git", "-C", str(checkout_path), "rev-parse", "HEAD^{tree}"],
+                }
+                observed: dict[str, str] = {}
+                for name, command in commands.items():
+                    result = subprocess.run(command, text=True, capture_output=True)
+                    if result.returncode:
+                        raise CacheError("state-conflict", "preimplementation checkout observation failed", 4)
+                    observed[name] = result.stdout.strip()
+                observed["git_top_level"] = str(Path(observed["git_top_level"]).resolve())
+                observed["repository"] = str(Path(observed["repository"]).resolve())
                 checkout_path = Path(checkout["checkout"])
-                if not checkout_path.is_dir():
-                    raise CacheError(
-                        "state-conflict",
-                        "preimplementation abort requires the original managed checkout before task archival",
-                        4,
-                    )
                 status = subprocess.run(
                     ["git", "-C", str(checkout_path), "status", "--porcelain=v2", "--untracked-files=all", "-z"],
                     capture_output=True,
                 )
-                head = subprocess.run(["git", "-C", str(checkout_path), "rev-parse", "HEAD"], text=True, capture_output=True)
-                if status.returncode or status.stdout or head.returncode or head.stdout.strip() != checkout["baseline_revision"]:
+                if (
+                    status.returncode
+                    or status.stdout
+                    or hashlib.sha256(status.stdout).hexdigest() != checkout["baseline_status_fingerprint"]
+                    or observed["git_top_level"] != str(Path(checkout["git_top_level"]).resolve())
+                    or observed["repository"] != str(Path(delivery["repository"]).resolve())
+                    or observed["target_branch"] != delivery["target_branch"]
+                    or observed["head"] != checkout["baseline_revision"]
+                    or observed["tree"] != checkout["baseline_tree_sha"]
+                ):
                     raise CacheError("state-conflict", "preimplementation abort checkout was mutated", 4)
+                continue
+            if disposition["disposition"] == "removed":
+                if os.path.lexists(checkout_path):
+                    raise CacheError(
+                        "state-conflict",
+                        "preimplementation removed checkout still exists",
+                        4,
+                    )
+                worktrees = subprocess.run(
+                    ["git", "--git-dir", delivery["repository"], "worktree", "list", "--porcelain"],
+                    text=True,
+                    capture_output=True,
+                )
+                if worktrees.returncode:
+                    raise CacheError("state-conflict", "preimplementation worktree registry observation failed", 4)
+                registered = [
+                    canonical_absolute_path(line.removeprefix("worktree "), "worktree registry path")
+                    for line in worktrees.stdout.splitlines()
+                    if line.startswith("worktree ")
+                ]
+                if canonical_absolute_path(checkout["checkout"], "managed checkout") in registered:
+                    raise CacheError("state-conflict", "preimplementation removed checkout remains registered", 4)
+                branch = subprocess.run(
+                    [
+                        "git", "--git-dir", delivery["repository"], "show-ref", "--verify", "--hash",
+                        f"refs/heads/{delivery['target_branch']}",
+                    ],
+                    text=True,
+                    capture_output=True,
+                )
+                if branch.returncode not in {0, 1}:
+                    raise CacheError("state-conflict", "preimplementation target branch observation failed", 4)
+                if branch.returncode == 0 and branch.stdout.strip() != checkout["baseline_revision"]:
+                    raise CacheError("state-conflict", "preimplementation removed checkout branch advanced", 4)
+                continue
+            raise CacheError("invalid-input", "preimplementation checkout disposition is invalid", 2)
+        for task in state["tasks"]:
             task["implementation_baseline"] = "planning-required"
             task["state"] = "blocked"
             task["attention_reason"] = nonempty(event["reason"], "reason")

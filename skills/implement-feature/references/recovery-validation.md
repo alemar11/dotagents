@@ -60,8 +60,14 @@ authorization and execution-scope fingerprints, exact managed checkout
 revision/tree/status, and every manifest/receipt byte hash. Resume only the same
 baseline-only tasks. Never recapture after source, tool, argv, adapter, policy,
 or scope drift; return `authorization-stale` or execute the typed
-preimplementation abort. Partial baseline evidence grants no implementation
-authority.
+preimplementation abort with complete task-stop and checkout-disposition
+evidence. A missing recorded checkout is retirement evidence, not authority to
+recreate or replace the task in the active ledger. When the current imperative
+implementation grant, exact bundle/scope identity, and every fresh-start
+invariant in `baseline-validation.md` also hold, that objective loss makes the
+run control-plane-unrecoverable and permits one automatic fresh bootstrap only
+after verified retirement and archive. Partial baseline evidence grants no
+implementation authority.
 
 ## Complete Freshness Pass
 

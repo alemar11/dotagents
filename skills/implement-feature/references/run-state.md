@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v21 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v22 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -107,10 +107,15 @@ output limit, interruption, and cleanup failure. Cleanup-failed blocks dispatch,
 seal, claim release, archival, and takeover.
 
 Only complete acceptance permits root Goal creation/activation and an
-implementation transition. `preimplementation-aborted` is the sole
-typed early closeout after registration; it requires complete task-stop and
-unchanged-checkout proof and the absence of Goal, delivery, provider,
-AutoReview, review, gate, and partial-acceptance state.
+implementation transition. `preimplementation-aborted` is the sole typed early
+closeout after registration. It requires complete task-stop evidence and exactly
+one typed checkout disposition per registered delivery: `not-bound`,
+`present-clean`, or `removed`. `present-clean` binds the original checkout,
+repository, branch, revision, tree, and empty status. `removed` requires the
+path and Git worktree registration to be absent while the local target branch
+is absent or still at the baseline revision. Every form also requires the
+absence of Goal, delivery, command, provider, AutoReview, review, gate, handoff,
+and partial-acceptance state.
 
 ## Gate Scopes And Invalidation
 
@@ -240,7 +245,7 @@ reject absolute/backslash/empty/parent traversal.
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and
 `terminal` reports staged closeout, review-timeout warnings, and archive
-readiness. Their shapes remain unchanged in v21. `diagnostics` schema `2.0.0`
+readiness. Their shapes remain unchanged in v22. `diagnostics` schema `2.0.0`
 is the root's user-facing read model. It binds generation/fingerprint, preserves
 typed evidence in raw fields, and adds qualified display fields. It derives
 `terminal_verification=invalidated|clean|incomplete`; only unchanged

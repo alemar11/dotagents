@@ -10,7 +10,7 @@ families' phase-specific inputs and evidence.
 | --- | --- |
 | `checkouts-observed` | Task identity plus the complete registered delivery checkout map and evidence. |
 | `baseline-accepted` | Current CAS/scope binding, every registered baseline manifest and receipt byte digest, and acceptance evidence. |
-| `preimplementation-aborted` | Closed reason, complete stopped-but-not-yet-archived task evidence, live unchanged-checkout proof, and abort evidence. |
+| `preimplementation-aborted` | Closed reason, complete typed task-stop evidence, one canonical `not-bound`, `present-clean`, or `removed` disposition per delivery, and abort evidence. |
 | `preflight-observed` | Exact delivery/GitHub/branch/default-base identity, definitive CI availability, preflight key, and evidence. |
 | `command-reserved` | Delivery, one-attempt command/manifest/policy identity, attempt/receipt refs, current task observation, and evidence. |
 | `command-launched` | Same attempt identity, durable launch fingerprint, and evidence. |
@@ -29,6 +29,16 @@ repository, absolute App checkout/Git top-level, target branch, baseline
 revision/tree/status, execution scope, and isolation. Baseline acceptance
 contains every registered `(task,delivery,validation)` tuple exactly once;
 partial acceptance changes nothing.
+
+Preimplementation task-stop states are `not-created` when no task ref exists,
+or `idle`, `archived`, `failed`, and `unavailable` for an existing task.
+`unavailable` requires conclusive not-found evidence after the complete App
+retry contract. Checkout dispositions are sorted by task and delivery.
+`not-bound` is valid only before a managed checkout was recorded.
+`present-clean` requires the exact live baseline identity and no Git-visible
+changes. `removed` requires an absent filesystem path, no matching Git worktree
+registration, and a missing or baseline-equal local target branch. Opaque
+evidence never overrides those local checks.
 
 Command statuses are `passed`, `failed`, `timed-out`, `cancelled`,
 `output-limit`, `interrupted`, and `cleanup-failed`. A null receipt digest is

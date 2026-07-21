@@ -25,7 +25,7 @@ remain blocking.
 ## Active And Archived State
 
 Keep resumable ledger-schema `15.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v21 is the
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v22 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
@@ -68,12 +68,17 @@ fingerprint, path, and the ledger's exact terminal evidence, not Markdown.
 Archive consumes the receipt; interruption remains recoverable.
 
 If baseline preparation/acceptance cannot continue, first apply the verified
-`preimplementation-aborted` event from `baseline-validation.md` while every
-original App-managed checkout still exists. Then call `set_thread_archived` for
-the stopped baseline-only tasks, and only then
+`preimplementation-aborted` event from `baseline-validation.md` with the
+complete task-stop and checkout-disposition set. Then call
+`set_thread_archived` for stopped baseline-only tasks that are not already
+archived, and only then
 run the same two commands with `--release-reason preimplementation-abort` and
 `ledger archive --reason preimplementation-abort`, using the exact abort
 evidence ref. This path never creates, completes, or synthesizes a Goal.
+A verified control-plane-unrecoverable run may begin one automatic fresh
+bootstrap under the current imperative implementation grant only after this
+release and archive are complete and verified. A still-recoverable run requires
+an explicit `start over` request. Neither path reopens this ledger.
 
 ## Archive V2 Contract
 

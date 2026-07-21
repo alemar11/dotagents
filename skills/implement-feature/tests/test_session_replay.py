@@ -476,7 +476,7 @@ class SessionReplayTests(unittest.TestCase):
                 "--operation-id", "10000000000000000000000000000001",
                 "--registration-file", str(packet("registration", registration)),
             )
-            self.assertEqual(created["version"], "21.0.0")
+            self.assertEqual(created["version"], "22.0.0")
 
             head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
             tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()

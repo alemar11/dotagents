@@ -74,13 +74,56 @@ scope, and require AutoReview's review scope to equal that exact set.
 ## Preimplementation Stop
 
 When baseline preparation or acceptance cannot complete, first stop every
-baseline-only task and obtain complete terminal-or-idle task-stop evidence;
-stopped does not mean archived. While every original App-managed checkout still
-exists, apply `preimplementation-aborted`. Only after that event is accepted may
-the root call `set_thread_archived` for those tasks, release the claim, and
-archive the ledger. It proves Goal state is still pending, no delivery revision,
+baseline-only task and obtain complete typed task-stop evidence. Record one
+checkout disposition per delivery: `not-bound` when binding never completed,
+`present-clean` when the original checkout still matches its complete baseline
+identity, or `removed` when the path and worktree registration are gone and the
+local target branch is absent or baseline-equal. Apply
+`preimplementation-aborted` before archiving any remaining task whose checkout
+is still present. An already archived task is acceptable only when its checkout
+disposition remains independently provable; the disposition is evidence, not
+permission to recreate it. Only after the event is accepted may the root call
+`set_thread_archived` for any remaining tasks, release the claim, and archive
+the ledger. It proves Goal state is still pending and that no delivery revision,
 provider/AutoReview authority, review, gate, source mutation, or partial
-baseline acceptance exists, and each checkout still has its baseline revision
-and a status fingerprint proving no Git-visible changes. Release with the typed
-`preimplementation-abort` receipt and
-archive with the same reason/evidence. Never synthesize Goal state.
+baseline acceptance exists. Each
+present checkout must match its full baseline identity; each removed checkout
+must have no remaining worktree registration or advanced target branch. Release
+with the typed `preimplementation-abort` receipt and archive with the same
+reason/evidence. Never synthesize Goal state.
+
+## Fresh Start Orchestration
+
+A fresh start is orchestration, not a ledger state. The ordinary imperative
+implementation invocation automatically selects it without another owner
+question only when one complete recovery pass proves all of these facts:
+
+- the current root owns the identified active claim and supported ledger for
+  the exact accepted bundle and execution scope;
+- Goal and implementation baseline remain pending and the typed abort proves
+  there is no implementation, delivery, command, provider, review, gate,
+  handoff, tracker, or source-mutation evidence;
+- the run is control-plane-unrecoverable because a recorded managed checkout is
+  absent and unregistered, or a recorded task is conclusively
+  `archived`, `failed`, or `unavailable` after the complete App retry contract;
+- the cause is lost task/checkout infrastructure, not deterministic baseline,
+  planning, authorization, source, tool, adapter, policy, or scope failure; and
+- this invocation has not already performed an automatic fresh start.
+
+An overlapping claim owned by another root remains a takeover case and never
+authorizes an automatic fresh start.
+
+Then perform exactly one sequence: retire the old run through
+`preimplementation-aborted`, archive remaining tasks, release its claim,
+archive and verify its ledger, and re-enter the normal bootstrap with new claim,
+ledger, task, and checkout identities. Never reset state in place, reuse the
+retired task, or describe the old run as restarted. If the fresh baseline fails,
+stop normally; never start over again automatically in the same invocation.
+
+A still-recoverable eligible run continues by default. Only an explicit owner
+request to `start over` selects retirement instead. Ambiguous task, checkout,
+mutation, ownership, bundle, or scope evidence always blocks; explicit wording
+does not override it. The composition is unavailable after Goal activation,
+baseline acceptance, any implementation-phase task, delivery revision, command
+journal entry, provider operation, review, gate, handoff, or tracker mutation.
+Such a run requires its existing recovery path or owner intervention.

@@ -31,6 +31,17 @@ implementation, or merely permits tasks, workers, delegation, or subagents.
 Those task-surface permissions may reinforce an implementation request but do
 not supply one. Resolve an explicit stop or cancellation as `denied`.
 
+The same imperative implementation grant also authorizes one automatic fresh
+start when the current root's identified preimplementation run is proven
+mutation-free, bound to the same accepted bundle and execution scope, and
+conclusively unable to resume because its recorded task or managed checkout is
+unavailable. Do not require or ask for a separate `start over` request. This
+introduces no option field and never authorizes an automatic retry loop. An
+explicit `start over` request is needed only to abandon a still-recoverable run,
+and it cannot override ambiguous or ineligible state. The fresh attempt still
+receives the complete disclosure and scope summary; changed bundle or scope
+evidence is a new authorization.
+
 ## Standard Run Authorization
 
 After successful intake and preflight, always state this exact disclosure:

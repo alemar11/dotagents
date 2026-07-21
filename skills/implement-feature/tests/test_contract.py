@@ -845,7 +845,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("control-plane", options)
         self.assertNotIn("control-plane", packets)
 
-        self.assertIn('__version__ = "21.0.0"', cache_helper)
+        self.assertIn('__version__ = "22.0.0"', cache_helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', cache_helper)
         self.assertIn(
             '__version__ = "5.0.0"', self.read("scripts/execution-manifest")
@@ -899,7 +899,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn('CONTROLLER_PROJECTION_SCHEMA_VERSION = "3.0.0"', helper)
         self.assertIn('CONTROLLER_TEMPLATE_SCHEMA_VERSION = "3.0.0"', helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', helper)
-        self.assertIn('__version__ = "21.0.0"', helper)
+        self.assertIn('__version__ = "22.0.0"', helper)
         self.assertIn('REGISTRATION_SCHEMA_VERSION = "9.0.0"', helper)
         self.assertIn("owned-operation-started", helper)
         self.assertIn("validate_owned_artifact", helper)
@@ -1084,7 +1084,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertLess(sizes(controller_route), sizes(loaded))
         self.assertLessEqual(len(controller_route) - 1, 3)
 
-        self.assertIn('__version__ = "21.0.0"', self.read("scripts/ledger-cache"))
+        self.assertIn('__version__ = "22.0.0"', self.read("scripts/ledger-cache"))
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', self.read("scripts/ledger-cache"))
         self.assertIn('__version__ = "5.0.0"', self.read("scripts/execution-manifest"))
         self.assertIn('VERSION = "3.0.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
@@ -1441,12 +1441,28 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("permits only `terminal` and", lifecycle)
         self.assertIn("`preimplementation-abort`", lifecycle)
         baseline = self.read("references/baseline-validation.md")
+        normalized_baseline = " ".join(baseline.split())
         abort = baseline.split("## Preimplementation Stop", 1)[1]
         self.assertLess(abort.index("task-stop evidence"), abort.index("`preimplementation-aborted`"))
         self.assertLess(abort.index("`preimplementation-aborted`"), abort.index("`set_thread_archived`"))
         preimplementation = lifecycle.split("If baseline preparation/acceptance cannot continue", 1)[1]
         self.assertLess(preimplementation.index("`preimplementation-aborted`"), preimplementation.index("`set_thread_archived`"))
         self.assertLess(preimplementation.index("`set_thread_archived`"), preimplementation.index("--release-reason preimplementation-abort"))
+        self.assertIn("A fresh start is orchestration, not a ledger state", baseline)
+        self.assertIn("automatically selects it without another owner question", normalized_baseline)
+        self.assertIn("control-plane-unrecoverable", baseline)
+        self.assertIn("not deterministic baseline", normalized_baseline)
+        self.assertIn("new claim, ledger, task, and checkout identities", normalized_baseline)
+        self.assertIn("never start over again automatically", normalized_baseline.lower())
+        self.assertIn("Do not ask for a separate `start over`", skill)
+        self.assertIn("A recoverable run still requires an explicit request", skill)
+        self.assertIn("one fresh run with new identities", skill)
+        self.assertIn("Do not require or ask for a separate `start over`", options)
+        self.assertIn("still-recoverable run", options)
+        packets = self.read("references/packets-task.md")
+        self.assertIn("`not-bound`, `present-clean`, or `removed`", packets)
+        self.assertIn("and `unavailable` for an existing task", packets)
+        self.assertIn('"failed", "unavailable"', self.read("scripts/ledger-cache"))
         self.assertIn("Frozen archive-v1 entries remain readable evidence", normalized_ledger)
         self.assertIn("deterministic Markdown audit report is rendered only during archival", normalized_ledger)
 
@@ -1897,7 +1913,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "phase-specific inputs and evidence",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "21.0.0"', helper)
+        self.assertIn('__version__ = "22.0.0"', helper)
         self.assertIn("unsupported-ledger", helper)
         self.assertNotIn("review-authority", helper)
         for removed in (
@@ -1909,7 +1925,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v21_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v22_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = "\n".join(
             self.read(path)
@@ -1923,7 +1939,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "21.0.0"',
+            '__version__ = "22.0.0"',
             'LEDGER_SCHEMA_VERSION = "15.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "9.0.0"',
         ):

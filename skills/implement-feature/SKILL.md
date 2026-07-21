@@ -99,6 +99,13 @@ closed.
 Resume or takeover only the original recorded tasks after the controller
 selects recovery and its complete contracts. Never infer identity, create a
 replacement, import archived state, or migrate an unsupported active schema.
+For the same accepted bundle, the ordinary imperative implementation invocation
+also authorizes one automatic fresh start when the current root's run is proven
+control-plane-unrecoverable and the typed preimplementation retirement in
+`baseline-validation.md` accepts. Do not ask for a separate `start over`
+request. A recoverable run still requires an explicit request to abandon it;
+ambiguous evidence blocks. Only after archive verification may the invocation
+re-enter the normal bootstrap as one fresh run with new identities.
 
 Return state-derived source, task, root Goal, managed-checkout, changed-path,
 validation, commit, PR/revision, review, CI, tracker/domain-closeout,
