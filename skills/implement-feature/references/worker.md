@@ -1,102 +1,55 @@
-# Visible App Task Role
+# Visible App Worker
 
-Canonical owner of visible-task identity, assignment, App checkout isolation,
-Goal prohibition, fixed prompt, and report shape; contains no phase procedure.
+## Assignment
 
-## Identity And Assignment
+Create exactly one visible App task per selected executable Feature Spec. Each
+assignment owns one repository, one App project/worktree, one target branch,
+and one eventual PR. A Feature Spec naming several repositories is incompatible
+with this runtime and returns `planning-required` before state.
 
-Create exactly one visible App task per implementation-eligible Feature Spec.
-Persist its durable source id, exact authored title, fixed model/thinking
-profile, immutable assignment fingerprint, task ref, lifecycle, and one delivery per
-affected repository. Titles are UI evidence, never identity.
+Derive the immutable title as `🛠️ <exact authored Feature Spec title>`. The
+hammer-and-wrench emoji is fixed; do not choose or infer another emoji.
+The thread ID is identity; title is observed evidence. Inherit platform model
+and thinking defaults unless the owner explicitly requested exact values.
 
-Derive and persist `task_title` once as
-`<emoji> <exact authored Feature Spec title>`: one emoji grapheme followed by
-one space and the exact title. Use one semantically relevant emoji for the
-dominant user-facing goal and `🛠️`
-only as fallback. It is not a user option. Persist it before
-`codex_app__create_thread`; resolve `clientThreadId` to `threadId` without
-replacement; then call `codex_app__set_thread_title` and observe the exact live
-title before advancement. Never create another task for delayed identity or
-title evidence. Recovery and takeover reuse the original task, assignment,
-title, and profile.
+## Authority
 
-The assignment fingerprint binds exact scope, acceptance, validation, review,
-`CI when configured`, and terminal result. Never reuse or widen it.
+The worker owns implementation, validation, publication, review fixes, and its
+final handoff inside the assigned managed worktree. Root owns claims, state,
+the Goal, scheduling, sibling tasks, and final portfolio verification.
 
-## Managed Workspace
+The worker must not create, fork, title, message, archive, or otherwise manage
+App tasks; use Goal tools; implement in another checkout; create raw worktrees;
+or merge, enqueue, deploy, release, or perform post-merge closure.
 
-Before work, bind every delivery's repository, App checkout, Git top-level,
-branch, baseline revision/tree/status, execution scope, and isolation evidence.
-Missing, shared, symlinked, unmanaged, or non-isolated evidence blocks.
+## Bootstrap Prompt
 
-Never manage raw Git worktrees, rotate the caller checkout, or transfer work to
-root/background execution. One multi-repository Spec remains one visible task.
+Send the exact:
 
-## Authority Boundary
+- source ref and accepted source SHA-256;
+- assignment ID and title;
+- repository, App project, managed checkout, observed branch and baseline head;
+- target branch and allowed paths;
+- acceptance criteria and literal validation commands;
+- integration gates and optional domain closeout;
+- immutable manifest fingerprint;
+- root-only authority boundary and successful handoff shape.
 
-Workers report evidence; only root changes portfolio state. Workers never use
-Goal tools, renew claims, manage siblings, release/archive, merge, deploy, or
-close post-merge work. Workers must never create, fork, message, rename, pin,
-archive, or otherwise manage another visible App task. In particular, never
-call `codex_app__create_thread`, `codex_app__fork_thread`,
-`codex_app__send_message_to_thread`, or any App task lifecycle tool. Internal
-agents, when explicitly authorized, remain non-visible inside the same task,
-checkout, scope, and authority.
+Start in baseline-only mode. Verify the assignment and checkout and run only
+the baseline procedure from `baseline-validation.md`. Do not edit, commit,
+publish, invoke review, or use task/Goal tools until root sends the explicit
+message containing `implementation_authority=granted` and the matching baseline
+head and scope fingerprint.
 
-For root-owned advancement, wait in the exact phase; root alone records and
-resolves the typed wait. Elapsed turns create no replacement lifecycle.
+After that message, load and follow only the current phase reference supplied by
+root. Stop on source, checkout, branch, path, authorization, or evidence drift.
 
-## Fixed Task Prompt
+## Reports
 
-Send the canonical source/title, repositories and managed checkouts, branch and
-allowed paths, bundle/authorization/execution fingerprints, acceptance criteria and
-dependency refs, validation/integration command manifests, domain-closeout
-payload or none, and bundle manifest path/digests.
+Report material transitions only: baseline, changed paths, current head,
+validation, commit, PR, review, CI, mergeability, tracker/domain closeout,
+blocker, and next action. With no material change, use at most one concise
+liveness line per 60 seconds.
 
-Start baseline-only: verify assignment/checkouts and run only registered
-read-only baseline manifests. Do not edit, commit, push, start GitStack or
-AutoReview, emit gates, or use Goal tools until root reports atomic baseline
-acceptance and Goal activation. After activation, perform only the phase
-selected by the controller and its loaded procedure contract. Execute each
-manifest through its one bounded attempt. Work only in managed checkouts and
-stop on scope, identity, authority, or evidence drift. Never create, fork,
-message, rename, pin, archive, or manage another visible App task; internal
-agents remain non-visible within this task and checkout.
-
-Deliver this fixed prompt through `codex_app__send_message_to_thread` only to
-the recorded task identity.
-
-## Report
-
-The fixed successful outcome is
-`pull-request-ready-for-merge`.
-
-After required full reads, freshness validation, ledger reconciliation, and
-event application, visible packets are presentation-only: never suppress
-`task-observed`, gates, claim CAS/heartbeat, command attempts, review waits,
-warnings, or durable operations. Use a transient root fingerprint only; cache
-loss permits one snapshot, never authority.
-
-The closed fingerprint covers lifecycle/state/outcome, attention reason,
-blocker/approval/failure identity, next action, deadline-risk/freshness state,
-revision/PR/review/CI/mergeability/evidence identity, claim-loss or
-monitor-degraded state, and terminal/closeout state. Wording-only changes are
-not material. Stale/out-of-order/ambiguous input never replaces the last fresh
-fingerprint. Coalesce only within the same authoritative
-observation/reconciliation cycle; never wait for later evidence.
-
-Full snapshots retain task assignment evidence, state, the complete
-delivery-keyed managed checkout map, changed files, exact task title and
-observation, model/thinking/profile reason, validation, commits, exact PR
-number/URL/revision, review/wait, CI, prepared tracker closeout, internal
-agents, blockers/drift, and next action. A one-shot 10-second App-delay notice
-is emitted at most once. With no material change root may emit at most one
-concise liveness line per 60 seconds; no worker packet/event or evidence repeat
-is created. Claim/execution/provider heartbeats stay internal.
-
-Full terminal snapshots retain current PR lifecycle/conflict/mergeability,
-required base freshness, approval, merge-queue eligibility, and observation
-tuple/time. Domain-closeout reports retain actual `capture_outcome`, delta
-fingerprint, verified named destination, documentation-diff fingerprint,
-implementation revision tuples, or the exact blocker.
+The successful worker result is `pull-request-ready-for-merge` with exact
+thread, repository, branch, head, and canonical PR URL.

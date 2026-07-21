@@ -1,92 +1,118 @@
 # Root Bootstrap
 
-This file owns the complete pre-registration order. It applies only after the
-runtime surface and installed GitStack parity gates in `SKILL.md` pass and before
-the ledger exists.
+Load this reference before persistent state, visible worker tasks, a new Goal,
+or repository/provider mutation.
 
-Each entry into this bootstrap is a new bootstrap epoch. Create a new empty
-transient directory before producing any derived artifact. Revalidated exact
-immutable source snapshot bytes may be reused as inputs. Never copy, reopen, or
-reuse derived registration JSON, a command request, execution manifest, receipt,
-preflight result, fingerprint, claim, ledger, or task/checkout identity from a
-prior or retired epoch. Regenerate all derived artifacts with the currently
-loaded skill and helper installation.
+## Load Path
 
-## Closed Contract Selection
+Always load:
 
-Build one read-only source snapshot, then select the full bootstrap set from
-facts already present in that snapshot:
+- `spec-backed-delivery.md` for source validation and frontier selection;
+- `options.md` for scope disclosure and authorization;
+- `app-orchestration.md` for current App project, task, and Goal tools.
 
-- Always load `spec-backed-delivery.md`, `execution-manifest.md`, and
-  `baseline-validation.md` for snapshot, delivery preflight, intake, and
-  validation-plan derivation.
-- Also load `multi-repo-workspace.md` when any Spec names more than one affected
-  repository or the complete bundle contains partial plus integration Specs.
-- Load `app-control-plane-delays.md` only when an App task identity/title or
-  root Goal observation is already delayed or ambiguous.
-- Load `options.md` and `task-model-policy.md` only after intake and preflight
-  succeed and authorization is ready to resolve.
-- After authorization is granted, load `run-state.md`, `cache-lifecycle.md`, and
-  `packets-registration.md` for claim, maintenance, and registration.
+Load `multi-repo-workspace.md` when the requested bundle spans repositories.
+Workers load `baseline-validation.md` inside their managed checkouts. The exact
+ordinary start manifest and command are below, so do not load `run-state.md`
+during a healthy fresh start; load it only for CLI errors, recovery, or
+maintenance.
 
-These predicates are final. Never add a contract later from prose or omit a
-selected contract. Missing, contradictory, or unreadable selection evidence
-fails before claim.
+## Fast-Start Order
 
-## Snapshot, Preflight, And Intake
+1. Resolve the supplied Feature Spec and traverse its complete connected bundle.
+2. Validate the bundle unchanged. Select only executable Specs whose authored
+   cross-Spec dependencies are already merged and integration-proven. Report
+   blocked downstream refs as the next frontier; do not claim them.
+3. Require exactly one affected repository per selected executable Spec and one
+   unique `(repository_claim, target_branch_name)` owner. Missing or conflicting
+   execution data is `planning-required`.
+4. Confirm the root exposes `list_projects`, task create/read/wait/message/title
+   tools, and Goal get/create/update tools. Call `list_projects` once and map
+   every selected repository path to exactly one project ID. Read the current
+   root Goal and reject an unrelated or blocked unfinished Goal.
+5. Resolve the current GitStack runtime from the loaded App catalog. In parallel
+   per repository, prove access, target/default branch existence, current head,
+   and conflicting branch or PR identity. Defer CI, review access, rules,
+   approvals, mergeability, and queue eligibility.
+6. Render the exact sources and fingerprints, repositories/projects, branches,
+   paths, validation commands, task titles, Goal objective, and expected PRs.
+   Resolve authority through `options.md`.
+7. Re-read source revisions and repository heads only when authorization caused
+   a user wait, an observation became stale, or drift is otherwise evidenced.
+8. Write the exact schema-1 manifest below to a private temporary JSON file and
+   call `scripts/run-state --json run start`. Continue only when
+   `start_authorized=true`.
+9. Create or adopt and read back the root Goal through
+   `app-orchestration.md`, then bind it in state.
+10. Dispatch up to three canonical non-overlapping assignments immediately.
 
-Take one exact-byte snapshot of the durable Feature Spec and complete generated
-issue graph. Reuse it for canonical bundle preparation, fingerprints, intake,
-authorization, and registration. Refetch and rerun preflight before claim when
-proven drift occurs; changed identity after authorization is
-`authorization-stale`.
+Independent repository reads, task creation, title observation, and worker
+baselines may fan out to the three-task limit. Fan in before each wave receives
+implementation authority.
 
-Normalize GitHub shorthand `owner/repository#N` to
-`https://github.com/owner/repository/issues/N` for helper claim/task identity;
-preserve the shorthand as the authoritative artifact ref and never pass it
-directly to a helper.
+## Start Manifest
 
-Prepare and verify the delivery-preflight manifest before authorization.
-Require authenticated GitHub push/PR capability plus readable lifecycle,
-default-base, mergeability/conflicts, repository policy, and definitive CI
-classification `configured|not-configured`. Unknown capability returns
-`preflight-failed` with no artifacts. `not-configured` is valid.
+Use exactly these fields:
 
-Validate stable refs, the complete acyclic graphs, earlier-only dependencies,
-one executable owner per `(repository,target_branch_name)`, repository and path
-scope, validation adapters, acceptance criteria, integration gates, local
-tracker destinations, domain-closeout ownership, and fixed model profiles.
-Missing or contradictory execution evidence is `planning-required`. An
-explicit non-App target is `unsupported-delivery-target`. Never repair or
-mutate the source artifacts.
+```json
+{
+  "schema_version": 1,
+  "run_id": "019f-example",
+  "root_task_id": "019f-root",
+  "goal_objective": "Implement the dependency-ready Feature Spec frontier",
+  "sources": [
+    {
+      "kind": "github-issue",
+      "ref": "https://github.com/owner/repository/issues/42",
+      "sha256": "<sha256-of-accepted-source-body>"
+    }
+  ],
+  "repositories": [
+    {
+      "repository_claim": "repository:github:owner/repository",
+      "repository_path": "/absolute/repository",
+      "project_id": "<App-project-id>",
+      "default_branch_name": "main",
+      "git_common_dir": "/absolute/repository/.git"
+    }
+  ],
+  "assignments": [
+    {
+      "assignment_id": "spec-01",
+      "source_ref": "https://github.com/owner/repository/issues/42",
+      "title": "🛠️ Exact authored Feature Spec title",
+      "repository_claim": "repository:github:owner/repository",
+      "target_branch_name": "feature/example",
+      "allowed_paths": ["src/example/**"],
+      "acceptance_criteria": ["Observed behavior matches the Spec"],
+      "validation_commands": ["literal accepted command"],
+      "integration_gates": [],
+      "domain_closeout": null
+    }
+  ]
+}
+```
 
-Sort ready candidates by canonical claim/task source id. Greedily select within
-the remaining three-task capacity only pairwise path-disjoint work, treating
-ancestor/descendant scopes as overlapping. A downstream is ready only after
-every upstream ref is merged; merge-ready-but-unmerged is still a dependency
-wait. Never serialize, force-bind, or schedule around a duplicate executable
-`(repository,target_branch_name)` owner.
+`sources` includes the accepted selected Specs and any coordination source
+required to understand them. A GitHub issue ref is canonical and lowercase.
+For a local source use `kind=local-file`, an absolute regular-file `ref`, and
+its exact content SHA-256. The helper rechecks local bytes and claims both path
+and filesystem identity.
 
-## Authorization, Claim, And Registration
+`repositories` comes from the one authoritative `list_projects` mapping plus
+the provider-read default branch. Resolve
+`git_common_dir` with `git rev-parse --path-format=absolute --git-common-dir`
+inside the mapped repository; the helper stores its filesystem identity. At
+task bind, resolve the same value independently inside the managed checkout.
+Repository claims, App project IDs, repository paths, and Git common-directory
+filesystem identities are one-to-one; any duplicate mapping is invalid.
+`assignments` contains exactly one row per selected executable Spec. The helper
+rejects two assignments for one source ref, undeclared sources or repositories,
+duplicate repository/branch pairs, and noncanonical fields.
 
-Render the deterministic complete scope summary. Resolve an explicit imperative
-invocation through `options.md`; ask its single question only when permission
-remains `not-requested`. A grant binds the exact execution-scope fingerprint.
+The manifest is the recovery packet. Keep source bodies, paths, acceptance,
+validation, and optional closeout data there instead of deriving them from old
+state after compaction.
 
-Carry the verified GitStack installation evidence and fingerprint during
-registration. Derive `execution_manifest_evidence` from the sibling
-`scripts/execution-manifest` path and current file bytes in this epoch; bind its
-fingerprint into authorization. Run `active-root-claim --json doctor`, canonicalize repository and source
-identities, and acquire the complete portfolio claim before cache or ledger
-mutation. Qualify local refs with their Git common directory. A live overlap is
-`needs-owner`; a stale conflict follows the separately authorized takeover
-contract in `run-state.md` and never permits partial replacement.
-
-After claim, synchronously run the cache doctor and fixed 180-day prune once in
-root. Then create one schema-10 registration packet through
-`packets-registration.md`, create schema-15 state, set and observe the derived
-root title, and enter the controller loop. Goal state remains internal
-`pending`; do not call `create_goal` yet.
-
-Pre-claim failure reports exact evidence and proves that no claim, ledger,
-Goal, task, tracker write, or source mutation exists.
+Any failure before `run start` proves zero run state, worker task, new Goal,
+repository write, or provider mutation.

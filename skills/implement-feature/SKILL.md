@@ -1,118 +1,109 @@
 ---
 name: implement-feature
-description: Execute ready Feature Spec bundles in visible ChatGPT desktop app tasks through merge-ready-but-unmerged pull requests. Use only when explicitly invoked.
+description: Implement dependency-ready durable Feature Specs in visible ChatGPT desktop app tasks and deliver reviewed, merge-ready pull requests. Use only when explicitly invoked.
 ---
 
 # Implement Feature
 
-## Purpose And Authority
+## Contract
 
-Use this skill only when the owner explicitly invokes `$implement-feature` in
-the ChatGPT desktop app. It executes complete durable Feature Spec bundles; it
-never plans, repairs, regenerates, or publishes planning artifacts.
-It is the single App-only implementation adapter for Feature Specs.
+Use this skill only after the owner explicitly invokes `$implement-feature` in
+the ChatGPT desktop app. Consume durable execution-ready Feature Specs; never
+plan, repair, rewrite, or publish planning artifacts.
 
-Before reading sources or asking permission, verify visible App task creation,
-App-managed worktree binding, task-title mutation and observation, and root
-`create_goal`, `get_goal`, and `update_goal`. Call `get_goal` once. Missing
-capability returns `unsupported-runtime`; a blocked root Goal returns
-`new-root-required`. Both stop before source reads, claim, artifacts, tasks, or
-mutation. Goal pause/resume and App heartbeat automation are outside this
-runtime. Do not create a task to inspect capabilities.
+One run owns the dependency-ready frontier selected from the requested bundle.
+Every executable Feature Spec in that frontier must name exactly one affected
+Git repository and becomes one visible App task in that repository's App-managed
+worktree. Cross-Spec dependencies must already be merged and integration-proven;
+leave blocked Specs for a later invocation. Never merge on their behalf.
 
-Immediately after that App surface gate, run the installed GitStack parity gate
-in `references/gitstack-installation-parity.md` using the exact bundled-skill
-path supplied by the App/system skill catalog. Failure stops before source reads,
-permission, claim, artifacts, tasks, Goals, or mutation.
+The root owns one lifecycle Goal, the task queue, durable state, provider
+operations, reconciliation, and final verification. Workers implement and
+report only. Neither root nor workers create raw Git worktrees, implement in the
+root checkout, use background execution, merge, enqueue, deploy, release, or
+perform post-merge closure.
 
-After read-only intake succeeds, use the exact disclosure and authorization
-resolution in `references/options.md`. An imperative owner invocation that
-explicitly directs `$implement-feature` to implement or execute an identified
-Feature Spec or bundle resolves `visible_app_task_permission=granted`; show the
-complete scope summary and continue without asking a redundant question. When
-implementation intent remains absent or ambiguous, use the fixed answers and
-continue only after a grant. The grant binds the exact bundle, repository, path,
-validation, tool, and execution-scope fingerprints. Denial, or silence when a
-question is required, creates nothing. Drift before implementation is
-`authorization-stale`; an undeclared path after implementation starts is
-`needs-owner`. Never ask again, recapture, or widen scope. Generic delegation,
-worker assignment, subagent authority, or permission to create tasks alone
-never supplies the implementation grant.
+## Fast Start
 
-## Immutable Safety Contract
+Load `references/root-bootstrap.md`. Before persistent state, validate the
+source and ready frontier, map each repository through the App project list,
+perform only the repository/branch/collision reads needed to start, disclose
+the exact scope, and resolve authorization. Defer CI, review access, branch
+rules, approvals, mergeability, and merge-queue reads to publication or
+closeout, where they must be fresh.
 
-- Root owns the claim, typed state, scheduling, reconciliation, cache work,
-  deadlines, final verification, and the sole lifecycle Goal. Workers never
-  create, read, update, complete, or block Goals.
-- Create exactly one visible App task per implementation-eligible Feature Spec
-  and at most three nonterminal Spec tasks. Coordination-only artifacts create
-  no task. Identity comes from durable refs and fingerprints, never titles.
-- Use only App-managed isolated worktrees. Never create raw Git worktrees,
-  rotate the caller checkout, implement in root, or use a background worker.
-- Keep the accepted bundle, repositories, target branches, allowed paths,
-  validation plan, task assignments, and model profiles immutable.
-- Use `scripts/active-root-claim` as the sole ownership authority and
-  `scripts/ledger-cache` as the sole active-state writer. Unknown, stale,
-  unsupported, incomplete, or ambiguous authority and evidence fail closed.
-- Require current-scope validation, terminal `$autoreview`, exact-revision
-  Codex review, configured CI or explicit `not-configured`, integration,
-  tracker-closeout, branch-rule, approval, mergeability, and merge-queue
-  eligibility proof. Pending or unknown evidence blocks except the exact
-  warning-backed 45-minute `warned-timeout` review result.
-- The only successful task result is
-  `pull-request-ready-for-merge`. Never enqueue, merge, deploy,
-  release, or perform post-merge closure. A later merge request starts a
-  separate GitHub workflow.
+Start fresh schema-1 state with `scripts/run-state`, then create or adopt the
+root Goal before creating workers. The state database is durable user state at
+`$XDG_STATE_HOME/dotagents/skills/implement-feature/run-state-v1.sqlite3` or
+`~/.local/state/dotagents/skills/implement-feature/run-state-v1.sqlite3`. It is
+not a cache. This hard cut has no migration, legacy reader, archive format, or
+compatibility aliases.
 
-## Pre-Registration Bootstrap
+## App Orchestration
 
-After the surface gate, load `references/root-bootstrap.md`. It owns the closed
-pre-registration order and selects its complete contract set from the already
-observed snapshot. Do not infer another route from this file.
+Load `references/app-orchestration.md` before creating the Goal or a task. Use
+the current App task and Goal tools exactly as routed there. Inherit the App's
+model and thinking defaults unless the owner explicitly requested particular
+values.
 
-Acquire the claim before durable state. Register the immutable accepted
-snapshot, authorization, deliveries, profiles, validation plans, and objective.
-Do not call Goal mutation tools until the controller selects Goal activation
-after the complete atomic baseline is accepted.
+Keep at most three live worker tasks. Fill slots in canonical assignment order,
+skipping work whose paths overlap a live task. For each task:
 
-## Post-Registration Controller Loop
+1. Journal creation, create the worktree task, resolve its exact identity, set
+   and read back its title, then bind the task and checkout in `run-state`.
+2. Send the baseline-only bootstrap prompt, run the accepted baseline, and
+   record `task baseline`.
+3. Journal and send the explicit implementation-authorized message, then
+   record `task authorize`. No edit may precede this step.
+4. Monitor with bounded waits and authoritative task reads. Load only the
+   current phase reference: `worker-implementation.md`,
+   `worker-validation.md`, `worker-publication.md`, the review references, or
+   `worker-closeout.md`.
+5. Record `task ready` only after the exact-head, reviewed, CI-classified,
+   merge-ready PR handoff is independently reproducible. A ready task frees one
+   slot; immediately dispatch the next non-conflicting planned assignment.
 
-After registration, `scripts/ledger-cache --json controller next` is the only
-phase router:
+The successful result is `pull-request-ready-for-merge` for every assignment
+in this run. Complete and read back the root Goal only after all assignments
+are independently verified, then finish state and release claims. See
+`references/gates.md`.
 
-1. Run `controller next` against the live claim and ledger.
-2. Load exactly the returned `required_contracts`. Reuse a contract only when
-   the same installation/worktree path plus content SHA is certainly live in
-   context.
-3. Perform only the selected action through its typed template and owner.
-4. Reconcile or record its result through the typed helper, then repeat.
+## Operations And Recovery
 
-The registry inside `scripts/ledger-cache` is the sole action-to-contract
-mapping. Never add a contract from prose or select a phase manually. Contract
-caching is transient prompt behavior, not caller authority or persisted state.
-Compaction, uncertain retention, recovery, or changed bytes reloads only the
-current action set. A missing, stale, extra, or unreadable contract fails
-closed.
+Before any irreversible App, GitStack, AutoReview, or provider mutation, call
+`run-state operation begin`. Launch only when it returns
+`launch_authorized=true`, then call `operation finish`. Never replace or
+relaunch an `unknown` operation; reconcile the same identity. Read the complete
+paginated journal during recovery.
 
-## Recovery And Output
+Load `references/recovery-validation.md` after compaction, an active claim, a
+missing task, or state trouble. Old-version and missing preimplementation state
+normally start over after authoritative App/project/Goal readback proves that
+no worker can still mutate. Once any task received implementation authority,
+preserve its work and recover or stop for the owner; never discard it as a
+version repair.
 
-Resume or takeover only the original recorded tasks after the controller
-selects recovery and its complete contracts. Never infer identity, create a
-replacement, import archived state, or migrate an unsupported active schema.
-For the same accepted bundle, the ordinary imperative implementation invocation
-also authorizes one automatic fresh start when the current root's run is proven
-control-plane-unrecoverable and the typed preimplementation retirement in
-`baseline-validation.md` accepts. Do not ask for a separate `start over`
-request. A recoverable run still requires an explicit request to abandon it;
-ambiguous evidence blocks. Only after archive verification may the invocation
-re-enter the normal bootstrap as one fresh run with new identities. A fresh run
-reuses only revalidated immutable source inputs; it creates an empty transient
-bootstrap workspace and regenerates every derived packet, manifest, receipt,
-fingerprint, claim, ledger, task, and checkout identity under the currently
-loaded installation.
+Return concise state-derived source, assignment, Goal, task/worktree, changed
+path, validation, commit, PR/head, review, CI, tracker/domain-closeout,
+mergeability, warning, blocker, and next-action evidence.
 
-Return state-derived source, task, root Goal, managed-checkout, changed-path,
-validation, commit, PR/revision, review, CI, tracker/domain-closeout,
-mergeability, warning, blocker, and next-action evidence. Pre-claim exits report
-zero mutation. Terminal closeout remains staged and fail closed; changed proof
-after sealing blocks archive and never reopens a Goal.
+## Reference Routing
+
+- Intake and authorization: `references/spec-backed-delivery.md`,
+  `references/options.md`, and `references/multi-repo-workspace.md` only when
+  the connected bundle spans repositories.
+- App and task state: `references/app-orchestration.md`,
+  `references/worker.md`, and `references/baseline-validation.md`. Load
+  `references/run-state.md` only for CLI errors, recovery, exact command-shape
+  lookup outside the normal path, or maintenance.
+- Implementation: `references/worker-implementation.md` and
+  `references/worker-validation.md`.
+- Publication: `references/worker-publication.md` and
+  `references/review-mutation-authority.md`.
+- Review: `references/autoreview-fix-loop.md`,
+  `references/codex-review-closeout.md`,
+  `references/review-reconciliation.md`,
+  `references/review-thread-resolution.md`, and
+  `references/worker-review-fix.md`.
+- Closeout or recovery: `references/worker-closeout.md`,
+  `references/gates.md`, and `references/recovery-validation.md`.

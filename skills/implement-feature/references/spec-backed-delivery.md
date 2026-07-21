@@ -2,188 +2,99 @@
 
 ## Applicability
 
-Load this reference during read-only intake. Accept a durable Feature Spec only
-with its complete generated implementation-issue graph. The bundle may be
-hosted on GitHub or stored as local Markdown, but implementation always ends in
-GitHub pull requests ready to merge and not merged.
+Load during read-only intake. Accept only a durable Feature Spec with its
+complete generated implementation-issue graph. Traverse the complete connected
+bundle, then select the dependency-ready frontier for this run. The source may
+be GitHub or local Markdown, but selected implementation ends in GitHub pull
+requests ready to merge and not merged.
 
-Reject rough intent, standalone Specs, ad-hoc implementation requests,
-`proposed-spec:<...>` refs, incomplete graphs, and retired planning or handoff
-vocabulary. This contract never creates, repairs, regenerates, or publishes
-planning artifacts.
+Reject rough intent, standalone Specs, proposed refs, incomplete issue graphs,
+ad-hoc implementation requests, and retired planning vocabulary. Never repair,
+regenerate, or publish planning artifacts from this workflow.
 
-## Canonical Execution Contract
+## Execution Contract
 
-Every generated issue contains exactly one `## Execution Contract` table with
-these fields:
+Every generated issue contains exactly one `## Execution Contract` table:
 
 | Field | Required data |
 | --- | --- |
-| `source_spec_ref` | Stable durable parent Feature Spec id or path. |
-| `feature_slug` | Canonical feature slug shared by the bundle. |
-| `affected_repositories` | Complete repository ids or paths for this issue. |
+| `source_spec_ref` | Stable durable parent Feature Spec ref. |
+| `feature_slug` | Canonical bundle feature slug. |
+| `affected_repositories` | Complete repository IDs or paths for the issue. |
 | `allowed_paths` | Repository-qualified writable path scopes. |
-| `target_branch_name` | Branch shared by every affected repository inside this Feature Spec. |
-| `dependency_ids` | Earlier generated issue ids within this Feature Spec; use `none` when empty. |
+| `target_branch_name` | Branch shared by affected repositories inside the Spec. |
+| `dependency_ids` | Strictly earlier issue IDs in the same Spec, or `none`. |
 
-Goal, requirements, acceptance criteria, implementation plan, validation
-commands, and named integration gates remain authoritative in their existing
-sections and must be complete. Persist a knowledge payload only in the final
-integration issue's `## Domain Knowledge Closeout` when accepted durable
-decisions actually need Project Memory closeout. A Feature Spec containing
-`knowledge_delta` or `## Domain Knowledge Handoff` is incompatible.
+Goals, requirements, acceptance criteria, implementation steps, literal
+validation commands, working directories, and integration gates remain
+authoritative in their existing sections. Inputs must be bounded enough to
+execute without inventing paths, commands, branches, or acceptance behavior.
 
-When a final issue carries `knowledge_delta`, require all three lists and
-normalize every `target_surfaces` entry to exactly one repository plus one
-portable repo-relative path, rejecting absolute paths, `..` traversal, and
-ambiguous ownership. That repository must appear in the same issue's
-`affected_repositories`, and the target path must equal or descend from an
-explicit scope in the same issue's `allowed_paths`. Reject the bundle as
-`planning-required` when any target escapes that scope; intake must not widen
-the Execution Contract or rely on Project Memory to cross its boundary.
+The parent Spec has a `## Feature Dependencies` table containing only
+`upstream_feature_spec_ref` and `dependency_reason`. Missing tables are not
+interpreted as empty. Intra- and cross-Spec dependency graphs must be acyclic;
+every upstream Spec must be verified merged with integration proof before its
+dependent Spec can enter a run. Blocked downstream Specs remain next-frontier
+evidence and receive no assignment or claim.
 
-Require exactly one `## Domain Knowledge Closeout` owner when the payload is
-present and none when it is absent. For a single Spec, temporarily remove the
-owner and its outgoing `dependency_ids`, derive the nodes with no dependents in
-the remaining intra-Spec graph, and require the owner's final `dependency_ids`
-to include every such node. No issue may depend on the owner. For a
-multi-repository bundle, apply the same algorithm only inside the dedicated
-integration partial and require its owner to be the unique final issue there;
-the partial's Feature Dependencies provide the upstream merge waits. The
-section must explicitly require `$project-memory` with
-`memory_slice=domain-memory` and
-`domain_operation=implementation-closeout` only after integrated behavior is
-proven. Missing, duplicated, early, or graph-incomplete closeout data is
-`planning-required`; intake must not infer or add it from worker instructions.
-The closeout section must also require `capture_outcome=captured`, reconciliation
-of every accepted delta item and required named target, named verified
-destinations, and complete documentation-diff verification. For a nonempty
-accepted delta, `deferred` or `no-durable-change` blocks the issue and must be
-reported; neither satisfies terminal closeout. A supplied accepted item rejected
-or contradicted by landed behavior also blocks and requires an owner decision
-or separately authorized planning/implementation correction; it cannot count
-as captured.
-
-For a local Markdown issue, `affected_repositories` includes the tracker-owning
-Git repository and `allowed_paths` includes both its exact active
-path and exact derived `done/` destination. Both paths must resolve inside that
-affected Git repository and an App-managed checkout. A tracker artifact outside
-all affected Git repositories is non-App-executable; abort as
-`planning-required` rather than inventing an owner or widening scope.
-Register both refs before CLAIM as the source's `source_spec_ref` and
-`planned_done_ref`, with `tracker_repository` selecting the owning delivery.
-The active ref is authoritative until current complete
-task-revision-set substantive, integration, and required domain-closeout proof
-permits the one planned tracked move. `source-moved` then adopts the done ref
-with an unchanged body fingerprint, marks that delivery tracker-dirty, and
-invalidates the old revision set until the committed/pushed new delivery
-revision is established by `revision-observed`, a current committed/published
-`delivery-observed` snapshot clears dirt, and gates are rerun.
-
-The root snapshots the complete source and each issue body and computes its own
-fingerprints by preparing the canonical aggregate and per-entry records through
-`execution-manifest.md`. Every worker can independently reconstruct the
-documented `sha256-frame-v1` aggregate from the manifest without receiving a
-private byte recipe. Source-provided option rows, resolution fingerprints, duplicated
-delivery sections, and `## Orchestrator Handoff` sections are incompatible.
-
-## Intake Validation
+## Validation
 
 Require:
 
 - stable source and issue refs plus one shared feature slug;
-- every affected repository and exact allowed path scope;
-- one target branch name shared inside each Feature Spec, with the integration
-  partial's branch equal to `<ordinary_target_branch_name>-integration` for the
-  ordinary partial in its owner repo;
-- exactly one implementation-eligible Feature Spec owner for every
-  portfolio-wide `(repository, target_branch_name)` pair. Exclude a
-  coordination-only parent/global artifact because it creates no task or
-  App-managed worktree. The same branch name may appear in different
-  repositories, but a same-repository executable-Spec collision is
-  `planning-required` before CLAIM even when paths are disjoint or dependencies
-  serialize execution;
-- a complete acyclic generated-issue graph in which every `dependency_ids`
-  entry resolves to a strictly earlier generated issue inside the same Spec;
-  reject self, same-ID, and later-ID dependencies even when the graph would be
-  acyclic;
-- the parent Spec's mandatory `## Feature Dependencies` table, including an
-  empty body when there are no edges, and containing
-  only `upstream_feature_spec_ref` and `dependency_reason` rows that form an
-  acyclic cross-Spec graph;
-- bounded goals, requirements, acceptance criteria, and validation commands;
-- a complete deterministic validation plan derived from those commands before
-  authorization. Each entry binds a stable validation/command id, authored argv
-  fingerprint, closed adapter/policy, projected read-only argv fingerprint, and
-  pinned tool/version identity fingerprint. Only `prettier-check-v1` with
-  `unchanged-outside-scope` and `clean-exit-v1` with `clean-required`
-  are valid; any command without a provably read-only projection is
-  `planning-required` and its authored mutating form is never run;
+- every affected repository, target branch, and exact allowed path;
+- exactly one affected repository per implementation-eligible Feature Spec;
+- one executable Spec owner for each `(repository, target_branch_name)` pair;
+- a complete generated-issue graph whose dependencies point strictly backward;
+- bounded acceptance criteria and literal validation commands with working
+  directories and expected results;
+- no publish, deploy, destructive, interactive-secret, or merge command hidden
+  inside validation;
 - named integration gates for multi-repository work;
-- exactly one distinct repo-owned integration Feature Spec in every
-  multi-repository bundle, downstream of every implementation partial, with at
-  least one issue that owns a bounded path change plus cross-repository proof so
-  it can produce a real PR, and with the exact derived integration branch rather
-  than the ordinary partial's branch;
-- no contradiction between the Spec, issues, and current repository topology.
-- every domain-closeout target surface is contained by its final issue's
-  affected repositories and allowed paths.
+- no contradiction with current repository topology or instructions.
 
-A Feature Spec without the canonical `## Feature Dependencies` heading and
-two-column table is incompatible input and aborts as `planning-required`.
-Never interpret absence as an empty edge set or infer edges from issue
-`dependency_ids`, prose, branch names, or similar titles. Every authored
-upstream Feature Spec must be verified merged with integration proof before
-dispatch.
+Do not project, rewrite, or classify validation commands. The App executes the
+literal accepted command under its normal sandbox and approval path. If safe
+execution cannot be established, return `planning-required` or
+`unsupported-runtime` before implementation.
 
-`non_app_delivery_target` or any other explicit non-App marker aborts as
-`unsupported-delivery-target`. Retired delivery targets, delivery
-permissions, review requirements or skips, worker actions, parallelization,
-repository-layout copies, PR-count strategies, completion methods, closeout
-enums, and issue-mutation permissions are invalid structured input. Merge
-authorization is also invalid because merge is outside this skill.
+Normalize verified `owner/repository#N` GitHub refs to their canonical issue
+URLs for claims and task identity while preserving the authored ref as source
+evidence.
 
-Missing or contradictory execution data aborts as `planning-required` before
-CLAIM. Report the exact source refs and fields; do not infer, rewrite, or widen
-the bundle.
+## Domain Knowledge Closeout
 
-After verifying a GitHub source ref in the globally qualified shorthand
-`owner/repository#N`, deterministically derive
-`https://github.com/owner/repository/issues/N`. Preserve the shorthand as the
-authoritative artifact ref in the source snapshot, but use the URL as the
-canonical claim/task source id, scheduling key, and takeover identity. A source
-already expressed as that canonical URL is unchanged. This normalization is
-derived runtime evidence, not a bundle field or user option.
+An accepted knowledge delta belongs only to the unique final integration issue
+under `## Domain Knowledge Closeout`. Every target names exactly one repository
+and portable repo-relative path contained by that issue's repositories and
+allowed paths. Require `$project-memory` with `memory_slice=domain-memory` and
+`domain_operation=implementation-closeout` only after integrated behavior is
+proven. Missing, duplicate, early, escaping, contradicted, or graph-incomplete
+closeout data is `planning-required`.
 
-## Derived Delivery And Closeout
+## Local Tracker Sources
 
-One App task owns all repositories named by its Feature Spec. Registration
-creates one nonempty `deliveries[]` entry per affected Git repository, and the
-number of pull requests equals the delivery count. Every delivery uses the
-shared target branch as its head and must produce a real, `OPEN`, non-draft,
-reviewed PR, CI passed when configured and explicitly `not-configured`
-otherwise, ready to merge into its discovered default branch. The PR
-base is derived per delivery and verified during preflight and current-head
-review; it is not an input field.
+For local Markdown, include the tracker repository, exact active path, and exact
+derived `done/` path in scope. Both must resolve inside an affected repository
+and App-managed checkout. Move only after substantive, integration, and domain
+closeout proof; then commit, push, and regenerate all head-bound evidence. The
+move is prepared closeout until later merge.
 
-Derive tracker closeout from the source backend. Put each generated
-implementation issue's GitHub closing keyword in its owning repository PR. Put
-each implementation-eligible Feature Spec keyword in its designated
-default-branch whole-Spec closeout PR only after that Spec's gates pass. In a
-multi-repository bundle, put any accepted hosted parent/global Feature Spec
-keyword in the final integration partial's default-branch PR only after every
-partial gate passes. Use a fully qualified
-`owner/repository#number` ref when the issue and PR are in different
-repositories, and record every link as armed; hosted issues stay open until
-merge. Closing keywords are valid only in PRs whose base is the repository
-default branch; a different base is a blocker, not a closeout vehicle.
+## Multi-Repository Bundles
 
-For local Markdown, after current task-revision-set substantive acceptance,
-integration proof, and any knowledge closeout, move each issue to its derived
-`done/` path in its owning delivery. That event dirties and invalidates the old
-delivery revision. Commit and push the move, observe the resulting head, rerun
-final validation and `$autoreview`, convert draft PRs to ready-for-review, then
-obtain current-revision review and CI before terminal merge-ready state. The
-move is only prepared closeout until the later default-branch
-merge lands it. A separate GitHub workflow owns merge and post-merge closure
-verification.
+Require one distinct repository-owned integration Feature Spec downstream of
+all implementation partials. It owns a bounded path-changing issue plus named
+cross-repository proof and produces a real PR in a later invocation after its
+upstreams merge. Its branch is
+`<ordinary_target_branch_name>-integration` in its repository. A validation-only
+or no-op integration artifact is incompatible.
+
+## Derived Delivery
+
+One App task owns one selected Feature Spec in exactly one repository and
+produces one real, open, non-draft, reviewed PR against its discovered default
+branch, with configured CI passing or provider-backed proof that CI is not
+configured. A multi-repository Spec is `planning-required`; never split one
+source into several runtime assignments. Derive tracker closing refs from
+source ownership, but leave hosted issues open until merge. A separate GitHub
+workflow owns merge and post-merge closure.

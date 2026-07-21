@@ -1,62 +1,49 @@
-# Worker Publication And Delivery Phases
+# Worker Publication And Delivery
 
-Load only for publication, ready transition, CI, tracker closeout, or
-mergeability selected by the controller.
+Load for commit, push, PR, ready transition, CI, tracker closeout, or
+mergeability work.
 
-## Provider Text Transport
+GitStack owns Git and GitHub behavior. Resolve its current bundled workflow and
+runtime from the App catalog; do not pin a plugin version or validate one copy
+and execute another.
 
-Treat every provider-owned title, body, description, comment, reply, review,
-release note, and warning as opaque UTF-8 bytes. Never place that text in argv,
-an environment variable, a shell command string or command substitution, logs,
-dry-run output, or errors.
+Before an irreversible GitStack mutation, record the exact owner request with
+`run-state operation begin` and require `launch_authorized=true`. Invoke the
+typed GitStack workflow only for that new receipt, then record or reconcile its
+result with `operation finish`. Ambiguous transport requires
+exact-target readback and never a blind retry.
 
-For each provider-text mutation other than the typed review request:
+Keep provider text in file-backed inputs when the owner supports them. Never
+interpolate untrusted title, body, comment, reply, or warning text into shell
+commands, environment variables, substitutions, logs, or errors.
 
-1. Write each field without interpolation to its own absolute regular
-   non-symlink file outside the managed checkout using a literal tool such as
-   `apply_patch`.
-2. From the exact checkout run GitStack `--json repo snapshot` and retain its
-   SHA-256 fingerprint.
-3. Invoke only the typed file operation with `--title-file`, `--body-file`, or
-   its matching file field plus
-   `--expected-worktree-fingerprint <fingerprint>`. Inline text flags, parser
-   aliases, generic API writes, and shell-built commands are forbidden.
-4. Require exact target, provider object id and URL, UTF-8 byte count and
-   SHA-256, and unchanged worktree fingerprint.
+Commit through `$gitstack:git-commit`. Use a regular commit unless repository
+instructions require one targeted fixup. Never autosquash or rewrite a
+published branch. Every new head invalidates previous head-bound evidence.
 
-`reviews address` is read-only. Open a PR with
-`publish open --title-file --body-file`; GitStack has no `publish edit`
-command. A failed or unreadable mutation permits only one exact-target
-read-back and is never retried blindly. Preserve provider identity as
-partial-success evidence if later worktree proof fails. A connector response
-alone is not byte verification. Old snapshots and temporary files are not
-recovery authority. Provider transport is a typed GitStack request operation,
-does not extend `execution-manifest`, and does not define Codex review-request
-content.
+Create or update the assignment's one delivery PR from the exact authored
+target branch against its repository's discovered default branch. Resolve the
+exact PR number and canonical URL before readying it, and require that URL's
+owner/repository to equal the assignment claim. Re-read the same PR and prove
+open, non-draft, unchanged identity, current head, configured CI or
+provider-backed `not-configured`, branch rules, approvals, base freshness,
+conflict state, mergeability, and merge-queue eligibility.
 
-Create or update each delivery PR against its discovered default branch. Use
-GitStack's typed file-backed provider-text operations with immediate repository
-snapshot and exact target/text/worktree readback. Never place provider text in
-argv, environment variables, shell strings, substitutions, logs, or errors.
-Ambiguous mutation uses exact-target reconciliation and is never retried.
+New PRs from `$gitstack:yeet` are drafts. After the final current-head
+AutoReview, Codex review, actionable-finding loop, and configured CI result are
+terminal, journal `owner=gitstack`, `action=ensure-pull-request-ready`, the
+assignment ID, exact PR URL, and exact head. Read the same PR first. If it is
+still draft, invoke the current GitHub connector
+`github_mark_pull_request_ready_for_review` exactly once; use GitStack's
+same-target authenticated provider fallback only when that connector operation
+is unavailable. If it is already non-draft, perform no write. In either case,
+re-read the same PR and require non-draft plus the unchanged URL, repository,
+head SHA, head branch, base branch, and observed repository default branch.
+Finish the operation with exactly those fields and
+`status=ready-for-review`. An ambiguous mutation is reconciled by readback
+under the same operation key and is never relaunched.
 
-Commit through `$gitstack:git-commit`; use a regular commit unless repository
-instructions require one exact targeted fixup. Never autosquash or rewrite a
-published branch. Observe every changed head as a new revision and invalidate
-prior revision-bound gates.
-
-After substantive proof and terminal AutoReview, convert a draft through exact
-PR identity. Outside the ready mutation's shell chain, resolve and persist its
-exact number and URL; run `gh pr ready <number> --repo <owner/repo>` with no
-selectorless or branch inference, then re-read the same number and require the
-unchanged URL and `isDraft=false`. Then obtain current-revision Codex
-review, configured CI or explicit `not-configured`, tracker-closeout evidence,
-and current branch-rule, approval, base-freshness, conflict, mergeability, and
-merge-queue eligibility proof.
-
-The ready-for-review transition is nonterminal. After that nonterminal
-transition, continue through review, CI, tracker closeout, and mergeability.
-
-Arm hosted closing refs only in their designated default-branch delivery PRs;
-leave issues open until merge. The PR must remain `OPEN`. Unknown, pending, closed, merged, stale,
-conflicting, or ineligible state blocks. Never enqueue or merge.
+The ready-for-review transition is nonterminal and does not replace the final
+rules, approvals, conflict, or mergeability reads. Arm hosted closing refs only in
+their designated default-branch PRs and leave issues open until merge. Never
+enqueue or merge.

@@ -1,27 +1,29 @@
 # Worker Implementation Phase
 
-Load only when the controller selects implementation.
+Load for a dependency-ready Feature Spec.
 
-Verify the current assignment, App-managed checkout map, accepted baseline,
-active root Goal evidence, source fingerprints, and dependency integration.
-Implement only the accepted issue graph in dependency order and only inside
-registered paths. Never reconstruct command, tool, cwd, hash, or authority data
-from prose.
+Reverify assignment, App-managed checkout, accepted baseline, active root
+Goal, source fingerprints, repository instructions, and dependency integration.
+Implement the accepted issue graph in order and only inside allowed paths.
 
-Prove substantive acceptance and named integration behavior. When the final
-issue carries an accepted knowledge delta, invoke Project Memory only after
-integration using `memory_slice=domain-memory` and
-`domain_operation=implementation-closeout`. Require `capture_outcome=captured`,
-every accepted item reconciled to landed behavior, named verified destinations,
-and complete documentation-diff proof. Persist the delta fingerprint, each
-verified named destination, documentation-diff fingerprint, and complete
-implementation revision tuples. A contradiction, `deferred`, or
-`no-durable-change` blocks for owner direction.
+The App-generated checkout branch is bootstrap-only and may differ from the
+authored target branch. After explicit implementation authority and before the
+first source edit, create and switch to the exact target branch at the accepted
+baseline head. If that ref now exists unexpectedly, resolves to another head,
+or cannot be checked out in this managed worktree, stop for the owner. Keep all
+implementation commits, pushes, and the PR head on that target branch. Branch
+drift means any later branch other than the exact target.
 
-For a local tracker source, do not move it during ordinary implementation. The
-predeclared active-to-done move becomes eligible only after current complete
-task-revision-set acceptance, integration, and domain-closeout proof in the
-closeout phase.
+Use repository evidence and judgment for implementation details; the run-state
+tool does not prescribe code actions. Report exact changed paths. An undeclared
+changed or newly required path is `needs-owner`; never widen scope.
 
-Report exact changed paths and source evidence. An undeclared changed or newly
-required path is `needs-owner`; never ask to widen scope.
+When the final issue carries an accepted knowledge delta, invoke Project Memory
+only after integrated behavior is proven with `memory_slice=domain-memory` and
+`domain_operation=implementation-closeout`. Require captured outcome, named
+verified destinations, reconciliation to landed behavior, and documentation
+diff proof. Contradiction, deferral, or no durable change blocks for owner
+direction.
+
+Do not move local tracker artifacts during ordinary implementation; that is a
+closeout action after current substantive proof.

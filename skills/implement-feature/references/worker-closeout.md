@@ -1,35 +1,24 @@
-# Worker And Portfolio Closeout
+# Worker Closeout
 
-This file is the canonical owner of terminal sequencing, the no-merge boundary,
-and post-terminal behavior.
+The worker's only successful handoff is `pull-request-ready-for-merge` for its
+single repository assignment.
 
-The only successful App result is
-`pull-request-ready-for-merge`.
+For a local tracker, perform only the predeclared active-to-done move after
+substantive, integration, and optional domain-closeout proof. Commit and push
+that move, then regenerate validation, AutoReview, Codex review, CI, and
+mergeability evidence for the resulting head.
 
-After root-title revalidation, execute the closeout sequence below.
+Before reporting ready:
 
-For local tracker sources, move only the predeclared active ref to its done ref
-after current substantive, integration, and domain-closeout proof. Require an
-unchanged body, record the move, commit and push it, observe the newer revision,
-rerun validation and terminal AutoReview, then obtain current-revision review,
-CI status, and all terminal gates. The move remains prepared until later merge.
+1. Reconcile the worker's publication and review operations with root.
+2. Stop edits and read the exact checkout head and allowed-path diff.
+3. Reproduce validation, AutoReview, Codex review, configured-CI or
+   `not-configured`, PR identity, rules, approvals, conflicts, mergeability, and
+   tracker/domain-closeout evidence for that head.
+4. Confirm that neither worker nor root merged, enqueued, deployed, released,
+   or performed post-merge closure.
+5. Report exact assignment ID, thread ID, repository, target branch, head,
+   canonical PR URL, evidence summary, warnings, and `next_action=return-to-root`.
 
-Closeout order is irreversible:
-
-1. Seal each task against its complete current revision set and gates.
-2. Record its `pull-request-ready` handoff with
-   `external-merge-required` authority.
-3. Independently reverify every task and record portfolio verification.
-4. Complete the sole root Goal, read it back, and record completion.
-5. Reverify eligibility, release the claim, and archive through
-   `cache-lifecycle.md`.
-
-Failure or changed truth retains active state and blocks the next stage. After
-seal or Goal completion, record drift only as post-terminal drift; never reopen
-the Goal or resume implementation. Correction requires owner action and a new
-separately authorized run.
-
-Neither root nor any worker enqueues or merges a pull request, deploys,
-releases, closes hosted tracker items, or performs post-merge verification. A
-later GitHub workflow owns those actions and must recheck any late review
-findings.
+Root independently re-reads this evidence before calling `run-state task ready`.
+The worker does not complete the Goal or finish run state.

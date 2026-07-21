@@ -1,241 +1,70 @@
-# Recovery Validation
+# Recovery And Start Over
 
-Load this reference on every manual resume, including prepared
-takeover and embedded-adoption recovery before a candidate JSON state exists.
+Use this reference after compaction, an active claim, a missing worker, an
+unknown operation, or state/runtime trouble.
 
-## Runtime Surface Revalidation
+## Reconstruct Current Truth
 
-Before reading run state or a recorded task, verify visible ChatGPT desktop app
-task creation, App-managed worktree binding, task-title mutation and
-observation, and `create_goal`, `get_goal`, and `update_goal` in the root.
-Require first-class targeted root Goal
-`pending`/`active`/`complete` readback and updates. Goal pause/resume and App
-heartbeat automation are not required. Prior evidence, background agents, and filesystem
-access are insufficient. Missing support is `unsupported-runtime` without
-asking permission or performing mutation.
+1. Run `scripts/run-state --json doctor`.
+2. When the database is initialized and supported, resolve known source or
+   repository ownership with `claim find`, read the complete run projection
+   with `run show`, and page `operation list` from sequence zero until
+   `has_more=false`; use `operation show` for exact result history.
+3. When `doctor=uninitialized`, skip state reads and reconstruct identity only
+   from App project, task, Goal, source, Git, and provider evidence.
+4. Call `list_projects`, then read or wait on every stored or externally
+   discovered thread ID. Verify
+   title, project, managed checkout, Git top-level, branch, and current head.
+5. Read the root Goal and require its exact objective and supported state.
+6. Re-read accepted source fingerprints and current Git/provider artifacts.
 
-On delayed or ambiguous task identity, title, or root Goal evidence, load
-`app-control-plane-delays.md` and retain its original monotonic deadline.
+The stored manifest is the canonical assignment packet. App, Git, and provider
+readback is authoritative current truth. Never infer a live task or Goal from a
+title, an old message, or state alone.
 
-Call `get_goal` once in the root. If `blocked`, return `new-root-required` before
-authorization/run-state reads, require a fresh App task, preserve prior
-artifacts, and never adopt/update that Goal.
+## Resume
 
-Run and verify a freshly prepared `delivery-preflight` command manifest under
-`execution-manifest.md` and require its pinned authenticated `gh` plus API
-reachability before external freshness checks. Missing capability is
-`unsupported-runtime`; do not reinterpret it as CI absence.
+Resume the original thread when its identity and checkout remain provable.
+Reconcile `unknown` operations through owner/provider readback and finish the
+same key; never launch a replacement operation. `run show` exposes planned
+assignments and live-slot count so root can continue deterministic refill.
 
-Read `ledger-cache ledger read --projection recovery` only after that gate.
-Before any mutation, read each exact recorded task and require matching Goal
-tools and never create a replacement or objective fallback.
+A disappeared or replaced worker after implementation authority is
+`needs-owner`. Preserve its managed checkout and Git work. Do not release its
+claims, create a second task, or silently reconstruct implementation elsewhere.
 
-Compact `wait_threads` snapshots are hints only: they never append
-`task-observed` or update durable task state. Before a task lifecycle mutation,
-worker steering, authority grant, completion acceptance, gate, terminal
-decision, release, or takeover, read the same visible task directly with
-`read_thread`. Read newest-first pages to EOF, or stop at an exact durable
-anchor only when the normalized ID/hash chain is unbroken. A cursor reset or
-expiry, missing/broken anchor, conflicting marker/hash, or takeover falls back
-to EOF. Keep only the bounded full-read observation packet; never persist raw
-history or pagination cursors. Reuse the exact `task_ref` and `host_id` on
-reconnect. `wait_cursor` is an opaque resume hint and is never compared with a
-`read_thread` pagination cursor.
+## Start Over
 
-The bounded proof has exactly `observation_kind`, `task_ref`, `host_id`,
-optional `wait_cursor`, `read_scope` (`eof` or `anchored`), nullable
-`anchor_observation_fingerprint`, nullable `anchor_marker_id`, latest
-turn/message/tool-marker IDs, `observed_status`, content and page-chain
-fingerprints, `observed_at`, `base_generation`, `base_head`, and
-`observation_fingerprint`. An initial proof must be `eof` with null anchors;
-an `eof` proof always has null anchors. An `anchored` proof must name the
-previous accepted observation fingerprint and one of its marker IDs. These
-fields are part of the proof fingerprint. It invents no App revision,
-frontier, or gap fields. An exact proof replay is a no-op; marker/hash,
-anchor, or identity conflict fails closed.
+This version has no migration, compatibility, takeover, or `retired` lifecycle.
+Use start over for preimplementation state only:
 
-For `implementation_baseline=pending`, recovery is baseline-only. Require
-internal Goal state `pending` and no external Goal, verify immutable bundle,
-authorization and execution-scope fingerprints, exact managed checkout
-revision/tree/status, and every manifest/receipt byte hash. Resume only the same
-baseline-only tasks. Never recapture after source, tool, argv, adapter, policy,
-or scope drift; return `authorization-stale` or execute the typed
-preimplementation abort with complete task-stop and checkout-disposition
-evidence. A missing recorded checkout is retirement evidence, not authority to
-recreate or replace the task in the active ledger. When the current imperative
-implementation grant, exact bundle/scope identity, and every fresh-start
-invariant in `baseline-validation.md` also hold, that objective loss makes the
-run control-plane-unrecoverable and permits one automatic fresh bootstrap only
-after verified retirement and archive. Partial baseline evidence grants no
-implementation authority.
+- retired cache layouts and other versioned database filenames are ignored;
+- `doctor=uninitialized` starts a new schema-1 database only after App project,
+  task, Goal, source, Git, and provider reads prove no matching worker can still
+  mutate;
+- an active schema-1 run with no authorized task may end its exact created tasks,
+  record each `task abort`, and call
+  `run finish --outcome preimplementation-aborted` before a fresh run;
+- an incompatible database at the current schema-1 path is never read or
+  rewritten. Preserve it and require owner direction before moving it aside;
+  after the same no-live-work proof, start with a clean schema-1 path.
 
-## Complete Freshness Pass
+The fresh run uses new run, task, and operation identities, revalidates current
+source and projects, and imports nothing. It may adopt the same still-active
+root Goal when that objective remains exact.
 
-Perform one complete read-only pass:
+Once any task received `implementation_authority=granted`, an old/missing state
+error is not a start-over excuse. Recover from the original App task and Git
+work or stop for the owner. If the exact schema-1 database is missing, the CLI
+cannot adopt that existing task: preserve the checkout and report
+`needs-owner` unless the exact database can be restored.
 
-1. Revalidate authorization, `task-model-policy.md`, and every recorded per-Spec profile,
-   including explicit no-task adoption entries. Unknown, unavailable, or
-   substituted profiles block.
-2. Recompute every source and generated-issue fingerprint plus every canonical
-   claim/task source id. For local tracker sources, accept a missing active path
-   only when the exact predeclared done ref exists in the registered delivery,
-   the body fingerprint is unchanged, and Git proves the tracked move. Both
-   paths, neither path, another destination, a GitHub source move, or changed
-   body blocks.
-3. Verify each registered repository and branch, then rerun the bounded
-   delivery preflight for the complete registered set. Require the same GitHub
-   repository/default-base identity and a definitive `configured` or
-   `not-configured` result. An unknown result blocks without replacing prior
-   state. Then verify the complete
-   `deliveries[]` set for each task. Every delivery requires its exact
-   App-managed checkout, Git top-level, baseline, current HEAD, isolation proof,
-   and unique `(repository, checkout)` ownership. A partial, shared, symlinked,
-   unmanaged, or non-isolated map blocks.
-4. Verify the active claim still covers the same repositories and sources. For
-   `takeover-prepared`, require the recorded grant, exact transaction id, and
-   helper's idempotent `recover-takeover`; a changed replaced snapshot blocks.
-5. Rebuild the complete implementation-eligible Spec registry. Derive the exact
-   singular/plural root title. Require one task per Spec at most, one delivery
-   per affected repository, and no more than three nonterminal tasks. Record
-   live title drift without repairing it during this pass.
-6. Rederive the portfolio objective from the bundle; require exact
-   `CI when configured` and its fingerprint as a hard cut. Call `get_goal` in
-   the root. Pending registration may
-   observe a matching active Goal or no Goal; do not adopt or create it
-   during this pass. An active root Goal must match its objective and fingerprint.
-   Completed root Goal readback requires a matching portfolio verification.
-7. Recompute each delivery's exact PR repository, number, URL,
-   head/base/merge-base tuple, review request and deadline, configured CI or
-   explicit `not-configured`, PR lifecycle,
-   tracker state, mergeability and repository rules. Recompute the canonical
-   complete task revision set, validation, AutoReview, integration, domain
-   closeout, merged dependencies, path conflicts, ready order, review deadlines,
-   blockers, and next stage.
-8. For sealed tasks and a completed root Goal, independently reverify terminal truth.
-   Record drift candidates; do not resume work or reopen the root Goal.
+## Preimplementation Abort
 
-The recovery projection is derived guidance, not external truth. It reports
-timestamps, not wall-clock `overdue` judgments. Callers compare review deadlines
-with their observed clock. Do not patch JSON or manufacture an event from stale
-prose.
+End and read back each created baseline-only task as `completed` or `archived`,
+then call `task abort` with that exact thread and observation ref. Reconcile all
+pending/unknown operations. Planned assignments require no fake task. Only then
+may `run finish --outcome preimplementation-aborted` release claims.
 
-## Applying Reconciled State
-
-Only after the full pass succeeds may the root apply material events through
-`ledger-cache ledger apply` at the observed generation. On CAS conflict,
-discard the batch, reread, and recompute.
-
-Late direct task evidence after a seal uses the existing `task-observed` packet
-to record terminal drift only; it never replaces the sealed observation/result,
-reopens the Goal, or regrants authority.
-
-Before seal, apply a changed definitive capability observation through
-`preflight-observed`; its new preflight key invalidates delivery and
-task-set bindings. After seal, never apply that event: record the changed key
-only through `terminal-drift-recorded` and block archive.
-
-For `portfolio_goal_state=pending`, first repair and observe the root title,
-then apply `root-title-observed`. Adopt a matching Goal observed in the pass or,
-only when none exists, call `create_goal` once without `token_budget`; apply
-`portfolio-goal-activated`. A different unfinished Goal is `needs-owner`; a
-blocked root Goal never reaches this phase.
-
-For a nonterminal task, require exact source assignment, task ref, exact derived
-display title, profile, matching assignment fingerprint, and complete managed
-checkout map. Only if that exact title or identity observation is delayed,
-ambiguous, or overwritten, load `app-control-plane-delays.md`. Repair
-generated-title drift only inside its initial quiet window or with title-source
-proof; preserve a later explicit user title. Report accepted evidence through
-`task-observed`. Resume only the original visible task with its recorded profile.
-
-If a local move is fully proven, apply `source-moved`; it is valid only when all
-prerequisite current task-revision-set gates passed before it. It dirties its
-owning delivery and invalidates old evidence. Establish the subsequent
-committed/pushed tuple through delivery-keyed `revision-observed`, then apply
-`delivery-observed` with the exact revision key and current lifecycle. Only a
-newer committed and published observation clears tracker dirt. Rerun gates.
-
-## Review Wait Recovery
-
-Before reconciling any GitStack or AutoReview operation, require its exact
-schema-15 `owned-operation-started` record and owner request. `operation
-start` fails once a start is present. `operation read-start` recovers its
-receipt, and `operation read-request` recovers the opaque request named by the
-generic start descriptor. Completed predecessor/follow-up evidence uses
-`operation read-result`, which requires the current live controller to name
-the exact source result fingerprint and returns opaque owner evidence plus its
-generic projection and immutable source binding. The owner validates consumed
-state and performs readback only. Closed recovery outcomes never retry, reset
-the 45-minute deadline, delete a marker, or launch again.
-
-Before any resumed provider-text mutation, reload the transport contract in
-`worker.md`, recreate the opaque text file from current authorized data, and
-take a fresh GitStack `repo snapshot` in the exact managed checkout. Require
-the typed file flag and `--expected-worktree-fingerprint`; old snapshots and
-old temporary files are not recovery authority. Preserve a confirmed provider
-object/read-back as partial success, and never retry an ambiguous write. A
-connector mutation is byte-verified only after an exact-target read-back.
-
-Recompute the exact delivery revision before review work. Reuse a result only
-for that tuple with all addressable findings dispositioned. Re-read stored
-`finding_count` and `finding_comment_ids`; require equal cardinality. A
-fix-required result with zero ids needs a fresh fix revision and review but no
-thread receipt. For every nonzero id, preserve and revalidate the exact
-GitStack reply and resolution receipts against their finding and resolution
-revisions. Missing, conflicting, wrong-target, or stale receipts block; do not
-replace them with raw GraphQL or a no-change disposition. A GitStack result
-with `mutation_may_have_applied=true` remains blocked and is never retried.
-Preserve an existing request's
-original `wait_started_at` and deadline. Persist its single invocation before
-the provider call with `max(0,floor(deadline-wait_invoked_at))`; zero is one immediate
-check. A recorded invocation is never relaunched. Accept observations only for
-the exact current request and revision while active-waiting.
-
-If the waiter result remains pending, compare its observation time with the
-immutable 45-minute deadline. Before the deadline, continue observing the
-already-launched call; do not start another. At or after the deadline, require
-the persistent PR warning, then record the one final
-`waiting/warned-timeout` observation with its `warning_ref`. The root Goal
-remains active, the claim remains unchanged, and closeout continues. A
-missing request, access or provider failure, findings, or missing warning is a
-blocker. Never create a review schedule, pause a Goal, arm a heartbeat, or
-relaunch the provider waiter. Old-revision waits remain inert history.
-
-## Staged Closeout Recovery
-
-Resume at the first incomplete closeout stage without requiring a later stage:
-
-1. A task with all current proof but no seal may apply
-   `task-sealed`.
-2. An unchanged seal without terminal handoff may apply
-   `handoff-recorded` from current delivery proof.
-3. Once all tasks have terminal handoffs, independently reverify and apply
-   `portfolio-verified`.
-4. A verified portfolio with active root Goal may complete and read it back,
-   then apply `portfolio-goal-completed`; already-completed matching evidence is
-   adopted once and derives `portfolio_goal_state=complete`.
-5. Only then run the complete terminal release/archive sequence from
-   `cache-lifecycle.md`; an already
-   released state may finish the same archive operation idempotently.
-
-These are closeout transitions, not implementation resume. Never repair or
-resume implementation during this interrupted completion transition. If any terminal fact
-changed after a seal or root Goal completion, apply
-`terminal-drift-recorded`. It preserves irreversible root Goal history, blocks
-portfolio verification or archive, and requires owner action or a fresh run.
-
-## Prepared Takeover Without Candidate State
-
-When a recovered takeover claim has no candidate JSON because creation never
-completed, initialize only from the current prepared journal and that
-current claim's complete embedded adoption mappings. Verify each source, exact
-task ref or explicit
-no-task entry, Goal, immutable profile, title, and every delivery checkout. The
-registration packet carries those mappings and ledger creation binds the
-candidate claim. A resumed same-root run instead keeps its original claim; it
-never rebinds state to a replacement fingerprint.
-
-Do not infer identity from task titles, replaced-root prose, or archived state,
-and do not create a task when the mapping records one. If candidate JSON exists,
-validate it normally. Active Markdown or unsupported schemas block without
-import, migration, rename, dual-read, retirement, or deletion.
+Do not complete the root Goal for an aborted attempt. A fresh run may continue
+the same objective.

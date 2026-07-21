@@ -1,0 +1,2059 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sqlite3
+import stat
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+CLI_VERSION = "1.0.0"
+STATE_SCHEMA_VERSION = 1
+MAX_INPUT_BYTES = 2 * 1024 * 1024
+MAX_LIVE_TASKS = 3
+SQLITE_BUSY_TIMEOUT_MS = 10_000
+
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+HEAD_RE = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
+TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
+LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+REPOSITORY_CLAIM_RE = re.compile(
+    r"^repository:github:([a-z0-9](?:[a-z0-9-]{0,38}))/"
+    r"([a-z0-9._-]{1,100})$"
+)
+GITHUB_ISSUE_RE = re.compile(
+    r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
+    r"([a-z0-9._-]{1,100})/issues/([1-9][0-9]*)$"
+)
+GITHUB_PULL_RE = re.compile(
+    r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
+    r"([a-z0-9._-]{1,100})/pull/([1-9][0-9]*)$"
+)
+
+APP_ASSIGNMENT_ACTIONS = {
+    "create-task",
+    "set-task-title",
+    "send-worker-bootstrap",
+    "authorize-implementation",
+    "archive-task",
+}
+APP_GOAL_ACTIONS = {"create-goal", "complete-goal"}
+PROTECTED_APP_ACTIONS = APP_ASSIGNMENT_ACTIONS | APP_GOAL_ACTIONS
+GITSTACK_ASSIGNMENT_ACTIONS = {"ensure-pull-request-ready"}
+
+
+class StateError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int = 2) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def state_root() -> Path:
+    configured = os.environ.get("XDG_STATE_HOME")
+    if configured:
+        base = Path(configured).expanduser()
+        if not base.is_absolute():
+            raise StateError("invalid-state-home", "XDG_STATE_HOME must be absolute")
+    else:
+        base = Path.home() / ".local" / "state"
+    return base / "dotagents" / "skills" / "implement-feature"
+
+
+def database_path() -> Path:
+    return state_root() / "run-state-v1.sqlite3"
+
+
+def ensure_private_state_root() -> Path:
+    root = state_root()
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if root.is_symlink() or not root.is_dir():
+        raise StateError("unsafe-state-root", f"state root is not a real directory: {root}", 4)
+    os.chmod(root, 0o700)
+    return root
+
+
+def validate_database_file(path: Path) -> None:
+    if path.is_symlink():
+        raise StateError("unsafe-state-database", f"state database is a symlink: {path}", 4)
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode):
+        raise StateError("unsafe-state-database", f"state database is not regular: {path}", 4)
+    if info.st_mode & 0o077:
+        raise StateError("unsafe-state-permissions", f"state database must be owner-only: {path}", 4)
+
+
+def connect(*, write: bool) -> sqlite3.Connection:
+    path = database_path()
+    if write:
+        ensure_private_state_root()
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(descriptor)
+    elif not path.exists():
+        raise StateError("state-uninitialized", "fresh schema-1 state has not been initialized", 3)
+
+    validate_database_file(path)
+    connection = sqlite3.connect(
+        path,
+        timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
+        isolation_level=None,
+    )
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        if write:
+            connection.execute("BEGIN IMMEDIATE")
+            schema_created = ensure_schema(connection, allow_create=True)
+            if schema_created:
+                connection.commit()
+                connection.execute("BEGIN IMMEDIATE")
+            os.chmod(path, 0o600)
+        else:
+            ensure_schema(connection, allow_create=False)
+    except Exception:
+        connection.rollback()
+        connection.close()
+        raise
+    return connection
+
+
+def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool:
+    version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+    if version == 0:
+        existing_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if existing_tables:
+            raise StateError(
+                "unsupported-state-schema",
+                "unversioned state contains tables; migrations are not supported",
+                4,
+            )
+        if allow_create:
+            create_schema(connection)
+            return True
+        raise StateError("state-uninitialized", "fresh schema-1 state has not been initialized", 3)
+    if version != STATE_SCHEMA_VERSION:
+        raise StateError(
+            "unsupported-state-schema",
+            f"expected fresh state schema 1, found {version}; migrations are not supported",
+            4,
+        )
+    required = {
+        "metadata",
+        "runs",
+        "sources",
+        "repositories",
+        "claims",
+        "assignments",
+        "operations",
+        "operation_results",
+    }
+    actual = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        )
+    }
+    if not required.issubset(actual):
+        raise StateError("invalid-state-schema", "state tables do not match schema 1", 4)
+    metadata = connection.execute(
+        "SELECT value FROM metadata WHERE key = 'schema_version'"
+    ).fetchone()
+    if metadata is None or metadata[0] != "1":
+        raise StateError("invalid-state-schema", "state metadata does not match schema 1", 4)
+    return False
+
+
+def create_schema(connection: sqlite3.Connection) -> None:
+    statements = (
+        """CREATE TABLE metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )""",
+        """CREATE TABLE runs (
+            run_id TEXT PRIMARY KEY,
+            root_task_id TEXT NOT NULL,
+            manifest_json TEXT NOT NULL,
+            manifest_sha256 TEXT NOT NULL,
+            goal_objective_sha256 TEXT NOT NULL,
+            goal_source TEXT CHECK(goal_source IN ('created', 'adopted')),
+            goal_status TEXT NOT NULL DEFAULT 'unbound'
+                CHECK(goal_status IN ('unbound', 'active', 'completed')),
+            status TEXT NOT NULL DEFAULT 'active'
+                CHECK(status IN ('active', 'completed', 'preimplementation-aborted')),
+            revision INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            finished_at TEXT
+        )""",
+        """CREATE TABLE sources (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            source_ref TEXT NOT NULL,
+            source_kind TEXT NOT NULL CHECK(source_kind IN ('github-issue', 'local-file')),
+            source_sha256 TEXT NOT NULL,
+            claim_keys_json TEXT NOT NULL,
+            PRIMARY KEY(run_id, source_ref)
+        )""",
+        """CREATE TABLE repositories (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            repository_claim TEXT NOT NULL,
+            repository_path TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            default_branch_name TEXT NOT NULL,
+            git_common_dir TEXT NOT NULL,
+            git_common_dir_device INTEGER NOT NULL,
+            git_common_dir_inode INTEGER NOT NULL,
+            PRIMARY KEY(run_id, repository_claim)
+        )""",
+        """CREATE TABLE claims (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            claim_key TEXT NOT NULL,
+            active INTEGER NOT NULL CHECK(active IN (0, 1)),
+            acquired_at TEXT NOT NULL,
+            released_at TEXT,
+            PRIMARY KEY(run_id, claim_key)
+        )""",
+        """CREATE UNIQUE INDEX one_active_claim
+            ON claims(claim_key) WHERE active = 1""",
+        """CREATE TABLE assignments (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            assignment_id TEXT NOT NULL,
+            source_ref TEXT NOT NULL,
+            title TEXT NOT NULL,
+            repository_claim TEXT NOT NULL,
+            repository_path TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            target_branch_name TEXT NOT NULL,
+            assignment_json TEXT NOT NULL,
+            task_state TEXT NOT NULL DEFAULT 'planned'
+                CHECK(task_state IN (
+                    'planned', 'baseline-pending', 'baseline-passed',
+                    'implementation-authorized', 'ready-for-merge', 'terminal-aborted'
+                )),
+            thread_id TEXT,
+            observed_title TEXT,
+            checkout_path TEXT,
+            git_top_level TEXT,
+            checkout_branch TEXT,
+            baseline_head TEXT,
+            head_sha TEXT,
+            pr_head_branch TEXT,
+            pr_base_branch TEXT,
+            pr_default_branch TEXT,
+            pr_url TEXT,
+            terminal_app_status TEXT,
+            terminal_observation_ref TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(run_id, assignment_id),
+            FOREIGN KEY(run_id, source_ref) REFERENCES sources(run_id, source_ref),
+            FOREIGN KEY(run_id, repository_claim)
+                REFERENCES repositories(run_id, repository_claim)
+        )""",
+        """CREATE UNIQUE INDEX one_thread_identity
+            ON assignments(thread_id) WHERE thread_id IS NOT NULL""",
+        """CREATE TABLE operations (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            operation_key TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            action TEXT NOT NULL,
+            subject_id TEXT NOT NULL,
+            head_sha TEXT,
+            request_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('pending', 'unknown', 'succeeded', 'failed')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(run_id, operation_key)
+        )""",
+        """CREATE TABLE operation_results (
+            run_id TEXT NOT NULL,
+            operation_key TEXT NOT NULL,
+            result_index INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('unknown', 'succeeded', 'failed')),
+            result_json TEXT NOT NULL,
+            recorded_at TEXT NOT NULL,
+            PRIMARY KEY(run_id, operation_key, result_index),
+            FOREIGN KEY(run_id, operation_key)
+                REFERENCES operations(run_id, operation_key) ON DELETE RESTRICT
+        )""",
+        "INSERT INTO metadata(key, value) VALUES ('schema_version', '1')",
+        "PRAGMA user_version = 1",
+    )
+    for statement in statements:
+        connection.execute(statement)
+
+
+def read_json_file(path_text: str, *, label: str) -> dict[str, Any]:
+    path = Path(path_text)
+    if not path.is_absolute():
+        raise StateError("invalid-input-path", f"{label} path must be absolute")
+    if path.is_symlink() or not path.is_file():
+        raise StateError("invalid-input-path", f"{label} must be a regular non-symlink file")
+    if path.stat().st_size > MAX_INPUT_BYTES:
+        raise StateError("input-too-large", f"{label} exceeds {MAX_INPUT_BYTES} bytes")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise StateError("invalid-json", f"cannot read {label}: {error}") from error
+    if not isinstance(value, dict):
+        raise StateError("invalid-json", f"{label} must contain one JSON object")
+    return value
+
+
+def require_exact_keys(value: dict[str, Any], keys: set[str], label: str) -> None:
+    actual = set(value)
+    if actual != keys:
+        missing = sorted(keys - actual)
+        extra = sorted(actual - keys)
+        raise StateError("invalid-input", f"{label} keys mismatch; missing={missing}, extra={extra}")
+
+
+def require_string(value: Any, field: str, *, maximum: int = 2048) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+        raise StateError("invalid-input", f"{field} must be a nonempty string up to {maximum} characters")
+    return value
+
+
+def require_token(value: Any, field: str) -> str:
+    text = require_string(value, field, maximum=128)
+    if not TOKEN_RE.fullmatch(text):
+        raise StateError("invalid-input", f"{field} must match {TOKEN_RE.pattern}")
+    return text
+
+
+def require_lower_kebab(value: Any, field: str) -> str:
+    text = require_string(value, field, maximum=80)
+    if not LOWER_KEBAB_RE.fullmatch(text):
+        raise StateError("invalid-input", f"{field} must be lower-kebab")
+    return text
+
+
+def require_sha256(value: Any, field: str) -> str:
+    text = require_string(value, field, maximum=64)
+    if not SHA256_RE.fullmatch(text):
+        raise StateError("invalid-input", f"{field} must be a lowercase sha256")
+    return text
+
+
+def require_head(value: Any, field: str) -> str:
+    text = require_string(value, field, maximum=64)
+    if not HEAD_RE.fullmatch(text):
+        raise StateError("invalid-input", f"{field} must be a lowercase 40- or 64-character Git head")
+    return text
+
+
+def require_string_list(
+    value: Any, field: str, *, allow_empty: bool, maximum_items: int = 256
+) -> list[str]:
+    if not isinstance(value, list) or len(value) > maximum_items or (not value and not allow_empty):
+        qualifier = "possibly empty" if allow_empty else "nonempty"
+        raise StateError("invalid-input", f"{field} must be a {qualifier} string list")
+    result = [require_string(item, f"{field}[]", maximum=4096) for item in value]
+    if len(set(result)) != len(result):
+        raise StateError("invalid-input", f"{field} must not contain duplicates")
+    return result
+
+
+def canonical_repository_claim(value: Any) -> str:
+    claim = require_string(value, "repository_claim", maximum=256)
+    if not REPOSITORY_CLAIM_RE.fullmatch(claim):
+        raise StateError(
+            "invalid-input",
+            "repository_claim must be repository:github:<lowercase-owner>/<lowercase-repository>",
+        )
+    return claim
+
+
+def canonical_directory(value: Any, field: str) -> str:
+    text = require_string(value, field, maximum=4096)
+    path = Path(text)
+    if not path.is_absolute() or path.is_symlink() or not path.is_dir():
+        raise StateError("invalid-input", f"{field} must be an absolute real directory")
+    return str(path.resolve())
+
+
+def validate_target_branch(value: Any) -> str:
+    branch = require_string(value, "target_branch_name", maximum=255)
+    invalid = (
+        branch.startswith("-")
+        or branch.startswith("/")
+        or branch.endswith("/")
+        or branch.endswith(".")
+        or ".." in branch
+        or "//" in branch
+        or any(character.isspace() or character in "~^:?*[\\" for character in branch)
+    )
+    if invalid:
+        raise StateError("invalid-input", "target_branch_name is not a canonical Git branch name")
+    return branch
+
+
+def local_source_claim_keys(path: Path, digest: str, label: str) -> list[str]:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise StateError(
+            "source-drift", f"{label} is no longer an accessible regular non-symlink file", 4
+        ) from error
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise StateError("source-drift", f"{label} is no longer a regular file", 4)
+        observed = hashlib.sha256()
+        while chunk := os.read(descriptor, 1024 * 1024):
+            observed.update(chunk)
+        current = os.stat(path, follow_symlinks=False)
+        if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (
+            info.st_dev,
+            info.st_ino,
+        ):
+            raise StateError("source-drift", f"{label} changed while it was observed", 4)
+    except OSError as error:
+        raise StateError("source-drift", f"{label} changed while it was observed", 4) from error
+    finally:
+        os.close(descriptor)
+    if observed.hexdigest() != digest:
+        raise StateError("source-drift", f"{label} content does not match its sha256", 4)
+    return [f"source:path:{path}", f"source:local:{info.st_dev}:{info.st_ino}"]
+
+
+def source_claim_keys(source: dict[str, str], index: int) -> list[str]:
+    if source["kind"] == "github-issue":
+        match = GITHUB_ISSUE_RE.fullmatch(source["ref"])
+        assert match is not None
+        return [f"source:github:{match.group(1)}/{match.group(2)}#{match.group(3)}"]
+    return local_source_claim_keys(Path(source["ref"]), source["sha256"], f"sources[{index}]")
+
+
+def validate_source(value: Any, index: int) -> tuple[dict[str, str], list[str]]:
+    if not isinstance(value, dict):
+        raise StateError("invalid-input", f"sources[{index}] must be an object")
+    require_exact_keys(value, {"kind", "ref", "sha256"}, f"sources[{index}]")
+    kind = require_string(value["kind"], f"sources[{index}].kind", maximum=32)
+    ref = require_string(value["ref"], f"sources[{index}].ref", maximum=4096)
+    digest = require_sha256(value["sha256"], f"sources[{index}].sha256")
+    if kind == "github-issue":
+        match = GITHUB_ISSUE_RE.fullmatch(ref)
+        if not match:
+            raise StateError("invalid-input", f"sources[{index}].ref must be a canonical lowercase GitHub issue URL")
+    elif kind == "local-file":
+        path = Path(ref)
+        if not path.is_absolute() or path.is_symlink() or not path.is_file():
+            raise StateError("invalid-input", f"sources[{index}].ref must be an absolute regular non-symlink file")
+        ref = str(path.resolve())
+    else:
+        raise StateError("invalid-input", f"sources[{index}].kind must be github-issue or local-file")
+    source = {"kind": kind, "ref": ref, "sha256": digest}
+    return source, source_claim_keys(source, index)
+
+
+def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
+    require_exact_keys(
+        raw,
+        {
+            "schema_version",
+            "run_id",
+            "root_task_id",
+            "goal_objective",
+            "sources",
+            "repositories",
+            "assignments",
+        },
+        "manifest",
+    )
+    if raw["schema_version"] != 1:
+        raise StateError("unsupported-input-schema", "manifest schema_version must be 1")
+    run_id = require_token(raw["run_id"], "run_id")
+    root_task_id = require_string(raw["root_task_id"], "root_task_id", maximum=256)
+    goal_objective = require_string(raw["goal_objective"], "goal_objective", maximum=4000)
+
+    if not isinstance(raw["sources"], list) or not raw["sources"]:
+        raise StateError("invalid-input", "sources must be a nonempty list")
+    sources: list[dict[str, str]] = []
+    source_claims: dict[str, list[str]] = {}
+    for index, item in enumerate(raw["sources"]):
+        source, claims = validate_source(item, index)
+        if source["ref"] in source_claims:
+            raise StateError("invalid-input", "source refs must be unique")
+        sources.append(source)
+        source_claims[source["ref"]] = claims
+
+    if not isinstance(raw["repositories"], list) or not raw["repositories"]:
+        raise StateError("invalid-input", "repositories must be a nonempty list")
+    repositories: list[dict[str, Any]] = []
+    repository_map: dict[str, dict[str, Any]] = {}
+    project_ids: set[str] = set()
+    repository_paths: set[str] = set()
+    git_common_paths: set[str] = set()
+    git_common_fs_ids: set[tuple[int, int]] = set()
+    for index, item in enumerate(raw["repositories"]):
+        if not isinstance(item, dict):
+            raise StateError("invalid-input", f"repositories[{index}] must be an object")
+        require_exact_keys(
+            item,
+            {
+                "repository_claim",
+                "repository_path",
+                "project_id",
+                "default_branch_name",
+                "git_common_dir",
+            },
+            f"repositories[{index}]",
+        )
+        claim = canonical_repository_claim(item["repository_claim"])
+        path = canonical_directory(item["repository_path"], f"repositories[{index}].repository_path")
+        project_id = require_string(item["project_id"], f"repositories[{index}].project_id", maximum=256)
+        default_branch_name = validate_target_branch(item["default_branch_name"])
+        git_common_dir = canonical_directory(
+            item["git_common_dir"], f"repositories[{index}].git_common_dir"
+        )
+        git_identity_info = Path(git_common_dir).stat()
+        git_fs_id = (git_identity_info.st_dev, git_identity_info.st_ino)
+        if claim in repository_map:
+            raise StateError("invalid-input", "repository claims must be unique")
+        if project_id in project_ids:
+            raise StateError("invalid-input", "each repository must map to a distinct App project_id")
+        if path in repository_paths:
+            raise StateError("invalid-input", "each repository claim must map to a distinct repository_path")
+        if git_common_dir in git_common_paths or git_fs_id in git_common_fs_ids:
+            raise StateError(
+                "invalid-input",
+                "each repository claim must map to a distinct Git common-directory identity",
+            )
+        normalized = {
+            "repository_claim": claim,
+            "repository_path": path,
+            "project_id": project_id,
+            "default_branch_name": default_branch_name,
+            "git_common_dir": git_common_dir,
+        }
+        repositories.append(normalized)
+        repository_map[claim] = normalized
+        project_ids.add(project_id)
+        repository_paths.add(path)
+        git_common_paths.add(git_common_dir)
+        git_common_fs_ids.add(git_fs_id)
+
+    if not isinstance(raw["assignments"], list) or not raw["assignments"]:
+        raise StateError("invalid-input", "assignments must be a nonempty list")
+    assignments: list[dict[str, Any]] = []
+    assignment_ids: set[str] = set()
+    assigned_sources: set[str] = set()
+    delivery_pairs: set[tuple[str, str]] = set()
+    used_repositories: set[str] = set()
+    assignment_keys = {
+        "assignment_id",
+        "source_ref",
+        "title",
+        "repository_claim",
+        "target_branch_name",
+        "allowed_paths",
+        "acceptance_criteria",
+        "validation_commands",
+        "integration_gates",
+        "domain_closeout",
+    }
+    for index, item in enumerate(raw["assignments"]):
+        if not isinstance(item, dict):
+            raise StateError("invalid-input", f"assignments[{index}] must be an object")
+        require_exact_keys(item, assignment_keys, f"assignments[{index}]")
+        assignment_id = require_token(item["assignment_id"], f"assignments[{index}].assignment_id")
+        source_ref = require_string(item["source_ref"], f"assignments[{index}].source_ref", maximum=4096)
+        title = require_string(item["title"], f"assignments[{index}].title", maximum=256)
+        repository_claim = canonical_repository_claim(item["repository_claim"])
+        target_branch = validate_target_branch(item["target_branch_name"])
+        allowed_paths = require_string_list(item["allowed_paths"], f"assignments[{index}].allowed_paths", allow_empty=False)
+        acceptance = require_string_list(item["acceptance_criteria"], f"assignments[{index}].acceptance_criteria", allow_empty=False)
+        validation = require_string_list(item["validation_commands"], f"assignments[{index}].validation_commands", allow_empty=False)
+        integration = require_string_list(item["integration_gates"], f"assignments[{index}].integration_gates", allow_empty=True)
+        domain_closeout = item["domain_closeout"]
+        if domain_closeout is not None and not isinstance(domain_closeout, dict):
+            raise StateError("invalid-input", f"assignments[{index}].domain_closeout must be an object or null")
+        if assignment_id in assignment_ids:
+            raise StateError("invalid-input", "assignment_id values must be unique")
+        if source_ref not in source_claims:
+            raise StateError("invalid-input", f"assignments[{index}].source_ref is not declared")
+        if source_ref in assigned_sources:
+            raise StateError("invalid-input", "one Feature Spec source may own only one App assignment")
+        if repository_claim not in repository_map:
+            raise StateError("invalid-input", f"assignments[{index}].repository_claim is not declared")
+        pair = (repository_claim, target_branch)
+        if pair in delivery_pairs:
+            raise StateError("invalid-input", "repository and target branch pairs must be unique")
+        normalized = {
+            "assignment_id": assignment_id,
+            "source_ref": source_ref,
+            "title": title,
+            "repository_claim": repository_claim,
+            "target_branch_name": target_branch,
+            "allowed_paths": allowed_paths,
+            "acceptance_criteria": acceptance,
+            "validation_commands": validation,
+            "integration_gates": integration,
+            "domain_closeout": domain_closeout,
+        }
+        assignments.append(normalized)
+        assignment_ids.add(assignment_id)
+        assigned_sources.add(source_ref)
+        delivery_pairs.add(pair)
+        used_repositories.add(repository_claim)
+    if used_repositories != set(repository_map):
+        raise StateError("invalid-input", "every declared repository must own at least one assignment")
+
+    manifest = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "root_task_id": root_task_id,
+        "goal_objective": goal_objective,
+        "sources": sorted(sources, key=lambda item: item["ref"]),
+        "repositories": sorted(repositories, key=lambda item: item["repository_claim"]),
+        "assignments": sorted(assignments, key=lambda item: item["assignment_id"]),
+    }
+    return manifest
+
+
+def get_run(connection: sqlite3.Connection, run_id: str) -> sqlite3.Row:
+    row = connection.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    if row is None:
+        raise StateError("run-not-found", f"run does not exist: {run_id}", 3)
+    return row
+
+
+def require_active_revision(row: sqlite3.Row, expected_revision: int) -> None:
+    if row["status"] != "active":
+        raise StateError("run-terminal", f"run is already {row['status']}", 4)
+    if row["revision"] != expected_revision:
+        raise StateError(
+            "revision-conflict",
+            f"expected revision {expected_revision}, current revision is {row['revision']}",
+            4,
+        )
+
+
+def advance_revision(connection: sqlite3.Connection, run_id: str, revision: int) -> int:
+    next_revision = revision + 1
+    connection.execute(
+        "UPDATE runs SET revision = ?, updated_at = ? WHERE run_id = ?",
+        (next_revision, utc_now(), run_id),
+    )
+    return next_revision
+
+
+def assignment_projection(row: sqlite3.Row) -> dict[str, Any]:
+    assignment = json.loads(row["assignment_json"])
+    return {
+        **assignment,
+        "repository_path": row["repository_path"],
+        "project_id": row["project_id"],
+        "task_state": row["task_state"],
+        "thread_id": row["thread_id"],
+        "observed_title": row["observed_title"],
+        "checkout_path": row["checkout_path"],
+        "git_top_level": row["git_top_level"],
+        "checkout_branch": row["checkout_branch"],
+        "baseline_head": row["baseline_head"],
+        "head_sha": row["head_sha"],
+        "pr_head_branch": row["pr_head_branch"],
+        "pr_base_branch": row["pr_base_branch"],
+        "pr_default_branch": row["pr_default_branch"],
+        "pr_url": row["pr_url"],
+        "terminal_app_status": row["terminal_app_status"],
+        "terminal_observation_ref": row["terminal_observation_ref"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def run_projection(connection: sqlite3.Connection, run_id: str) -> dict[str, Any]:
+    row = get_run(connection, run_id)
+    assignments = [
+        assignment_projection(item)
+        for item in connection.execute(
+            "SELECT * FROM assignments WHERE run_id = ? ORDER BY assignment_id", (run_id,)
+        )
+    ]
+    unresolved = [
+        dict(item)
+        for item in connection.execute(
+            """SELECT sequence, operation_key, owner, action, subject_id, status
+               FROM operations WHERE run_id = ? AND status IN ('pending', 'unknown')
+               ORDER BY sequence""",
+            (run_id,),
+        )
+    ]
+    return {
+        "run_id": run_id,
+        "root_task_id": row["root_task_id"],
+        "status": row["status"],
+        "revision": row["revision"],
+        "manifest_sha256": row["manifest_sha256"],
+        "manifest": json.loads(row["manifest_json"]),
+        "goal": {
+            "source": row["goal_source"],
+            "status": row["goal_status"],
+            "objective_sha256": row["goal_objective_sha256"],
+        },
+        "assignments": assignments,
+        "unbound_assignment_ids": [
+            item["assignment_id"] for item in assignments if item["task_state"] == "planned"
+        ],
+        "live_task_count": sum(
+            item["task_state"]
+            in {"baseline-pending", "baseline-passed", "implementation-authorized"}
+            for item in assignments
+        ),
+        "unresolved_operations": unresolved,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "finished_at": row["finished_at"],
+    }
+
+
+def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
+    path = database_path()
+    if not path.exists():
+        return {
+            "ready": True,
+            "state": "uninitialized",
+            "database_path": str(path),
+            "state_schema_version": 1,
+            "tool_version": CLI_VERSION,
+            "writes_performed": False,
+        }
+    try:
+        connection = connect(write=False)
+    except StateError as error:
+        if error.code != "state-uninitialized":
+            raise
+        return {
+            "ready": True,
+            "state": "uninitialized",
+            "database_path": str(path),
+            "state_schema_version": 1,
+            "tool_version": CLI_VERSION,
+            "writes_performed": False,
+        }
+    try:
+        active_runs = connection.execute(
+            "SELECT COUNT(*) FROM runs WHERE status = 'active'"
+        ).fetchone()[0]
+        return {
+            "ready": True,
+            "state": "initialized",
+            "database_path": str(path),
+            "state_schema_version": 1,
+            "tool_version": CLI_VERSION,
+            "active_runs": active_runs,
+            "writes_performed": False,
+        }
+    finally:
+        connection.close()
+
+
+def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
+    raw = read_json_file(args.manifest, label="manifest")
+    manifest = validate_manifest(raw)
+    manifest_json = canonical_json(manifest)
+    manifest_sha = sha256_text(manifest_json)
+    connection = connect(write=True)
+    try:
+        source_claims = {
+            source["ref"]: source_claim_keys(source, index)
+            for index, source in enumerate(manifest["sources"])
+        }
+        claim_keys = sorted(
+            {claim for claims in source_claims.values() for claim in claims}
+            | {repository["repository_claim"] for repository in manifest["repositories"]}
+        )
+        existing = connection.execute(
+            "SELECT status FROM runs WHERE run_id = ?", (manifest["run_id"],)
+        ).fetchone()
+        if existing is not None:
+            raise StateError("run-already-exists", f"run id already exists with status {existing['status']}", 4)
+        conflicts = [
+            dict(row)
+            for row in connection.execute(
+                f"SELECT claim_key, run_id FROM claims WHERE active = 1 AND claim_key IN ({','.join('?' for _ in claim_keys)})",
+                claim_keys,
+            )
+        ]
+        if conflicts:
+            raise StateError("claim-conflict", f"active claims already exist: {canonical_json(conflicts)}", 4)
+        run_id = manifest["run_id"]
+        now = utc_now()
+        connection.execute(
+            """INSERT INTO runs(
+                   run_id, root_task_id, manifest_json, manifest_sha256,
+                   goal_objective_sha256, revision, created_at, updated_at
+               ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
+            (
+                run_id,
+                manifest["root_task_id"],
+                manifest_json,
+                manifest_sha,
+                sha256_text(manifest["goal_objective"]),
+                now,
+                now,
+            ),
+        )
+        source_lookup = {item["ref"]: item for item in manifest["sources"]}
+        for source in manifest["sources"]:
+            connection.execute(
+                "INSERT INTO sources VALUES (?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    source["ref"],
+                    source["kind"],
+                    source["sha256"],
+                    canonical_json(source_claims[source["ref"]]),
+                ),
+            )
+        repository_lookup = {item["repository_claim"]: item for item in manifest["repositories"]}
+        for repository in manifest["repositories"]:
+            git_identity = Path(repository["git_common_dir"]).stat()
+            connection.execute(
+                "INSERT INTO repositories VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    repository["repository_claim"],
+                    repository["repository_path"],
+                    repository["project_id"],
+                    repository["default_branch_name"],
+                    repository["git_common_dir"],
+                    git_identity.st_dev,
+                    git_identity.st_ino,
+                ),
+            )
+        for claim_key in claim_keys:
+            connection.execute(
+                "INSERT INTO claims VALUES (?, ?, 1, ?, NULL)", (run_id, claim_key, now)
+            )
+        for assignment in manifest["assignments"]:
+            repository = repository_lookup[assignment["repository_claim"]]
+            assert assignment["source_ref"] in source_lookup
+            connection.execute(
+                """INSERT INTO assignments(
+                       run_id, assignment_id, source_ref, title, repository_claim,
+                       repository_path, project_id, target_branch_name,
+                       assignment_json, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id,
+                    assignment["assignment_id"],
+                    assignment["source_ref"],
+                    assignment["title"],
+                    assignment["repository_claim"],
+                    repository["repository_path"],
+                    repository["project_id"],
+                    assignment["target_branch_name"],
+                    canonical_json(assignment),
+                    now,
+                ),
+            )
+        connection.commit()
+        return {
+            "run_id": run_id,
+            "revision": 1,
+            "manifest_sha256": manifest_sha,
+            "claim_keys": claim_keys,
+            "assignment_ids": [item["assignment_id"] for item in manifest["assignments"]],
+            "start_authorized": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
+    connection = connect(write=False)
+    try:
+        if args.status == "all":
+            rows = connection.execute(
+                "SELECT run_id, status, revision, created_at, updated_at, finished_at FROM runs ORDER BY created_at DESC"
+            )
+        else:
+            rows = connection.execute(
+                "SELECT run_id, status, revision, created_at, updated_at, finished_at FROM runs WHERE status = ? ORDER BY created_at DESC",
+                (args.status,),
+            )
+        return {"runs": [dict(row) for row in rows]}
+    finally:
+        connection.close()
+
+
+def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
+    connection = connect(write=False)
+    try:
+        return run_projection(connection, require_token(args.run_id, "run_id"))
+    finally:
+        connection.close()
+
+
+def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
+    claim_key = require_string(args.claim_key, "claim_key", maximum=4096)
+    connection = connect(write=False)
+    try:
+        row = connection.execute(
+            """SELECT claim_key, run_id, acquired_at FROM claims
+               WHERE claim_key = ? AND active = 1""",
+            (claim_key,),
+        ).fetchone()
+        return {"claim": dict(row) if row else None}
+    finally:
+        connection.close()
+
+
+def validate_operation_subject(
+    connection: sqlite3.Connection,
+    run: sqlite3.Row,
+    owner: str,
+    action: str,
+    subject_id: str,
+) -> None:
+    if owner == "app" and action in APP_ASSIGNMENT_ACTIONS:
+        exists = connection.execute(
+            "SELECT 1 FROM assignments WHERE run_id = ? AND assignment_id = ?",
+            (run["run_id"], subject_id),
+        ).fetchone()
+        if exists is None:
+            raise StateError("invalid-operation-subject", "App assignment operation subject is unknown")
+    elif owner == "app" and action in APP_GOAL_ACTIONS and subject_id != run["root_task_id"]:
+        raise StateError("invalid-operation-subject", "App Goal operation subject must be root_task_id")
+    elif owner == "gitstack" and action in GITSTACK_ASSIGNMENT_ACTIONS:
+        exists = connection.execute(
+            "SELECT 1 FROM assignments WHERE run_id = ? AND assignment_id = ?",
+            (run["run_id"], subject_id),
+        ).fetchone()
+        if exists is None:
+            raise StateError("invalid-operation-subject", "GitStack assignment operation subject is unknown")
+
+
+def validate_app_operation_launch(
+    connection: sqlite3.Connection,
+    run: sqlite3.Row,
+    action: str,
+    subject_id: str,
+) -> None:
+    if action == "create-goal":
+        if run["goal_status"] != "unbound":
+            raise StateError("invalid-operation-transition", "root Goal is already bound", 4)
+        return
+    if action == "complete-goal":
+        if run["goal_status"] != "active":
+            raise StateError("goal-not-active", "root Goal must be active before completion", 4)
+        unready = connection.execute(
+            "SELECT COUNT(*) FROM assignments WHERE run_id = ? AND task_state != 'ready-for-merge'",
+            (run["run_id"],),
+        ).fetchone()[0]
+        if unready:
+            raise StateError("run-not-ready", "every assignment must be ready before Goal completion", 4)
+        unresolved = connection.execute(
+            "SELECT COUNT(*) FROM operations WHERE run_id = ? AND status IN ('pending', 'unknown')",
+            (run["run_id"],),
+        ).fetchone()[0]
+        if unresolved:
+            raise StateError(
+                "unresolved-operations",
+                "root Goal completion cannot launch while operations are pending or unknown",
+                4,
+            )
+        return
+
+    assignment = get_assignment(connection, run["run_id"], subject_id)
+    state = assignment["task_state"]
+    if action == "create-task":
+        if run["goal_status"] != "active" or state != "planned":
+            raise StateError(
+                "invalid-operation-transition",
+                "task creation requires an active Goal and a planned assignment",
+                4,
+            )
+        live = connection.execute(
+            """SELECT COUNT(*) FROM assignments WHERE run_id = ?
+               AND task_state IN ('baseline-pending', 'baseline-passed', 'implementation-authorized')""",
+            (run["run_id"],),
+        ).fetchone()[0]
+        if live >= MAX_LIVE_TASKS:
+            raise StateError("task-capacity-reached", f"at most {MAX_LIVE_TASKS} live tasks are allowed", 4)
+    elif action == "set-task-title":
+        if state != "planned":
+            raise StateError("invalid-operation-transition", "title requires a planned assignment", 4)
+        successful_app_result(connection, run["run_id"], "create-task", subject_id)
+    elif action == "send-worker-bootstrap":
+        if state != "baseline-pending":
+            raise StateError(
+                "invalid-operation-transition", "bootstrap requires the exact bound baseline task", 4
+            )
+    elif action == "authorize-implementation":
+        if state != "baseline-passed":
+            raise StateError(
+                "invalid-operation-transition", "implementation authority requires a passed baseline", 4
+            )
+        pending_baselines = connection.execute(
+            "SELECT COUNT(*) FROM assignments WHERE run_id = ? AND task_state = 'baseline-pending'",
+            (run["run_id"],),
+        ).fetchone()[0]
+        if pending_baselines:
+            raise StateError(
+                "baseline-fan-in-incomplete",
+                "implementation authority requires every dispatched task baseline to pass",
+                4,
+            )
+    elif action == "archive-task":
+        if state not in {"baseline-pending", "baseline-passed"}:
+            raise StateError(
+                "invalid-operation-transition", "only a preimplementation task may be archived", 4
+            )
+        authority = connection.execute(
+            """SELECT status FROM operations WHERE run_id = ? AND owner = 'app'
+               AND action = 'authorize-implementation' AND subject_id = ?
+               AND status IN ('pending', 'unknown', 'succeeded') LIMIT 1""",
+            (run["run_id"], subject_id),
+        ).fetchone()
+        if authority is not None:
+            raise StateError(
+                "implementation-already-started",
+                "an implementation-authority operation prevents preimplementation archive",
+                4,
+            )
+
+
+def validate_gitstack_operation_launch(
+    connection: sqlite3.Connection,
+    run: sqlite3.Row,
+    action: str,
+    subject_id: str,
+    head_sha: str | None,
+) -> None:
+    if action != "ensure-pull-request-ready":
+        return
+    assignment = get_assignment(connection, run["run_id"], subject_id)
+    if assignment["task_state"] != "implementation-authorized":
+        raise StateError(
+            "invalid-operation-transition",
+            "pull-request ready transition requires the exact authorized assignment",
+            4,
+        )
+    if head_sha is None:
+        raise StateError(
+            "operation-head-required",
+            "pull-request ready transition must be bound to the exact current head",
+            4,
+        )
+
+
+def command_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    operation_key = require_token(args.operation_key, "operation_key")
+    owner = require_lower_kebab(args.owner, "owner")
+    action = require_lower_kebab(args.action, "action")
+    subject_id = require_string(args.subject_id, "subject_id", maximum=256)
+    head_sha = require_head(args.head_sha, "head_sha") if args.head_sha else None
+    request = read_json_file(args.request, label="request")
+    request_json = canonical_json(request)
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        validate_operation_subject(connection, run, owner, action, subject_id)
+        existing = connection.execute(
+            "SELECT status FROM operations WHERE run_id = ? AND operation_key = ?",
+            (run_id, operation_key),
+        ).fetchone()
+        if existing is not None:
+            raise StateError("operation-already-started", f"operation already exists with status {existing['status']}", 4)
+        protected = (owner == "app" and action in PROTECTED_APP_ACTIONS) or (
+            owner == "gitstack" and action in GITSTACK_ASSIGNMENT_ACTIONS
+        )
+        if protected:
+            duplicate = connection.execute(
+                "SELECT operation_key, status FROM operations WHERE run_id = ? AND owner = ? AND action = ? AND subject_id = ?",
+                (run_id, owner, action, subject_id),
+            ).fetchone()
+            if duplicate is not None:
+                raise StateError(
+                    "protected-operation-already-started",
+                    f"{action} for {subject_id} already uses {duplicate['operation_key']} ({duplicate['status']})",
+                    4,
+                )
+            if owner == "app":
+                validate_app_operation_launch(connection, run, action, subject_id)
+            else:
+                validate_gitstack_operation_launch(
+                    connection, run, action, subject_id, head_sha
+                )
+        now = utc_now()
+        connection.execute(
+            """INSERT INTO operations(
+                   run_id, operation_key, owner, action, subject_id, head_sha,
+                   request_json, status, created_at, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
+            (run_id, operation_key, owner, action, subject_id, head_sha, request_json, now, now),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {
+            "run_id": run_id,
+            "revision": revision,
+            "operation_key": operation_key,
+            "launch_authorized": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def validate_protected_result(
+    operation: sqlite3.Row, status: str, result: dict[str, Any]
+) -> None:
+    if status != "succeeded":
+        return
+    action = operation["action"]
+    if operation["owner"] == "gitstack" and action == "ensure-pull-request-ready":
+        require_exact_keys(
+            result,
+            {
+                "pr_url",
+                "head_sha",
+                "head_branch_name",
+                "base_branch_name",
+                "default_branch_name",
+                "status",
+            },
+            "ensure-pull-request-ready result",
+        )
+        if result["status"] != "ready-for-review":
+            raise StateError(
+                "invalid-operation-result",
+                "ensure-pull-request-ready result status must be ready-for-review",
+            )
+        require_string(result["pr_url"], "pr_url", maximum=2048)
+        require_head(result["head_sha"], "head_sha")
+        if result["head_sha"] != operation["head_sha"]:
+            raise StateError(
+                "operation-head-drift",
+                "ensure-pull-request-ready result does not match the operation head",
+            )
+        for field in ("head_branch_name", "base_branch_name", "default_branch_name"):
+            require_string(result[field], field, maximum=255)
+        return
+    if operation["owner"] != "app":
+        return
+    if action == "create-task":
+        require_exact_keys(result, {"thread_id"}, "create-task result")
+        require_string(result["thread_id"], "thread_id", maximum=256)
+    elif action == "set-task-title":
+        require_exact_keys(result, {"thread_id", "title"}, "set-task-title result")
+        require_string(result["thread_id"], "thread_id", maximum=256)
+        require_string(result["title"], "title", maximum=256)
+    elif action in {"send-worker-bootstrap", "authorize-implementation"}:
+        require_exact_keys(result, {"thread_id"}, f"{action} result")
+        require_string(result["thread_id"], "thread_id", maximum=256)
+    elif action == "archive-task":
+        require_exact_keys(result, {"thread_id", "status"}, "archive-task result")
+        require_string(result["thread_id"], "thread_id", maximum=256)
+        if result["status"] != "archived":
+            raise StateError("invalid-operation-result", "archive-task result status must be archived")
+    elif action in {"create-goal", "complete-goal"}:
+        require_exact_keys(result, {"status", "objective_sha256"}, f"{action} result")
+        expected_status = "active" if action == "create-goal" else "complete"
+        if result["status"] != expected_status:
+            raise StateError("invalid-operation-result", f"{action} result status must be {expected_status}")
+        require_sha256(result["objective_sha256"], "objective_sha256")
+
+
+def command_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    operation_key = require_token(args.operation_key, "operation_key")
+    status = args.status
+    result = read_json_file(args.result, label="result")
+    result_json = canonical_json(result)
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        operation = connection.execute(
+            "SELECT * FROM operations WHERE run_id = ? AND operation_key = ?",
+            (run_id, operation_key),
+        ).fetchone()
+        if operation is None:
+            raise StateError("operation-not-found", f"operation does not exist: {operation_key}", 3)
+        if operation["status"] in {"succeeded", "failed"}:
+            prior = connection.execute(
+                """SELECT status, result_json FROM operation_results
+                   WHERE run_id = ? AND operation_key = ? ORDER BY result_index DESC LIMIT 1""",
+                (run_id, operation_key),
+            ).fetchone()
+            if prior and prior["status"] == status and prior["result_json"] == result_json:
+                connection.rollback()
+                return {
+                    "run_id": run_id,
+                    "revision": run["revision"],
+                    "operation_key": operation_key,
+                    "status": status,
+                    "replayed": True,
+                }
+            raise StateError("operation-terminal", f"operation is already {operation['status']}", 4)
+        if operation["status"] == "unknown" and status == "unknown":
+            prior = connection.execute(
+                """SELECT result_json FROM operation_results
+                   WHERE run_id = ? AND operation_key = ? AND status = 'unknown'
+                   ORDER BY result_index DESC LIMIT 1""",
+                (run_id, operation_key),
+            ).fetchone()
+            if prior and prior["result_json"] == result_json:
+                connection.rollback()
+                return {
+                    "run_id": run_id,
+                    "revision": run["revision"],
+                    "operation_key": operation_key,
+                    "status": status,
+                    "replayed": True,
+                }
+            raise StateError("operation-unknown", "reconcile the existing unknown operation instead of adding another unknown result", 4)
+        validate_protected_result(operation, status, result)
+        result_index = connection.execute(
+            "SELECT COALESCE(MAX(result_index), 0) + 1 FROM operation_results WHERE run_id = ? AND operation_key = ?",
+            (run_id, operation_key),
+        ).fetchone()[0]
+        now = utc_now()
+        connection.execute(
+            "INSERT INTO operation_results VALUES (?, ?, ?, ?, ?, ?)",
+            (run_id, operation_key, result_index, status, result_json, now),
+        )
+        connection.execute(
+            "UPDATE operations SET status = ?, updated_at = ? WHERE run_id = ? AND operation_key = ?",
+            (status, now, run_id, operation_key),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {
+            "run_id": run_id,
+            "revision": revision,
+            "operation_key": operation_key,
+            "status": status,
+            "replayed": False,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def operation_projection(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    results = [
+        {
+            **dict(item),
+            "result": json.loads(item["result_json"]),
+        }
+        for item in connection.execute(
+            """SELECT result_index, status, result_json, recorded_at
+               FROM operation_results WHERE run_id = ? AND operation_key = ?
+               ORDER BY result_index""",
+            (row["run_id"], row["operation_key"]),
+        )
+    ]
+    for result in results:
+        result.pop("result_json")
+    return {
+        "sequence": row["sequence"],
+        "operation_key": row["operation_key"],
+        "owner": row["owner"],
+        "action": row["action"],
+        "subject_id": row["subject_id"],
+        "head_sha": row["head_sha"],
+        "request": json.loads(row["request_json"]),
+        "status": row["status"],
+        "results": results,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def command_operation_show(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    operation_key = require_token(args.operation_key, "operation_key")
+    connection = connect(write=False)
+    try:
+        row = connection.execute(
+            "SELECT * FROM operations WHERE run_id = ? AND operation_key = ?",
+            (run_id, operation_key),
+        ).fetchone()
+        if row is None:
+            raise StateError("operation-not-found", f"operation does not exist: {operation_key}", 3)
+        return {"operation": operation_projection(connection, row)}
+    finally:
+        connection.close()
+
+
+def command_operation_list(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    limit = args.limit
+    if limit < 1 or limit > 200:
+        raise StateError("invalid-input", "limit must be between 1 and 200")
+    connection = connect(write=False)
+    try:
+        get_run(connection, run_id)
+        rows = list(
+            connection.execute(
+                """SELECT * FROM operations WHERE run_id = ? AND sequence > ?
+                   ORDER BY sequence LIMIT ?""",
+                (run_id, args.after_sequence, limit + 1),
+            )
+        )
+        has_more = len(rows) > limit
+        visible = rows[:limit]
+        return {
+            "operations": [operation_projection(connection, row) for row in visible],
+            "has_more": has_more,
+            "next_after_sequence": visible[-1]["sequence"] if visible else args.after_sequence,
+        }
+    finally:
+        connection.close()
+
+
+def successful_operation_result(
+    connection: sqlite3.Connection,
+    run_id: str,
+    owner: str,
+    action: str,
+    subject_id: str,
+) -> dict[str, Any]:
+    row = connection.execute(
+        """SELECT * FROM operations
+           WHERE run_id = ? AND owner = ? AND action = ? AND subject_id = ?
+             AND status = 'succeeded'
+           ORDER BY sequence DESC LIMIT 1""",
+        (run_id, owner, action, subject_id),
+    ).fetchone()
+    if row is None:
+        raise StateError(
+            "missing-owner-operation",
+            f"missing succeeded {owner} {action} operation for {subject_id}",
+            4,
+        )
+    result = connection.execute(
+        """SELECT result_json FROM operation_results
+           WHERE run_id = ? AND operation_key = ? AND status = 'succeeded'
+           ORDER BY result_index DESC LIMIT 1""",
+        (run_id, row["operation_key"]),
+    ).fetchone()
+    if result is None:
+        raise StateError("invalid-state", f"{owner} {action} operation has no succeeded result", 4)
+    return json.loads(result["result_json"])
+
+
+def successful_app_result(
+    connection: sqlite3.Connection, run_id: str, action: str, subject_id: str
+) -> dict[str, Any]:
+    try:
+        return successful_operation_result(connection, run_id, "app", action, subject_id)
+    except StateError as error:
+        if error.code == "missing-owner-operation":
+            raise StateError(
+                "missing-app-operation",
+                f"missing succeeded App {action} operation for {subject_id}",
+                4,
+            ) from error
+        raise
+
+
+def command_goal_bind(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    objective_sha = require_sha256(args.objective_sha256, "objective_sha256")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        if run["goal_status"] != "unbound":
+            raise StateError("goal-already-bound", f"Goal is already {run['goal_status']}", 4)
+        if objective_sha != run["goal_objective_sha256"]:
+            raise StateError("goal-objective-drift", "observed Goal objective does not match the start manifest", 4)
+        if args.source == "created":
+            result = successful_app_result(connection, run_id, "create-goal", run["root_task_id"])
+            if result["objective_sha256"] != objective_sha:
+                raise StateError("goal-objective-drift", "create-goal result does not match the start manifest", 4)
+        connection.execute(
+            "UPDATE runs SET goal_source = ?, goal_status = 'active' WHERE run_id = ?",
+            (args.source, run_id),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "goal_status": "active", "goal_source": args.source}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def get_assignment(connection: sqlite3.Connection, run_id: str, assignment_id: str) -> sqlite3.Row:
+    row = connection.execute(
+        "SELECT * FROM assignments WHERE run_id = ? AND assignment_id = ?",
+        (run_id, assignment_id),
+    ).fetchone()
+    if row is None:
+        raise StateError("assignment-not-found", f"assignment does not exist: {assignment_id}", 3)
+    return row
+
+
+def command_task_bind(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    observation = read_json_file(args.observation, label="task observation")
+    require_exact_keys(
+        observation,
+        {
+            "schema_version",
+            "assignment_id",
+            "thread_id",
+            "observed_title",
+            "project_id",
+            "repository_claim",
+            "git_common_dir",
+            "checkout_path",
+            "git_top_level",
+            "checkout_branch",
+            "baseline_head",
+        },
+        "task observation",
+    )
+    if observation["schema_version"] != 1:
+        raise StateError("unsupported-input-schema", "task observation schema_version must be 1")
+    assignment_id = require_token(observation["assignment_id"], "assignment_id")
+    thread_id = require_string(observation["thread_id"], "thread_id", maximum=256)
+    observed_title = require_string(observation["observed_title"], "observed_title", maximum=256)
+    project_id = require_string(observation["project_id"], "project_id", maximum=256)
+    repository_claim = canonical_repository_claim(observation["repository_claim"])
+    git_common_dir = canonical_directory(observation["git_common_dir"], "git_common_dir")
+    checkout_path = canonical_directory(observation["checkout_path"], "checkout_path")
+    git_top_level = canonical_directory(observation["git_top_level"], "git_top_level")
+    checkout_branch = require_string(observation["checkout_branch"], "checkout_branch", maximum=255)
+    baseline_head = require_head(observation["baseline_head"], "baseline_head")
+    if checkout_path != git_top_level:
+        raise StateError("invalid-task-observation", "checkout_path must equal the observed Git top-level")
+
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        if run["goal_status"] != "active":
+            raise StateError("goal-not-active", "bind the observed root Goal before worker tasks", 4)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["task_state"] != "planned":
+            raise StateError("task-already-bound", f"assignment is already {assignment['task_state']}", 4)
+        live = connection.execute(
+            """SELECT COUNT(*) FROM assignments WHERE run_id = ?
+               AND task_state IN ('baseline-pending', 'baseline-passed', 'implementation-authorized')""",
+            (run_id,),
+        ).fetchone()[0]
+        if live >= MAX_LIVE_TASKS:
+            raise StateError("task-capacity-reached", f"at most {MAX_LIVE_TASKS} live tasks are allowed", 4)
+        if observed_title != assignment["title"]:
+            raise StateError("task-title-drift", "observed title does not match the immutable assignment", 4)
+        if project_id != assignment["project_id"] or repository_claim != assignment["repository_claim"]:
+            raise StateError(
+                "task-repository-drift",
+                "observed App project and Git repository do not match the immutable assignment",
+                4,
+            )
+        repository = connection.execute(
+            "SELECT * FROM repositories WHERE run_id = ? AND repository_claim = ?",
+            (run_id, assignment["repository_claim"]),
+        ).fetchone()
+        assert repository is not None
+        git_identity = Path(git_common_dir).stat()
+        if (
+            git_common_dir != repository["git_common_dir"]
+            or git_identity.st_dev != repository["git_common_dir_device"]
+            or git_identity.st_ino != repository["git_common_dir_inode"]
+        ):
+            raise StateError(
+                "task-repository-drift",
+                "checkout Git common-directory identity does not match the immutable repository",
+                4,
+            )
+        checkout_owner = connection.execute(
+            """SELECT a.run_id, a.assignment_id
+               FROM assignments AS a
+               JOIN runs AS r ON r.run_id = a.run_id
+               WHERE r.status = 'active'
+                 AND a.checkout_path IS NOT NULL
+                 AND (a.checkout_path = ? OR a.git_top_level = ?)
+                 AND NOT (a.run_id = ? AND a.assignment_id = ?)
+               LIMIT 1""",
+            (checkout_path, git_top_level, run_id, assignment_id),
+        ).fetchone()
+        if checkout_owner is not None:
+            raise StateError(
+                "checkout-conflict",
+                "managed checkout is already bound to an active assignment "
+                f"{checkout_owner['run_id']}/{checkout_owner['assignment_id']}",
+                4,
+            )
+        created = successful_app_result(connection, run_id, "create-task", assignment_id)
+        titled = successful_app_result(connection, run_id, "set-task-title", assignment_id)
+        if created["thread_id"] != thread_id or titled != {"thread_id": thread_id, "title": observed_title}:
+            raise StateError("task-identity-drift", "App operation results do not match the task observation", 4)
+        now = utc_now()
+        connection.execute(
+            """UPDATE assignments SET
+                   task_state = 'baseline-pending', thread_id = ?, observed_title = ?,
+                   checkout_path = ?, git_top_level = ?, checkout_branch = ?,
+                   baseline_head = ?, updated_at = ?
+               WHERE run_id = ? AND assignment_id = ?""",
+            (
+                thread_id,
+                observed_title,
+                checkout_path,
+                git_top_level,
+                checkout_branch,
+                baseline_head,
+                now,
+                run_id,
+                assignment_id,
+            ),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "task_state": "baseline-pending"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_task_baseline(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    observation = read_json_file(args.observation, label="baseline observation")
+    require_exact_keys(
+        observation,
+        {"schema_version", "assignment_id", "thread_id", "head_sha", "status"},
+        "baseline observation",
+    )
+    if observation["schema_version"] != 1 or observation["status"] != "passed":
+        raise StateError("invalid-baseline-observation", "baseline observation must use schema 1 and status passed")
+    assignment_id = require_token(observation["assignment_id"], "assignment_id")
+    thread_id = require_string(observation["thread_id"], "thread_id", maximum=256)
+    head_sha = require_head(observation["head_sha"], "head_sha")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["task_state"] != "baseline-pending" or assignment["thread_id"] != thread_id:
+            raise StateError("invalid-task-transition", "baseline requires the exact baseline-pending task", 4)
+        bootstrap = successful_app_result(connection, run_id, "send-worker-bootstrap", assignment_id)
+        if bootstrap["thread_id"] != thread_id:
+            raise StateError("task-identity-drift", "worker-bootstrap result has another thread identity", 4)
+        if assignment["baseline_head"] != head_sha:
+            raise StateError("baseline-drift", "baseline result head differs from the bound checkout head", 4)
+        connection.execute(
+            "UPDATE assignments SET task_state = 'baseline-passed', updated_at = ? WHERE run_id = ? AND assignment_id = ?",
+            (utc_now(), run_id, assignment_id),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "task_state": "baseline-passed"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_task_authorize(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    assignment_id = require_token(args.assignment_id, "assignment_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["task_state"] != "baseline-passed":
+            raise StateError("invalid-task-transition", "implementation authority requires a passed baseline", 4)
+        pending_baselines = connection.execute(
+            "SELECT COUNT(*) FROM assignments WHERE run_id = ? AND task_state = 'baseline-pending'",
+            (run_id,),
+        ).fetchone()[0]
+        if pending_baselines:
+            raise StateError(
+                "baseline-fan-in-incomplete",
+                "implementation authority requires every dispatched task baseline to pass",
+                4,
+            )
+        result = successful_app_result(connection, run_id, "authorize-implementation", assignment_id)
+        if result["thread_id"] != assignment["thread_id"]:
+            raise StateError("task-identity-drift", "implementation-authority result has another thread identity", 4)
+        connection.execute(
+            "UPDATE assignments SET task_state = 'implementation-authorized', updated_at = ? WHERE run_id = ? AND assignment_id = ?",
+            (utc_now(), run_id, assignment_id),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "task_state": "implementation-authorized"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_task_ready(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    observation = read_json_file(args.observation, label="ready observation")
+    require_exact_keys(
+        observation,
+        {
+            "schema_version",
+            "assignment_id",
+            "thread_id",
+            "head_sha",
+            "head_branch_name",
+            "base_branch_name",
+            "default_branch_name",
+            "pr_url",
+            "status",
+        },
+        "ready observation",
+    )
+    if observation["schema_version"] != 1 or observation["status"] != "ready-for-merge":
+        raise StateError("invalid-ready-observation", "ready observation must use schema 1 and status ready-for-merge")
+    assignment_id = require_token(observation["assignment_id"], "assignment_id")
+    thread_id = require_string(observation["thread_id"], "thread_id", maximum=256)
+    head_sha = require_head(observation["head_sha"], "head_sha")
+    head_branch_name = require_string(
+        observation["head_branch_name"], "head_branch_name", maximum=255
+    )
+    base_branch_name = require_string(
+        observation["base_branch_name"], "base_branch_name", maximum=255
+    )
+    default_branch_name = require_string(
+        observation["default_branch_name"], "default_branch_name", maximum=255
+    )
+    pr_url = require_string(observation["pr_url"], "pr_url", maximum=2048)
+    pull_match = GITHUB_PULL_RE.fullmatch(pr_url)
+    if pull_match is None:
+        raise StateError("invalid-ready-observation", "pr_url must be a canonical GitHub pull request URL")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["task_state"] != "implementation-authorized" or assignment["thread_id"] != thread_id:
+            raise StateError("invalid-task-transition", "ready observation requires the exact authorized task", 4)
+        if head_branch_name != assignment["target_branch_name"]:
+            raise StateError(
+                "target-branch-drift",
+                "ready branch does not match the immutable assignment target branch",
+                4,
+            )
+        if base_branch_name != default_branch_name:
+            raise StateError(
+                "pull-request-base-drift",
+                "ready pull request base does not match the observed repository default branch",
+                4,
+            )
+        repository = connection.execute(
+            "SELECT default_branch_name FROM repositories WHERE run_id = ? AND repository_claim = ?",
+            (run_id, assignment["repository_claim"]),
+        ).fetchone()
+        assert repository is not None
+        if default_branch_name != repository["default_branch_name"]:
+            raise StateError(
+                "pull-request-base-drift",
+                "observed default branch does not match the immutable repository manifest",
+                4,
+            )
+        pull_repository_claim = f"repository:github:{pull_match.group(1)}/{pull_match.group(2)}"
+        if pull_repository_claim != assignment["repository_claim"]:
+            raise StateError(
+                "pull-request-repository-drift",
+                "ready pull request does not belong to the assignment repository",
+                4,
+            )
+        ready_result = successful_operation_result(
+            connection, run_id, "gitstack", "ensure-pull-request-ready", assignment_id
+        )
+        expected_ready_result = {
+            "pr_url": pr_url,
+            "head_sha": head_sha,
+            "head_branch_name": head_branch_name,
+            "base_branch_name": base_branch_name,
+            "default_branch_name": default_branch_name,
+            "status": "ready-for-review",
+        }
+        if ready_result != expected_ready_result:
+            raise StateError(
+                "pull-request-identity-drift",
+                "ready-for-review provider result does not match the terminal observation",
+                4,
+            )
+        connection.execute(
+            """UPDATE assignments SET task_state = 'ready-for-merge', head_sha = ?,
+                   pr_head_branch = ?, pr_base_branch = ?, pr_default_branch = ?,
+                   pr_url = ?, updated_at = ? WHERE run_id = ? AND assignment_id = ?""",
+            (
+                head_sha,
+                head_branch_name,
+                base_branch_name,
+                default_branch_name,
+                pr_url,
+                utc_now(),
+                run_id,
+                assignment_id,
+            ),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "task_state": "ready-for-merge"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_task_abort(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    observation = read_json_file(args.observation, label="abort observation")
+    require_exact_keys(
+        observation,
+        {"schema_version", "assignment_id", "thread_id", "app_status", "observation_ref"},
+        "abort observation",
+    )
+    if observation["schema_version"] != 1 or observation["app_status"] not in {"completed", "archived"}:
+        raise StateError("invalid-abort-observation", "abort observation must use schema 1 and completed or archived App status")
+    assignment_id = require_token(observation["assignment_id"], "assignment_id")
+    thread_id = require_string(observation["thread_id"], "thread_id", maximum=256)
+    require_string(observation["observation_ref"], "observation_ref", maximum=2048)
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["task_state"] not in {"baseline-pending", "baseline-passed"}:
+            raise StateError("implementation-already-started", "only preimplementation tasks can be aborted", 4)
+        if assignment["thread_id"] != thread_id:
+            raise StateError("task-identity-drift", "abort observation has another thread identity", 4)
+        if observation["app_status"] == "archived":
+            archived = successful_app_result(connection, run_id, "archive-task", assignment_id)
+            if archived != {"thread_id": thread_id, "status": "archived"}:
+                raise StateError("task-identity-drift", "archive-task result does not match the abort observation", 4)
+        connection.execute(
+            """UPDATE assignments SET task_state = 'terminal-aborted',
+                   terminal_app_status = ?, terminal_observation_ref = ?, updated_at = ?
+               WHERE run_id = ? AND assignment_id = ?""",
+            (
+                observation["app_status"],
+                observation["observation_ref"],
+                utc_now(),
+                run_id,
+                assignment_id,
+            ),
+        )
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "task_state": "terminal-aborted"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_goal_complete(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    objective_sha = require_sha256(args.objective_sha256, "objective_sha256")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        if run["goal_status"] != "active":
+            raise StateError("goal-not-active", "only the active bound Goal can complete", 4)
+        if objective_sha != run["goal_objective_sha256"]:
+            raise StateError("goal-objective-drift", "observed Goal objective does not match the run", 4)
+        incomplete = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT assignment_id, task_state FROM assignments WHERE run_id = ? AND task_state != 'ready-for-merge'",
+                (run_id,),
+            )
+        ]
+        if incomplete:
+            raise StateError("assignments-incomplete", f"cannot complete Goal: {canonical_json(incomplete)}", 4)
+        result = successful_app_result(connection, run_id, "complete-goal", run["root_task_id"])
+        if result["objective_sha256"] != objective_sha:
+            raise StateError("goal-objective-drift", "complete-goal result does not match the run", 4)
+        unresolved = connection.execute(
+            "SELECT operation_key, status FROM operations WHERE run_id = ? AND status IN ('pending', 'unknown')",
+            (run_id,),
+        ).fetchall()
+        if unresolved:
+            raise StateError("unresolved-operations", f"cannot complete Goal with unresolved operations: {canonical_json([dict(row) for row in unresolved])}", 4)
+        connection.execute("UPDATE runs SET goal_status = 'completed' WHERE run_id = ?", (run_id,))
+        revision = advance_revision(connection, run_id, run["revision"])
+        connection.commit()
+        return {"run_id": run_id, "revision": revision, "goal_status": "completed"}
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = require_token(args.run_id, "run_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_active_revision(run, args.expected_revision)
+        unresolved = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT operation_key, status FROM operations WHERE run_id = ? AND status IN ('pending', 'unknown')",
+                (run_id,),
+            )
+        ]
+        if unresolved:
+            raise StateError("unresolved-operations", f"cannot finish with unresolved operations: {canonical_json(unresolved)}", 4)
+        assignments = list(
+            connection.execute(
+                "SELECT assignment_id, task_state, thread_id, head_sha, pr_url FROM assignments WHERE run_id = ? ORDER BY assignment_id",
+                (run_id,),
+            )
+        )
+        if args.outcome == "completed":
+            if run["goal_status"] != "completed" or any(row["task_state"] != "ready-for-merge" for row in assignments):
+                raise StateError("run-incomplete", "completed outcome requires the completed Goal and every task ready-for-merge", 4)
+        else:
+            unsafe = [
+                dict(row)
+                for row in assignments
+                if row["task_state"] not in {"planned", "terminal-aborted"}
+            ]
+            if unsafe:
+                raise StateError("tasks-not-reconciled", f"preimplementation abort requires planned or terminal-aborted tasks: {canonical_json(unsafe)}", 4)
+            if run["goal_status"] == "completed":
+                raise StateError("goal-already-completed", "a completed Goal cannot be attached to an aborted run", 4)
+        now = utc_now()
+        connection.execute(
+            "UPDATE runs SET status = ?, revision = ?, updated_at = ?, finished_at = ? WHERE run_id = ?",
+            (args.outcome, run["revision"] + 1, now, now, run_id),
+        )
+        connection.execute(
+            "UPDATE claims SET active = 0, released_at = ? WHERE run_id = ? AND active = 1",
+            (now, run_id),
+        )
+        connection.commit()
+        return {
+            "run_id": run_id,
+            "revision": run["revision"] + 1,
+            "outcome": args.outcome,
+            "claims_released": True,
+            "goal_status": run["goal_status"],
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="run-state",
+        description="Atomic schema-1 state for Implement Feature App orchestration.",
+    )
+    parser.add_argument("--json", action="store_true", help="emit one JSON object")
+    parser.add_argument("--version", action="version", version=CLI_VERSION)
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    doctor = commands.add_parser("doctor", help="inspect state readiness without writing")
+    doctor.set_defaults(handler=command_doctor, command_name="doctor")
+
+    run = commands.add_parser("run", help="start, inspect, list, or finish runs")
+    run_commands = run.add_subparsers(dest="run_command", required=True)
+    start = run_commands.add_parser("start", help="atomically create a run and claims")
+    start.add_argument("--manifest", required=True)
+    start.set_defaults(handler=command_run_start, command_name="run start")
+    list_runs = run_commands.add_parser("list", help="list durable runs")
+    list_runs.add_argument(
+        "--status",
+        choices=("active", "completed", "preimplementation-aborted", "all"),
+        default="active",
+    )
+    list_runs.set_defaults(handler=command_run_list, command_name="run list")
+    show = run_commands.add_parser("show", help="read one complete orchestration projection")
+    show.add_argument("--run-id", required=True)
+    show.set_defaults(handler=command_run_show, command_name="run show")
+    finish = run_commands.add_parser("finish", help="finish a run and release its claims")
+    finish.add_argument("--run-id", required=True)
+    finish.add_argument("--expected-revision", type=int, required=True)
+    finish.add_argument("--outcome", choices=("completed", "preimplementation-aborted"), required=True)
+    finish.set_defaults(handler=command_run_finish, command_name="run finish")
+
+    claim = commands.add_parser("claim", help="inspect active claim ownership")
+    claim_commands = claim.add_subparsers(dest="claim_command", required=True)
+    find = claim_commands.add_parser("find", help="find the active run for an exact claim")
+    find.add_argument("--claim-key", required=True)
+    find.set_defaults(handler=command_claim_find, command_name="claim find")
+
+    operation = commands.add_parser("operation", help="journal one-use owner mutations")
+    operation_commands = operation.add_subparsers(dest="operation_command", required=True)
+    begin = operation_commands.add_parser("begin", help="record intent before mutation")
+    begin.add_argument("--run-id", required=True)
+    begin.add_argument("--expected-revision", type=int, required=True)
+    begin.add_argument("--operation-key", required=True)
+    begin.add_argument("--owner", required=True)
+    begin.add_argument("--action", required=True)
+    begin.add_argument("--subject-id", required=True)
+    begin.add_argument("--head-sha")
+    begin.add_argument("--request", required=True)
+    begin.set_defaults(handler=command_operation_begin, command_name="operation begin")
+    finish_operation = operation_commands.add_parser("finish", help="record or reconcile a result")
+    finish_operation.add_argument("--run-id", required=True)
+    finish_operation.add_argument("--expected-revision", type=int, required=True)
+    finish_operation.add_argument("--operation-key", required=True)
+    finish_operation.add_argument("--status", choices=("unknown", "succeeded", "failed"), required=True)
+    finish_operation.add_argument("--result", required=True)
+    finish_operation.set_defaults(handler=command_operation_finish, command_name="operation finish")
+    show_operation = operation_commands.add_parser("show", help="read one operation and result history")
+    show_operation.add_argument("--run-id", required=True)
+    show_operation.add_argument("--operation-key", required=True)
+    show_operation.set_defaults(handler=command_operation_show, command_name="operation show")
+    list_operations = operation_commands.add_parser("list", help="page through the complete operation journal")
+    list_operations.add_argument("--run-id", required=True)
+    list_operations.add_argument("--after-sequence", type=int, default=0)
+    list_operations.add_argument("--limit", type=int, default=50)
+    list_operations.set_defaults(handler=command_operation_list, command_name="operation list")
+
+    goal = commands.add_parser("goal", help="bind or complete the root-owned Goal")
+    goal_commands = goal.add_subparsers(dest="goal_command", required=True)
+    bind_goal = goal_commands.add_parser("bind", help="bind an observed active Goal")
+    bind_goal.add_argument("--run-id", required=True)
+    bind_goal.add_argument("--expected-revision", type=int, required=True)
+    bind_goal.add_argument("--source", choices=("created", "adopted"), required=True)
+    bind_goal.add_argument("--objective-sha256", required=True)
+    bind_goal.set_defaults(handler=command_goal_bind, command_name="goal bind")
+    complete_goal = goal_commands.add_parser("complete", help="record exact Goal completion readback")
+    complete_goal.add_argument("--run-id", required=True)
+    complete_goal.add_argument("--expected-revision", type=int, required=True)
+    complete_goal.add_argument("--objective-sha256", required=True)
+    complete_goal.set_defaults(handler=command_goal_complete, command_name="goal complete")
+
+    task = commands.add_parser("task", help="bind and advance visible App tasks")
+    task_commands = task.add_subparsers(dest="task_command", required=True)
+    bind_task = task_commands.add_parser("bind", help="bind task identity and managed checkout")
+    bind_task.add_argument("--run-id", required=True)
+    bind_task.add_argument("--expected-revision", type=int, required=True)
+    bind_task.add_argument("--observation", required=True)
+    bind_task.set_defaults(handler=command_task_bind, command_name="task bind")
+    baseline = task_commands.add_parser("baseline", help="record a passed baseline")
+    baseline.add_argument("--run-id", required=True)
+    baseline.add_argument("--expected-revision", type=int, required=True)
+    baseline.add_argument("--observation", required=True)
+    baseline.set_defaults(handler=command_task_baseline, command_name="task baseline")
+    authorize = task_commands.add_parser("authorize", help="record the explicit implementation GO")
+    authorize.add_argument("--run-id", required=True)
+    authorize.add_argument("--expected-revision", type=int, required=True)
+    authorize.add_argument("--assignment-id", required=True)
+    authorize.set_defaults(handler=command_task_authorize, command_name="task authorize")
+    ready = task_commands.add_parser("ready", help="record a ready-for-merge worker handoff")
+    ready.add_argument("--run-id", required=True)
+    ready.add_argument("--expected-revision", type=int, required=True)
+    ready.add_argument("--observation", required=True)
+    ready.set_defaults(handler=command_task_ready, command_name="task ready")
+    abort = task_commands.add_parser("abort", help="record terminal preimplementation task reconciliation")
+    abort.add_argument("--run-id", required=True)
+    abort.add_argument("--expected-revision", type=int, required=True)
+    abort.add_argument("--observation", required=True)
+    abort.set_defaults(handler=command_task_abort, command_name="task abort")
+    return parser
+
+
+def render(payload: dict[str, Any], *, command: str, as_json: bool) -> None:
+    envelope = {"schema_version": 1, "ok": True, "command": command, **payload}
+    if as_json:
+        print(canonical_json(envelope))
+    else:
+        print(json.dumps(envelope, indent=2, sort_keys=True, ensure_ascii=False))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        payload = args.handler(args)
+        render(payload, command=args.command_name, as_json=args.json)
+        return 0
+    except StateError as error:
+        envelope = {
+            "schema_version": 1,
+            "ok": False,
+            "command": getattr(args, "command_name", "unknown"),
+            "error": {"code": error.code, "message": error.message},
+        }
+        if args.json:
+            print(canonical_json(envelope))
+        else:
+            print(f"{error.code}: {error.message}", file=sys.stderr)
+        return error.exit_code
+    except sqlite3.Error as error:
+        primary_code = (getattr(error, "sqlite_errorcode", 0) or 0) & 0xFF
+        busy = primary_code in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+        error_code = "state-busy" if busy else "state-database-error"
+        message = (
+            f"state database remained busy for {SQLITE_BUSY_TIMEOUT_MS // 1000} seconds"
+            if busy
+            else str(error)
+        )
+        envelope = {
+            "schema_version": 1,
+            "ok": False,
+            "command": getattr(args, "command_name", "unknown"),
+            "error": {"code": error_code, "message": message},
+        }
+        if args.json:
+            print(canonical_json(envelope))
+        else:
+            print(f"{error_code}: {message}", file=sys.stderr)
+        return 4
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
