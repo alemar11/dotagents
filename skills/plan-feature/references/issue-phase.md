@@ -41,8 +41,8 @@ Receive:
 - a durable `source_spec_ref`, or a proposed ref only with
   `write_mode=propose`;
 - the complete Feature Spec body and validated cross-Spec dependency graph;
-- planning identity, affected repositories, allowed paths, and shared target
-  branch;
+- planning identity, affected repositories, allowed paths, shared target
+  branch, and stable `delivery_type`;
 - tracker backend and repository layout facts for every owning repository;
 - workspace parent/child refs when applicable;
 - current durable implementation-issue bodies, generated IDs, refs, metadata,
@@ -303,8 +303,8 @@ text/count/order; safety constraints; and material validation constraints,
 including retry/attempt budgets and required terminal outcome. Compare those
 sections and fields directly; do not compute a whole-body, result, assignment,
 message, or tracker-text digest.
-For issue comparison, source and branch identity mean the rendered
-`source_spec_ref` and `target_branch_name`.
+For issue comparison, source, branch, and delivery identity mean the rendered
+`source_spec_ref`, `target_branch_name`, and `delivery_type`.
 Do not perform a fresh model split merely to recreate comparison prose.
 
 Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
@@ -400,9 +400,10 @@ Use `references/issue-body-template.md`. Every issue has exactly one
 - `affected_repositories`;
 - `allowed_paths`;
 - `target_branch_name`;
+- `delivery_type`;
 - `dependency_ids`.
 
-Do not add delivery, permission, review, PR-count, completion-method,
+Do not add permission, review, PR-count, completion-method,
 scheduling-mode, or worker configuration fields.
 
 Dependency reasons belong in Context or implementation prose and must not

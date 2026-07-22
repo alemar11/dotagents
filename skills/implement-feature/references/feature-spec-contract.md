@@ -1,0 +1,69 @@
+# Execution-Ready Feature Spec Contract
+
+Read the complete durable Feature Spec and implementation-issue graph before
+startup. Accept GitHub issues or local Markdown. Reject proposals, standalone
+or incomplete Specs, missing issue graphs, planning requests, missing
+`delivery_type`, and every tracker/delivery combination except GitHub plus
+`github-pr`, local Markdown plus `github-pr`, or local Markdown plus
+`local-branch`.
+
+Each selected Spec must establish stable fields for:
+
+- intended outcome and delivery type;
+- authorized repository, source, target branch, and allowed paths;
+- ordered issues and dependency edges;
+- acceptance text, criterion count, and criterion order;
+- safety constraints;
+- literal validation commands plus material retry or attempt budget and required
+  terminal result.
+
+An ordinary external dependency must satisfy its stable dependency contract
+before startup. A dedicated integration Spec in the selected bundle is the
+exception: its visible Codex worker waits for every prerequisite assignment's
+exact repository, branch, HEAD, and ChatGPT-created worktree evidence. GitHub input
+must be merged only when the durable dependency explicitly requires it. Never
+use claim release alone as dependency or integration proof.
+
+One selected implementation Spec owns one repository, head branch, visible task,
+worktree, worker, delivery result, and claim. `github-pr` additionally owns one
+PR against the observed default branch; `local-branch` owns no push or provider
+artifact. Its claim identity is the canonical repository plus canonical durable
+`source_spec_ref`; an active head branch is also unique within that repository.
+Different roots may therefore execute different Specs in the same repository
+through distinct head branches and worktrees. Each root serializes its own
+work: overlapping paths or issue dependencies serialize. Cross-root integration
+conflict is ordinary worker-owned Git and PR evidence, not a controller path
+claim.
+
+Repository identity never selects tracker or delivery transport. A repository
+identified as `github:owner/repository` may validly use a local Markdown
+`source_spec_ref` and `local-branch`; source-ref validation keys from the stable
+`tracker_backend` fact while terminal validation keys from `delivery_type`.
+
+In a monorepo, one coherent Spec worker normally owns FE, BE, app, and their
+integration in one worktree. In a multi-repository bundle, the dedicated
+integration Spec is another implementation-eligible visible Codex task. Before
+the one startup permission or state creation, require authoritative ChatGPT
+desktop project evidence that its task can access every exact sibling
+ChatGPT-created worktree. Absence or ambiguity blocks the whole local cross-repository bundle;
+root execution and future manual testing are forbidden fallbacks.
+
+## Drift Classification
+
+Workers reread the current Spec and issues before each issue, after recovery,
+and before final verification. They may autonomously accept these compatible
+operational changes when the stable fields above remain intact:
+
+- implementation approach or internal technical design;
+- safer or simpler rewrites;
+- additional or equivalent tests;
+- compatible clarifications;
+- progress, evidence, and status text;
+- checkbox markers whose underlying acceptance text, count, and order did not
+  change.
+
+Stop as `blocked-durable-contract` without asking when outcome, delivery type,
+repository/path/source/branch authority, dependency structure, acceptance text
+or shape, safety, or a material validation budget/terminal result changes.
+Compare authoritative stable sections directly. Do not create body, contract,
+result, assignment-packet, or message hashes.

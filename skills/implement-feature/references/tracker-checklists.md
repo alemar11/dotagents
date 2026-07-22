@@ -1,4 +1,4 @@
-# Tracker Proof
+# Tracker Checklists
 
 The worker, not root, owns acceptance judgment and tracker mutation for its
 Feature Spec. Before each issue, after recovery, and before final verification,
@@ -9,7 +9,8 @@ packet, checksum, or text hash.
 For each issue:
 
 1. Implement and validate the current accepted contract.
-2. Bind proof to the current Git head and provider observation.
+2. Bind proof to the current Git head and, only for `github-pr`, provider
+   observation.
 3. Check an issue criterion only after that current-head proof exists.
 4. Read the authoritative issue again and require the checkbox change to be
    visible.
@@ -25,4 +26,5 @@ Recovery repeats the same read-before-write and read-after-write sequence.
 Never infer success from an earlier response, stale checkbox, worker summary,
 or root opinion. Root must not edit, check, uncheck, reinterpret, or adjudicate
 criteria. It only verifies that the authoritative final tracker and current-head
-evidence agree before PR-ready closeout.
+evidence agree before the delivery-specific closeout. Local Markdown moves and
+checkbox changes must be committed on the declared delivery branch.

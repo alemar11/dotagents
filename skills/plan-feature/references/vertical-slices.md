@@ -210,8 +210,8 @@ Every agent-ready issue must have:
 - explicit non-goals;
 - complete requirements and acceptance criteria;
 - preferred validation plus a fallback or explicit `None`;
-- exactly one `## Execution Contract` containing the six required normal
-  fields from `references/options.md`;
+- exactly one `## Execution Contract` matching the field registry in
+  `references/issue-body-template.md`;
 - valid generated dependency IDs and an acyclic graph;
 - portable source and evidence refs;
 - no unresolved human decision or placeholder question;

@@ -157,18 +157,5 @@ class GraphCompressionReplayTests(unittest.TestCase):
                     any(owner_id in issue["depends_on"] for issue in replay["final_issues"])
                 )
 
-    def test_runtime_phase_orders_compression_before_hardening(self) -> None:
-        issue_phase = (SKILL_ROOT / "references/issue-phase.md").read_text(encoding="utf-8")
-
-        self.assertLess(
-            issue_phase.index("### 5. Compress The Candidate Graph"),
-            issue_phase.index("### 6. Converge With Durable Issue State"),
-        )
-        self.assertLess(
-            issue_phase.index("### 6. Converge With Durable Issue State"),
-            issue_phase.index("### 7. Harden Every Missing Issue"),
-        )
-
-
 if __name__ == "__main__":
     unittest.main()

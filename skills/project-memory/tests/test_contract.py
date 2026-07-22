@@ -407,13 +407,14 @@ class ProjectMemoryContractTests(unittest.TestCase):
             / "spec-phase.md"
         ).read_text(encoding="utf-8")
         retired_context_field = "`context_" + "file`"
-        for contents in (plan_options, spec_phase):
-            normalized = " ".join(contents.split())
-            self.assertIn("`context_files`", contents)
-            self.assertNotIn(retired_context_field, contents)
-            self.assertIn("applicable available", normalized)
-            self.assertIn("root", normalized)
-            self.assertIn("scoped context", normalized)
+        self.assertNotIn("`context_files`", plan_options)
+        self.assertIn("outside the option registry", plan_options)
+        normalized = " ".join(spec_phase.split())
+        self.assertIn("`context_files`", spec_phase)
+        self.assertNotIn(retired_context_field, spec_phase)
+        self.assertIn("applicable available", normalized)
+        self.assertIn("root", normalized)
+        self.assertIn("scoped context", normalized)
         plan_skill = (
             REPO_ROOT / "skills" / "plan-feature" / "SKILL.md"
         ).read_text(encoding="utf-8")
@@ -739,9 +740,10 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("exact derived `done/` path", normalized)
         self.assertIn("inside that repository", normalized)
         self.assertIn("non-App-executable", normalized)
-        self.assertIn("Commit and push the move", normalized)
-        self.assertIn("rerun final validation, review, and CI", normalized)
-        self.assertIn("prepared rather than globally completed", normalized)
+        self.assertIn("Commit the move on the declared delivery branch", normalized)
+        self.assertIn("rerun every final validation and review gate", normalized)
+        self.assertIn("`local-branch` executor performs no push or PR", normalized)
+        self.assertIn("Project Memory does not choose between them", normalized)
 
     def test_project_layout_is_owned_separately_from_tracker_routing(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")

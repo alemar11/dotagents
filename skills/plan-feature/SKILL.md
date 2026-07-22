@@ -46,207 +46,75 @@ Resolve `write_mode` once:
 ## Fixed Planning Contract
 
 - Load `references/spec-phase.md` before Feature Spec work and
-  `references/issue-phase.md` before issue work. Load templates only with their
-  owning phase.
-- Treat `tracker_backend` and `repository_layout` as Project Memory facts. Run
-  the matching Project Memory routing slice when either fact is missing,
-  stale, or contradictory.
-- Load issue-type and workflow-state tracker values with their explicit Project
-  Memory transports. Reject a missing, unknown, or backend-incompatible
-  transport instead of inferring mutation mechanics from the value.
-- Load `references/idea-discovery.md` only when exact refs are absent and the
-  user explicitly asks to discover captured Ideas. Never scan an Idea backlog
-  during an ordinary planning request. Discovery is read-only until the user
-  selects durable refs; it may load `references/idea-source.md` only in that
-  reference's validation-only mode. Selection activates the full source
-  contract. The final `source_idea_refs` remain execution data, not options.
-  Require `label` for GitHub Idea marker/workflow mappings and `local-header`
-  for local mappings; reject missing or incompatible transports.
-  Accept marker-valid Ideas as planning input only on the new-source route,
-  when no durable `source_spec_ref` exists. Reject proposed Idea refs. On the
-  existing-source route, derive `bound_source_idea_refs` only from exact
-  `- Source Idea:` lines in the immutable Feature Spec set. Any explicitly
-  supplied `source_idea_refs` must equal that complete bound set; reject
-  additional, missing, different, or unbound refs.
-- Keep one Plan Feature run bounded to one feature. Multiple selected Ideas may
-  feed that feature, but unrelated Ideas require separate runs rather than one
-  batch of unrelated Specs.
-- Resolve one planning identity: `feature_slug` plus any selected product,
-  workspace, context, or orchestrator-project identity.
-- Derive `source_route=new-source` when no durable `source_spec_ref` is supplied
-  or discovered, including an exact continuation of one recognized
-  multi-repository publication transaction. Derive
-  `source_route=existing-source` from one canonical final durable source ref.
-  Foreign or ambiguous partial-publication artifacts block. This is execution
-  data, never a selectable option.
-- Converge only to a complete Feature Spec bundle. Never return or publish a
-  standalone Feature Spec as a successful terminal result. A request to stop
-  before issue generation is incompatible with this skill and returns a
-  blocker, not a partial planning artifact.
-- Require at least one final implementation issue for every
-  implementation-eligible Feature Spec. A coordination-only parent is the sole
-  zero-issue artifact; if a purported implementation Spec has no implementable
-  outcome, block instead of treating the bundle as complete.
-- Before issue-graph synthesis, enumerate the complete durable bundle. Seed the
-  candidate graph with contract-equivalent existing issues as fixed IDs/slices,
-  synthesize only uncovered scope, create only missing artifacts, repair only
-  missing mapped tracker metadata or parent/sub-issue attachment, and return a
-  verified no-op when the bundle is already complete. Never renumber or
-  regenerate a retained issue. Dependency data and source-body sibling or
-  cross-Spec relationships must already match; stop on stale, conflicting,
-  duplicate, or extra implementation artifacts instead of rewriting them or
-  creating parallel replacements.
-- Immediately before any issue mutation, no-op, or proposal return, re-read the
-  owning Feature Spec, Project Memory mapping transports, and complete issue,
-  metadata, and relationship state. Recompute or block on drift, and verify
-  exact absence again before each create. Revalidate every mapped native type;
-  provision only exact missing mapped labels through verified `create-label`
-  operations under `write_mode=apply`; proposal mode reports them without
-  mutation.
-- For any multi-repository new-source apply, treat initial Spec creation and
-  exact cross-link finalization as one recoverable publication transaction.
-  Predeclare every role, parameterized final-body template, and allowed ref
-  slot plus the optional exact final-only body-metadata insertion. Stage only
-  hosted roles whose refs are not yet known without that final metadata, resolve
-  every durable or deterministic ref, materialize the final bodies,
-  finalize only the predeclared ref substitutions and metadata insertion, and
-  verify the complete Spec set before issue generation. In a mixed-backend bundle, keep local bodies
-  unwritten until hosted refs and bodies are final. In an all-local bundle,
-  resume only exact missing predeclared file creates. A recognized
-  same-transaction artifact is not a foreign race; any other appeared or
-  changed target blocks.
-- Until that transaction and the complete bundle converge, every partial-
-  failure handoff must retain the complete parameterized body templates,
-  allowed ref and body-metadata slots, role-to-target/ref map, selected
-  `source_idea_refs` plus verified prior outcome refs, completed operations, and
-  exact missing operations. A retry resumes only when that payload exactly
-  matches current state through direct field and body comparison; a digest is
-  insufficient recovery evidence.
-- Withhold incomplete artifacts. Return concrete blockers instead of
-  publishing or labeling partial work agent-ready. The uniquely marked staging
-  issues inside an authorized hosted publication transaction are temporary
-  non-executable transport, not Feature Specs or successful Plan Feature output.
-- Use a durable `source_spec_ref` in every issue. A canonical single-repository
-  or workspace-qualified proposed ref is allowed only with
-  `write_mode=propose` and is never executable. In multi-repository work, every
-  repo-scoped proposed ref includes its owning repository slug, and every
-  applied ref identifies its owning repository, so sibling identities cannot
-  collide.
-- Give every issue exactly one `## Execution Contract` table with
-  `source_spec_ref`, `feature_slug`, `affected_repositories`, `allowed_paths`,
-  `target_branch_name`, and `dependency_ids`. Do not duplicate these values in
-  another delivery, handoff, or option section.
-- Treat the Feature Spec and generated issues as strong executor-ready starting
-  briefs, not immutable technical scripts. Protect the stable planning contract
-  directly: goal/outcome and Non-Goals; repositories, allowed paths, source and
-  branch identity; dependencies; acceptance-criterion
-  text/count/order; safety constraints; and material validation constraints,
-  including attempt budgets and required terminal outcome. Preserve the
-  worker-mutable execution record: checkbox markers, implementation approach
-  and internal design, safer or simpler rewrites, additional or equivalent
-  tests, compatible clarifications, progress/status/evidence, and concrete
-  in-scope refactors or fixes. Never compute a whole-body tracker digest. On an
-  existing-source route, `unchanged` means these stable fields are unchanged;
-  preserve executor-owned acceptance checkbox markers without authorizing Plan
-  Feature to edit them.
-  In generated issues, source and branch identity are the rendered
-  `source_spec_ref` and `target_branch_name`.
-- Feature Spec acceptance criteria and issue acceptance criteria are separate
-  contracts and need not use identical wording, counts, or boundaries. Before
-  publication, build a transient coverage map from every Spec criterion to one
-  or more final vertical issues. Require complete coverage without
-  contradiction or scope widening. Within each individual Spec or issue,
-  criterion text, count, and order are stable while checkbox markers remain
-  executor-owned. Do not persist the transient coverage map unless the tracker
-  artifact needs concise human-readable coverage evidence.
-- For every local Markdown issue, include the tracker-owning repository in
-  `affected_repositories` and include both the exact active issue path and its
-  exact derived `done/` destination in `allowed_paths`. This is execution scope,
-  not a completion-method option. Both paths must resolve inside that affected
-  Git repository so the selected executor can own the move; otherwise withhold
-  the issue as non-executable.
-- Keep intra-Spec ordering only in `dependency_ids`. Derive reverse edges when
-  needed; do not persist them.
-- Keep authored cross-Spec ordering only in the Feature Spec's mandatory
-  `## Feature Dependencies` table. Every upstream edge waits for upstream
-  merge and integration proof. Never convert those edges into issue IDs.
-- Across the complete implementation-eligible bundle, give exactly one Feature
-  Spec ownership of each `(affected_repository, target_branch_name)` pair. The
-  same branch name may be used in different repositories, but two Specs must
-  never claim the same pair, even when their paths are disjoint or dependencies
-  would serialize them. Resolve collisions before publishing a new bundle; for
-  an immutable existing source, stop instead of renaming its branch.
-- Make output consumable by `$implement-feature` regardless of whether the
-  configured tracker is GitHub or local Markdown. Plan Feature does not require
-  a GitHub remote, choose a publication transport, or select or grant
-  implementation, review, issue-mutation, publication, or merge authority. The
-  executor derives its supported terminal outcome from the repository and
-  tracker evidence it owns.
-- Carry an optional `knowledge_delta` data object with `decisions`,
-  `target_surfaces`, and `evidence` lists. Absence means no durable change.
-  Keep unresolved planning questions in a separate `planning_blockers` list.
-- Normalize every `knowledge_delta.target_surfaces` entry to one affected
-  repository plus one portable repo-relative path. The final closeout issue
-  must name that repository in `affected_repositories` and cover that exact
-  path in `allowed_paths`; reject absolute paths, `..` traversal, ambiguous
-  repository ownership, and any delta that would require widening an immutable
-  source. On the existing-source route, every target must already fit the
-  unchanged Feature Spec repository/path scope or issue generation stops.
-- Call `$grill-me-with-context` only with
-  `capture_mode=defer-to-caller`. Planning may read durable context but must
-  not update domain-memory surfaces.
-- Never persist `knowledge_delta` or a `## Domain Knowledge Handoff` in a
-  Feature Spec. Carry the optional delta directly between phases and persist its
-  exact payload only on one final implementation/integration issue. For a
-  single Spec, exclude that owner and its own `dependency_ids`, derive the
-  no-dependent terminals in the remaining graph, then require the owner to
-  depend directly on all of them and have no dependents itself. The final issue
-  proves integrated behavior and invokes `$project-memory domain-memory` with
-  `memory_slice=domain-memory` and
-  `domain_operation=implementation-closeout` after implementation.
-- Until that final issue is durable and verified, every partial-failure report
-  must return an exact continuation handoff containing `feature_slug`, the
-  durable or staged Spec refs, any applicable multi-repository
-  publication-transaction identity, and the complete `knowledge_delta`. A retry
-  must require exact-match continuation data; omission or mismatch blocks
-  rather than silently dropping closeout.
-- Every multi-repository bundle gets exactly one distinct repo-owned integration
-  partial whose
-  Feature Dependencies wait for every implementation partial to merge. Generate
-  at least one integration issue from it whether or not a knowledge delta
-  exists. That issue must own a bounded repository/path change plus
-  cross-repository proof so an executor can produce a real integration change;
-  withhold the bundle when no such integration vehicle exists. Attach domain
-  closeout only to its final issue when a delta exists. Derive the integration partial's branch by
-  appending `-integration` to the resolved ordinary partial branch; never reuse
-  the ordinary partial's branch in the same repository. With the default
-  ordinary branch this yields `feature/<feature_slug>-integration`.
-- Before freezing generated IDs or invoking `$plan-harder`, run the structural
-  graph-compression gate from `references/vertical-slices.md` on every
-  implementation-eligible Feature Spec. Compare the complete candidate graph,
-  combine weak or coordination-heavy slices, remove artificial dependencies,
-  and preserve required integration and domain-closeout ownership. Issue count
-  is report data only and never determines whether the graph passes.
-- Run `$plan-harder` one or more times per missing final issue with
-  `planning_mode=issue-hardening` and `output_surface=caller`, beginning only
-  after vertical boundaries, scope, compression, and graph ownership have
-  stabilized. Retain a contract-equivalent durable issue only when it already
-  carries valid final hardening provenance and matches the stable desired
-  contract. If new
-  hardening exposes a graph-level defect, discard affected results, return to
-  compression, and re-harden every materially changed unpublished issue.
-  Persist only the final stable result and one provenance line.
-- Keep worker surfaces, task counts, App permissions, checkout paths, and
-  runtime scheduling out of Feature Specs and generated issues.
-- Prefer concise behavioral or scenario prose for decisions and failure policy;
-  use tables only for exact identity or scope facts. Acceptance criteria must be
-  unique, individually provable checkboxes with stable wording and order. A
-  paid, external, non-repeatable, or otherwise constrained validation must have
-  an explicit prose failure policy before `ready-for-agent`. Treat any document
-  line-count budget as a review warning, never a correctness gate.
-- Publish only portable evidence: repo-relative paths, repo-qualified sibling
-  paths, hosted links, or descriptive source labels. Never publish
-  developer-machine absolute paths.
+  `references/issue-phase.md` plus `references/vertical-slices.md` before issue
+  work. Load each template only with its owning phase. Those references own
+  branch-specific validation, publication, recovery, and reporting detail.
+- Treat tracker routing, repository topology, issue types, workflow states, and
+  their transports as Project Memory facts. Reject missing, stale,
+  contradictory, or backend-incompatible facts instead of turning them into
+  Plan Feature options.
+- Keep one run bounded to one feature and derive one `source_route` from intake
+  evidence. No durable Spec selects `new-source`; one canonical durable Spec
+  selects `existing-source`; an exact recognized incomplete publication
+  transaction resumes `new-source`. Ambiguous or foreign partial state blocks.
+- Load `references/idea-discovery.md` only for an explicit discovery request
+  without exact refs. Discovery is read-only until the user selects durable
+  Ideas. Load `references/idea-source.md` only when selected or source-bound
+  Ideas require validation or reconciliation. Ideas may seed new-source
+  planning but never rewrite an existing Spec.
+- A successful run always returns one complete bundle: every required Feature
+  Spec, a nonempty hardened issue graph for every implementation-eligible Spec,
+  tracker metadata, and relationships. Coordination-only parents are the only
+  zero-issue Specs. Withhold every incomplete bundle.
+- Treat Specs and issues as executor-ready briefs, not immutable technical
+  scripts. Stable content is the outcome and Non-Goals, source/repository/path/
+  branch scope, dependencies, acceptance text/count/order, safety constraints,
+  and material validation policy. Checkbox markers, technical approach,
+  equivalent tests, compatible clarifications, progress, and evidence remain
+  executor-owned. Compare stable content directly; never fingerprint a body.
+- Keep `tracker_backend` and `delivery_type` separate. Project Memory owns only
+  tracker location. Every implementation-eligible Spec and issue carries the
+  stable non-option delivery fact `github-pr` or `local-branch`; support GitHub
+  tracker plus PR, local tracker plus local branch, and local tracker plus PR.
+  Never infer PR delivery merely from a GitHub repository identity.
+- Feature Spec and issue acceptance criteria are independent contracts. Before
+  publication, require a transient complete, non-contradictory map from every
+  Spec criterion to one or more final issues. Checkbox state never changes
+  criterion identity and Plan Feature never edits executor-owned markers.
+- Give every issue one seven-field `## Execution Contract` owned by
+  `references/issue-body-template.md`. Keep intra-Spec ordering only in
+  `dependency_ids`; keep cross-Spec ordering only in the Spec's mandatory
+  `## Feature Dependencies` table.
+- Before synthesis or mutation, enumerate durable state and retain
+  contract-equivalent issues with their IDs. Create only missing artifacts,
+  repair only supported missing metadata or parent attachment, return a
+  verified no-op for a complete bundle, and block on duplicates, stale bodies,
+  conflicting relationships, or races. Re-read authoritative state immediately
+  before proposal, no-op, and mutation.
+- In local Markdown mode, issue scope includes the tracker repository and both
+  the exact active issue path and its derived `done/` path. In every backend,
+  use portable refs and evidence and keep executor transport, task scheduling,
+  checkout, review, publication, and merge authority out of planning artifacts.
+- Each implementation-eligible Spec owns a unique
+  `(affected_repository, target_branch_name)` pair. Multi-repository bundles
+  use one distinct repo-owned integration Spec whose Feature Dependencies wait
+  for every implementation partial's required stable delivery evidence and
+  whose visible App worker owns real integration work over the exact SHA set.
+  A monorepo normally uses one worker/worktree across its packages.
+  `references/spec-phase.md` owns recoverable multi-repository publication.
+- Carry accepted durable planning decisions only as optional
+  `knowledge_delta` phase data. Never persist it in a Feature Spec; put it only
+  on the final integration/closeout issue whose repository and allowed paths
+  contain every target. `references/issue-phase.md` owns terminal dependency
+  derivation and continuation evidence.
+- Compress the candidate graph before freezing new IDs or invoking
+  `$plan-harder`. Issue count is observation, not a cap. Harden every missing
+  final issue only after graph, scope, and ownership stabilize; retain matching
+  durable issues and persist only the final hardening result.
+- Prefer concise behavioral prose for decisions and failure policy; reserve
+  tables for exact identity and scope. Criteria must be unique and individually
+  provable. Constrained validation requires an explicit prose failure policy
+  before `ready-for-agent`.
 
 ## Composed Skills
 
@@ -296,6 +164,11 @@ Proposed refs never select the existing-source route. Then finish resolving
 `feature_slug`, affected repositories, allowed paths, one target branch shared
 only within each implementation-eligible Feature Spec, and any
 product/workspace identity from accepted input and repository evidence.
+Resolve one stable `delivery_type` per implementation-eligible Spec without
+adding an option or Project Memory setting. GitHub tracking resolves to its only
+supported delivery, `github-pr`; local tracking requires accepted evidence for
+`local-branch` or `github-pr`, and repository identity alone is never evidence
+for PR delivery.
 For a multi-repository workspace, derive workspace behavior from
 `repository_layout`; do not ask for another workspace-mode option.
 
@@ -386,7 +259,8 @@ parent owns no issues. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
-- `write_mode`, derived `source_route`, and Project Memory facts;
+- `write_mode`, derived `source_route`, Project Memory facts, and stable
+  `delivery_type` data;
 - planning identity and repository scope;
 - source-ref state and cross-Spec dependency rows;
 - optional validated `source_idea_refs`, normalized Idea evidence, prior
@@ -498,8 +372,7 @@ captured.
 
 ## References
 
-- `references/options.md`: the complete default-path run registry and execution
-  data shape.
+- `references/options.md`: the complete default-path selectable run registry.
 - `references/idea-discovery.md`: explicitly requested read-only backlog
   discovery and selection before durable Idea-source intake.
 - `references/idea-source.md`: selected durable Idea validation, intent

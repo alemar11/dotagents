@@ -16,6 +16,7 @@ Never include developer-machine absolute paths.
 | `affected_repositories` | [canonical repo slugs or current-repository] |
 | `allowed_paths` | [repo-relative or repo-qualified paths for this slice] |
 | `target_branch_name` | [one valid branch shared by all affected repositories inside this Feature Spec] |
+| `delivery_type` | [github-pr or local-branch, copied exactly from the owning Feature Spec] |
 | `dependency_ids` | [earlier generated issue IDs or none] |
 
 ## Goal
@@ -72,7 +73,8 @@ repeating dependency IDs.]
 Before starting this issue, after any recovery or handoff, and before final
 verification, re-read the current Feature Spec and complete current issue set.
 Block declaratively on any change to the goal or Non-Goals, repositories or
-allowed paths, `source_spec_ref`, `target_branch_name`, dependencies, acceptance
+allowed paths, `source_spec_ref`, `target_branch_name`, `delivery_type`,
+dependencies, acceptance
 criterion text/count/order, safety constraints, or material validation
 constraints including attempt budgets and required terminal outcomes. Do not
 ask the user from the worker task merely to resolve that semantic drift.
@@ -145,8 +147,9 @@ knowledge_delta:
   include the tracker-owning repository plus both the exact active and exact
   destination paths, and both paths must resolve inside that affected Git
   repository. Rerun every final gate that the resulting head invalidates. The
-  selected executor owns whether that final tracker move remains local, is
-  pushed, or is included in another supported delivery artifact.
+  Commit that move on the declared delivery branch. With `local-branch`, it
+  remains local; with `github-pr`, it is included in the published branch and
+  pull request.
 ```
 
 Tracker metadata is rendered by `write_mode` and backend rather than duplicated
@@ -165,7 +168,8 @@ in the base body:
   intended mappings as report metadata. A proposal is never an applied queue
   state.
 
-Do not add a delivery, permission, option, or orchestrator-handoff section.
+Do not add a permission, option, or orchestrator-handoff section. Delivery is
+represented only by the canonical `delivery_type` Execution Contract row.
 Derive issues blocked by this issue by scanning other issues'
 `dependency_ids`; keep dependency reasons in Context or implementation prose
 without re-listing IDs.

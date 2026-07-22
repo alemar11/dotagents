@@ -22,7 +22,9 @@ through the caller.
 - Use `references/options.md` for `write_mode`; consume the derived
   `source_route` and do not create another phase-level option.
 - Treat tracker backend, repository layout, and tracker mappings as Project
-  Memory facts.
+  Memory facts. Resolve the canonical `feature` type mapping before rendering
+  or validating a Feature Spec. Local trackers require `local-header`; GitHub
+  requires one supported hosted transport.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
   local or hosted write and return proposed bodies, locations, metadata, and
   publication order rather than executable commands.
@@ -39,6 +41,9 @@ Receive:
 - `write_mode` and the frozen derived `source_route`;
 - `tracker_backend`, `repository_layout`, and issue-type mappings with explicit
   transport plus exact tracker value from Project Memory;
+- one stable `delivery_type` per implementation-eligible Spec: `github-pr` or
+  `local-branch`; this is accepted execution data, not a Plan Feature option or
+  Project Memory setting;
 - planning identity: `feature_slug` and any selected `product_slug`,
   `project_slug`, `workspace_path`, or `context_files`, containing every
   applicable available root, child-root, and matched scoped context used for
@@ -153,13 +158,14 @@ For multi-repository work:
    local Markdown. Use those same refs in the repo-to-child mapping, sibling
    links, and Feature Dependencies; bare `#<number>` and bare repo-relative
    paths are invalid in a multi-repository bundle.
-3. Choose the one repository that owns post-merge cross-repository integration
+3. Choose the one repository that owns cross-repository integration
    proof from accepted scope and evidence;
    stop if that owner is ambiguous. Create a dedicated integration partial with proposed ref
    `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`.
    Its mandatory Feature Dependencies table contains one edge to every
    implementation partial, so it cannot execute until every upstream partial
-   has merged. Its generated integration task owns the cross-repository proof.
+   exposes stable delivery evidence. Its generated visible App integration task
+   owns the cross-repository proof over the exact repository/branch/HEAD set.
    The integration owner is an affected child repository selected from evidence;
    this does not require or create a coordination repository. Create this
    partial independently of `knowledge_delta`, and never render the delta in its
@@ -282,10 +288,18 @@ partial whose scope derives from that Idea, and omit it from unrelated
 partials. Preserve the Idea body and keep its refs and transient coverage maps
 out of generated implementation issues.
 
-The Feature Spec does not carry selectable delivery, review, permission,
-pull-request-count, scheduling, or tracker-closeout fields. It uses the same
-planning contract for GitHub and local Markdown trackers; the executor owns
-delivery and terminal-outcome selection from current repository evidence.
+Render `Delivery type: <delivery_type>` exactly once in `## Planning Identity`
+for every implementation-eligible Feature Spec and copy it into every generated
+issue. It is stable contract data, not a selectable Plan Feature option.
+Support exactly these tracker/delivery combinations: GitHub plus `github-pr`,
+local Markdown plus `local-branch`, and local Markdown plus `github-pr`.
+Repository identity does not choose delivery: a `github:owner/repository`
+identity may still use a local Spec and `local-branch`. On a new source, derive
+delivery only from accepted intent and repository capability; GitHub tracking
+has the sole compatible value `github-pr`, while an ambiguous local tracker in
+a repository capable of either delivery requires clarification. On an existing
+source, require the exact stable line unchanged. Do not persist delivery in
+Project Memory configuration.
 
 ### 4. Validate Feature Dependencies
 
@@ -306,7 +320,9 @@ For every edge:
 - require a concrete portable reason;
 - normalize upstream-to-downstream edges and validate the reachable Feature
   Spec graph is acyclic;
-- treat the edge as waiting for upstream merge and integration proof.
+- treat the edge as waiting for stable upstream branch/HEAD evidence and
+  integration proof; require merge only when the durable dependency contract
+  explicitly says the integration input must be merged.
 
 An empty table body means no authored cross-Spec dependencies. The section and
 its two canonical columns are mandatory on both source routes. A supplied
@@ -344,6 +360,8 @@ Then verify:
 - every materially constrained validation has an explicit prose failure policy
   with its attempt/retry budget, allowed fallback, retained evidence, and
   required terminal outcome;
+- every implementation-eligible Spec carries exactly one supported
+  `Delivery type:` line in Planning Identity;
 - open questions are empty or proven non-blocking;
 - a present phase-level knowledge delta has explicit portable decisions,
   targets, and evidence, while no Feature Spec body contains `knowledge_delta`
@@ -355,7 +373,15 @@ Then verify:
   with Feature Dependencies covering every implementation
   partial, and its title or path plus `Partial role: integration` distinguish it
   from the implementation partial in the same repository;
+- every dedicated integration partial contains an executable
+  `## Integration Execution Contract` covering component roles and start
+  commands, endpoint/environment wiring, collision-safe ports, health checks,
+  integration/E2E proof, timeout/retry/material budget, retained evidence,
+  cleanup, exact input SHA vector, HEAD reread, and required terminal outcome;
 - the body contains no workflow status field such as `Status: Draft`;
+- an applied local body contains exactly one `issue_type: <configured feature
+  value>` header after the H1 and before `## Source`; GitHub and proposed
+  bodies contain no local header;
 - every selected Idea ref appears only in the `## Source` section of each
   relevant Feature Spec and nowhere in generated issue contracts;
 - every material selected-Idea element has exactly one candidate destination:
@@ -366,12 +392,14 @@ Withhold the artifact and return blockers when the gate fails.
 
 ### 6. Apply Or Propose
 
-On the existing-source route, skip body drafting and publication. For a GitHub
-source, resolve the configured transport for canonical `feature` metadata from
-Project Memory before comparing state. Use `issue_operation=set-type` only for
-a `native-type` mapping, `issue_operation=add-label` for a `label` fallback, or
+On the existing-source route, skip body drafting and publication. Resolve the
+configured transport for canonical `feature` metadata before comparing state.
+For a local source, require the exact configured `local-header` value already
+in the immutable body; a missing or conflicting header requires a separately
+authorized source update. For GitHub, use `issue_operation=set-type` only for a
+`native-type` mapping, `issue_operation=add-label` for a `label` fallback, or
 the exact `body-field` convention when that convention is already satisfied by
-the immutable source. Under `write_mode=apply`, repair only the missing mapped
+the immutable source. Under `write_mode=apply`, repair only the missing hosted
 native type or label; under `write_mode=propose`, report that exact intended
 repair. A conflicting native type or mapped fallback blocks. Never invent or
 attempt an unsupported native type operation when GitHub Issue Types are
@@ -480,7 +508,10 @@ member and traverses the whole connected set.
   `owner/repository#<number>` or the canonical URL, never a bare issue number.
 - `write_mode=apply`, local: write the ordinary Feature Spec to
   `planning/features/<feature-slug>/SPEC.md` inside its owning repository and
-  use that path as `source_spec_ref`. In a multi-repository bundle, use
+  use that path as `source_spec_ref`. Require the Project Memory `feature`
+  mapping to use `local-header`, then insert exactly
+  `issue_type: <configured tracker value>` after the H1 and before `## Source`.
+  Do not add a workflow-state header to a Feature Spec. In a multi-repository bundle, use
   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` as the qualified
   ref and create the file only as its predeclared transaction operation. Write
   a dedicated integration partial to

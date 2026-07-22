@@ -55,7 +55,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
-| `implement-feature` | Coordinate visible App workers that execute ready Feature Specs end to end through reviewed PR-ready delivery. |
+| `implement-feature` | Coordinate visible Codex workers in the ChatGPT desktop app through reviewed GitHub PR or named local-branch delivery. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
@@ -84,7 +84,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `capture-idea` requires `$project-memory` for tracker routing and the canonical Idea marker mapping. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both write modes, plus applied tracker mutations.
-- `implement-feature` requires local `python3` for its sole shipped `scripts/run-state` SQLite helper, plus `$autoreview` and relevant GitStack workflows. One startup permission covers visible App-managed worktree tasks whose workers own implementation, validation, publication, review fixes, and tracker proof end to end. The root coordinates at most three disjoint workers and uses one per-user schema-1 DB at `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; canonical Feature Spec and head-branch claims prevent duplicate work while different roots may use distinct worktrees in the same repository. It never plans, repairs planning artifacts, or merges pull requests.
+- `implement-feature` requires local `python3` for its sole shipped `scripts/run-state` SQLite helper, plus `$autoreview` and GitStack only when GitHub transport is required. One startup permission covers visible Codex tasks and the ChatGPT-created worktrees assigned to them; workers own implementation, validation, commits, reviews, tracker proof, and either GitHub PR or named local-branch closeout. The root coordinates at most three disjoint workers and uses one per-user schema-1 DB at `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; canonical Feature Spec and head-branch claims prevent duplicate work while different roots may use distinct worktrees in the same repository. It never plans, repairs planning artifacts, switches the main worktree, or merges pull requests.
 
 ## Project-Local Skills
 

@@ -42,6 +42,7 @@ Planning data:
     - src/account-settings/**
     - tests/account-settings/**
   target_branch_name: feature/account-settings-export
+  delivery_type: github-pr
   source_spec_ref: proposed-spec:account-settings-export
 
 knowledge_delta:
@@ -160,6 +161,7 @@ attach, enqueue, or otherwise mutate a tracker object.
 
 - Feature slug: `account-settings-export`.
 - Repository layout: `single-repository`.
+- Delivery type: `github-pr`.
 
 ## Problem
 
@@ -238,6 +240,7 @@ Account owners cannot produce a portable archive of their supported settings.
 | `affected_repositories` | `current-repository` |
 | `allowed_paths` | `src/account-settings/**`, `tests/account-settings/**` |
 | `target_branch_name` | `feature/account-settings-export` |
+| `delivery_type` | `github-pr` |
 | `dependency_ids` | `none` |
 
 ## Goal
@@ -307,6 +310,7 @@ Proposed issue ref: `proposed-issue:account-settings-export/02`
 | `affected_repositories` | `current-repository` |
 | `allowed_paths` | `src/account-settings/download/**`, `tests/account-settings/**`, `CONTEXT.md`, `project-memory/adr/**` |
 | `target_branch_name` | `feature/account-settings-export` |
+| `delivery_type` | `github-pr` |
 | `dependency_ids` | `01` |
 
 ## Goal
@@ -624,9 +628,9 @@ handoff to match current state and must not reinterpret omission as
    stable result, validate the graph, and render exactly one Execution Contract
    per issue.
 6. Return bodies, intended repositories, mapped metadata, and topological
-   publication order using the deterministic single- or multi-repository
-   proposed issue refs from `options.md`. Return no executable publication
-   command.
+   publication order using the deterministic proposed refs defined by the
+   proposal route in `references/issue-phase.md`. Return no executable
+   publication command.
 7. State that proposed refs are non-executable and must be replaced by durable
    refs during a later `write_mode=apply` run.
 

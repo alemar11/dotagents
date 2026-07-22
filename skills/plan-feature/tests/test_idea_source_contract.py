@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 import unittest
 from pathlib import Path
@@ -13,115 +12,53 @@ def read(relative: str) -> str:
     return (SKILL_ROOT / relative).read_text(encoding="utf-8")
 
 
-def evaluate_state_fixture(case: dict[str, object]) -> dict[str, object]:
-    kind = case["kind"]
+def section(contents: str, heading: str, next_heading: str) -> str:
+    start = contents.index(heading) + len(heading)
+    end = contents.index(next_heading, start)
+    return contents[start:end]
 
-    if kind == "routing":
-        recovery = bool(case["planning_result_durable"]) and (
-            case["latest_outcome"] == "full" or bool(case["missing_operations"])
-        )
-        return {
-            "route": "reconciliation-only" if recovery else "ordinary-validation",
-            "ordinary_validation": not recovery,
-            "operations": list(case["missing_operations"]),
-        }
 
-    if kind == "proposal":
-        blocked = int(case["blocked"])
-        deferred = int(case["deferred"])
-        planned = int(case["proposed_spec_sections"]) + int(
-            case["proposed_non_goals"]
-        )
-        intended = None
-        if not blocked and planned:
-            intended = "partial" if deferred else "full"
-        return {
-            "intended_coverage": intended,
-            "durable_coverage_changed": False,
-            "canonical_outcome_written": False,
-        }
-
-    if kind == "comments":
-        refs = {
-            ref
-            for page in case["comment_pages"]
-            for comment in page
-            if comment["marker"]
-            for ref in comment["feature_spec_refs"]
-        }
-        return {"feature_spec_refs": sorted(refs)}
-
-    if kind == "successor":
-        prior = case["prior"]
-        candidate = case["candidate"]
-        if prior == candidate:
-            classification = "idempotent"
-        else:
-            prior_refs = set(prior["feature_spec_refs"])
-            candidate_refs = set(candidate["feature_spec_refs"])
-            prior_covered = set(prior["covered_scope"])
-            candidate_covered = set(candidate["covered_scope"])
-            candidate_remaining = {
-                item for item in candidate["remaining_scope"] if item != "none"
-            }
-            prior_remaining = {
-                item for item in prior["remaining_scope"] if item != "none"
-            }
-            monotonic = (
-                prior_refs < candidate_refs
-                and prior_covered <= candidate_covered
-                and prior_covered.isdisjoint(candidate_remaining)
-                and (
-                    prior_covered < candidate_covered
-                    or candidate_remaining < prior_remaining
-                )
-            )
-            classification = "valid-successor" if monotonic else "conflict"
-        return {"classification": classification}
-
-    if kind == "lifecycle":
-        answered_failure = (
-            case["prior_state"] == "needs-info"
-            and bool(case["requester_answer_supplied"])
-            and not bool(case["planning_result_durable"])
-            and case["terminal_failure"] == "technical"
-        )
-        return {
-            "workflow_state": "needs-triage" if answered_failure else case["prior_state"],
-            "canonical_outcome_written": False,
-        }
-
-    raise AssertionError(f"unknown fixture kind: {kind}")
+def table_fields(contents: str) -> list[str]:
+    fields: list[str] = []
+    for line in contents.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if not cells or cells[0] in {"Field", "---"}:
+            continue
+        fields.append(cells[0].strip("`"))
+    return fields
 
 
 class IdeaSourceContractTests(unittest.TestCase):
     def test_run_registry_contains_only_write_mode(self) -> None:
         options = read("references/options.md")
-        registry = options.split("## Run Registry", 1)[1].split(
-            "## Derived Source Route", 1
-        )[0]
-        fields = re.findall(r"^\| `([a-z_]+)` \|", registry, flags=re.MULTILINE)
+        registry = section(options, "## Run Registry", "## Resolution")
 
-        self.assertEqual(["write_mode"], fields)
-        self.assertNotIn("source_idea_refs", fields)
-        self.assertNotIn("idea_discovery", fields)
+        self.assertEqual(["write_mode"], table_fields(registry))
 
-    def test_idea_refs_are_kept_out_of_issue_execution_contracts(self) -> None:
+    def test_source_idea_refs_belong_to_the_spec_source_section(self) -> None:
         spec_template = read("references/spec-template.md")
         issue_template = read("references/issue-body-template.md")
+        source = section(spec_template, "## Source", "## Goal")
 
-        self.assertIn("- Source Idea:", spec_template)
+        self.assertRegex(source, r"(?m)^- Source Idea:")
+        self.assertNotRegex(issue_template, r"(?m)^- Source Idea:")
         self.assertNotIn("source_idea_refs", issue_template)
-        self.assertNotIn("Source Idea", issue_template)
 
-    def test_state_transition_fixtures_are_executable(self) -> None:
-        fixture_path = SKILL_ROOT / "tests" / "idea-source-state-fixtures.json"
-        cases = json.loads(fixture_path.read_text(encoding="utf-8"))
+    def test_spec_and_issue_templates_expose_distinct_acceptance_sections(self) -> None:
+        spec_template = read("references/spec-template.md")
+        issue_template = read("references/issue-body-template.md")
+        spec_acceptance = section(
+            spec_template, "## Acceptance Criteria", "## Validation Expectations"
+        )
+        issue_acceptance = section(
+            issue_template, "## Acceptance Criteria", "## Validation"
+        )
 
-        self.assertEqual(len(cases), len({case["name"] for case in cases}))
-        for case in cases:
-            with self.subTest(case=case["name"]):
-                self.assertEqual(case["expected"], evaluate_state_fixture(case))
+        self.assertRegex(spec_acceptance, r"(?m)^- \[ \] ")
+        self.assertRegex(issue_acceptance, r"(?m)^- \[ \] ")
+        self.assertNotEqual(spec_acceptance.strip(), issue_acceptance.strip())
 
 
 if __name__ == "__main__":

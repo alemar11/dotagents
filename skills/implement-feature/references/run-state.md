@@ -5,6 +5,9 @@ uses this shipped artifact. `CLI_VERSION` is exactly `1.0.0`; SQLite, manifest,
 observation, and JSON envelope schemas are integer `1`. This is a fresh
 breaking design with no migrations, aliases, importers, legacy readers, or
 alternate state files.
+Schema number `1` does not authorize an older shape: table and column structure
+must match exactly or the CLI returns `invalid-state-schema` without deleting or
+rewriting the user's DB.
 
 All controllers for the same machine user share:
 
@@ -19,9 +22,11 @@ writer coordination. Local SQLite does not coordinate different machines.
 ## Stored Data Allowlist
 
 The schema contains only metadata, runs, assignments, canonical Feature Spec
-claims, and typed App-operation reconciliation facts. It may retain durable
-source refs, App project/thread/worktree identity, receipts/readbacks, release
-reason, and coarse Git head, PR, or provider observation refs.
+claims, and typed ChatGPT task-operation reconciliation facts. It may retain durable
+source refs, tracker backend, delivery type, assignment prerequisites, ChatGPT
+project/thread/worktree identity, exact `receipt_ref`/`readback_ref` machine
+fields, release reason, normal Git
+head/base/ancestry facts, and PR/provider refs only when applicable.
 
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
@@ -41,6 +46,7 @@ scripts/run-state --json run list --status active
 
 scripts/run-state --json claim find \
   --repository-identity github:owner/repository \
+  --tracker-backend github \
   --source-spec-ref owner/repository#42
 scripts/run-state --json claim reconcile \
   --run-id RUN --assignment-id ASSIGNMENT --expected-revision N \
@@ -60,6 +66,8 @@ scripts/run-state --json app-operation list --run-id RUN
 
 scripts/run-state --json assignment ready \
   --run-id RUN --expected-revision N --observation /absolute/ready.json
+scripts/run-state --json assignment ready --integration-input \
+  --run-id RUN --expected-revision N --observation /absolute/ready.json
 scripts/run-state --json assignment block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json assignment abort \
@@ -72,6 +80,14 @@ Read commands and `doctor` never write. Every mutation uses one compare-and-swap
 revision transaction. JSON stdout is one object with `schema_version`, `ok`,
 and `command`; errors add typed `error.code` and `error.message`.
 
+Ready observations always bind assignment/thread/repository/checkout,
+`delivery_type`, named head and base branches, head/base SHAs, clean worktree,
+base ancestry, current-head validation/AutoReview/Codex-review SHAs, tracker
+readback, and the exact prerequisite HEAD map. `github-pr` additionally requires
+the provider default branch, canonical PR URL, and provider observation ref;
+`local-branch` rejects those fields. Status must be respectively
+`pr-ready-for-merge` or `local-branch-ready`.
+
 ## Claim Identity And Lifecycle
 
 Canonical GitHub repository identity is `github:owner/repository`. Local-only
@@ -79,9 +95,10 @@ identity derives from the resolved Git common-directory real path, device, and
 inode; linked worktrees intentionally share repository identity.
 
 One assignment owns one claim. Its uniqueness key is canonical repository plus
-canonical Feature Spec identity. GitHub `owner/repository#number` and the exact
-issue URL normalize to `github:owner/repository#number`. Local refs use the
-globally unambiguous repository-scoped Feature Spec path. A second uniqueness
+canonical Feature Spec identity. With `tracker_backend=github`, GitHub
+`owner/repository#number` and the exact issue URL normalize to one identity.
+With `tracker_backend=local`, the globally unambiguous repository-scoped path
+remains local regardless of canonical repository identity. A second uniqueness
 constraint prevents active assignments from sharing one implementation head
 branch in the same repository; the PR base branch is not part of that
 constraint.
@@ -92,8 +109,12 @@ Worker creation and bootstrap require that assignment's active claim and the
 root's active Goal. A root still owns only one unfinished run and one lifecycle
 Goal, and at most three workers may be live.
 
-`assignment ready` atomically records final evidence and releases that
-assignment's claim. `assignment abort` releases one claim only before bootstrap
+`assignment ready` validates delivery-specific typed evidence, atomically
+records normal Git facts, and releases that assignment's claim.
+`--integration-input` instead records the current prerequisite HEAD and retains
+the task and claim. Integration ready evidence must reproduce the current exact
+prerequisite HEAD vector; drift fails closed. `assignment abort` releases one
+claim only before bootstrap
 authority. A durable-contract block retains only the affected claim. `run
 finish` completes aggregate run state after assignment-level release; claim
 release never proves upstream merge or integration.
@@ -109,6 +130,7 @@ release never proves upstream merge or integration.
   "owner_assignment_id": "spec-42",
   "owner_expected_revision": 7,
   "repository_identity": "github:owner/repository",
+  "tracker_backend": "github",
   "source_spec_ref": "owner/repository#42",
   "worker_state": "active",
   "checkout_state": "present",
@@ -132,10 +154,10 @@ identities and revisions are mandatory. It preserves artifacts and transfers
 only the exact Feature Spec claim. There is no TTL, lease, heartbeat takeover,
 or repository-wide claim release.
 
-Typed App observations carry only action-specific fields plus `receipt_ref` and
+Typed ChatGPT operation observations carry only action-specific fields plus `receipt_ref` and
 `readback_ref` when actually observed. `unknown` preserves ambiguous effects
 and cannot be relaunched. Pending or unknown bootstrap delivery forbids worker
-archive until readback proves it failed.
+archive until independent task inspection proves it failed.
 
 ## CLI Maintenance
 

@@ -103,10 +103,10 @@ Durable local tracker artifacts live under `planning/features/` or
 caller-owned working data and never durable source references.
 
 Implementation issues created from a Feature Spec normally use
-`issue_type: task`. Feature Spec files do not need `issue_type:` or
-`workflow_state:` unless the repo intentionally treats them as local feature
-issues. Do not add `Status: Draft`; workflow state belongs on implementation
-issues or in tracker convention.
+`issue_type: task`. Applied Feature Spec files use the configured local-header
+mapping for canonical `feature` and never receive `workflow_state:`. Do not add
+`Status: Draft`; workflow state belongs on implementation issues or in tracker
+convention.
 
 ## Completion Convention
 
@@ -125,10 +125,11 @@ integration issue into the ordinary feature's `issues/done/` directory.
 Do not delete completed issue files or add a `done` status. The `done/` folder
 is the completion signal; `workflow_state:` remains the lifecycle state for
 active issues. Create the folder on demand when completing the first issue.
-Commit and push the move as part of the delivery change set, then rerun final
-validation, review, and CI gates invalidated by the new head. Until the later PR
-merge lands that path on the default branch, closeout is prepared rather than
-globally completed.
+Commit the move on the declared delivery branch, then rerun every final
+validation and review gate invalidated by the new head. A `github-pr` executor
+also pushes it and satisfies provider gates; a `local-branch` executor performs
+no push or PR and reaches local-branch-ready on the named branch. Project Memory
+does not choose between them.
 
 Project Memory records this local tracker lifecycle but does not choose the
 implementation stopping point or prescribe its delivery proof.

@@ -7,6 +7,9 @@ single run choice.
 ```markdown
 # Feature Spec: [Feature Name]
 
+issue_type: [configured local-header feature value; include only in an applied
+local artifact, otherwise omit this line]
+
 ## Source
 
 - Conversation, issue, document, or repository evidence used to create this
@@ -26,6 +29,8 @@ single run choice.
   affected child-repository root, and matched scoped context used for planning;
   omit roots and routes with no context file].
 - Repository layout: [Project Memory fact].
+- Delivery type: [github-pr or local-branch; stable execution fact, never a
+  selectable Plan Feature option].
 
 ## Problem
 
@@ -70,6 +75,16 @@ single run choice.
 [Include only when multiple repositories or packages must preserve an API,
 schema, version, migration, fixture, deployment, or compatibility contract.]
 
+## Integration Execution Contract
+
+[Include only for a dedicated multi-repository integration Feature Spec. In
+concise executable prose, name every repository role and component start
+command; endpoint and environment wiring; collision-safe port allocation;
+health checks; the integration/E2E command or scenario; timeout, retry, and any
+material validation budget; evidence to retain; cleanup behavior; and the
+required terminal outcome. Bind proof to the exact repository/branch/HEAD
+vector and require every HEAD to be reread before and after validation.]
+
 ## Acceptance Criteria
 
 - [ ] [One unique, individually provable product or system outcome. Keep
@@ -103,8 +118,10 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
 
 The `## Feature Dependencies` section is mandatory for every newly produced
 Feature Spec. Keep the heading and table header with no data rows when there
-are no authored edges. Every edge waits for upstream merge and integration
-proof; no start-condition field exists.
+are no authored edges. Every edge waits for stable prerequisite delivery
+evidence and its required integration proof. A GitHub dependency waits for
+merge only when the durable contract explicitly requires merged input; no
+start-condition field exists.
 
 For a GitHub `write_mode=apply` publication, resolve the configured `feature`
 transport before rendering the final body. Apply `native-type` or `label`
@@ -113,6 +130,13 @@ outside the body after publication verifies. When Project Memory instead maps
 header metadata region after the H1 and before `## Source`; include it in the
 final body and do not invent a key or value. In `write_mode=propose`, omit
 applied metadata from the body and report the intended mapping separately.
+
+For a local `write_mode=apply` publication, require the configured `feature`
+transport to be `local-header` and replace the template placeholder with the
+exact `issue_type: <configured tracker value>` line. Place it immediately after
+the H1 and before `## Source`. Feature Specs do not receive a local workflow
+state header. Proposed bodies omit the applied header and report its intended
+mapping separately.
 
 When Plan Feature receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no
@@ -136,7 +160,11 @@ path scope.
 
 Every multi-repository bundle has exactly one repo-owned integration partial
 with its distinct backend-owned title or
-path, retain `Partial role: integration` in its body, and include one merge-wait
-Feature Dependency edge to every implementation partial. This integration
+path, retain `Partial role: integration` in its body, and include one
+Feature Dependency edge to every implementation partial. Require merged input
+when the durable contract says so; otherwise require an exact branch/HEAD
+dependency. This integration
 partial exists independently of a knowledge delta and never carries the delta
-in its Feature Spec body.
+in its Feature Spec body. A monorepo normally keeps FE, BE, app, and integration
+inside one Feature Spec worker and one App-managed worktree; do not add a
+dedicated integration partial merely because packages differ.

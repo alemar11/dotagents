@@ -74,6 +74,8 @@ class RunStateScenarios(unittest.TestCase):
         repositories: list[tuple[str, Path]] | None = None,
         assignment_count: int = 1,
         project_prefix: str = "project",
+        tracker_backend: str | None = None,
+        delivery_type: str | None = None,
     ) -> dict[str, object]:
         repositories = repositories or [("github:example/project", self.common_a)]
         repo_rows = [
@@ -83,7 +85,13 @@ class RunStateScenarios(unittest.TestCase):
         assignments = []
         for index in range(assignment_count):
             identity, _ = repositories[index % len(repositories)]
-            if identity.startswith("github:"):
+            assignment_tracker = tracker_backend or (
+                "github" if identity.startswith("github:") else "local"
+            )
+            assignment_delivery = delivery_type or (
+                "github-pr" if assignment_tracker == "github" else "local-branch"
+            )
+            if assignment_tracker == "github":
                 owner_repository = identity.removeprefix("github:")
                 source_spec_ref = f"https://github.com/{owner_repository}/issues/{index + 1}"
             else:
@@ -93,9 +101,12 @@ class RunStateScenarios(unittest.TestCase):
                     "assignment_id": f"spec-{index + 1:02d}",
                     "source_spec_ref": source_spec_ref,
                     "repository_identity": identity,
+                    "tracker_backend": assignment_tracker,
+                    "delivery_type": assignment_delivery,
                     "project_id": f"{project_prefix}-{index % len(repositories) + 1}",
                     "title": f"🛠️ Feature {index + 1}",
                     "target_branch_name": f"feature/example-{index + 1}",
+                    "prerequisite_assignment_ids": [],
                 }
             )
         return {
@@ -166,13 +177,25 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def ready_worker(self, run_id: str, number: int = 1) -> dict[str, object]:
+        sha = f"{100 + number:040x}"
         observation = {
             "schema_version": 1,
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
-            "head_sha": f"{100 + number:040x}",
+            "repository_identity": "github:example/project",
+            "delivery_type": "github-pr",
+            "head_sha": sha,
             "head_branch_name": f"feature/example-{number}",
             "base_branch_name": "main",
+            "base_sha": f"{10:040x}",
+            "checkout_path": str(self.base / f"checkout {run_id} {number}"),
+            "worktree_clean": True,
+            "base_is_ancestor": True,
+            "validation_head_sha": sha,
+            "autoreview_head_sha": sha,
+            "codex_review_head_sha": sha,
+            "tracker_readback_ref": f"tracker:{run_id}:{number}",
+            "prerequisite_heads": {},
             "default_branch_name": "main",
             "pr_url": f"https://github.com/example/project/pull/{number}",
             "provider_observation_ref": f"provider:pr:{number}:head:{100 + number}",
@@ -184,11 +207,60 @@ class RunStateScenarios(unittest.TestCase):
             "--observation", str(self.write_json(f"ready-{run_id}-{number}.json", observation)),
         )
 
+    def ready_local_worker(
+        self,
+        run_id: str,
+        *,
+        number: int = 1,
+        repository_identity: str | None = None,
+        integration_input: bool = False,
+        prerequisite_heads: dict[str, str] | None = None,
+        expected: int = 0,
+        worktree_clean: bool = True,
+        head_branch_name: str | None = None,
+    ) -> dict[str, object]:
+        sha = f"{200 + number:040x}"
+        observation = {
+            "schema_version": 1,
+            "assignment_id": f"spec-{number:02d}",
+            "thread_id": f"thread-{run_id}-{number}",
+            "repository_identity": repository_identity or self.local_identity(self.common_a),
+            "delivery_type": "local-branch",
+            "head_sha": sha,
+            "head_branch_name": head_branch_name or f"feature/example-{number}",
+            "base_branch_name": "main",
+            "base_sha": f"{20:040x}",
+            "checkout_path": str(self.base / f"checkout {run_id} {number}"),
+            "worktree_clean": worktree_clean,
+            "base_is_ancestor": True,
+            "validation_head_sha": sha,
+            "autoreview_head_sha": sha,
+            "codex_review_head_sha": sha,
+            "tracker_readback_ref": f"tracker:{run_id}:{number}",
+            "prerequisite_heads": prerequisite_heads or {},
+            "status": "local-branch-ready",
+        }
+        arguments = [
+            "assignment", "ready", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id),
+            "--observation", str(self.write_json(f"local-ready-{run_id}-{number}.json", observation)),
+        ]
+        if integration_input:
+            arguments.append("--integration-input")
+        return self.invoke(*arguments, expected=expected)
+
     def finish_pr_ready(self, run_id: str) -> None:
         self.operation(run_id, f"complete-{run_id}", "complete-goal", f"root-{run_id}", {"observed_state": "completed"})
         self.invoke(
             "run", "finish", "--run-id", run_id,
             "--expected-revision", self.revision(run_id), "--outcome", "pr-ready",
+        )
+
+    def finish_local_ready(self, run_id: str) -> None:
+        self.operation(run_id, f"complete-{run_id}", "complete-goal", f"root-{run_id}", {"observed_state": "completed"})
+        self.invoke(
+            "run", "finish", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id), "--outcome", "local-branch-ready",
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
@@ -198,6 +270,151 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(result["state_schema_version"], 1)
         self.assertEqual(result["busy_timeout_ms"], 5000)
         self.assertFalse(self.database.exists())
+
+    def test_given_local_only_repository_when_local_delivery_finishes_then_named_branch_is_durable(self) -> None:
+        """Given no remote, when local delivery closes, then exact branch/head evidence reaches local-branch-ready."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest("local-only", repositories=[(identity, self.common_a)])
+        manifest["assignments"][0]["source_spec_ref"] = "planning/features/feature-1/SPEC.md"
+        self.invoke("run", "start", "--manifest", str(self.write_json("local-only.json", manifest)))
+        self.create_goal("local-only")
+        self.create_worker("local-only")
+        ready = self.ready_local_worker("local-only", repository_identity=identity)
+        self.assertEqual(ready["state"], "local-branch-ready")
+        self.finish_local_ready("local-only")
+        shown = self.invoke("run", "show", "--run-id", "local-only")
+        self.assertEqual(shown["status"], "local-branch-ready")
+        self.assertEqual(shown["assignments"][0]["target_branch_name"], "feature/example-1")
+
+    def test_given_github_identity_when_tracker_and_delivery_are_local_then_source_validation_stays_local(self) -> None:
+        """Given a GitHub remote identity, when the contract is local/local, then a local Spec path remains valid."""
+        self.start(
+            "github-identity-local",
+            tracker_backend="local",
+            delivery_type="local-branch",
+        )
+        shown = self.invoke("run", "show", "--run-id", "github-identity-local")
+        assignment = shown["assignments"][0]
+        self.assertEqual(assignment["source_spec_ref"], "project/planning/features/feature-1/SPEC.md")
+        self.assertEqual(assignment["delivery_type"], "local-branch")
+
+    def test_given_local_tracker_when_delivery_is_github_pr_then_provider_closeout_remains_supported(self) -> None:
+        """Given local Markdown tracking, when delivery is github-pr, then source and PR transports stay independent."""
+        self.start("local-tracker-pr", tracker_backend="local", delivery_type="github-pr")
+        self.create_goal("local-tracker-pr")
+        self.create_worker("local-tracker-pr")
+        self.ready_worker("local-tracker-pr")
+        self.finish_pr_ready("local-tracker-pr")
+        shown = self.invoke("run", "show", "--run-id", "local-tracker-pr")
+        self.assertEqual(shown["status"], "pr-ready")
+        self.assertTrue(shown["assignments"][0]["source_spec_ref"].endswith("/SPEC.md"))
+
+    def test_given_local_only_repository_when_github_pr_is_requested_then_start_rejects_it(self) -> None:
+        """Given no GitHub identity, when github-pr delivery is requested, then provider authority fails before state."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest(
+            "local-only-pr",
+            repositories=[(identity, self.common_a)],
+            delivery_type="github-pr",
+        )
+        error = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("local-only-pr.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-input")
+        self.assertFalse(self.database.exists())
+
+    def test_given_delivery_mismatch_when_ready_is_recorded_then_it_fails_closed(self) -> None:
+        """Given local-branch authority, when GitHub-ready evidence is supplied, then the typed mismatch is rejected."""
+        identity = self.local_identity(self.common_a)
+        self.start("delivery-mismatch", repositories=[(identity, self.common_a)])
+        self.create_goal("delivery-mismatch")
+        self.create_worker("delivery-mismatch")
+        observation = {
+            "schema_version": 1,
+            "assignment_id": "spec-01",
+            "thread_id": "thread-delivery-mismatch-1",
+            "repository_identity": identity,
+            "delivery_type": "github-pr",
+            "head_sha": f"{101:040x}",
+            "head_branch_name": "feature/example-1",
+            "base_branch_name": "main",
+            "base_sha": f"{10:040x}",
+            "checkout_path": str(self.base / "checkout delivery-mismatch 1"),
+            "worktree_clean": True,
+            "base_is_ancestor": True,
+            "validation_head_sha": f"{101:040x}",
+            "autoreview_head_sha": f"{101:040x}",
+            "codex_review_head_sha": f"{101:040x}",
+            "tracker_readback_ref": "tracker:mismatch",
+            "prerequisite_heads": {},
+            "default_branch_name": "main",
+            "pr_url": "https://github.com/example/project/pull/1",
+            "provider_observation_ref": "provider:mismatch",
+            "status": "pr-ready-for-merge",
+        }
+        error = self.invoke(
+            "assignment", "ready", "--run-id", "delivery-mismatch",
+            "--expected-revision", self.revision("delivery-mismatch"),
+            "--observation", str(self.write_json("delivery-mismatch.json", observation)),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "delivery-type-drift")
+
+    def test_given_dirty_or_detached_local_checkout_when_ready_is_recorded_then_it_is_rejected(self) -> None:
+        """Given local delivery, when the branch is dirty or detached, then no terminal claim release occurs."""
+        identity = self.local_identity(self.common_a)
+        self.start("dirty-local", repositories=[(identity, self.common_a)])
+        self.create_goal("dirty-local")
+        self.create_worker("dirty-local")
+        dirty = self.ready_local_worker(
+            "dirty-local", repository_identity=identity,
+            worktree_clean=False, expected=2,
+        )
+        self.assertEqual(dirty["error"]["code"], "invalid-ready-observation")
+        self.ready_local_worker("dirty-local", repository_identity=identity)
+        self.finish_local_ready("dirty-local")
+
+        self.start("detached-local", repositories=[(identity, self.common_a)])
+        self.create_goal("detached-local")
+        self.create_worker("detached-local")
+        detached = self.ready_local_worker(
+            "detached-local", repository_identity=identity,
+            head_branch_name="HEAD", expected=4,
+        )
+        self.assertEqual(detached["error"]["code"], "target-branch-drift")
+
+    def test_given_integration_assignment_when_inputs_stabilize_then_dispatch_and_sha_vector_are_enforced(self) -> None:
+        """Given two local partials, when integration runs, then exact prerequisite HEADs gate dispatch and proof."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest(
+            "integration-vector",
+            repositories=[(identity, self.common_a)],
+            assignment_count=2,
+        )
+        manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
+        self.invoke("run", "start", "--manifest", str(self.write_json("integration-vector.json", manifest)))
+        self.create_goal("integration-vector")
+        early = self.invoke(
+            "app-operation", "begin", "--run-id", "integration-vector",
+            "--expected-revision", self.revision("integration-vector"),
+            "--operation-key", "early-integration", "--action", "create-worker",
+            "--subject-id", "spec-02", expected=4,
+        )
+        self.assertEqual(early["error"]["code"], "prerequisites-not-ready")
+        self.create_worker("integration-vector", 1)
+        partial = self.ready_local_worker(
+            "integration-vector", number=1, repository_identity=identity,
+            integration_input=True,
+        )
+        self.assertEqual(partial["state"], "integration-input-ready")
+        self.create_worker("integration-vector", 2)
+        stale = self.ready_local_worker(
+            "integration-vector", number=2, repository_identity=identity,
+            prerequisite_heads={"spec-01": f"{999:040x}"},
+            expected=4,
+        )
+        self.assertEqual(stale["error"]["code"], "integration-head-drift")
 
     def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
         """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
@@ -217,18 +434,18 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "root-task-already-active")
 
-    def test_given_one_app_project_for_two_repositories_when_manifest_is_validated_then_it_fails_before_state(self) -> None:
-        """Given distinct repositories share a project ID, when start validates mapping, then no worker can target the wrong repo."""
+    def test_given_one_workspace_project_for_two_repositories_when_manifest_is_validated_then_both_assignments_are_allowed(self) -> None:
+        """Given a multi-repository project, when start validates exact repos, then the shared project ID is not repository identity."""
         manifest = self.manifest(
             "bad-project",
             repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)],
             assignment_count=2,
         )
         manifest["assignments"][1]["project_id"] = manifest["assignments"][0]["project_id"]
-        error = self.invoke(
-            "run", "start", "--manifest", str(self.write_json("bad-project.json", manifest)), expected=2,
+        result = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("workspace-project.json", manifest)),
         )
-        self.assertEqual(error["error"]["code"], "invalid-input")
+        self.assertEqual(result["acquired_assignment_ids"], ["spec-01", "spec-02"])
 
     def test_given_state_writes_when_inspected_then_sqlite_is_the_only_lock(self) -> None:
         """Given a writer, when state is initialized, then BEGIN IMMEDIATE and no lock file coordinate it."""
@@ -458,8 +675,18 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("wrong-base")
         observation = {
             "schema_version": 1, "assignment_id": "spec-01",
-            "thread_id": "thread-wrong-base-1", "head_sha": f"{101:040x}",
+            "thread_id": "thread-wrong-base-1",
+            "repository_identity": "github:example/project",
+            "delivery_type": "github-pr", "head_sha": f"{101:040x}",
             "head_branch_name": "feature/example-1", "base_branch_name": "release",
+            "base_sha": f"{10:040x}",
+            "checkout_path": str(self.base / "checkout wrong-base 1"),
+            "worktree_clean": True, "base_is_ancestor": True,
+            "validation_head_sha": f"{101:040x}",
+            "autoreview_head_sha": f"{101:040x}",
+            "codex_review_head_sha": f"{101:040x}",
+            "tracker_readback_ref": "tracker:wrong-base",
+            "prerequisite_heads": {},
             "default_branch_name": "main",
             "pr_url": "https://github.com/example/project/pull/1",
             "provider_observation_ref": "provider:wrong-base", "status": "pr-ready-for-merge",
@@ -570,7 +797,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         result = self.invoke("run", "finish", "--run-id", "abort", "--expected-revision", self.revision("abort"), "--outcome", "preimplementation-aborted")
         self.assertTrue(result["claims_released"])
-        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--source-spec-ref", "example/project#1")
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--tracker-backend", "github", "--source-spec-ref", "example/project#1")
         self.assertIsNone(owner["owner"])
 
     def test_given_two_planned_assignments_when_one_aborts_then_only_its_claim_releases(self) -> None:
@@ -595,6 +822,7 @@ class RunStateScenarios(unittest.TestCase):
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("missing-owner")),
             "repository_identity": "github:example/project",
+            "tracker_backend": "github",
             "source_spec_ref": "example/project#1",
             "worker_state": "not-found",
             "checkout_state": "not-found",
@@ -657,6 +885,7 @@ class RunStateScenarios(unittest.TestCase):
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("terminal-owner")),
             "repository_identity": "github:example/project",
+            "tracker_backend": "github",
             "source_spec_ref": "example/project#1",
             "worker_state": "completed",
             "checkout_state": "released",
@@ -686,6 +915,7 @@ class RunStateScenarios(unittest.TestCase):
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("active-owner")),
             "repository_identity": "github:example/project",
+            "tracker_backend": "github",
             "source_spec_ref": "example/project#1",
             "worker_state": "active",
             "checkout_state": "present",
@@ -711,6 +941,7 @@ class RunStateScenarios(unittest.TestCase):
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("bound-owner")),
             "repository_identity": "github:example/project",
+            "tracker_backend": "github",
             "source_spec_ref": "example/project#1",
             "worker_state": "completed",
             "checkout_state": "present",
@@ -736,6 +967,7 @@ class RunStateScenarios(unittest.TestCase):
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("unknown-owner")),
             "repository_identity": "github:example/project",
+            "tracker_backend": "github",
             "source_spec_ref": "example/project#1",
             "worker_state": "unknown",
             "checkout_state": "unknown",
@@ -839,7 +1071,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("started")
         error = self.invoke("run", "finish", "--run-id", "started", "--expected-revision", self.revision("started"), "--outcome", "preimplementation-aborted", expected=4)
         self.assertEqual(error["error"]["code"], "implementation-already-started")
-        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--source-spec-ref", "example/project#1")
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--tracker-backend", "github", "--source-spec-ref", "example/project#1")
         self.assertEqual(owner["owner"]["run_id"], "started")
 
     def test_given_schema_when_inspected_then_only_allowlisted_state_and_no_text_hashes_exist(self) -> None:
@@ -860,6 +1092,15 @@ class RunStateScenarios(unittest.TestCase):
             connection.execute("ALTER TABLE spec_claims RENAME TO repository_claims")
         error = self.invoke("doctor", expected=4)
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
+
+    def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
+        """Given a stale schema-1 DB, when opened, then exact structure fails closed and the file is preserved."""
+        self.start("stale-columns")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertTrue(self.database.exists())
 
 
 if __name__ == "__main__":

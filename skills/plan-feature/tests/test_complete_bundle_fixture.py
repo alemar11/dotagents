@@ -74,16 +74,17 @@ class CompleteBundleFixtureTests(unittest.TestCase):
 
     def test_run_registry_contains_only_write_mode(self) -> None:
         options = read("references/options.md")
-        registry = section(options, "## Run Registry", "## Derived Source Route")
+        registry = section(options, "## Run Registry", "## Resolution")
         self.assertEqual(["write_mode"], table_fields(registry))
 
-    def test_execution_contracts_have_exactly_six_fields(self) -> None:
+    def test_execution_contracts_have_exactly_seven_fields(self) -> None:
         expected = [
             "source_spec_ref",
             "feature_slug",
             "affected_repositories",
             "allowed_paths",
             "target_branch_name",
+            "delivery_type",
             "dependency_ids",
         ]
         template = section(
@@ -98,6 +99,22 @@ class CompleteBundleFixtureTests(unittest.TestCase):
                 table_fields(section(issue, "## Execution Contract", "## Goal")),
             )
             self.assertEqual(1, issue.count("## Execution Contract"))
+
+    def test_delivery_type_is_stable_across_spec_and_issues(self) -> None:
+        identity = section(self.spec, "## Planning Identity", "## Problem")
+        self.assertIn("Delivery type: `github-pr`", identity)
+        for issue in (self.issue_01, self.issue_02):
+            contract = section(issue, "## Execution Contract", "## Goal")
+            rows = {
+                row[0]: row[1]
+                for row in (
+                    [cell.strip().strip("`") for cell in line.strip("|").split("|")]
+                    for line in contract.splitlines()
+                    if line.startswith("|")
+                )
+                if len(row) == 2 and row[0] not in {"Field", "---"}
+            }
+            self.assertEqual("github-pr", rows["delivery_type"])
 
     def test_feature_dependency_table_has_exact_columns(self) -> None:
         dependencies = section(

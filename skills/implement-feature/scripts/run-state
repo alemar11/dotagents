@@ -38,7 +38,7 @@ GITHUB_SPEC_URL_RE = re.compile(
     r"([a-z0-9._-]{1,100})/issues/([1-9][0-9]*)$"
 )
 LOCAL_SPEC_REF_RE = re.compile(
-    r"^[a-z0-9][a-z0-9._-]{0,100}/planning/features/"
+    r"^(?:[a-z0-9][a-z0-9._-]{0,100}/)?planning/features/"
     r"[a-z0-9][a-z0-9._/-]*/(?:integration/)?SPEC\.md$"
 )
 
@@ -143,6 +143,38 @@ def connect(*, write: bool) -> sqlite3.Connection:
     return connection
 
 
+EXPECTED_SCHEMA_COLUMNS = {
+    "metadata": ("key", "value"),
+    "runs": (
+        "run_id", "root_task_id", "status", "goal_state", "implementation_started",
+        "revision", "created_at", "updated_at", "finished_at",
+    ),
+    "assignments": (
+        "run_id", "assignment_id", "source_spec_ref", "claim_spec_identity",
+        "repository_identity", "tracker_backend", "delivery_type", "project_id",
+        "title", "target_branch_name", "prerequisite_assignment_ids", "state",
+        "unchanged_wait_sweeps", "waiting_owner_run_id", "waiting_owner_assignment_id",
+        "waiting_owner_root_task_id", "thread_id", "checkout_path", "git_common_dir",
+        "head_sha", "base_branch_name", "base_sha", "worktree_clean",
+        "base_is_ancestor", "pr_url", "default_branch_name",
+        "provider_observation_ref", "updated_at",
+    ),
+    "spec_claims": (
+        "run_id", "assignment_id", "repository_identity", "claim_spec_identity",
+        "target_branch_name", "git_common_dir", "git_common_dir_device",
+        "git_common_dir_inode", "active", "acquired_at", "released_at",
+        "release_reason", "recovery_readback_ref",
+    ),
+    "app_operations": (
+        "sequence", "run_id", "operation_key", "action", "subject_id",
+        "assignment_id", "status", "receipt_ref", "readback_ref", "thread_id",
+        "project_id", "checkout_path", "git_common_dir", "observed_title",
+        "provider_observation_ref", "head_sha", "pr_url", "observed_state",
+        "created_at", "updated_at",
+    ),
+}
+
+
 def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool:
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
     if version == 0:
@@ -164,13 +196,25 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
             f"expected schema 1, found {version}; migrations are not supported",
             4,
         )
-    expected = {"metadata", "runs", "assignments", "spec_claims", "app_operations"}
+    expected = set(EXPECTED_SCHEMA_COLUMNS)
     actual = {
         row[0]
-        for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
     }
-    if not expected.issubset(actual):
+    if actual != expected:
         raise StateError("invalid-state-schema", "state tables do not match schema 1", 4)
+    for table, expected_columns in EXPECTED_SCHEMA_COLUMNS.items():
+        actual_columns = tuple(
+            row[1] for row in connection.execute(f"PRAGMA table_info({table})")
+        )
+        if actual_columns != expected_columns:
+            raise StateError(
+                "invalid-state-schema",
+                f"state table {table} columns do not match schema 1",
+                4,
+            )
     return False
 
 
@@ -182,7 +226,8 @@ def create_schema(connection: sqlite3.Connection) -> None:
             root_task_id TEXT NOT NULL,
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
-                'pr-ready', 'preimplementation-aborted'
+                'pr-ready', 'local-branch-ready', 'delivery-ready',
+                'preimplementation-aborted'
             )),
             goal_state TEXT NOT NULL DEFAULT 'not-created'
                 CHECK(goal_state IN ('not-created', 'active', 'completed')),
@@ -198,12 +243,16 @@ def create_schema(connection: sqlite3.Connection) -> None:
             source_spec_ref TEXT NOT NULL,
             claim_spec_identity TEXT NOT NULL,
             repository_identity TEXT NOT NULL,
+            tracker_backend TEXT NOT NULL CHECK(tracker_backend IN ('github','local')),
+            delivery_type TEXT NOT NULL CHECK(delivery_type IN ('github-pr','local-branch')),
             project_id TEXT NOT NULL,
             title TEXT NOT NULL,
             target_branch_name TEXT NOT NULL,
+            prerequisite_assignment_ids TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN (
                 'waiting-for-spec', 'planned', 'worker-created', 'active',
-                'pr-ready', 'blocked-durable-contract',
+                'integration-input-ready', 'pr-ready', 'local-branch-ready',
+                'blocked-durable-contract',
                 'blocked-by-active-spec', 'preimplementation-aborted',
                 'abandoned', 'abandoned-recovery-required'
             )),
@@ -215,9 +264,12 @@ def create_schema(connection: sqlite3.Connection) -> None:
             checkout_path TEXT,
             git_common_dir TEXT,
             head_sha TEXT,
+            base_branch_name TEXT,
+            base_sha TEXT,
+            worktree_clean INTEGER CHECK(worktree_clean IN (0,1)),
+            base_is_ancestor INTEGER CHECK(base_is_ancestor IN (0,1)),
             pr_url TEXT,
-            pr_base_branch TEXT,
-            pr_default_branch TEXT,
+            default_branch_name TEXT,
             provider_observation_ref TEXT,
             updated_at TEXT NOT NULL,
             PRIMARY KEY(run_id, assignment_id),
@@ -357,10 +409,17 @@ def repository_identity(value: Any, git_common_dir: str) -> str:
     return identity
 
 
-def canonical_source_spec_ref(value: Any, identity: str) -> tuple[str, str]:
+def canonical_source_spec_ref(
+    value: Any, identity: str, tracker_backend: str
+) -> tuple[str, str]:
     source_ref = string(value, "source_spec_ref", 4096)
-    github_repository = GITHUB_ID_RE.fullmatch(identity)
-    if github_repository:
+    if tracker_backend == "github":
+        github_repository = GITHUB_ID_RE.fullmatch(identity)
+        if github_repository is None:
+            raise StateError(
+                "invalid-input",
+                "GitHub tracker requires a github:owner/repository identity",
+            )
         match = GITHUB_SPEC_REF_RE.fullmatch(source_ref) or GITHUB_SPEC_URL_RE.fullmatch(source_ref)
         if match is None:
             raise StateError(
@@ -371,12 +430,14 @@ def canonical_source_spec_ref(value: Any, identity: str) -> tuple[str, str]:
         if (owner, repository) != github_repository.groups():
             raise StateError("invalid-input", "source_spec_ref belongs to another repository")
         return source_ref, f"github:{owner}/{repository}#{number}"
+    if tracker_backend != "local":
+        raise StateError("invalid-input", "tracker_backend must be github or local")
     if not LOCAL_SPEC_REF_RE.fullmatch(source_ref) or "//" in source_ref or "/../" in source_ref:
         raise StateError(
             "invalid-input",
             "local source_spec_ref must be a canonical repository-scoped Feature Spec path",
         )
-    return source_ref, source_ref
+    return source_ref, f"local:{source_ref}"
 
 
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -406,8 +467,11 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
     claim_spec_identities: set[tuple[str, str]] = set()
     delivery_pairs: set[tuple[str, str]] = set()
     used_identities: set[str] = set()
-    project_repositories: dict[str, str] = {}
-    keys = {"assignment_id", "source_spec_ref", "repository_identity", "project_id", "title", "target_branch_name"}
+    keys = {
+        "assignment_id", "source_spec_ref", "repository_identity", "tracker_backend",
+        "delivery_type", "project_id", "title", "target_branch_name",
+        "prerequisite_assignment_ids",
+    }
     for index, item in enumerate(raw["assignments"]):
         if not isinstance(item, dict):
             raise StateError("invalid-input", f"assignments[{index}] must be an object")
@@ -416,7 +480,27 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         identity = string(item["repository_identity"], f"assignments[{index}].repository_identity", 8192)
         if identity not in identities:
             raise StateError("invalid-input", f"assignments[{index}] uses an undeclared repository")
-        source_spec_ref, claim_spec_identity = canonical_source_spec_ref(item["source_spec_ref"], identity)
+        tracker_backend = string(
+            item["tracker_backend"], f"assignments[{index}].tracker_backend", 16
+        )
+        delivery_type = string(
+            item["delivery_type"], f"assignments[{index}].delivery_type", 24
+        )
+        if tracker_backend not in {"github", "local"}:
+            raise StateError("invalid-input", "tracker_backend must be github or local")
+        if delivery_type not in {"github-pr", "local-branch"}:
+            raise StateError("invalid-input", "delivery_type must be github-pr or local-branch")
+        if tracker_backend == "github" and delivery_type != "github-pr":
+            raise StateError(
+                "invalid-input", "GitHub tracker supports only github-pr delivery"
+            )
+        if delivery_type == "github-pr" and GITHUB_ID_RE.fullmatch(identity) is None:
+            raise StateError(
+                "invalid-input", "github-pr delivery requires a github:owner/repository identity"
+            )
+        source_spec_ref, claim_spec_identity = canonical_source_spec_ref(
+            item["source_spec_ref"], identity, tracker_backend
+        )
         target_branch = branch_name(item["target_branch_name"])
         pair = (identity, target_branch)
         claim_key = (identity, claim_spec_identity)
@@ -426,21 +510,31 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
                 "assignment ids, canonical Feature Specs, and repository/branch pairs must be unique",
             )
         project_id = string(item["project_id"], f"assignments[{index}].project_id", 256)
-        prior_repository = project_repositories.get(project_id)
-        if prior_repository is not None and prior_repository != identity:
+        prerequisites = item["prerequisite_assignment_ids"]
+        if (
+            not isinstance(prerequisites, list)
+            or any(not isinstance(value, str) for value in prerequisites)
+        ):
             raise StateError(
-                "invalid-input",
-                "one App project_id cannot map to distinct canonical repositories",
+                "invalid-input", "prerequisite_assignment_ids must be a list of assignment ids"
             )
-        project_repositories[project_id] = identity
+        normalized_prerequisites = [
+            token(value, f"assignments[{index}].prerequisite_assignment_ids")
+            for value in prerequisites
+        ]
+        if len(normalized_prerequisites) != len(set(normalized_prerequisites)):
+            raise StateError("invalid-input", "prerequisite assignment ids must be unique")
         assignments.append({
             "assignment_id": assignment_id,
             "source_spec_ref": source_spec_ref,
             "claim_spec_identity": claim_spec_identity,
             "repository_identity": identity,
+            "tracker_backend": tracker_backend,
+            "delivery_type": delivery_type,
             "project_id": project_id,
             "title": string(item["title"], f"assignments[{index}].title", 256),
             "target_branch_name": target_branch,
+            "prerequisite_assignment_ids": normalized_prerequisites,
         })
         assignment_ids.add(assignment_id)
         claim_spec_identities.add(claim_key)
@@ -448,6 +542,24 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         used_identities.add(identity)
     if used_identities != identities:
         raise StateError("invalid-input", "every repository must own an assignment")
+    known_assignment_ids = {item["assignment_id"] for item in assignments}
+    for assignment in assignments:
+        prerequisites = assignment["prerequisite_assignment_ids"]
+        if assignment["assignment_id"] in prerequisites or not set(prerequisites).issubset(
+            known_assignment_ids
+        ):
+            raise StateError(
+                "invalid-input", "prerequisite_assignment_ids must name other assignments in this run"
+            )
+    remaining = {item["assignment_id"]: set(item["prerequisite_assignment_ids"]) for item in assignments}
+    resolved: set[str] = set()
+    while remaining:
+        ready = {assignment_id for assignment_id, deps in remaining.items() if deps <= resolved}
+        if not ready:
+            raise StateError("invalid-input", "assignment prerequisites must be acyclic")
+        resolved.update(ready)
+        for assignment_id in ready:
+            del remaining[assignment_id]
     return run, repositories, assignments
 
 
@@ -537,7 +649,7 @@ def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
             "SELECT state FROM assignments WHERE run_id=? ORDER BY assignment_id", (run_id,)
         )
     ]
-    runnable = {"planned", "worker-created", "active"}
+    runnable = {"planned", "worker-created", "active", "integration-input-ready"}
     blockers = {"blocked-durable-contract", "blocked-by-active-spec", "abandoned-recovery-required", "abandoned"}
     if any(state in runnable for state in states):
         status = "active"
@@ -545,7 +657,7 @@ def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
         status = "waiting-for-spec"
     elif any(state in blockers for state in states):
         status = "blocked"
-    elif states and all(state == "pr-ready" for state in states):
+    elif states and all(state in {"pr-ready", "local-branch-ready"} for state in states):
         status = "active"
     elif states and all(state == "preimplementation-aborted" for state in states):
         status = "active"
@@ -578,14 +690,17 @@ def insert_run(
         connection.execute(
             """INSERT INTO assignments(
                 run_id,assignment_id,source_spec_ref,claim_spec_identity,repository_identity,
-                project_id,title,target_branch_name,state,waiting_owner_run_id,
+                tracker_backend,delivery_type,project_id,title,target_branch_name,
+                prerequisite_assignment_ids,state,waiting_owner_run_id,
                 waiting_owner_assignment_id,waiting_owner_root_task_id,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 run["run_id"], assignment["assignment_id"], assignment["source_spec_ref"],
                 assignment["claim_spec_identity"], assignment["repository_identity"],
+                assignment["tracker_backend"], assignment["delivery_type"],
                 assignment["project_id"], assignment["title"], assignment["target_branch_name"],
-                state, conflict["run_id"] if conflict else None,
+                canonical_json(assignment["prerequisite_assignment_ids"]), state,
+                conflict["run_id"] if conflict else None,
                 conflict["assignment_id"] if conflict else None,
                 conflict["root_task_id"] if conflict else None, now,
             ),
@@ -760,12 +875,16 @@ def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
     identity = string(args.repository_identity, "repository_identity", 8192)
-    _, claim_spec_identity = canonical_source_spec_ref(args.source_spec_ref, identity)
+    tracker_backend = string(args.tracker_backend, "tracker_backend", 16)
+    _, claim_spec_identity = canonical_source_spec_ref(
+        args.source_spec_ref, identity, tracker_backend
+    )
     connection = connect(write=False)
     try:
         owner = active_spec_owner(connection, identity, claim_spec_identity)
         return {
             "repository_identity": identity,
+            "tracker_backend": tracker_backend,
             "claim_spec_identity": claim_spec_identity,
             "owner": owner,
         }
@@ -775,9 +894,9 @@ def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
 
 def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action: str, subject_id: str) -> str | None:
     if action not in APP_ACTIONS:
-        raise StateError("invalid-app-action", f"unsupported App action: {action}")
+        raise StateError("invalid-app-action", f"unsupported ChatGPT task/Goal action: {action}")
     if run["status"] != "active":
-        raise StateError("run-not-active", f"App mutations require active claimed state, found {run['status']}", 4)
+        raise StateError("run-not-active", f"ChatGPT task/Goal changes require active claimed state, found {run['status']}", 4)
     assignment_id: str | None = None
     if action in {"create-worker", "set-worker-title", "send-bootstrap", "send-worker-message", "archive-worker"}:
         assignment = get_assignment(connection, run["run_id"], subject_id)
@@ -786,19 +905,37 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if not claim["active"]:
             raise StateError(
                 "assignment-claim-not-active",
-                "worker App operations require the assignment's active Feature Spec claim",
+                "worker task changes require the assignment's active Feature Spec claim",
                 4,
             )
         if run["goal_state"] != "active":
             raise StateError(
                 "goal-not-active",
-                "worker App operations require the active root Goal",
+                "worker task changes require the active root Goal",
                 4,
             )
         if action == "create-worker":
             if assignment["state"] != "planned":
                 raise StateError("invalid-assignment-transition", "worker creation requires a planned assignment", 4)
-            live = connection.execute("SELECT COUNT(*) FROM assignments WHERE run_id=? AND state IN ('worker-created','active')", (run["run_id"],)).fetchone()[0]
+            prerequisites = json.loads(assignment["prerequisite_assignment_ids"])
+            if prerequisites:
+                rows = connection.execute(
+                    "SELECT assignment_id,state FROM assignments WHERE run_id=?",
+                    (run["run_id"],),
+                )
+                states = {row["assignment_id"]: row["state"] for row in rows}
+                if any(
+                    states.get(prerequisite) not in {
+                        "integration-input-ready", "pr-ready", "local-branch-ready"
+                    }
+                    for prerequisite in prerequisites
+                ):
+                    raise StateError(
+                        "prerequisites-not-ready",
+                        "worker creation requires stable terminal branch/head evidence for every prerequisite",
+                        4,
+                    )
+            live = connection.execute("SELECT COUNT(*) FROM assignments WHERE run_id=? AND state IN ('worker-created','active','integration-input-ready')", (run["run_id"],)).fetchone()[0]
             pending = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND action='create-worker' AND status IN ('pending','unknown')", (run["run_id"],)).fetchone()[0]
             if live + pending >= MAX_LIVE_WORKERS:
                 raise StateError("worker-capacity-reached", "at most three live workers are allowed", 4)
@@ -806,7 +943,9 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             raise StateError("invalid-assignment-transition", "title readback requires a created worker", 4)
         elif action == "send-bootstrap" and assignment["state"] != "worker-created":
             raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
-        elif action == "send-worker-message" and assignment["state"] != "active":
+        elif action == "send-worker-message" and assignment["state"] not in {
+            "active", "integration-input-ready"
+        }:
             raise StateError("invalid-assignment-transition", "worker messages require an active worker", 4)
         elif action == "archive-worker" and assignment["state"] != "worker-created":
             raise StateError("implementation-already-started", "archive is allowed only before this assignment's bootstrap authority", 4)
@@ -825,7 +964,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                     4,
                 )
     elif subject_id != run["root_task_id"]:
-        raise StateError("invalid-app-subject", "root App action subject must be root_task_id", 4)
+        raise StateError("invalid-app-subject", "root ChatGPT action subject must be root_task_id", 4)
     if action == "create-goal" and run["goal_state"] != "not-created":
         raise StateError("goal-already-created", "root Goal already exists", 4)
     if action == "complete-goal":
@@ -843,7 +982,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if unresolved:
             raise StateError(
                 "unresolved-app-operations",
-                "reconcile every pending or unknown App operation before Goal completion",
+                "reconcile every pending or unknown task/Goal change before Goal completion",
                 4,
             )
         states = [
@@ -852,7 +991,9 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 "SELECT state FROM assignments WHERE run_id=?", (run["run_id"],)
             )
         ]
-        delivery_complete = all(state == "pr-ready" for state in states)
+        delivery_complete = all(
+            state in {"pr-ready", "local-branch-ready"} for state in states
+        )
         preimplementation_abort = (
             not run["implementation_started"]
             and all(state in {"planned", "preimplementation-aborted"} for state in states)
@@ -860,7 +1001,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if not delivery_complete and not preimplementation_abort:
             raise StateError(
                 "assignments-incomplete",
-                "Goal completion requires PR-ready assignments or fully reconciled preimplementation abort",
+                "Goal completion requires delivery-ready assignments or fully reconciled preimplementation abort",
                 4,
             )
     return assignment_id
@@ -920,7 +1061,7 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
     if not common.issubset(value):
         raise StateError(
             "invalid-input",
-            f"App operation observation is missing fields: {sorted(common - set(value))}",
+            f"ChatGPT operation observation is missing fields: {sorted(common - set(value))}",
         )
     if value["schema_version"] != 1 or value["status"] not in {"unknown", "succeeded", "failed"}:
         raise StateError("invalid-operation-observation", "observation must use schema 1 and a terminal or unknown status")
@@ -930,12 +1071,12 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
         exact_keys(
             value,
             common | reconciliation_refs | expected_extra,
-            "App operation observation",
+            "ChatGPT operation observation",
         )
     elif not actual_extra.issubset(reconciliation_refs | expected_extra):
         raise StateError(
             "invalid-input",
-            "App operation observation has unsupported fields: "
+            "ChatGPT operation observation has unsupported fields: "
             f"{sorted(actual_extra - reconciliation_refs - expected_extra)}",
         )
     normalized: dict[str, Any] = {
@@ -1026,7 +1167,7 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("operation-not-found", f"operation does not exist: {operation_key}", 3)
         if operation["status"] in {"succeeded", "failed"}:
             raise StateError("operation-terminal", f"operation is already {operation['status']}", 4)
-        observed = validate_operation_observation(operation, read_json_file(args.observation, "App operation observation"))
+        observed = validate_operation_observation(operation, read_json_file(args.observation, "ChatGPT operation observation"))
         if operation["status"] == "unknown" and observed["status"] == "unknown":
             raise StateError("operation-unknown", "reconcile the same unknown operation to succeeded or failed", 4)
         if observed["status"] == "succeeded":
@@ -1065,10 +1206,27 @@ def command_app_operation_list(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
-    value = read_json_file(args.observation, "PR-ready observation")
-    exact_keys(value, {"schema_version", "assignment_id", "thread_id", "head_sha", "head_branch_name", "base_branch_name", "default_branch_name", "pr_url", "provider_observation_ref", "status"}, "PR-ready observation")
-    if value["schema_version"] != 1 or value["status"] != "pr-ready-for-merge":
-        raise StateError("invalid-ready-observation", "ready observation must use schema 1 and pr-ready-for-merge")
+    value = read_json_file(args.observation, "delivery-ready observation")
+    common = {
+        "schema_version", "assignment_id", "thread_id", "repository_identity",
+        "delivery_type", "head_sha", "head_branch_name", "base_branch_name",
+        "base_sha", "checkout_path", "worktree_clean", "base_is_ancestor",
+        "validation_head_sha", "autoreview_head_sha", "codex_review_head_sha",
+        "tracker_readback_ref", "prerequisite_heads", "status",
+    }
+    github_extra = {"default_branch_name", "pr_url", "provider_observation_ref"}
+    delivery_type = value.get("delivery_type")
+    expected_keys = common | github_extra if delivery_type == "github-pr" else common
+    exact_keys(value, expected_keys, "delivery-ready observation")
+    expected_status = {
+        "github-pr": "pr-ready-for-merge",
+        "local-branch": "local-branch-ready",
+    }.get(delivery_type)
+    if value["schema_version"] != 1 or value["status"] != expected_status:
+        raise StateError(
+            "invalid-ready-observation",
+            "ready observation status must match its schema-1 delivery_type",
+        )
     run_id = token(args.run_id, "run_id")
     assignment_id = token(value["assignment_id"], "assignment_id")
     connection = connect(write=True)
@@ -1078,52 +1236,124 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
         if run["status"] != "active":
             raise StateError("run-not-active", f"run is {run['status']}", 4)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] != "active" or value["thread_id"] != assignment["thread_id"]:
+        if assignment["state"] not in {"active", "integration-input-ready"} or value["thread_id"] != assignment["thread_id"]:
             raise StateError("invalid-assignment-transition", "ready evidence must belong to the active worker", 4)
+        if args.integration_input:
+            dependents = [
+                row["prerequisite_assignment_ids"]
+                for row in connection.execute(
+                    "SELECT prerequisite_assignment_ids FROM assignments WHERE run_id=? AND assignment_id<>?",
+                    (run_id, assignment_id),
+                )
+            ]
+            if not any(assignment_id in json.loads(value) for value in dependents):
+                raise StateError(
+                    "not-an-integration-prerequisite",
+                    "integration input readiness requires a dependent assignment",
+                    4,
+                )
+        if value["delivery_type"] != assignment["delivery_type"]:
+            raise StateError("delivery-type-drift", "ready evidence uses another delivery type", 4)
+        if value["repository_identity"] != assignment["repository_identity"]:
+            raise StateError("repository-identity-drift", "ready evidence belongs to another repository", 4)
+        if directory(value["checkout_path"], "checkout_path") != assignment["checkout_path"]:
+            raise StateError("worker-checkout-drift", "ready evidence belongs to another checkout", 4)
         observed_head = head(value["head_sha"], "head_sha")
         if value["head_branch_name"] != assignment["target_branch_name"]:
-            raise StateError("target-branch-drift", "provider head branch differs from the assignment", 4)
+            raise StateError("target-branch-drift", "head branch differs from the assignment", 4)
         base_branch = branch_name(value["base_branch_name"])
-        default_branch = branch_name(value["default_branch_name"])
-        if base_branch != default_branch:
+        base_sha = head(value["base_sha"], "base_sha")
+        if value["worktree_clean"] is not True or value["base_is_ancestor"] is not True:
             raise StateError(
-                "pull-request-base-drift",
-                "PR base differs from the provider-observed default branch",
-                4,
+                "invalid-ready-observation",
+                "delivery readiness requires a clean worktree and proven base ancestry",
             )
-        pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
-        if pull is None:
-            raise StateError("invalid-ready-observation", "pr_url must be a canonical GitHub pull request URL")
-        github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
-        if github_identity and (pull.group(1), pull.group(2)) != (github_identity.group(1), github_identity.group(2)):
-            raise StateError("pull-request-repository-drift", "PR belongs to another repository", 4)
+        for field in ("validation_head_sha", "autoreview_head_sha", "codex_review_head_sha"):
+            if head(value[field], field) != observed_head:
+                raise StateError("stale-ready-evidence", f"{field} does not bind current HEAD", 4)
+        string(value["tracker_readback_ref"], "tracker_readback_ref", 2048)
+        prerequisite_ids = json.loads(assignment["prerequisite_assignment_ids"])
+        prerequisite_heads = value["prerequisite_heads"]
+        if not isinstance(prerequisite_heads, dict) or set(prerequisite_heads) != set(prerequisite_ids):
+            raise StateError(
+                "invalid-ready-observation",
+                "prerequisite_heads must exactly match assignment prerequisites",
+            )
+        if prerequisite_ids:
+            current_heads = {
+                row["assignment_id"]: row["head_sha"]
+                for row in connection.execute(
+                    "SELECT assignment_id,head_sha FROM assignments WHERE run_id=?",
+                    (run_id,),
+                )
+                if row["assignment_id"] in prerequisite_ids
+            }
+            normalized_heads = {
+                prerequisite: head(prerequisite_heads[prerequisite], f"prerequisite_heads.{prerequisite}")
+                for prerequisite in prerequisite_ids
+            }
+            if normalized_heads != current_heads:
+                raise StateError(
+                    "integration-head-drift",
+                    "integration proof does not match the current prerequisite HEAD vector",
+                    4,
+                )
+        pr_url = None
+        default_branch = None
+        provider_observation_ref = None
+        terminal_state = "local-branch-ready"
+        if delivery_type == "github-pr":
+            default_branch = branch_name(value["default_branch_name"])
+            if base_branch != default_branch:
+                raise StateError(
+                    "pull-request-base-drift",
+                    "PR base differs from the provider-observed default branch",
+                    4,
+                )
+            pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
+            if pull is None:
+                raise StateError("invalid-ready-observation", "pr_url must be a canonical GitHub pull request URL")
+            github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
+            if github_identity is None or (pull.group(1), pull.group(2)) != github_identity.groups():
+                raise StateError("pull-request-repository-drift", "PR belongs to another repository", 4)
+            pr_url = value["pr_url"]
+            provider_observation_ref = string(
+                value["provider_observation_ref"], "provider_observation_ref", 2048
+            )
+            terminal_state = "pr-ready"
+        persisted_state = "integration-input-ready" if args.integration_input else terminal_state
         unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')", (run_id, assignment_id)).fetchone()[0]
         if unresolved:
-            raise StateError("unresolved-app-operation", "reconcile assignment App operations before ready", 4)
+            raise StateError("unresolved-app-operation", "reconcile assignment task changes before ready", 4)
         connection.execute(
-            """UPDATE assignments SET state='pr-ready',head_sha=?,pr_url=?,pr_base_branch=?,
-               pr_default_branch=?,provider_observation_ref=?,updated_at=?
+            """UPDATE assignments SET state=?,head_sha=?,base_branch_name=?,base_sha=?,
+               worktree_clean=1,base_is_ancestor=1,pr_url=?,default_branch_name=?,
+               provider_observation_ref=?,updated_at=?
                WHERE run_id=? AND assignment_id=?""",
             (
-                observed_head, value["pr_url"], base_branch, default_branch,
-                string(value["provider_observation_ref"], "provider_observation_ref", 2048),
+                persisted_state, observed_head, base_branch, base_sha, pr_url, default_branch,
+                provider_observation_ref,
                 utc_now(), run_id, assignment_id,
             ),
         )
-        now = utc_now()
-        updated = connection.execute(
-            """UPDATE spec_claims SET active=0,released_at=?,release_reason='pr-ready'
-               WHERE run_id=? AND assignment_id=? AND active=1""",
-            (now, run_id, assignment_id),
-        ).rowcount
-        if updated != 1:
-            raise StateError("assignment-claim-not-active", "ready assignment has no active claim", 4)
+        claim_released = False
+        if not args.integration_input:
+            now = utc_now()
+            updated = connection.execute(
+                """UPDATE spec_claims SET active=0,released_at=?,release_reason=?
+                   WHERE run_id=? AND assignment_id=? AND active=1""",
+                (now, terminal_state, run_id, assignment_id),
+            ).rowcount
+            if updated != 1:
+                raise StateError("assignment-claim-not-active", "ready assignment has no active claim", 4)
+            claim_released = True
         recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
         return {
             "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
-            "state": "pr-ready", "claim_released": True,
+            "state": persisted_state, "delivery_type": delivery_type,
+            "claim_released": claim_released,
         }
     except Exception:
         connection.rollback()
@@ -1190,7 +1420,7 @@ def command_assignment_abort(args: argparse.Namespace) -> dict[str, Any]:
             (run_id, assignment_id),
         ).fetchone()[0]
         if unresolved:
-            raise StateError("unresolved-app-operation", "reconcile assignment App operations before abort", 4)
+            raise StateError("unresolved-app-operation", "reconcile assignment task changes before abort", 4)
         now = utc_now()
         connection.execute(
             """UPDATE assignments SET state='preimplementation-aborted',updated_at=?
@@ -1224,7 +1454,8 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
         value,
         {
             "schema_version", "owner_run_id", "owner_assignment_id", "owner_expected_revision",
-            "repository_identity", "source_spec_ref", "worker_state", "checkout_state", "readback_ref",
+            "repository_identity", "tracker_backend", "source_spec_ref", "worker_state",
+            "checkout_state", "readback_ref",
         },
         "claim recovery observation",
     )
@@ -1239,12 +1470,16 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
     if checkout_state not in {"present", "released", "not-found", "unknown"}:
         raise StateError("invalid-input", "checkout_state is not supported")
     repository = string(value["repository_identity"], "repository_identity", 8192)
-    source_spec_ref, claim_identity = canonical_source_spec_ref(value["source_spec_ref"], repository)
+    tracker_backend = string(value["tracker_backend"], "tracker_backend", 16)
+    source_spec_ref, claim_identity = canonical_source_spec_ref(
+        value["source_spec_ref"], repository, tracker_backend
+    )
     return {
         "owner_run_id": token(value["owner_run_id"], "owner_run_id"),
         "owner_assignment_id": token(value["owner_assignment_id"], "owner_assignment_id"),
         "owner_expected_revision": value["owner_expected_revision"],
         "repository_identity": repository,
+        "tracker_backend": tracker_backend,
         "source_spec_ref": source_spec_ref,
         "claim_spec_identity": claim_identity,
         "worker_state": worker_state,
@@ -1268,6 +1503,7 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("assignment-not-waiting", f"assignment is {waiter['state']}", 4)
         if (
             waiter["repository_identity"] != observed["repository_identity"]
+            or waiter["tracker_backend"] != observed["tracker_backend"]
             or waiter["claim_spec_identity"] != observed["claim_spec_identity"]
         ):
             raise StateError("claim-identity-drift", "recovery evidence belongs to another Feature Spec", 4)
@@ -1448,16 +1684,41 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("run-not-finishable", f"run is {run['status']}", 4)
         unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND status IN ('pending','unknown')", (run_id,)).fetchone()[0]
         if unresolved:
-            raise StateError("unresolved-app-operations", "finish requires complete App-operation reconciliation", 4)
+            raise StateError("unresolved-app-operations", "finish requires complete task/Goal change reconciliation", 4)
         states = [row[0] for row in connection.execute("SELECT state FROM assignments WHERE run_id=?", (run_id,))]
-        if args.outcome == "pr-ready":
-            if run["goal_state"] != "completed" or any(state != "pr-ready" for state in states):
-                raise StateError("run-incomplete", "PR-ready finish requires completed Goal and every assignment PR-ready", 4)
+        if args.outcome != "preimplementation-aborted":
+            delivery_rows = list(
+                connection.execute(
+                    "SELECT delivery_type,state FROM assignments WHERE run_id=?",
+                    (run_id,),
+                )
+            )
+            expected_state = {
+                "github-pr": "pr-ready",
+                "local-branch": "local-branch-ready",
+            }
+            if run["goal_state"] != "completed" or any(
+                row["state"] != expected_state[row["delivery_type"]]
+                for row in delivery_rows
+            ):
+                raise StateError("run-incomplete", "delivery finish requires completed Goal and every assignment ready for its delivery type", 4)
+            delivery_types = {row["delivery_type"] for row in delivery_rows}
+            expected_outcome = (
+                "pr-ready" if delivery_types == {"github-pr"}
+                else "local-branch-ready" if delivery_types == {"local-branch"}
+                else "delivery-ready"
+            )
+            if args.outcome != expected_outcome:
+                raise StateError(
+                    "delivery-outcome-mismatch",
+                    f"run delivery vector requires outcome {expected_outcome}",
+                    4,
+                )
             active_claims = connection.execute(
                 "SELECT COUNT(*) FROM spec_claims WHERE run_id=? AND active=1", (run_id,)
             ).fetchone()[0]
             if active_claims:
-                raise StateError("claims-not-released", "every PR-ready assignment must release its claim before run finish", 4)
+                raise StateError("claims-not-released", "every delivery-ready assignment must release its claim before run finish", 4)
         else:
             if run["implementation_started"]:
                 raise StateError("implementation-already-started", "preimplementation abort cannot release a post-bootstrap claim", 4)
@@ -1470,7 +1731,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                     4,
                 )
         now = utc_now()
-        terminal = "pr-ready" if args.outcome == "pr-ready" else "preimplementation-aborted"
+        terminal = args.outcome
         connection.execute("UPDATE runs SET status=?,revision=?,updated_at=?,finished_at=? WHERE run_id=?", (terminal, run["revision"] + 1, now, now, run_id))
         if args.outcome == "preimplementation-aborted":
             connection.execute(
@@ -1496,7 +1757,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="run-state", description="Schema-1 SQLite coordination for Implement Feature App controllers.")
+    parser = argparse.ArgumentParser(prog="run-state", description="Schema-1 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
     parser.add_argument("--json", action="store_true", help="emit one machine-readable JSON object")
     parser.add_argument("--version", action="version", version=CLI_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -1513,25 +1774,26 @@ def build_parser() -> argparse.ArgumentParser:
     wait.add_argument("--assignment-id", required=True)
     wait.add_argument("--expected-revision", type=int, required=True)
     wait.set_defaults(handler=command_run_wait_sweep, command_name="run wait-sweep")
-    show = run_commands.add_parser("show", help="read one run, its assignments, claims, and unresolved App operations")
+    show = run_commands.add_parser("show", help="read one run, its assignments, claims, and unresolved task/Goal changes")
     show.add_argument("--run-id", required=True)
     show.set_defaults(handler=command_run_show, command_name="run show")
     listing = run_commands.add_parser("list", help="list root runs")
-    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "preimplementation-aborted", "all"), default="active")
+    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "all"), default="active")
     listing.set_defaults(handler=command_run_list, command_name="run list")
-    finish = run_commands.add_parser("finish", help="release claims after PR-ready closeout or verified preimplementation abort")
+    finish = run_commands.add_parser("finish", help="close a delivery-ready run or verified preimplementation abort")
     finish.add_argument("--run-id", required=True)
     finish.add_argument("--expected-revision", type=int, required=True)
-    finish.add_argument("--outcome", choices=("pr-ready", "preimplementation-aborted"), required=True)
+    finish.add_argument("--outcome", choices=("pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted"), required=True)
     finish.set_defaults(handler=command_run_finish, command_name="run finish")
 
     claim = commands.add_parser("claim", help="inspect or reconcile canonical Feature Spec ownership")
     claim_commands = claim.add_subparsers(dest="claim_command", required=True)
     find = claim_commands.add_parser("find", help="find the active owner of one canonical Feature Spec")
     find.add_argument("--repository-identity", required=True)
+    find.add_argument("--tracker-backend", choices=("github", "local"), required=True)
     find.add_argument("--source-spec-ref", required=True)
     find.set_defaults(handler=command_claim_find, command_name="claim find")
-    reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative App readback")
+    reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative ChatGPT task inspection")
     reconcile.add_argument("--run-id", required=True)
     reconcile.add_argument("--assignment-id", required=True)
     reconcile.add_argument("--expected-revision", type=int, required=True)
@@ -1546,22 +1808,22 @@ def build_parser() -> argparse.ArgumentParser:
     abandon.add_argument("--owner-expected-revision", type=int, required=True)
     abandon.set_defaults(handler=command_claim_abandon, command_name="claim abandon")
 
-    operation = commands.add_parser("app-operation", help="journal and reconcile one App mutation")
+    operation = commands.add_parser("app-operation", help="record and reconcile one ChatGPT task/Goal change")
     operation_commands = operation.add_subparsers(dest="operation_command", required=True)
-    begin = operation_commands.add_parser("begin", help="authorize one App launch")
+    begin = operation_commands.add_parser("begin", help="authorize one ChatGPT task/Goal change")
     begin.add_argument("--run-id", required=True)
     begin.add_argument("--expected-revision", type=int, required=True)
     begin.add_argument("--operation-key", required=True)
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
     begin.add_argument("--subject-id", required=True)
     begin.set_defaults(handler=command_app_operation_begin, command_name="app-operation begin")
-    op_finish = operation_commands.add_parser("finish", help="record or reconcile App receipt and readback")
+    op_finish = operation_commands.add_parser("finish", help="record or reconcile the immediate response and independent state inspection")
     op_finish.add_argument("--run-id", required=True)
     op_finish.add_argument("--expected-revision", type=int, required=True)
     op_finish.add_argument("--operation-key", required=True)
     op_finish.add_argument("--observation", required=True)
     op_finish.set_defaults(handler=command_app_operation_finish, command_name="app-operation finish")
-    op_list = operation_commands.add_parser("list", help="page through typed App-operation facts")
+    op_list = operation_commands.add_parser("list", help="page through typed ChatGPT task-operation facts")
     op_list.add_argument("--run-id", required=True)
     op_list.add_argument("--after-sequence", type=int, default=0)
     op_list.add_argument("--limit", type=int, default=50)
@@ -1569,10 +1831,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     assignment = commands.add_parser("assignment", help="record worker terminal evidence")
     assignment_commands = assignment.add_subparsers(dest="assignment_command", required=True)
-    ready = assignment_commands.add_parser("ready", help="record root-verified PR-ready evidence")
+    ready = assignment_commands.add_parser("ready", help="record typed root-verified delivery-ready evidence")
     ready.add_argument("--run-id", required=True)
     ready.add_argument("--expected-revision", type=int, required=True)
     ready.add_argument("--observation", required=True)
+    ready.add_argument("--integration-input", action="store_true", help="retain the worker and claim while exposing an exact prerequisite HEAD")
     ready.set_defaults(handler=command_assignment_ready, command_name="assignment ready")
     block = assignment_commands.add_parser("block", help="retain claims after a durable contract change")
     block.add_argument("--run-id", required=True)
