@@ -27,6 +27,9 @@ deferred domain-memory closeout.
   dependencies are intra-Spec only.
 - Give every issue one Execution Contract table and no duplicate delivery or handoff
   projection.
+- Treat generated issues as strong executor-ready starting briefs. Protect the
+  stable planning contract directly while preserving compatible executor-owned
+  operational edits; never compare a whole tracker body or compute its digest.
 - Run structural graph compression before freezing IDs or invoking
   `$plan-harder` for missing issues; issue count is report data only.
 - Load `non-app-delivery.md` when the current request explicitly selects its
@@ -81,6 +84,11 @@ Read the Feature Spec and verify:
   prose-derived edges before issue generation;
 - problem, goals, requirements, acceptance criteria, repository scope, and
   validation expectations are complete;
+- acceptance criteria are unique, individually provable checkboxes with stable
+  wording and order;
+- every paid, external, non-repeatable, or otherwise constrained validation has
+  a prose failure policy naming its attempt/retry budget, allowed fallback,
+  retained evidence, and required terminal outcome;
 - affected repositories and allowed paths resolve to real planning scope;
 - the target branch is valid and shared across all affected repositories;
 - a dedicated integration partial uses a target branch distinct from the
@@ -124,17 +132,21 @@ the complete active and `done/` subtrees. If neither backend can prove complete
 state, block before graph synthesis, absence claims, no-op, or proposal output.
 
 Parse every durable candidate's generated ID, title, source ref, Execution
-Contract, scope, dependencies, hardening provenance, metadata, and parent
-relationship. Validate its vertical outcome against the current immutable
-Feature Spec. A durable candidate with stale source identity, missing or
-contradictory obligations inside its claimed vertical outcome or scope, widened
-scope, invalid provenance, malformed dependencies, or duplicate identity is a
-conflict; do not ignore it and draft a replacement. Obligations outside that
-claimed slice remain eligible uncovered behavior for new missing slices.
+Contract, stable planning fields, hardening provenance, metadata, and parent
+relationship. Validate its vertical outcome against the current Feature Spec.
+A durable candidate with stale source identity, missing or contradictory stable
+obligations inside its claimed vertical outcome or scope, widened scope,
+invalid provenance, malformed dependencies, or duplicate identity is a
+conflict; do not ignore it and draft a replacement. Preserve compatible
+executor-owned checkbox progress, implementation/design rewrites, additional or
+equivalent tests, clarifications, status, evidence, and in-scope fixes.
+Obligations outside that claimed slice remain eligible uncovered behavior for
+new missing slices.
 
 Seed the candidate graph with every valid durable issue. Its generated ID,
-vertical outcome, title, scope, dependencies, integration/closeout role, and
-body contract are fixed inputs, not suggestions for model regeneration. Derive
+vertical outcome, title, stable planning contract, dependencies, and
+integration/closeout role are fixed inputs, not suggestions for model
+regeneration. Its execution record remains mutable. Derive
 which current Spec obligations those retained slices cover, then synthesize
 only independently valuable uncovered behavior. If retained slices cover the
 complete Spec, synthesize nothing. If no durable issue exists, build the graph
@@ -285,24 +297,37 @@ conflict. Freeze the resulting IDs for rendering and publication.
 
 After the complete structural graph and stable generated IDs are known, compare
 it with the complete durable snapshot enumerated before synthesis in step 2.
-Compare by generated ID, owning Feature Spec, title, canonical body contract,
-target branch, dependencies, tracker metadata, and parent/sub-issue attachment.
+Compare by generated ID, owning Feature Spec, title, stable planning contract,
+tracker metadata, and parent/sub-issue attachment. The stable contract is the
+required goal/outcome and Non-Goals; repositories, allowed paths, source and
+branch identity, and delivery type; dependencies; acceptance-criterion
+text/count/order; safety constraints; and material validation constraints,
+including retry/attempt budgets and required terminal outcome. Compare those
+sections and fields directly; do not compute a whole-body, result, assignment,
+message, or tracker-text digest.
+For issue comparison, source and branch identity mean the rendered
+`source_spec_ref` and `target_branch_name`. Delivery type is the normal fixed
+App flow when the conditional `non_app_delivery_target` row is absent, or that
+exact target when present. Do not add or infer another delivery field.
 Do not perform a fresh model split merely to recreate comparison prose.
 
 Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
-Treat its body as contract-equivalent only when the generated ID, title,
-`source_spec_ref`, Execution Contract fields, and `dependency_ids` exactly match
-the stable desired graph; required sections occur exactly once; every current
-source requirement, acceptance criterion, and validation obligation is covered
+Treat its body as contract-equivalent only when the generated ID, title, stable
+fields above, and `dependency_ids` exactly match the desired graph; required
+sections occur exactly once; every current source requirement, acceptance
+criterion, safety constraint, and material validation obligation is covered
 without contradiction or scope widening; no blocker or placeholder remains;
-and the final hardening provenance is valid. Explanatory prose need not be
-byte-regenerated. Any missing obligation, contradictory edit, or structured
-field drift is a body conflict.
+and the final hardening provenance is valid. Checkbox markers, implementation
+approach/internal design, safer or simpler rewrites, additional or equivalent
+tests, compatible clarifications, progress/status/evidence, and concrete
+in-scope refactors or fixes are a worker-mutable execution record and must be
+preserved. Any stable-field drift is a conflict.
 
 Then reconcile:
 
-- retain an existing issue only when its identity and body match the stable
-  desired inputs and it carries valid final hardening provenance;
+- retain an existing issue when its identity and stable planning fields match
+  and it carries valid final hardening provenance, preserving compatible
+  mutable execution content;
 - treat an absent desired issue as missing and continue to hardening for that
   issue only;
 - when a contract-equivalent issue exists but mapped tracker metadata or its
@@ -311,7 +336,7 @@ Then reconcile:
 - when every desired issue, metadata value, and parent/sub-issue attachment is
   exact, record a candidate no-op without hardening or mutation; after the
   final fresh read in step 10, return a no-op without hardening or mutation; and
-- stop on duplicates, extra linked implementation issues, changed bodies,
+- stop on duplicates, extra linked implementation issues, stable-field drift,
   conflicting generated IDs, stale source refs, invalid provenance, or any
   graph mismatch. Do not rewrite, close, replace, renumber, or silently adopt a
   conflicting artifact.
@@ -323,7 +348,7 @@ open issue that has not progressed beyond planning is an absent label-backed
 `ready-for-agent` state repairable; a conflicting canonical workflow state is a
 conflict. Resolve each configured GitHub metadata transport before recording
 the repair: `native-type` uses `set-type` and `label` uses `add-label`. A configured
-`body-field` is part of the immutable body contract, not repairable tracker
+`body-field` is part of the stable planning contract, not repairable tracker
 metadata: it must already match, and a missing or different body field is a body
 conflict that blocks convergence until a separately authorized replacement
 lands. Never attempt a native type operation when types are disabled. Unrelated
@@ -355,7 +380,11 @@ brief into the issue template:
 
 Do not paste the hardening brief wholesale or create duplicate top-level
 sections. Preserve exactly one standard hardening provenance line for the final
-stable pass.
+stable pass. Render the implementation approach as a planning-time
+recommendation and include this exact meaning: "This is the planning-time
+recommended approach. The implementing Codex task may replace it with a simpler
+or safer design when the accepted goal, scope, constraints and acceptance
+criteria remain unchanged."
 
 Run final verticality, scope-overlap, dependency, validation, and readiness
 gates. If hardening exposes a graph-level defect, discard affected results,
@@ -394,6 +423,11 @@ An applied issue may receive `ready-for-agent` only when:
 
 - its source ref is durable;
 - goal, requirements, acceptance criteria, and validation are complete;
+- acceptance criteria are unique, individually provable checkboxes whose text,
+  count, and order are stable while checkbox markers remain executor-owned;
+- every material paid, external, non-repeatable, or otherwise constrained
+  validation has an explicit prose failure policy with attempt/retry budget,
+  allowed fallback, retained evidence, and required terminal outcome;
 - the Execution Contract contains every required field exactly once;
 - affected repositories and allowed paths are unambiguous;
 - a local issue includes its tracker-owning repository plus its exact active and
@@ -407,6 +441,15 @@ An applied issue may receive `ready-for-agent` only when:
 - every domain-closeout target surface is contained by that final issue's
   `affected_repositories` and `allowed_paths`;
 - non-App compatibility is represented consistently across the full bundle.
+
+The generated brief must also require the eventual worker to re-read the
+current Spec and complete issue set before each issue, after recovery, and
+before final verification. Compatible operational edits remain usable. Drift
+in a stable field blocks declaratively without asking the user from the worker
+task. The implementing Codex task owns its issue checkbox markers after
+current-head proof and a fresh artifact read, updates parent Spec criteria only
+after Spec-level proof, and restores unchecked state when later invalidated.
+Root coordination never edits or judges individual criteria.
 
 A proposed issue may report `ready-for-agent` only as its intended future
 mapping after the same content gates pass. Never emit or persist that workflow
@@ -468,7 +511,8 @@ exists.
   paths in each issue's Execution Contract.
   For a contract-equivalent existing active file with only missing canonical
   `issue_type: task` or `workflow_state: ready-for-agent`, repair exactly those
-  header lines and verify the rest of the file is byte-identical. Never perform
+  header lines and verify every stable section and all mutable execution
+  content remain unchanged. Never perform
   this repair on a file in `done/`, restore an executor-owned lifecycle state,
   or edit a conflicting body.
 - `write_mode=propose`: write nothing. Return retained durable artifacts plus

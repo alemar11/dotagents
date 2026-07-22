@@ -63,7 +63,8 @@ artifacts. The route is derived execution data, not a selectable field:
   graph, metadata, and relationships.
 - `source_route=existing-source`: exactly one canonical durable
   `source_spec_ref` was supplied or discovered at intake. Validate and preserve
-  the source body and ref unchanged, skip Feature Spec drafting and publication,
+  the source's stable fields and ref unchanged, preserve executor-owned
+  acceptance checkbox markers, skip Feature Spec drafting and publication,
   then converge its implementation issues, metadata, and relationships. When
   that source is any member of a multi-repository bundle, traverse its canonical
   parent, child, sibling, and Feature Dependency links and validate the complete
@@ -76,14 +77,17 @@ temporary file, or unresolved shorthand is not a durable existing source.
 Exact partial-publication artifacts from one recognized multi-repository
 transaction are new-source continuation evidence, not canonical durable Specs.
 Hosted staging roles carry unique transaction markers; local final roles require
-the exact continuation handoff and predeclared final-body match. Neither selects
+the exact continuation handoff and direct predeclared final-body comparison. Neither selects
 the existing-source route.
 
-On the existing-source route, any missing section, blocking question,
+For existing-source comparison, checkbox markers are the only mutable part of
+Feature Spec acceptance criteria. Preserve their current state; criterion text,
+count, and order remain stable. On the existing-source route, any missing
+section, blocking question,
 nonportable evidence, schema repair, persisted knowledge payload, or content
 correction blocks the run until a separately authorized Feature Spec update
 lands. A missing or ambiguous required linked partial also blocks. Plan Feature
-must not rewrite or republish any immutable source.
+must not rewrite or republish the source.
 
 ## Complete-Bundle Convergence
 
@@ -212,9 +216,9 @@ Carry only the data needed to connect planning artifacts:
   partial Feature Specs;
 - optional multi-repository publication-continuation data: one generated transaction
   identity plus the complete predeclared role-to-target map, reconstructable
-  parameterized body templates and their hashes, allowed ref slots, staged or
+  parameterized body templates, allowed ref slots, staged or
   finalized refs, the optional exact final-only body-metadata slot and value,
-  any materialized final-body hashes, selected `source_idea_refs`, verified
+  any materialized final bodies, selected `source_idea_refs`, verified
   prior outcome refs, and completed plus exact missing operations. It is
   derived recovery data, not a run option or durable Project Memory
   configuration;

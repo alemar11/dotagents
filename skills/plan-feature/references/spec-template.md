@@ -72,12 +72,17 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
 
 ## Acceptance Criteria
 
-- [ ] [Specific, testable product or system outcome.]
+- [ ] [One unique, individually provable product or system outcome. Keep
+  criterion text, count, and order stable; only executor-owned checkbox markers
+  may change after publication.]
 
 ## Validation Expectations
 
 - [Required automated or manual proof.]
 - [Named integration gate when applicable.]
+- [For paid, external, non-repeatable, or otherwise constrained proof, state in
+  prose the attempt/retry budget, allowed fallback, evidence to retain, and
+  required terminal outcome.]
 
 ## Risks
 
@@ -89,6 +94,9 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
 
 ## Issue-Splitting Notes
 
+- This is planning-time guidance. Generated implementation approaches are
+  recommendations and may be replaced by a simpler or safer design without
+  changing the accepted goal, scope, constraints, or acceptance criteria.
 - [Suggested vertical slices or sequencing constraints.]
 
 ## Non-App Delivery
@@ -113,7 +121,7 @@ transport before rendering the final body. Apply `native-type` or `label`
 outside the body after publication verifies. When Project Memory instead maps
 `feature` to `body-field`, insert that exact configured field in the
 header metadata region after the H1 and before `## Source`; include it in the
-final body hash and do not invent a key or value. In `write_mode=propose`, omit
+final body and do not invent a key or value. In `write_mode=propose`, omit
 applied metadata from the body and report the intended mapping separately.
 
 Omit the optional Non-App Delivery section when its predicate is false. Do not

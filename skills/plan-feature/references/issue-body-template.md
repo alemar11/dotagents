@@ -43,19 +43,54 @@ contracts, integration order, and named gates.]
 
 Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
 
-[Concise implementation approach synthesized from the hardening brief. Merge
-acceptance and validation details into their owning sections. Explain material
-dependency reasons in Context or this prose without repeating dependency IDs.]
+This is the planning-time recommended approach. The implementing Codex task may
+replace it with a simpler or safer design when the accepted goal, scope,
+constraints and acceptance criteria remain unchanged.
+
+[Concise planning-time implementation recommendation synthesized from the
+hardening brief. Merge acceptance and validation details into their owning
+sections. Explain material dependency reasons in Context or this prose without
+repeating dependency IDs.]
 
 ## Acceptance Criteria
 
-- [ ] [Specific, verifiable outcome.]
+- [ ] [One unique, individually provable outcome. Keep criterion text and order
+  stable; the implementing Codex task owns only the checkbox marker.]
 
 ## Validation
 
 - Preferred: [Command, test, or manual check.]
 - Fallback: [Equivalent proof when the preferred runner is unavailable, or
   None.]
+- Failure policy: [Required prose for paid, external, non-repeatable, or
+  otherwise constrained proof: attempt/retry budget, allowed fallback, evidence
+  to retain, and required terminal outcome. Omit only when validation is not
+  materially constrained.]
+
+## Executor Update Contract
+
+Before starting this issue, after any recovery or handoff, and before final
+verification, re-read the current Feature Spec and complete current issue set.
+Block declaratively on any change to the goal or Non-Goals, repositories or
+allowed paths, `source_spec_ref`, `target_branch_name`, derived delivery type,
+dependencies, acceptance
+criterion text/count/order, safety constraints, or material validation
+constraints including attempt budgets and required terminal outcomes. Do not
+ask the user from the worker task merely to resolve that semantic drift.
+
+Derive delivery type as the normal fixed App flow when this issue has no
+`non_app_delivery_target` row, or as that exact conditional target when the row
+is present. Do not add a duplicate delivery field.
+
+The implementing Codex task may update acceptance checkbox markers,
+implementation approach and internal design, safer or simpler rewrites,
+additional or equivalent tests, compatible clarifications, progress, status,
+evidence, and concrete refactors or fixes within accepted scope. It updates this
+issue's checkboxes only after current-head proof, then re-reads the GitHub or
+local artifact before writing. It updates parent Feature Spec checkboxes only
+when Spec-level behavior is proven, and restores an unchecked marker whenever
+later evidence invalidates the proof. Root coordination never edits or judges
+individual acceptance criteria.
 
 ## Integration Gates
 
