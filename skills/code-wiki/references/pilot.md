@@ -184,8 +184,13 @@ scripts/code-wiki --json pilot aggregate \
 
 The aggregate is `reject` when either pair rejects; otherwise `inconclusive`
 when either is inconclusive; otherwise `revise` when either revises; otherwise
-`promote`. `aggregate.json` retains both complete repository decisions and
-`aggregate.md` renders only that canonical object.
+`promote`. Before applying that precedence, aggregation resolves the baseline
+and candidate manifests recorded by each comparison, reruns the canonical
+comparator including artifact hashes and signed live provenance, and requires
+the supplied comparison object to match the freshly rebuilt decision exactly.
+Missing, stale, or edited comparison evidence fails closed. `aggregate.json`
+retains both revalidated repository decisions and `aggregate.md` renders only
+that canonical object.
 
 The report never changes Code Wiki's default workflow. Promotion requires a
 separate explicit product decision.

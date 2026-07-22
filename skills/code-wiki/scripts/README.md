@@ -69,10 +69,12 @@ them. A passing candidate records exactly two generation calls; its one optional
 bounded repair is a visible third call, while reader usage stays in the reader
 bucket. A complete reader-failing baseline remains evaluable, but the candidate
 must pass quality and safety absolutely. Aggregation accepts exactly two named
-comparison objects and applies `reject`, `inconclusive`, `revise`, then
-`promote` precedence. Under `--json`, command errors return an
-`ok=false` object without credentials. See `../references/pilot.md` for typed
-manifest fields, safety rules, exact thresholds, and result semantics.
+comparison objects, freshly rebuilds each decision from its referenced run
+manifests and signed provenance, rejects any mismatch, and then applies
+`reject`, `inconclusive`, `revise`, then `promote` precedence. Under `--json`,
+command errors return an `ok=false` object without credentials. See
+`../references/pilot.md` for typed manifest fields, safety rules, exact
+thresholds, and result semantics.
 
 The retained 2026-07-22 live evidence is React=`reject`, GitHub
 CLI=`inconclusive`, aggregate=`reject`. The CLI candidate is historical

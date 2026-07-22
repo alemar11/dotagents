@@ -22,6 +22,17 @@ from code_wiki.version import VERSION
 
 
 PROMOTION_STATUSES = {"promote", "revise", "reject", "inconclusive"}
+COMPARISON_FIELDS = {
+    "schema_version",
+    "promotion_status",
+    "reasons",
+    "inputs",
+    "identity",
+    "metrics",
+    "quality",
+    "call_shape",
+    "gates",
+}
 USAGE_FIELDS = (
     "input_tokens",
     "cached_input_tokens",
@@ -1077,55 +1088,81 @@ def render_markdown(decision: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _revalidate_comparison(
+    decision: dict[str, Any],
+    repository: str,
+) -> dict[str, Any]:
+    if not isinstance(decision, dict) or set(decision) != COMPARISON_FIELDS:
+        raise RuntimeError(f"aggregate comparison fields are invalid for {repository}")
+    inputs = decision.get("inputs")
+    if not isinstance(inputs, dict) or set(inputs) != {"baseline_run", "candidate_run"}:
+        raise RuntimeError(f"aggregate comparison inputs are invalid for {repository}")
+    baseline_raw = inputs.get("baseline_run")
+    candidate_raw = inputs.get("candidate_run")
+    if (
+        not isinstance(baseline_raw, str)
+        or not baseline_raw
+        or not isinstance(candidate_raw, str)
+        or not candidate_raw
+    ):
+        raise RuntimeError(f"aggregate comparison run paths are invalid for {repository}")
+    try:
+        baseline_path = Path(baseline_raw).expanduser().resolve()
+        candidate_path = Path(candidate_raw).expanduser().resolve()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise RuntimeError(f"aggregate comparison run paths are invalid for {repository}") from exc
+    baseline, baseline_errors = _read_manifest(baseline_path, "baseline")
+    candidate, candidate_errors = _read_manifest(candidate_path, "node-graph")
+    canonical = build_decision(
+        baseline,
+        candidate,
+        baseline_errors,
+        candidate_errors,
+        baseline_path,
+        candidate_path,
+    )
+    if decision != canonical:
+        raise RuntimeError(
+            f"aggregate comparison does not match fresh canonical revalidation for {repository}"
+        )
+    return canonical
+
+
+def _aggregate_status(statuses: dict[str, str]) -> str:
+    if "reject" in statuses.values():
+        return "reject"
+    if "inconclusive" in statuses.values():
+        return "inconclusive"
+    if "revise" in statuses.values():
+        return "revise"
+    return "promote"
+
+
 def build_aggregate(decisions: dict[str, dict[str, Any]]) -> dict[str, Any]:
     if set(decisions) != {"cli", "react"}:
         raise RuntimeError(
             "pilot aggregation requires exactly two repository decisions named cli and react"
         )
+    canonical_decisions = {
+        repository: _revalidate_comparison(decision, repository)
+        for repository, decision in sorted(decisions.items())
+    }
     statuses: dict[str, str] = {}
-    for repository, decision in sorted(decisions.items()):
+    for repository, decision in canonical_decisions.items():
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", repository):
             raise RuntimeError(f"aggregate repository key is noncanonical: {repository}")
-        required_fields = {
-            "schema_version",
-            "promotion_status",
-            "reasons",
-            "inputs",
-            "identity",
-            "metrics",
-            "quality",
-            "call_shape",
-            "gates",
-        }
-        if (
-            not isinstance(decision, dict)
-            or decision.get("schema_version") != 1
-            or not required_fields.issubset(decision)
-            or not isinstance(decision.get("reasons"), list)
-            or any(not isinstance(reason, str) for reason in decision.get("reasons", []))
-            or any(not isinstance(decision.get(field), dict) for field in required_fields - {
-                "schema_version", "promotion_status", "reasons"
-            })
-        ):
-            raise RuntimeError(f"aggregate decision is invalid for {repository}")
         status = decision.get("promotion_status")
         if status not in PROMOTION_STATUSES:
             raise RuntimeError(f"aggregate promotion status is invalid for {repository}")
         statuses[repository] = status
-    if "reject" in statuses.values():
-        aggregate_status = "reject"
-    elif "inconclusive" in statuses.values():
-        aggregate_status = "inconclusive"
-    elif "revise" in statuses.values():
-        aggregate_status = "revise"
-    else:
-        aggregate_status = "promote"
+    aggregate_status = _aggregate_status(statuses)
     return {
         "schema_version": 1,
         "aggregate_status": aggregate_status,
         "component_statuses": statuses,
         "repository_decisions": {
-            repository: decisions[repository] for repository in sorted(decisions)
+            repository: canonical_decisions[repository]
+            for repository in sorted(canonical_decisions)
         },
         "reasons": [
             f"{repository}: {status}" for repository, status in sorted(statuses.items())

@@ -18,10 +18,10 @@ CMD = SKILL_ROOT / "scripts" / "code-wiki"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 from code_wiki.pilot.comparison import (  # noqa: E402
+    _aggregate_status,
     _read_manifest,
     build_aggregate,
     build_decision,
-    render_aggregate_markdown,
 )
 from code_wiki.pilot.common import hash_path  # noqa: E402
 from code_wiki.pilot.contracts import ContractError, load_graph, parse_node  # noqa: E402
@@ -2120,19 +2120,6 @@ class CodeWikiPilotTests(unittest.TestCase):
                         self.assertTrue(report["gates"][gate]["pass"])
 
     def test_two_repository_aggregation_has_exact_precedence(self) -> None:
-        def decision(status: str, reason: str) -> dict[str, object]:
-            return {
-                "schema_version": 1,
-                "promotion_status": status,
-                "reasons": [reason],
-                "inputs": {},
-                "identity": {},
-                "metrics": {},
-                "quality": {},
-                "call_shape": {},
-                "gates": {},
-            }
-
         cases = (
             (("promote", "promote"), "promote"),
             (("promote", "revise"), "revise"),
@@ -2142,52 +2129,70 @@ class CodeWikiPilotTests(unittest.TestCase):
         )
         for statuses, expected in cases:
             with self.subTest(statuses=statuses):
-                aggregate = build_aggregate(
-                    {
-                        "cli": decision(statuses[0], "cli fixture"),
-                        "react": decision(statuses[1], "react fixture"),
-                    }
+                self.assertEqual(
+                    _aggregate_status({"cli": statuses[0], "react": statuses[1]}),
+                    expected,
                 )
-                self.assertEqual(aggregate["aggregate_status"], expected)
-                self.assertEqual(set(aggregate["repository_decisions"]), {"cli", "react"})
-                markdown = render_aggregate_markdown(aggregate)
-                self.assertIn(f"Aggregate status: `{expected}`", markdown)
-                self.assertIn("`cli`", markdown)
-                self.assertIn("`react`", markdown)
         with self.assertRaisesRegex(RuntimeError, "exactly two"):
             build_aggregate({})
         with self.assertRaisesRegex(RuntimeError, "cli and react"):
-            build_aggregate(
-                {
-                    "alpha": decision("promote", "alpha passed"),
-                    "beta": decision("promote", "beta passed"),
-                }
-            )
+            build_aggregate({"alpha": {}, "beta": {}})
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            cli_path = root / "cli-comparison.json"
-            react_path = root / "react-comparison.json"
-            cli_path.write_text(json.dumps(decision("promote", "cli passed")), encoding="utf-8")
-            react_path.write_text(json.dumps(decision("revise", "react missed one gate")), encoding="utf-8")
-            output = root / "aggregate"
-            result = self.run_cli(
+            repo, commit = self.create_repo(root)
+            baseline_fixture = self.write_fixture(root, "baseline")
+            candidate_fixture = self.write_fixture(root, "node-graph")
+            baseline_result, baseline_out, _ = self.run_fixture(
+                root, repo, commit, "baseline", baseline_fixture, "aggregate-baseline"
+            )
+            candidate_result, candidate_out, _ = self.run_fixture(
+                root, repo, commit, "node-graph", candidate_fixture, "aggregate-candidate"
+            )
+            self.assertEqual(baseline_result.returncode, 0, baseline_result.stdout)
+            self.assertEqual(candidate_result.returncode, 0, candidate_result.stdout)
+            comparison_out = root / "comparison"
+            comparison_result = self.run_cli(
                 "--json",
                 "pilot",
-                "aggregate",
-                "--comparison",
-                f"cli={cli_path}",
-                "--comparison",
-                f"react={react_path}",
+                "compare",
+                "--baseline-run",
+                str(baseline_out / "run.json"),
+                "--candidate-run",
+                str(candidate_out / "run.json"),
                 "--out",
-                str(output),
+                str(comparison_out),
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            payload = json.loads(result.stdout)
-            self.assertEqual(payload["aggregate_status"], "revise")
-            aggregate = json.loads((output / "aggregate.json").read_text(encoding="utf-8"))
-            self.assertEqual(aggregate["component_statuses"], {"cli": "promote", "react": "revise"})
-            self.assertIn("Aggregate status: `revise`", (output / "aggregate.md").read_text(encoding="utf-8"))
+            self.assertEqual(comparison_result.returncode, 0, comparison_result.stdout)
+            comparison_path = comparison_out / "comparison.json"
+
+            valid_output = root / "valid-aggregate"
+            valid_result = self.run_cli(
+                "--json", "pilot", "aggregate",
+                "--comparison", f"cli={comparison_path}",
+                "--comparison", f"react={comparison_path}",
+                "--out", str(valid_output),
+            )
+            self.assertEqual(valid_result.returncode, 0, valid_result.stdout + valid_result.stderr)
+            valid_payload = json.loads(valid_result.stdout)
+            self.assertEqual(valid_payload["aggregate_status"], "inconclusive")
+            self.assertIn(
+                "Aggregate status: `inconclusive`",
+                (valid_output / "aggregate.md").read_text(encoding="utf-8"),
+            )
+
+            fabricated = json.loads(comparison_path.read_text(encoding="utf-8"))
+            fabricated["promotion_status"] = "promote"
+            fabricated_path = root / "fabricated-comparison.json"
+            fabricated_path.write_text(json.dumps(fabricated), encoding="utf-8")
+            fabricated_result = self.run_cli(
+                "--json", "pilot", "aggregate",
+                "--comparison", f"cli={fabricated_path}",
+                "--comparison", f"react={fabricated_path}",
+                "--out", str(root / "fabricated-aggregate"),
+            )
+            self.assertEqual(fabricated_result.returncode, 2)
+            self.assertIn("fresh canonical revalidation", fabricated_result.stdout)
 
 
 if __name__ == "__main__":
