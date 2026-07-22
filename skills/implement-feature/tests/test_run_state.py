@@ -423,6 +423,28 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(shown["unresolved_app_operations"], [])
         self.assertEqual(result["conflicting_owners"][0]["root_task_id"], "root-owner")
 
+    def test_given_same_owner_adds_worker_when_wait_sweeps_continue_then_bound_does_not_reset(self) -> None:
+        """Given one repository owner, when its worker list changes, then stable owner identity keeps the wait bounded."""
+        self.start("churn-owner", assignment_count=2)
+        self.create_goal("churn-owner")
+        self.start("churn-waiter")
+        first = self.invoke(
+            "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--expected-revision", self.revision("churn-waiter"),
+        )
+        self.assertEqual(first["unchanged_wait_sweeps"], 1)
+        self.create_worker("churn-owner", 1)
+        second = self.invoke(
+            "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--expected-revision", self.revision("churn-waiter"),
+        )
+        self.assertEqual(second["unchanged_wait_sweeps"], 2)
+        third = self.invoke(
+            "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--expected-revision", self.revision("churn-waiter"),
+        )
+        self.assertEqual(third["status"], "blocked-by-active-run")
+
     def test_given_post_bootstrap_durable_block_when_other_root_waits_then_no_takeover_occurs(self) -> None:
         """Given Root A has worker authority and blocks, when Root B waits, then A retains the repository."""
         self.start("owner")
@@ -514,6 +536,34 @@ class RunStateScenarios(unittest.TestCase):
         with sqlite3.connect(self.database) as connection:
             columns = [row[1] for row in connection.execute("PRAGMA table_info(app_operations)")]
         self.assertFalse(any("hash" in column for column in columns))
+
+    def test_given_unknown_bootstrap_when_archive_begins_then_worker_is_preserved(self) -> None:
+        """Given bootstrap may have delivered, when preimplementation archive begins, then reconciliation is mandatory."""
+        self.start("archive-unknown")
+        self.create_goal("archive-unknown")
+        assignment = "spec-01"
+        thread = "thread-archive-unknown-1"
+        checkout = self.base / "archive unknown checkout"
+        checkout.mkdir()
+        self.operation(
+            "archive-unknown", "create-archive-unknown", "create-worker", assignment,
+            {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"},
+        )
+        self.operation(
+            "archive-unknown", "title-archive-unknown", "set-worker-title", assignment,
+            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+        )
+        self.operation(
+            "archive-unknown", "bootstrap-archive-unknown", "send-bootstrap", assignment,
+            {}, status="unknown",
+        )
+        error = self.invoke(
+            "app-operation", "begin", "--run-id", "archive-unknown",
+            "--expected-revision", self.revision("archive-unknown"),
+            "--operation-key", "archive-after-unknown", "--action", "archive-worker",
+            "--subject-id", assignment, expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "bootstrap-reconciliation-required")
 
     def test_given_unknown_app_effect_before_receipt_when_recorded_then_no_reference_is_fabricated(self) -> None:
         """Given transport ambiguity before any receipt, when unknown is recorded, then nullable typed facts preserve truth."""

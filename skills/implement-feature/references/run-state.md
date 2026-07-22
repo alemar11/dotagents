@@ -72,6 +72,10 @@ Bootstrap success is the implementation-authority boundary. A post-bootstrap
 durable-contract block retains claims; only whole-run PR-ready or verified
 preimplementation abort releases them.
 
+Pending or unknown bootstrap delivery forbids worker archive until readback
+proves the bootstrap failed. Bounded repository waits compare stable repository,
+run, and root-task owner identity; worker-list changes do not reset the counter.
+
 Worker creation and bootstrap require the active root Goal. Worker thread and
 active-checkout bindings are unique across active roots. Goal completion cannot
 launch without this run's active Goal or while another App operation is pending

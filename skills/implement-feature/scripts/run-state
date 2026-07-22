@@ -449,6 +449,17 @@ def active_conflicts(connection: sqlite3.Connection, identities: list[str]) -> l
     return result
 
 
+def stable_conflict_owners(conflicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "repository_identity": item["repository_identity"],
+            "run_id": item["run_id"],
+            "root_task_id": item["root_task_id"],
+        }
+        for item in conflicts
+    ]
+
+
 def insert_run(
     connection: sqlite3.Connection,
     run: dict[str, str],
@@ -551,7 +562,8 @@ def command_run_wait_sweep(args: argparse.Namespace) -> dict[str, Any]:
             connection.commit()
             return {"run_id": run_id, "revision": revision, "status": "active", "claims_acquired": True, "may_create_goal_or_worker": True, "conflicting_owners": []}
         prior = json.loads(run["waiting_owner_runs_json"])
-        sweeps = run["unchanged_wait_sweeps"] + 1 if conflicts == prior else 1
+        unchanged_owner = stable_conflict_owners(conflicts) == stable_conflict_owners(prior)
+        sweeps = run["unchanged_wait_sweeps"] + 1 if unchanged_owner else 1
         terminal = sweeps >= MAX_UNCHANGED_WAIT_SWEEPS
         status = "blocked-by-active-run" if terminal else "waiting-for-repository"
         revision = advance(connection, run)
@@ -639,6 +651,20 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             raise StateError("invalid-assignment-transition", "worker messages require an active worker", 4)
         elif action == "archive-worker" and (run["implementation_started"] or assignment["state"] not in {"worker-created"}):
             raise StateError("implementation-already-started", "archive is allowed only before bootstrap authority", 4)
+        if action == "archive-worker":
+            bootstrap = connection.execute(
+                """SELECT status FROM app_operations
+                   WHERE run_id=? AND assignment_id=? AND action='send-bootstrap'
+                     AND status IN ('pending','unknown','succeeded')
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment["assignment_id"]),
+            ).fetchone()
+            if bootstrap:
+                raise StateError(
+                    "bootstrap-reconciliation-required",
+                    "archive requires proof that bootstrap was never delivered",
+                    4,
+                )
     elif subject_id != run["root_task_id"]:
         raise StateError("invalid-app-subject", "root App action subject must be root_task_id", 4)
     if action == "create-goal" and run["goal_state"] != "not-created":
