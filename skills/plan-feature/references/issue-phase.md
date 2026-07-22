@@ -32,9 +32,6 @@ deferred domain-memory closeout.
   operational edits; never compare a whole tracker body or compute its digest.
 - Run structural graph compression before freezing IDs or invoking
   `$plan-harder` for missing issues; issue count is report data only.
-- Load `non-app-delivery.md` when the current request explicitly selects its
-  target, or when the source Feature Spec contains exactly one target and one
-  resolvable `explicit_instruction_ref`.
 
 ## Phase Inputs
 
@@ -58,9 +55,7 @@ Receive:
   `feature_slug`, every staged or durable Spec ref, multi-repository publication
   transaction identity plus reconstructable templates when present, selected
   `source_idea_refs` plus verified prior outcome refs, and the complete
-  `knowledge_delta` until its final owner issue is durable;
-- `non_app_delivery_target` and its non-option `explicit_instruction_ref` only
-  when the conditional reference was loaded.
+  `knowledge_delta` until its final owner issue is durable.
 
 Stop when an apply run lacks a durable source ref, when proposed and durable
 refs are mixed ambiguously, or when the source still has blocking open
@@ -103,9 +98,6 @@ Read the Feature Spec and verify:
 - the complete parent/child Feature Spec mapping exists for multi-repository
   work;
 - portable evidence contains no developer-machine absolute path;
-- non-App data is absent or contains exactly one target plus exactly one
-  resolvable `explicit_instruction_ref` whose instruction selects the same
-  target and scope under the loaded conditional reference;
 - the Feature Spec body contains neither `knowledge_delta` nor
   `## Domain Knowledge Handoff`;
 - a present phase-level knowledge delta contains decisions, target surfaces,
@@ -198,10 +190,9 @@ repository to `affected_repositories`, and add both exact paths to
 `allowed_paths`, including in proposal output. The eventual move is therefore
 inside the issue's authorized execution scope; do not replace either path with a
 wildcard. Verify both paths resolve inside that affected Git repository and a
-future App-managed checkout can expose them. If the tracker artifact lives at a
-non-Git workspace root or outside every affected repository, withhold normal
-App-compatible output unless the explicit non-App contract applies; never
-invent a tracker-owning repository.
+future executor checkout can expose them. If the tracker artifact lives at a
+non-Git workspace root or outside every affected repository, withhold the issue
+as non-executable; never invent a tracker-owning repository.
 
 All issues use the Feature Spec's shared `target_branch_name`. Repository
 topology stays a Project Memory fact and is not copied into a selectable issue
@@ -214,8 +205,8 @@ partial whose Feature Dependencies cover every implementation partial.
 Generate at least one real integration issue from that partial after the
 upstream merge waits; this issue owns the cross-repository proof whether or not
 `knowledge_delta` exists. It must own a bounded repository/path change plus the
-proof, not a no-op or validation-only task, so it can produce the App's required
-PR. If no such integration vehicle exists, withhold the App-compatible bundle
+proof, not a no-op or validation-only task, so an executor can produce a real
+integration change. If no such integration vehicle exists, withhold the bundle
 as blocked. Keep its `dependency_ids` local to the integration partial.
 
 All integration issues use the integration partial's distinct branch derived as
@@ -286,7 +277,14 @@ After repairs, rerun step 4's owner-excluded terminal derivation when
 `knowledge_delta` is present, using the repaired remaining graph and replacing
 an unpublished closeout owner's `dependency_ids`; a retained owner must already
 match the result. Then rerun verticality, overlap,
-dependency, acyclicity, integration, and closeout validation. Topologically
+dependency, acyclicity, integration, and closeout validation. Build a transient
+acceptance coverage map from every Feature Spec criterion to one or more final
+issues. Spec and issue criteria are independently authored and need not be
+textually identical. Require every Spec criterion to be covered, reject
+contradictory or scope-widening issue criteria, and keep each artifact's own
+criterion text, count, and order stable. Recompute this map after hardening; do
+not persist it unless concise human-readable coverage evidence is useful.
+Topologically
 assign unused final generated IDs only to missing slices so the closeout owner
 is last and every `dependency_ids` entry points to a strictly earlier generated
 ID. Never renumber a durable seed. If no unused ID placement can satisfy the
@@ -300,15 +298,13 @@ it with the complete durable snapshot enumerated before synthesis in step 2.
 Compare by generated ID, owning Feature Spec, title, stable planning contract,
 tracker metadata, and parent/sub-issue attachment. The stable contract is the
 required goal/outcome and Non-Goals; repositories, allowed paths, source and
-branch identity, and delivery type; dependencies; acceptance-criterion
+branch identity; dependencies; acceptance-criterion
 text/count/order; safety constraints; and material validation constraints,
 including retry/attempt budgets and required terminal outcome. Compare those
 sections and fields directly; do not compute a whole-body, result, assignment,
 message, or tracker-text digest.
 For issue comparison, source and branch identity mean the rendered
-`source_spec_ref` and `target_branch_name`. Delivery type is the normal fixed
-App flow when the conditional `non_app_delivery_target` row is absent, or that
-exact target when present. Do not add or infer another delivery field.
+`source_spec_ref` and `target_branch_name`.
 Do not perform a fresh model split merely to recreate comparison prose.
 
 Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
@@ -406,11 +402,8 @@ Use `references/issue-body-template.md`. Every issue has exactly one
 - `target_branch_name`;
 - `dependency_ids`.
 
-For an explicit non-App bundle, append a `non_app_delivery_target` row to that
-same table and report that the complete bundle is App-incompatible. Do not add
-`explicit_instruction_ref`, permission, review, PR-count, completion-method,
-scheduling-mode, or worker configuration fields. The instruction ref remains
-exactly once in the owning Feature Spec.
+Do not add delivery, permission, review, PR-count, completion-method,
+scheduling-mode, or worker configuration fields.
 
 Dependency reasons belong in Context or implementation prose and must not
 repeat the ID list. Reverse edges are a derived view only. The issue body may
@@ -439,8 +432,7 @@ An applied issue may receive `ready-for-agent` only when:
 - the structural graph-compression gate passed before hardening;
 - the domain closeout owner is unique when required;
 - every domain-closeout target surface is contained by that final issue's
-  `affected_repositories` and `allowed_paths`;
-- non-App compatibility is represented consistently across the full bundle.
+  `affected_repositories` and `allowed_paths`.
 
 The generated brief must also require the eventual worker to re-read the
 current Spec and complete issue set before each issue, after recovery, and
@@ -581,8 +573,7 @@ Return:
 - withheld issues and blockers;
 - exact continuation handoff for any partial apply whose domain-closeout owner
   is not yet durable, including the complete `knowledge_delta` and missing
-  operation list;
-- explicit App incompatibility when a non-App target is present.
+  operation list.
 
 When `knowledge_delta` is present, report `capture_outcome=deferred` and the
 final issue ref. Otherwise report `capture_outcome=no-durable-change`. This is

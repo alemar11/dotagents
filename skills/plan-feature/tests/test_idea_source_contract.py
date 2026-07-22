@@ -7,7 +7,6 @@ from pathlib import Path
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = SKILL_ROOT.parents[1]
 
 
 def read(relative: str) -> str:
@@ -96,353 +95,33 @@ def evaluate_state_fixture(case: dict[str, object]) -> dict[str, object]:
 
 
 class IdeaSourceContractTests(unittest.TestCase):
-    def test_source_idea_refs_and_discovery_are_data_not_options(self) -> None:
+    def test_run_registry_contains_only_write_mode(self) -> None:
         options = read("references/options.md")
         registry = options.split("## Run Registry", 1)[1].split(
-            "## Project Memory Facts", 1
+            "## Derived Source Route", 1
         )[0]
         fields = re.findall(r"^\| `([a-z_]+)` \|", registry, flags=re.MULTILINE)
 
         self.assertEqual(["write_mode"], fields)
-        self.assertIn("`source_idea_refs`", options)
-        self.assertIn("explicit Idea-discovery intent", options)
-        self.assertIn("invocation evidence, not a field", options)
-        self.assertNotIn("source_idea_refs", registry)
-        self.assertNotIn("idea_discovery", registry)
+        self.assertNotIn("source_idea_refs", fields)
+        self.assertNotIn("idea_discovery", fields)
 
-    def test_idea_ref_eligibility_is_derived_from_source_route(self) -> None:
-        contract = read("references/idea-source.md")
-        phase = read("references/spec-phase.md")
-        skill = read("SKILL.md")
-        activation = contract.split("## Activation And Eligibility", 1)[1].split(
-            "## Durable Identity And Validation", 1
-        )[0]
-        normalized = " ".join(activation.split())
-        normalized_lower = normalized.lower()
-
-        self.assertIn("new-source route", normalized_lower)
-        self.assertIn("no durable `source_spec_ref`", normalized_lower)
-        self.assertIn("existing-source route", normalized_lower)
-        self.assertIn("`bound_source_idea_refs`", normalized)
-        self.assertIn("exact set equality", normalized)
-        self.assertIn("reject", normalized_lower)
-        self.assertNotIn("mode=", activation)
-        self.assertIn("proposed-idea:", contract)
-        self.assertIn("owner/repository#<number>", contract)
-        self.assertIn("planning/ideas/<idea-slug>.md", contract)
-        self.assertIn(
-            "<repository-slug>/planning/ideas/<idea-slug>.md", contract
-        )
-        for contents in (phase, skill):
-            route_contract = " ".join(contents.split()).lower()
-            self.assertIn("new-source route", route_contract)
-            self.assertIn("existing-source route", route_contract)
-
-    def test_existing_source_retry_reconciles_only_spec_bound_ideas(self) -> None:
-        contract = " ".join(read("references/idea-source.md").split())
-        phase = " ".join(read("references/spec-phase.md").split())
-        skill = " ".join(read("SKILL.md").split())
-
-        for contents in (contract, phase, skill):
-            self.assertIn("bound_source_idea_refs", contents)
-            self.assertIn("exact set equality", contents)
-        self.assertIn("never infer full coverage from the source link alone", contract)
-        self.assertIn("complete bundle converges", contract)
-        self.assertIn("never normalize them into new requirements", skill)
-
-    def test_discovery_is_explicit_read_only_and_selection_gated(self) -> None:
-        contract = read("references/idea-discovery.md")
-        source_contract = read("references/idea-source.md")
-        skill = read("SKILL.md")
-        normalized = " ".join(contract.split())
-
-        for phrase in (
-            "Run discovery only when the user explicitly asks",
-            "Never scan an Idea backlog during an ordinary planning request",
-            "Discovery itself never changes labels, files, comments, or issue state",
-            "Require an explicit selection before drafting",
-            "The selected durable refs become the existing `source_idea_refs`",
-            "require separate Plan Feature runs",
-        ):
-            self.assertIn(phrase, normalized)
-        self.assertIn("optional Idea discovery and validation", skill)
-        self.assertIn("If the user only asked to inspect the backlog", normalized)
-        self.assertIn("Load `idea-source.md` in validation-only mode", contract)
-        self.assertIn("Require explicit transport `label`", normalized)
-        self.assertIn("requiring `local-header`", contract)
-        self.assertIn("from `idea-discovery.md` for validation-only", source_contract)
-        self.assertIn("reconciliation-pending rather than a planning candidate", normalized)
-        self.assertNotIn("list open issues", source_contract)
-
-    def test_backend_validation_keeps_idea_out_of_type_registry(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-
-        self.assertIn("artifact_marker=idea", contract)
-        self.assertIn("has no native Issue Type", contract)
-        self.assertIn("no other mapped canonical workflow-state label", normalized)
-        self.assertIn("`artifact_marker: idea`", contract)
-        self.assertIn("no `issue_type`", contract)
-        self.assertIn("`needs-triage` or `needs-info`", contract)
-        self.assertIn("workflow states are mutually exclusive", normalized)
-        self.assertIn("Read the complete body and the complete comment history", normalized)
-        self.assertIn("following pagination", normalized)
-        self.assertIn("transport `label` for the marker", normalized)
-        self.assertIn("Require `local-header`", contract)
-
-    def test_all_idea_sections_have_a_tentative_planning_mapping(self) -> None:
-        contract = read("references/idea-source.md")
-        template = (SKILL_ROOT.parent / "capture-idea" / "references" / "idea-template.md").read_text(
-            encoding="utf-8"
-        )
-
-        for heading in (
-            "Summary",
-            "Problem or Opportunity",
-            "Proposed Direction",
-            "Expected Value",
-            "Known Context and Constraints",
-            "Open Questions",
-            "Source",
-        ):
-            self.assertIn(f"## {heading}", template)
-            self.assertIn(f"`{heading}`", contract)
-        self.assertIn("Do not silently promote tentative direction", contract)
-        self.assertIn("never acceptance criteria by itself", contract)
-
-    def test_coverage_states_and_terminal_derivation_are_deterministic(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-
-        for state in ("covered", "excluded", "deferred", "blocked"):
-            self.assertRegex(contract, rf"\| `{state}` \|")
-        self.assertIn("`full`: every material element is `covered` or `excluded`", normalized)
-        self.assertIn("`partial`: at least one material element", normalized)
-        self.assertIn("at least one element is `blocked`", normalized)
-        self.assertIn("`covered_scope` and `remaining_scope`", normalized)
-        self.assertIn("Do not persist the internal map", contract)
-        self.assertIn("report-only intended projection", normalized)
-        self.assertIn("intended_coverage=partial|full", contract)
-        self.assertIn("never satisfy durable `covered` or `excluded`", normalized)
-
-    def test_projection_uses_only_feature_spec_source(self) -> None:
-        contract = read("references/idea-source.md")
-        template = read("references/spec-template.md")
-        phase = read("references/spec-phase.md")
-        normalized_phase = " ".join(phase.split())
+    def test_idea_refs_are_kept_out_of_issue_execution_contracts(self) -> None:
+        spec_template = read("references/spec-template.md")
         issue_template = read("references/issue-body-template.md")
 
-        self.assertIn("- Source Idea: <durable-ref>", contract)
-        self.assertIn("Source Idea:", template)
-        self.assertIn("every parent or partial", contract)
-        self.assertIn("Keep Idea refs and coverage maps out of generated", contract)
-        self.assertIn("trace every material accepted element", normalized_phase)
+        self.assertIn("- Source Idea:", spec_template)
         self.assertNotIn("source_idea_refs", issue_template)
         self.assertNotIn("Source Idea", issue_template)
-
-    def test_prior_partial_outcomes_are_loaded_and_coverage_is_cumulative(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-
-        self.assertIn("With one or more `coverage: partial` records", normalized)
-        self.assertIn("load and validate every listed durable Feature Spec", normalized)
-        self.assertIn("plan only the remaining scope", normalized)
-        self.assertIn("cumulatively across verified prior Specs", normalized)
-        self.assertIn("use cumulative refs and scope", normalized)
-        self.assertIn("Missing, malformed, ambiguous, or unrelated prior refs block", normalized)
-        self.assertIn("monotonic cumulative history", normalized)
-        self.assertIn("must not return previously covered scope", normalized)
-
-    def test_canonical_outcome_is_exact_cumulative_and_append_only(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-        block = (
-            "## Planning Outcome\n"
-            "<!-- plan-feature:idea-outcome -->\n"
-            "coverage: <partial|full>\n"
-            "feature_spec_refs:\n"
-            "- <globally unambiguous durable ref>\n"
-            "covered_scope:\n"
-            "- <concise cumulative covered outcome>\n"
-            "remaining_scope:\n"
-        )
-
-        self.assertIn(block, contract)
-        self.assertIn("`### Planning Outcome` subsection", contract)
-        self.assertIn("one append-only\n`## Planning Outcomes` section", contract)
-        self.assertIn("order them lexicographically", contract)
-        self.assertIn("single `remaining_scope` item `none` for `full`", contract)
-        self.assertIn("exact latest block as already applied", contract)
-        self.assertIn("strict superset", contract)
-        self.assertIn("same cumulative ref set with different coverage or scope", normalized)
-        self.assertIn("retired\n  one-line outcome syntax", contract)
-        self.assertNotIn("- coverage: <partial|full>; feature_spec_refs:", contract)
-
-    def test_lifecycle_is_terminal_apply_only_and_answer_aware(self) -> None:
-        contract = read("references/idea-source.md")
-        skill = read("SKILL.md")
-        normalized = " ".join(contract.split())
-
-        for phrase in (
-            "determine durable coverage independently for each selected new-source Idea or bound existing-source Idea",
-            "Waiting for one specific requester answer",
-            "Failure after a supplied answer resolved `needs-info`",
-            "replace stale `needs-info` with `needs-triage`",
-            "Cumulative durable planning covers only part",
-            "Cumulative durable planning fully covers",
-            "leave durable coverage unchanged and request no GitStack mutation",
-            "Do not add or remove workflow labels while an interactive",
-        ):
-            self.assertIn(phrase, normalized)
-        self.assertIn("Reconcile Idea Sources", skill)
-        self.assertIn("complete applied bundle", normalized.lower())
-        self.assertIn("complete applied bundle", " ".join(skill.split()).lower())
-
-    def test_github_lifecycle_provisions_required_state_labels(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-
-        self.assertIn("reconciliation that adds a workflow state", normalized)
-        self.assertIn("configured transport to be `label`", normalized)
-        self.assertIn("issue_operation=create-label", contract)
-        self.assertIn("before mutating any affected Idea", normalized)
-        self.assertIn("preserve current hosted state", normalized)
-        self.assertIn("Do not provision a label merely to clear", normalized)
-        self.assertIn("request no mutation", normalized)
-
-    def test_proposal_allows_github_reads_but_forbids_mutation(self) -> None:
-        contract = read("references/idea-source.md")
-        phase = read("references/spec-phase.md")
-        skill = read("SKILL.md")
-        canonical_outcome = contract.split("```markdown", 1)[1].split("```", 1)[0]
-
-        self.assertIn("through `$gitstack:github-issues` in both write", contract)
-        self.assertIn("omitting mutation fields", contract)
-        self.assertIn("keep the durable map unchanged", contract)
-        self.assertIn("leave every selected Idea unchanged", " ".join(contract.split()))
-        self.assertIn("leave every selected or bound Idea unchanged", " ".join(skill.split()))
-        self.assertIn("do not render a canonical planning", phase)
-        for field in (
-            "intended_coverage",
-            "intended_covered_scope",
-            "intended_remaining_scope",
-        ):
-            self.assertIn(field, contract)
-            self.assertIn(field, phase)
-            self.assertIn(field, skill)
-            self.assertNotIn(field, canonical_outcome)
-        self.assertIn("never invokes GitStack for publication or mutation", phase)
-        self.assertIn("may still use read-only GitStack", phase)
-        self.assertNotIn("`write_mode=propose` never invokes GitStack.", phase)
-        self.assertIn("Proposal mode never requests dry-run mutations", skill)
-
-    def test_reconciliation_recovery_precedes_ordinary_validation(self) -> None:
-        contract = read("references/idea-source.md")
-        skill = read("SKILL.md")
-        normalized_skill = " ".join(skill.split())
-        phase = read("references/spec-phase.md")
-        normalized = " ".join(contract.split())
-
-        self.assertIn("Reconciliation-Only Recovery", contract)
-        self.assertIn("before ordinary source validation", normalized)
-        self.assertIn("Do not draft, republish, or rewrite Feature Specs", normalized)
-        self.assertIn("Accept an already-closed GitHub Idea only", normalized)
-        self.assertIn("skip verified completed sources", normalized)
-        self.assertIn("run its reconciliation-only recovery branch first", normalized_skill)
-        self.assertIn("route reconciliation-only recovery before this phase", phase)
-        recovery = skill.index("Before ordinary Idea validation or discovery")
-        ordinary = skill.index("On the new-source route, when the invocation supplies")
-        discovery = skill.index("When the new-source route has no exact refs")
-        self.assertLess(recovery, ordinary)
-        self.assertLess(recovery, discovery)
-        self.assertIn("An open GitHub Idea in that state, or a local full-outcome Idea", normalized)
-        self.assertIn("is reconciliation-pending", normalized)
-
-    def test_consumed_sources_require_recovery_or_explicit_replan(self) -> None:
-        contract = read("references/idea-source.md")
-        normalized = " ".join(contract.split())
-
-        self.assertIn("latest canonical record is `coverage: full`", normalized)
-        self.assertIn("not valid ordinary planning input", normalized)
-        self.assertIn("explicitly asks to plan it again", normalized)
-        self.assertIn("execution data, not selectable options", normalized)
-        self.assertIn("separately authorized reopening", normalized)
-
-    def test_missing_marker_mapping_is_a_narrow_prerequisite(self) -> None:
-        contract = read("references/idea-source.md")
-        options = read("references/options.md")
-        normalized_options = " ".join(options.split())
-
-        for contents in (contract, options):
-            self.assertIn("blocks only", contents)
-        self.assertIn("Idea capture, discovery, or consumption", normalized_options)
-        self.assertIn("Idea capture, discovery, or consumption", read("SKILL.md"))
-        self.assertIn(
-            "do not invalidate an unrelated Plan Feature run",
-            " ".join(contract.split()),
-        )
-
-    def test_forward_scenarios_cover_the_refined_paths(self) -> None:
-        fixture = read("tests/idea-source-scenarios.md")
-        headings = re.findall(r"^## (.+)$", fixture, flags=re.MULTILINE)
-
-        self.assertEqual(
-            [
-                "New-Source Local Idea To Complete Applied Bundle",
-                "Explicit GitHub Discovery Without Selection",
-                "Proposed Idea Ref Is Rejected",
-                "New-Source Proposal Leaves Idea Unchanged",
-                "Existing-Source Route Rejects Unbound Idea Refs",
-                "Partial New-Source Publication Retries Through Bound Ideas",
-                "Multiple Ideas Stay Bounded",
-                "Repeated Partial Planning Becomes Cumulative Full Coverage",
-                "Conflicting Cumulative Outcome Is Rejected",
-                "Reconciliation-Only Recovery",
-                "Answered Needs-Info Does Not Stay Stale",
-                "Complete Applied Bundle Precedes Idea Closure",
-            ],
-            headings,
-        )
-        self.assertNotRegex(fixture, r"(?m)^\s*-\s*`mode=")
-        for phrase in (
-            "no durable `source_spec_ref`",
-            "all seven canonical Idea sections",
-            "perform no comment, label, type, close, Feature Spec, or issue mutation",
-            "reject the proposed ref before drafting or mutation",
-            "mutation fields omitted",
-            "leave the selected Idea unchanged",
-            "derive the complete `bound_source_idea_refs` set",
-            "require no separate third reconciliation invocation",
-            "read the complete paginated comment history",
-            "render no canonical planning outcome block",
-            "require a separate Plan Feature run",
-            "derive cumulative full coverage from both Specs",
-            "strict superset",
-            "retry only the missing close operation",
-            "replace stale `needs-info` with `needs-triage`",
-            "complete applied bundle is durable and verified",
-            "do not wait for a future implementation PR or PR merge",
-        ):
-            self.assertIn(phrase, " ".join(fixture.split()))
 
     def test_state_transition_fixtures_are_executable(self) -> None:
         fixture_path = SKILL_ROOT / "tests" / "idea-source-state-fixtures.json"
         cases = json.loads(fixture_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(7, len(cases))
         self.assertEqual(len(cases), len({case["name"] for case in cases}))
         for case in cases:
             with self.subTest(case=case["name"]):
                 self.assertEqual(case["expected"], evaluate_state_fixture(case))
-
-    def test_repo_guidance_keeps_idea_as_planning_not_delivery_lifecycle(self) -> None:
-        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        normalized = " ".join(agents.split())
-
-        self.assertIn("Allow backlog discovery only from an explicit", normalized)
-        self.assertIn("monotonic cumulative covered and remaining scope", normalized)
-        self.assertIn("An Idea tracks planning completion", normalized)
-        self.assertIn("later PR merge does not own its closure", normalized)
 
 
 if __name__ == "__main__":

@@ -1,21 +1,13 @@
 # Plan Feature Option Contract
 
 Load this reference before the first Plan Feature phase. It is the sole owner
-of default-path selectable Plan Feature behavior. The one conditional non-App
-extension remains owned by `non-app-delivery.md` and is valid only after its
-current-request-or-durable-source predicate is satisfied.
+of selectable Plan Feature behavior.
 
 ## Syntax And Hard Cut
 
 - Field names use snake_case and enum values use lower-kebab-case.
 - User wording is selection evidence, never an alternative value.
-- Before rejecting unknown fields, inspect the current request and any durable
-  source Feature Spec for the non-App predicate. Load `non-app-delivery.md` when
-  the current user explicitly selects a non-App stopping point, or when a
-  canonical source already carries exactly one `non_app_delivery_target` and
-  exactly one resolvable `explicit_instruction_ref`. Validate that conditional
-  field together with the Run Registry. Otherwise reject it and every other
-  selectable field or value not listed below.
+- Reject every selectable field or value not listed below.
 - Reject retired fields, values, partial-flow requests, and aliases instead of
   translating them. Plan Feature has one convergent planning pipeline.
 - Keep facts, paths, slugs, refs, dependency IDs, evidence, and derived route or
@@ -283,21 +275,15 @@ The section is the single execution projection. Do not duplicate its fields in
 a delivery section, handoff section, or option table. Derive reverse dependency
 edges by scanning `dependency_ids`; never persist a second reverse-edge list.
 
-Normal artifacts are App-compatible and rely on `$implement-feature`'s fixed
-reviewed, CI-clean pull-request-ready flow. Plan Feature does not select or
-grant implementation, publication, review, merge, or issue-mutation authority.
+Artifacts use the same planning contract for GitHub and local Markdown
+trackers. Plan Feature does not require a GitHub remote or select or grant
+implementation, publication, review, merge, or issue-mutation authority. The
+executor derives a supported terminal outcome from current repository and
+tracker evidence.
 
 In `write_mode=propose`, return the intended mapped issue type and workflow
 state as report metadata only. Do not put an applied `workflow_state` line in a
 proposed body or imply that a proposed issue has entered an execution queue.
-
-Load `non-app-delivery.md` before structured option validation or drafting when
-the current user explicitly requests a non-App stopping point, or when a
-canonical durable source Spec already carries exactly one target and exactly
-one resolvable `explicit_instruction_ref`. Validate its registry together with
-this default-path registry. `explicit_instruction_ref` is evidence data, not an
-option or issue field. That reference owns the sole optional extension to the
-Execution Contract.
 
 ## Feature Dependency Contract
 

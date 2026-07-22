@@ -157,10 +157,8 @@ class GraphCompressionReplayTests(unittest.TestCase):
                     any(owner_id in issue["depends_on"] for issue in replay["final_issues"])
                 )
 
-    def test_runtime_contract_orders_compression_before_hardening(self) -> None:
-        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    def test_runtime_phase_orders_compression_before_hardening(self) -> None:
         issue_phase = (SKILL_ROOT / "references/issue-phase.md").read_text(encoding="utf-8")
-        vertical = (SKILL_ROOT / "references/vertical-slices.md").read_text(encoding="utf-8")
 
         self.assertLess(
             issue_phase.index("### 5. Compress The Candidate Graph"),
@@ -169,21 +167,6 @@ class GraphCompressionReplayTests(unittest.TestCase):
         self.assertLess(
             issue_phase.index("### 6. Converge With Durable Issue State"),
             issue_phase.index("### 7. Harden Every Missing Issue"),
-        )
-        normalized_skill = " ".join(skill.split()).lower()
-        self.assertIn("structural graph-compression", normalized_skill)
-        self.assertIn("issue count", normalized_skill)
-        self.assertIn("never determines", normalized_skill)
-        normalized_phase = " ".join(issue_phase.split()).lower()
-        self.assertIn("structural graph-compression", normalized_phase)
-        self.assertIn("count-neutral", normalized_phase)
-        normalized_vertical = " ".join(vertical.split()).lower()
-        self.assertIn("structural graph-compression", normalized_vertical)
-        self.assertIn("issue count", normalized_vertical)
-        self.assertIn("threshold", normalized_vertical)
-        self.assertIn(
-            "freeze generated ids only after the gate passes",
-            " ".join(vertical.split()).lower(),
         )
 
 

@@ -117,6 +117,13 @@ relationships:
   - child: proposed-issue:account-settings-export/02
     parent: proposed-spec:account-settings-export
     dependency_ids: 01
+acceptance_coverage:
+  - spec_criterion: An authorized account owner can download a portable settings archive.
+    issue_refs: proposed-issue:account-settings-export/01, proposed-issue:account-settings-export/02
+  - spec_criterion: The archive excludes settings owned by another account.
+    issue_refs: proposed-issue:account-settings-export/01, proposed-issue:account-settings-export/02
+  - spec_criterion: The complete export path has focused integration proof.
+    issue_refs: proposed-issue:account-settings-export/02
 publication_order:
   - proposed-spec:account-settings-export
   - proposed-issue:account-settings-export/01
@@ -273,8 +280,7 @@ coverage.
 
 Re-read the current Spec and complete issue set before starting, after recovery,
 and before final verification. Preserve stable planning fields and block on
-semantic drift. Delivery is the normal fixed App flow because no
-`non_app_delivery_target` row is present. After current-head proof and a fresh artifact read, the
+semantic drift. After current-head proof and a fresh artifact read, the
 implementing Codex task owns this issue's checkbox markers; it updates parent
 criteria only after Spec-level proof and restores unchecked state if invalidated.
 Root coordination never edits or judges individual criteria.
@@ -347,8 +353,7 @@ the accepted durable delta to Project Memory and verify its documentation diff.
 
 Re-read the current Spec and complete issue set before starting, after recovery,
 and before final verification. Preserve stable planning fields and block on
-semantic drift. Delivery is the normal fixed App flow because no
-`non_app_delivery_target` row is present. After current-head proof and a fresh artifact read, the
+semantic drift. After current-head proof and a fresh artifact read, the
 implementing Codex task owns this issue's checkbox markers; it updates parent
 criteria only after Spec-level proof and restores unchecked state if invalidated.
 Root coordination never edits or judges individual criteria.
@@ -425,7 +430,7 @@ The integration partial is downstream of both implementation partials, so its
 whole issue graph waits for their merges. Its issue IDs remain local to the
 integration partial; no sibling-partial issue ID is copied into
 `dependency_ids`. The integration issue owns a bounded change in the `web`
-repository plus the integrated proof, so it can produce a real PR. The
+repository plus the integrated proof, so it can produce a real integration change. The
 `knowledge_delta_owner` line is present only when a delta exists; the same
 integration partial and issue remain mandatory without one.
 
@@ -467,7 +472,7 @@ local_integration_completion_path: web/planning/features/account-settings-export
 ```
 
 Bare `#<number>` and bare repo-relative paths are not valid sibling identities.
-The applied integration Feature Spec and its generated issue are App-compatible
+The applied integration Feature Spec and its generated issue are executable
 only after these durable refs replace every proposed ref; this projection does
 not publish or enqueue them.
 
@@ -679,7 +684,7 @@ This sequence is descriptive output only; it contains no executable command.
 - A Feature Spec body persists `knowledge_delta` or a
   `## Domain Knowledge Handoff` section.
 - A multi-repository bundle omits its distinct integration partial or emits a
-  validation-only integration issue that cannot produce a real PR.
+  validation-only integration issue that cannot produce a real integration change.
 - Domain knowledge is captured during planning or assigned to a docs-only
   issue.
 - A `knowledge_delta.target_surfaces` entry falls outside the final closeout

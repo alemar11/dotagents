@@ -72,15 +72,10 @@ repeating dependency IDs.]
 Before starting this issue, after any recovery or handoff, and before final
 verification, re-read the current Feature Spec and complete current issue set.
 Block declaratively on any change to the goal or Non-Goals, repositories or
-allowed paths, `source_spec_ref`, `target_branch_name`, derived delivery type,
-dependencies, acceptance
+allowed paths, `source_spec_ref`, `target_branch_name`, dependencies, acceptance
 criterion text/count/order, safety constraints, or material validation
 constraints including attempt budgets and required terminal outcomes. Do not
 ask the user from the worker task merely to resolve that semantic drift.
-
-Derive delivery type as the normal fixed App flow when this issue has no
-`non_app_delivery_target` row, or as that exact conditional target when the row
-is present. Do not add a duplicate delivery field.
 
 The implementing Codex task may update acceptance checkbox markers,
 implementation approach and internal design, safer or simpler rewrites,
@@ -90,7 +85,10 @@ issue's checkboxes only after current-head proof, then re-reads the GitHub or
 local artifact before writing. It updates parent Feature Spec checkboxes only
 when Spec-level behavior is proven, and restores an unchecked marker whenever
 later evidence invalidates the proof. Root coordination never edits or judges
-individual acceptance criteria.
+individual acceptance criteria. Inside an `## Acceptance Criteria` section,
+only checkbox markers are execution progress; criterion text, count, and order
+remain stable. This does not restrict updates to the other mutable execution
+sections named above.
 
 ## Integration Gates
 
@@ -131,18 +129,14 @@ knowledge_delta:
 
 ## Completion
 
-- GitHub tracker: arm this issue with a closing keyword in the relevant
-  implementation PR. Use the fully qualified `owner/repository#<number>` form
-  when the issue belongs to another repository, and require that PR to target
-  its repository's default branch so the keyword can take effect on merge. If
-  no relevant PR can carry an effective closing keyword, withhold the
-  App-compatible issue or bundle as blocked; a non-closing link is not
-  completion proof.
+- GitHub tracker: after current-head evidence proves the issue criteria, update
+  the issue checkboxes and tracker lifecycle truthfully. The selected executor
+  owns whether completion is represented by a closing reference, explicit
+  close operation, or another supported tracker transition; Plan Feature does
+  not choose that delivery mechanism.
 - Local tracker: after implementation, integration proof, and any domain
   closeout succeed, move this file to the `done/` directory of its owning issue
-  subtree. Commit and push that move, run final validation and `$autoreview`,
-  convert draft PRs to ready-for-review, then obtain current-revision review and
-  CI before terminal merge-ready. An ordinary issue moves to
+  subtree. An ordinary issue moves to
   `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`; an integration
   issue moves to
   `planning/features/<feature-slug>/integration/issues/done/<NN>-<slug>.md`.
@@ -150,12 +144,9 @@ knowledge_delta:
   work, require cross-repo integration proof first. The Execution Contract must
   include the tracker-owning repository plus both the exact active and exact
   destination paths, and both paths must resolve inside that affected Git
-  repository. Commit and push the move, then rerun every final gate that the
-  resulting head invalidates. The `done/` path reaches the default branch only
-  when the later PR merge lands it; at the App terminal state closeout is
-  prepared, not globally completed.
-- Explicit non-App bundle: follow `non-app-delivery.md`; the eventual executor
-  owns authorization and tracker lifecycle. Planning grants neither.
+  repository. Rerun every final gate that the resulting head invalidates. The
+  selected executor owns whether that final tracker move remains local, is
+  pushed, or is included in another supported delivery artifact.
 ```
 
 Tracker metadata is rendered by `write_mode` and backend rather than duplicated
@@ -174,10 +165,8 @@ in the base body:
   intended mappings as report metadata. A proposal is never an applied queue
   state.
 
-For an explicit non-App bundle, append a `non_app_delivery_target` row to the
-same Execution Contract exactly as `non-app-delivery.md` requires. Do not add
-`explicit_instruction_ref` or another delivery, permission, option, dependency,
-or orchestrator-handoff section. Derive issues blocked by this issue by scanning other issues'
+Do not add a delivery, permission, option, or orchestrator-handoff section.
+Derive issues blocked by this issue by scanning other issues'
 `dependency_ids`; keep dependency reasons in Context or implementation prose
 without re-listing IDs.
 

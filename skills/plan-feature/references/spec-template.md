@@ -99,16 +99,6 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
   changing the accepted goal, scope, constraints, or acceptance criteria.
 - [Suggested vertical slices or sequencing constraints.]
 
-## Non-App Delivery
-
-[Include this section only after loading `non-app-delivery.md` for an explicit
-current request or a canonical durable source that already carries exactly one
-target and one resolvable instruction ref. Use each canonical line exactly once
-and state that this Feature Spec bundle is incompatible with
-`$implement-feature`.]
-
-non_app_delivery_target: [canonical value]
-explicit_instruction_ref: [portable resolvable authorized-user instruction ref]
 ```
 
 The `## Feature Dependencies` section is mandatory for every newly produced
@@ -123,9 +113,6 @@ outside the body after publication verifies. When Project Memory instead maps
 header metadata region after the H1 and before `## Source`; include it in the
 final body and do not invent a key or value. In `write_mode=propose`, omit
 applied metadata from the body and report the intended mapping separately.
-
-Omit the optional Non-App Delivery section when its predicate is false. Do not
-leave placeholder text in a published body.
 
 When Plan Feature receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no

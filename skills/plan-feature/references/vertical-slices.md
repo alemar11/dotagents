@@ -65,15 +65,15 @@ Each issue must identify:
 - named integration gates and validation order;
 - sibling Feature Spec refs when repo-scoped partials exist.
 
-Expected PR slots are planning context, not completion proof. The executor
-records real PR links during implementation.
+Potential delivery artifacts are planning context, not completion proof. The
+executor records real delivery evidence during implementation.
 
 Every multi-repository bundle has exactly one distinct repo-owned integration
 partial downstream of all implementation partials and at least one integration
 issue that owns a bounded repo/path change and proves the cross-repository result
 after those upstream merges. A validation-only or no-op issue cannot satisfy the
-App's real-PR conclusion; withhold the App-compatible bundle if no concrete
-integration vehicle exists. This structure does not depend on a knowledge
+required integrated outcome; withhold the bundle if no concrete integration
+vehicle exists. This structure does not depend on a knowledge
 delta.
 
 ## Dependency Graph
@@ -219,9 +219,6 @@ Every agent-ready issue must have:
 - a completed final stable `$plan-harder` issue-hardening pass, after graph and
   scope stabilization;
 - domain closeout only on the unique final issue when required.
-
-For explicit non-App planning, the same section also carries the conditional
-target field and the bundle is not App-compatible.
 
 Withhold any issue that fails this gate and report its blockers. Do not emit a
 weaker agent-ready variant.

@@ -11,7 +11,9 @@ Use this planning-only skill to converge feature intent or a durable Feature
 Spec into one complete, internally consistent bundle: the Feature Spec set,
 hardened vertical implementation issues, tracker metadata, and relationships.
 A Feature Spec is the durable parent contract for one bounded product or system
-change.
+change. The configured tracker may be GitHub or local Markdown. Plan Feature
+produces the same implementation-ready planning contract for either backend and
+does not select the executor's publication or completion transport.
 
 The public pipeline is:
 
@@ -31,17 +33,9 @@ default-path run registry:
 | --- | --- |
 | `write_mode` | `apply`, `propose` |
 
-Before validating selectable fields, inspect the current request and any
-durable source Feature Spec for the non-App predicate. Load
-`references/non-app-delivery.md` when the user explicitly requests a non-App
-stopping point, or when a canonical source Spec already carries exactly one
-`non_app_delivery_target` and exactly one resolvable
-`explicit_instruction_ref`.
-Validate that one conditional extension together with the default registry.
-Otherwise reject every unregistered field or value, including
-`non_app_delivery_target`. Project Memory owns tracker routing and repository
-topology; Plan Feature consumes those as facts. Paths, slugs, refs, branches,
-dependencies, and domain handoffs are data.
+Reject every unregistered field or value. Project Memory owns tracker routing
+and repository topology; Plan Feature consumes those as facts. Paths, slugs,
+refs, branches, dependencies, and domain handoffs are data.
 
 Resolve `write_mode` once:
 
@@ -145,7 +139,7 @@ Resolve `write_mode` once:
 - Treat the Feature Spec and generated issues as strong executor-ready starting
   briefs, not immutable technical scripts. Protect the stable planning contract
   directly: goal/outcome and Non-Goals; repositories, allowed paths, source and
-  branch identity, and delivery type; dependencies; acceptance-criterion
+  branch identity; dependencies; acceptance-criterion
   text/count/order; safety constraints; and material validation constraints,
   including attempt budgets and required terminal outcome. Preserve the
   worker-mutable execution record: checkbox markers, implementation approach
@@ -156,15 +150,21 @@ Resolve `write_mode` once:
   preserve executor-owned acceptance checkbox markers without authorizing Plan
   Feature to edit them.
   In generated issues, source and branch identity are the rendered
-  `source_spec_ref` and `target_branch_name`. Derive delivery type as the normal
-  fixed App flow when `non_app_delivery_target` is absent, or as that exact
-  conditional target when its row is present; do not add duplicate fields.
+  `source_spec_ref` and `target_branch_name`.
+- Feature Spec acceptance criteria and issue acceptance criteria are separate
+  contracts and need not use identical wording, counts, or boundaries. Before
+  publication, build a transient coverage map from every Spec criterion to one
+  or more final vertical issues. Require complete coverage without
+  contradiction or scope widening. Within each individual Spec or issue,
+  criterion text, count, and order are stable while checkbox markers remain
+  executor-owned. Do not persist the transient coverage map unless the tracker
+  artifact needs concise human-readable coverage evidence.
 - For every local Markdown issue, include the tracker-owning repository in
   `affected_repositories` and include both the exact active issue path and its
   exact derived `done/` destination in `allowed_paths`. This is execution scope,
   not a completion-method option. Both paths must resolve inside that affected
-  Git repository so an App-managed checkout can own the move; otherwise withhold
-  the issue as non-App-executable unless the explicit non-App contract applies.
+  Git repository so the selected executor can own the move; otherwise withhold
+  the issue as non-executable.
 - Keep intra-Spec ordering only in `dependency_ids`. Derive reverse edges when
   needed; do not persist them.
 - Keep authored cross-Spec ordering only in the Feature Spec's mandatory
@@ -176,15 +176,12 @@ Resolve `write_mode` once:
   never claim the same pair, even when their paths are disjoint or dependencies
   would serialize them. Resolve collisions before publishing a new bundle; for
   an immutable existing source, stop instead of renaming its branch.
-- Make ordinary output compatible with `$implement-feature`'s fixed reviewed,
-  CI-clean, pull-request-ready flow. Do not select or grant implementation,
-  publication, review, issue-mutation, or merge authority.
-- Load `references/non-app-delivery.md` before drafting only when the current
-  user explicitly requests a non-App stopping point, or a canonical durable
-  source Spec carries exactly one target and one resolvable
-  `explicit_instruction_ref`. The instruction ref is evidence data, not a run
-  option or issue field. Artifacts carrying `non_app_delivery_target` are
-  incompatible with `$implement-feature`.
+- Make output consumable by `$implement-feature` regardless of whether the
+  configured tracker is GitHub or local Markdown. Plan Feature does not require
+  a GitHub remote, choose a publication transport, or select or grant
+  implementation, review, issue-mutation, publication, or merge authority. The
+  executor derives its supported terminal outcome from the repository and
+  tracker evidence it owns.
 - Carry an optional `knowledge_delta` data object with `decisions`,
   `target_surfaces`, and `evidence` lists. Absence means no durable change.
   Keep unresolved planning questions in a separate `planning_blockers` list.
@@ -218,9 +215,9 @@ Resolve `write_mode` once:
   Feature Dependencies wait for every implementation partial to merge. Generate
   at least one integration issue from it whether or not a knowledge delta
   exists. That issue must own a bounded repository/path change plus
-  cross-repository proof so the App can produce a real PR; withhold the bundle
-  when no such integration vehicle exists. Attach domain closeout only to its
-  final issue when a delta exists. Derive the integration partial's branch by
+  cross-repository proof so an executor can produce a real integration change;
+  withhold the bundle when no such integration vehicle exists. Attach domain
+  closeout only to its final issue when a delta exists. Derive the integration partial's branch by
   appending `-integration` to the resolved ordinary partial branch; never reuse
   the ordinary partial's branch in the same repository. With the default
   ordinary branch this yields `feature/<feature_slug>-integration`.
@@ -399,8 +396,6 @@ require a separately authorized update. On the new-source route, load
 - optional exact multi-repository publication-continuation handoff with its
   reconstructable templates, slots, selected Idea/prior-outcome refs, and
   completed plus missing operations;
-- `non_app_delivery_target` and `explicit_instruction_ref` only after explicitly
-  loading the conditional reference; keep the latter as source evidence data.
 
 Require a durable local or hosted `source_spec_ref` for `write_mode=apply`, or
 a deterministic proposed ref and publication-order note for
@@ -494,7 +489,6 @@ Return:
   the complete `knowledge_delta` until its final owner issue is durable and
   verified;
 - blockers and withheld artifacts;
-- explicit App incompatibility when `non_app_delivery_target` is present.
 
 When `knowledge_delta` is present, report `capture_outcome=deferred` plus its
 actual or proposed final issue ref. Otherwise report
@@ -511,9 +505,6 @@ captured.
 - `references/idea-source.md`: selected durable Idea validation, intent
   normalization, cumulative coverage, Feature Spec projection, outcome records,
   and terminal lifecycle reconciliation.
-- `references/non-app-delivery.md`: load for an explicitly requested non-App
-  stopping point or a canonical durable source carrying exactly one target and
-  one resolvable `explicit_instruction_ref`.
 - `references/spec-phase.md`: Feature Spec drafting, routing, and publication.
 - `references/spec-template.md`: default Feature Spec shape.
 - `references/issue-phase.md`: issue splitting, hardening, graph validation,

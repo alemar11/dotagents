@@ -27,9 +27,6 @@ through the caller.
   local or hosted write and return proposed bodies, locations, metadata, and
   publication order rather than executable commands.
 - Do not create hosted-artifact mirrors or temporary planning trees.
-- Load `non-app-delivery.md` only when its current-request predicate is true or
-  a canonical durable source Spec carries exactly one target and one resolvable
-  `explicit_instruction_ref`.
 - Load `idea-source.md` when selected new-source `source_idea_refs` or derived
   existing-source `bound_source_idea_refs` are present. Explicit discovery must
   already have completed and produced a selection before new-source drafting.
@@ -64,8 +61,6 @@ Receive:
 - authored Feature Spec dependency rows;
 - optional `knowledge_delta` with `decisions`, `target_surfaces`, and
   `evidence` lists, plus a separate `planning_blockers` list;
-- `non_app_delivery_target` and its non-option `explicit_instruction_ref` only
-  when the conditional reference was loaded.
 
 Absence of `knowledge_delta` means planning introduced no durable project
 knowledge. Do not emit an empty object. Preserve unresolved planning blockers
@@ -169,8 +164,8 @@ For multi-repository work:
    this does not require or create a coordination repository. Create this
    partial independently of `knowledge_delta`, and never render the delta in its
    Feature Spec body. Require a bounded repo-owned integration vehicle that can
-   produce a concrete path change and real PR in addition to validation proof;
-   withhold the App-compatible bundle if no such vehicle exists. Derive its
+   produce a concrete path change in addition to validation proof; withhold the
+   bundle if no such vehicle exists. Derive its
    target branch as `<ordinary_target_branch_name>-integration` from the
    resolved ordinary branch in the same repository; the default result is
    `feature/<feature_slug>-integration`.
@@ -287,14 +282,10 @@ partial whose scope derives from that Idea, and omit it from unrelated
 partials. Preserve the Idea body and keep its refs and transient coverage maps
 out of generated implementation issues.
 
-The normal Feature Spec does not carry selectable delivery, review,
-permission, pull-request-count, scheduling, or tracker-closeout fields. Its
-generated issues are compatible with `$implement-feature`'s fixed flow.
-
-When the explicit non-App exception applies, include exactly one selected
-`non_app_delivery_target`, exactly one resolvable `explicit_instruction_ref`,
-and a prominent App-incompatibility statement. The ref is evidence data, not an
-option or issue field. Do not add authority fields.
+The Feature Spec does not carry selectable delivery, review, permission,
+pull-request-count, scheduling, or tracker-closeout fields. It uses the same
+planning contract for GitHub and local Markdown trackers; the executor owns
+delivery and terminal-outcome selection from current repository evidence.
 
 ### 4. Validate Feature Dependencies
 
@@ -364,10 +355,6 @@ Then verify:
   with Feature Dependencies covering every implementation
   partial, and its title or path plus `Partial role: integration` distinguish it
   from the implementation partial in the same repository;
-- non-App data is absent unless the conditional reference was loaded; when
-  present, exactly one target and one `explicit_instruction_ref` exist in the
-  owning section, and the ref resolves to an authorized-user instruction that
-  selects the same target and scope;
 - the body contains no workflow status field such as `Status: Draft`;
 - every selected Idea ref appears only in the `## Source` section of each
   relevant Feature Spec and nowhere in generated issue contracts;
@@ -552,7 +539,6 @@ Return:
 - any applicable multi-repository publication-transaction identity,
   role-to-ref map, and exact reconstructable continuation handoff when Spec
   finalization remains incomplete;
-- explicit App incompatibility when a non-App target is present.
 
 When `knowledge_delta` is present, pass it directly to the issue phase and
 report `capture_outcome=deferred` plus the owning Feature Spec ref. Otherwise
