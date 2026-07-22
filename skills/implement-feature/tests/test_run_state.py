@@ -83,10 +83,15 @@ class RunStateScenarios(unittest.TestCase):
         assignments = []
         for index in range(assignment_count):
             identity, _ = repositories[index % len(repositories)]
+            if identity.startswith("github:"):
+                owner_repository = identity.removeprefix("github:")
+                source_spec_ref = f"https://github.com/{owner_repository}/issues/{index + 1}"
+            else:
+                source_spec_ref = f"project/planning/features/feature-{index + 1}/SPEC.md"
             assignments.append(
                 {
                     "assignment_id": f"spec-{index + 1:02d}",
-                    "source_ref": f"https://github.com/example/project/issues/{index + 1}",
+                    "source_spec_ref": source_spec_ref,
                     "repository_identity": identity,
                     "project_id": f"{project_prefix}-{index % len(repositories) + 1}",
                     "title": f"🛠️ Feature {index + 1}",
@@ -160,7 +165,7 @@ class RunStateScenarios(unittest.TestCase):
             {"thread_id": thread},
         )
 
-    def ready_worker(self, run_id: str, number: int = 1) -> None:
+    def ready_worker(self, run_id: str, number: int = 1) -> dict[str, object]:
         observation = {
             "schema_version": 1,
             "assignment_id": f"spec-{number:02d}",
@@ -173,7 +178,7 @@ class RunStateScenarios(unittest.TestCase):
             "provider_observation_ref": f"provider:pr:{number}:head:{100 + number}",
             "status": "pr-ready-for-merge",
         }
-        self.invoke(
+        return self.invoke(
             "assignment", "ready", "--run-id", run_id,
             "--expected-revision", self.revision(run_id),
             "--observation", str(self.write_json(f"ready-{run_id}-{number}.json", observation)),
@@ -266,40 +271,105 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(code, 4)
         self.assertEqual(json.loads(output.getvalue())["error"]["code"], "state-busy")
 
-    def test_given_same_github_repo_in_different_workspaces_when_second_starts_then_it_waits(self) -> None:
-        """Given two paths for github:owner/repo, when roots start, then canonical identity conflicts."""
+    def test_given_same_github_spec_in_different_workspaces_when_second_starts_then_it_waits(self) -> None:
+        """Given one durable Spec through two paths, when roots start, then canonical Spec identity conflicts."""
         self.start("owner", repositories=[("github:example/project", self.common_a)])
         result = self.start("waiter", repositories=[("github:example/project", self.common_b)])
-        self.assertEqual(result["status"], "waiting-for-repository")
-        self.assertFalse(result["claims_acquired"])
-        self.assertEqual(result["conflicting_owners"][0]["run_id"], "owner")
+        self.assertEqual(result["status"], "waiting-for-spec")
+        self.assertEqual(result["acquired_assignment_ids"], [])
+        self.assertEqual(result["waiting_assignments"][0]["owner"]["run_id"], "owner")
 
-    def test_given_linked_local_worktrees_when_second_starts_then_common_dir_identity_collides(self) -> None:
-        """Given linked worktrees share a common dir, when both roots start, then local identity has one owner."""
+    def test_given_same_local_spec_in_linked_worktrees_when_second_starts_then_it_waits(self) -> None:
+        """Given linked worktrees address one local Spec, when roots start, then that Spec has one owner."""
         identity = self.local_identity(self.common_a)
         self.start("local-owner", repositories=[(identity, self.common_a)])
         result = self.start("local-waiter", repositories=[(identity, self.common_a)])
-        self.assertEqual(result["status"], "waiting-for-repository")
+        self.assertEqual(result["status"], "waiting-for-spec")
 
-    def test_given_multi_repo_request_when_one_conflicts_then_claims_are_all_or_none(self) -> None:
-        """Given one of two repositories is owned, when a root starts, then neither requested claim activates."""
-        self.start("owner", repositories=[("github:example/b", self.common_b)])
-        result = self.start(
-            "multi", repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)],
-            assignment_count=2,
+    def test_given_different_specs_in_same_repository_when_two_roots_start_then_both_acquire(self) -> None:
+        """Given distinct durable Specs in one repository, when two roots start, then worktrees may proceed concurrently."""
+        first = self.start("first-spec")
+        second_manifest = self.manifest("second-spec")
+        second_manifest["assignments"][0]["source_spec_ref"] = "example/project#2"
+        second_manifest["assignments"][0]["target_branch_name"] = "feature/example-2"
+        second = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("second-spec.json", second_manifest))
         )
-        self.assertFalse(result["claims_acquired"])
-        shown = self.invoke("run", "show", "--run-id", "multi")
-        self.assertTrue(all(row["active"] == 0 for row in shown["repository_claims"]))
+        self.assertEqual(first["acquired_assignment_ids"], ["spec-01"])
+        self.assertEqual(second["acquired_assignment_ids"], ["spec-01"])
+        self.assertTrue(second["may_create_goal_or_worker"])
+        self.create_goal("first-spec")
+        self.create_goal("second-spec")
+        self.create_worker("first-spec")
+        self.create_worker("second-spec")
+        self.assertEqual(self.invoke("run", "show", "--run-id", "first-spec")["assignments"][0]["state"], "active")
+        self.assertEqual(self.invoke("run", "show", "--run-id", "second-spec")["assignments"][0]["state"], "active")
 
-    def test_given_three_same_repo_specs_when_bootstrapped_then_one_claim_owns_three_workers(self) -> None:
-        """Given three disjoint Specs in one repo, when root dispatches them, then one claim supports three workers."""
+    def test_given_same_github_spec_in_url_and_short_form_when_roots_start_then_identity_collides(self) -> None:
+        """Given URL and shorthand aliases, when roots start, then canonicalization prevents duplicate implementation."""
+        self.start("url-owner")
+        waiter = self.manifest("short-waiter")
+        waiter["assignments"][0]["source_spec_ref"] = "example/project#1"
+        result = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("short-waiter.json", waiter))
+        )
+        self.assertEqual(result["status"], "waiting-for-spec")
+        self.assertEqual(result["waiting_assignments"][0]["owner"]["run_id"], "url-owner")
+
+    def test_given_two_concurrent_roots_when_same_spec_is_claimed_then_exactly_one_acquires(self) -> None:
+        """Given simultaneous starts for one Spec, when SQLite serializes writers, then exactly one root acquires it."""
+        manifests = [
+            self.write_json(f"concurrent-{name}.json", self.manifest(f"concurrent-{name}"))
+            for name in ("a", "b")
+        ]
+        processes = [
+            subprocess.Popen(
+                [str(TOOL), "--json", "run", "start", "--manifest", str(manifest)],
+                env=self.env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            for manifest in manifests
+        ]
+        payloads = []
+        for process in processes:
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, stderr + stdout)
+            payloads.append(json.loads(stdout))
+        self.assertEqual(sorted(len(item["acquired_assignment_ids"]) for item in payloads), [0, 1])
+
+    def test_given_different_specs_reuse_one_head_branch_when_roots_start_then_branch_owner_blocks_second(self) -> None:
+        """Given distinct Specs but one head branch, when roots start, then App worktree branch ownership stays unique."""
+        self.start("branch-owner")
+        waiter = self.manifest("branch-waiter")
+        waiter["assignments"][0]["source_spec_ref"] = "example/project#2"
+        result = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("branch-waiter.json", waiter))
+        )
+        self.assertEqual(result["status"], "waiting-for-spec")
+        self.assertEqual(result["waiting_assignments"][0]["owner"]["conflict_kind"], "head-branch")
+
+    def test_given_multi_spec_request_when_one_conflicts_then_free_specs_still_acquire(self) -> None:
+        """Given one of two Specs is owned, when a root starts, then its free Spec still acquires."""
+        self.start("owner", repositories=[("github:example/b", self.common_b)])
+        manifest = self.manifest(
+            "multi", repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)], assignment_count=2,
+        )
+        manifest["assignments"][1]["source_spec_ref"] = "https://github.com/example/b/issues/1"
+        result = self.invoke("run", "start", "--manifest", str(self.write_json("multi.json", manifest)))
+        self.assertEqual(result["acquired_assignment_ids"], ["spec-01"])
+        self.assertEqual(result["waiting_assignments"][0]["assignment_id"], "spec-02")
+        self.assertTrue(result["may_create_goal_or_worker"])
+        shown = self.invoke("run", "show", "--run-id", "multi")
+        self.assertEqual([row["active"] for row in shown["spec_claims"]], [1, 0])
+
+    def test_given_three_same_repo_specs_when_bootstrapped_then_each_has_its_own_claim(self) -> None:
+        """Given three disjoint Specs in one repo, when dispatched, then each worker has one Spec claim."""
         self.start("three", assignment_count=3)
         self.create_goal("three")
         for number in (1, 2, 3):
             self.create_worker("three", number)
         shown = self.invoke("run", "show", "--run-id", "three")
-        self.assertEqual(len(shown["repository_claims"]), 1)
+        self.assertEqual(len(shown["spec_claims"]), 3)
+        self.assertTrue(all(row["active"] == 1 for row in shown["spec_claims"]))
         self.assertEqual([row["state"] for row in shown["assignments"]], ["active"] * 3)
 
     def test_given_three_live_workers_when_fourth_creation_begins_then_capacity_blocks(self) -> None:
@@ -406,44 +476,47 @@ class RunStateScenarios(unittest.TestCase):
         self.start("owner")
         self.start("waiter")
         self.invoke("run", "finish", "--run-id", "owner", "--expected-revision", self.revision("owner"), "--outcome", "preimplementation-aborted")
-        result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
-        self.assertTrue(result["claims_acquired"])
-        self.assertTrue(result["may_create_goal_or_worker"])
+        result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--assignment-id", "spec-01", "--expected-revision", self.revision("waiter"))
+        self.assertTrue(result["claim_acquired"])
+        self.assertTrue(result["may_create_worker"])
 
     def test_given_unchanged_owner_when_three_sweeps_pass_then_waiter_blocks_before_app_objects(self) -> None:
         """Given an active owner, when three unchanged sweeps pass, then waiter terminates before Goal or task."""
         self.start("owner")
         self.start("waiter")
         for _ in range(3):
-            result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
-        self.assertEqual(result["status"], "blocked-by-active-run")
+            result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--assignment-id", "spec-01", "--expected-revision", self.revision("waiter"))
+        self.assertEqual(result["state"], "blocked-by-active-spec")
         shown = self.invoke("run", "show", "--run-id", "waiter")
         self.assertEqual(shown["goal_state"], "not-created")
         self.assertTrue(all(row["thread_id"] is None for row in shown["assignments"]))
         self.assertEqual(shown["unresolved_app_operations"], [])
-        self.assertEqual(result["conflicting_owners"][0]["root_task_id"], "root-owner")
+        self.assertEqual(result["conflicting_owner"]["root_task_id"], "root-owner")
 
     def test_given_same_owner_adds_worker_when_wait_sweeps_continue_then_bound_does_not_reset(self) -> None:
-        """Given one repository owner, when its worker list changes, then stable owner identity keeps the wait bounded."""
+        """Given one Spec owner, when its worker list changes, then stable owner identity keeps the wait bounded."""
         self.start("churn-owner", assignment_count=2)
         self.create_goal("churn-owner")
         self.start("churn-waiter")
         first = self.invoke(
             "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--assignment-id", "spec-01",
             "--expected-revision", self.revision("churn-waiter"),
         )
         self.assertEqual(first["unchanged_wait_sweeps"], 1)
         self.create_worker("churn-owner", 1)
         second = self.invoke(
             "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--assignment-id", "spec-01",
             "--expected-revision", self.revision("churn-waiter"),
         )
         self.assertEqual(second["unchanged_wait_sweeps"], 2)
         third = self.invoke(
             "run", "wait-sweep", "--run-id", "churn-waiter",
+            "--assignment-id", "spec-01",
             "--expected-revision", self.revision("churn-waiter"),
         )
-        self.assertEqual(third["status"], "blocked-by-active-run")
+        self.assertEqual(third["state"], "blocked-by-active-spec")
 
     def test_given_post_bootstrap_durable_block_when_other_root_waits_then_no_takeover_occurs(self) -> None:
         """Given Root A has worker authority and blocks, when Root B waits, then A retains the repository."""
@@ -454,12 +527,26 @@ class RunStateScenarios(unittest.TestCase):
             "assignment", "block", "--run-id", "owner", "--expected-revision", self.revision("owner"),
             "--assignment-id", "spec-01",
         )
-        self.assertTrue(result["claims_retained"])
+        self.assertTrue(result["claim_retained"])
         self.start("waiter")
         for _ in range(3):
-            blocked = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
-        self.assertEqual(blocked["status"], "blocked-by-active-run")
-        self.assertEqual(blocked["conflicting_owners"][0]["worker_thread_ids"], ["thread-owner-1"])
+            blocked = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--assignment-id", "spec-01", "--expected-revision", self.revision("waiter"))
+        self.assertEqual(blocked["state"], "blocked-by-active-spec")
+        self.assertEqual(blocked["conflicting_owner"]["thread_id"], "thread-owner-1")
+
+    def test_given_one_assignment_blocks_when_sibling_is_active_then_run_continues_sibling(self) -> None:
+        """Given one durable-contract block, when a sibling is active, then only the blocked Spec retains its claim."""
+        self.start("partial-block", assignment_count=2)
+        self.create_goal("partial-block")
+        self.create_worker("partial-block", 1)
+        self.create_worker("partial-block", 2)
+        result = self.invoke(
+            "assignment", "block", "--run-id", "partial-block",
+            "--expected-revision", self.revision("partial-block"), "--assignment-id", "spec-01",
+        )
+        self.assertEqual(result["run_status"], "active")
+        shown = self.invoke("run", "show", "--run-id", "partial-block")
+        self.assertEqual([row["state"] for row in shown["assignments"]], ["blocked-durable-contract", "active"])
 
     def test_given_prebootstrap_abort_when_finished_then_claim_releases(self) -> None:
         """Given a Goal and worker but no bootstrap authority, when both reconcile terminal, then claim releases."""
@@ -483,8 +570,43 @@ class RunStateScenarios(unittest.TestCase):
         )
         result = self.invoke("run", "finish", "--run-id", "abort", "--expected-revision", self.revision("abort"), "--outcome", "preimplementation-aborted")
         self.assertTrue(result["claims_released"])
-        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project")
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--source-spec-ref", "example/project#1")
         self.assertIsNone(owner["owner"])
+
+    def test_given_two_planned_assignments_when_one_aborts_then_only_its_claim_releases(self) -> None:
+        """Given two pre-bootstrap Specs, when one aborts, then its sibling claim remains active."""
+        self.start("partial-abort", assignment_count=2)
+        result = self.invoke(
+            "assignment", "abort", "--run-id", "partial-abort",
+            "--expected-revision", self.revision("partial-abort"), "--assignment-id", "spec-01",
+        )
+        self.assertTrue(result["claim_released"])
+        shown = self.invoke("run", "show", "--run-id", "partial-abort")
+        self.assertEqual([row["active"] for row in shown["spec_claims"]], [0, 1])
+        self.assertEqual(shown["status"], "active")
+
+    def test_given_prebootstrap_owner_missing_when_waiter_reconciles_then_abort_and_acquire_are_atomic(self) -> None:
+        """Given no bootstrap and authoritative missing worker proof, when reconciled, then old claim aborts safely."""
+        self.start("missing-owner")
+        self.start("missing-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "missing-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("missing-owner")),
+            "repository_identity": "github:example/project",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "not-found",
+            "checkout_state": "not-found",
+            "readback_ref": "app-read:missing-owner-worker",
+        }
+        result = self.invoke(
+            "claim", "reconcile", "--run-id", "missing-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("missing-waiter"),
+            "--observation", str(self.write_json("missing-recovery.json", observation)),
+        )
+        self.assertEqual(result["outcome"], "preimplementation-aborted")
+        self.assertTrue(result["claim_acquired"])
 
     def test_given_confirmed_failed_app_operation_when_retried_then_new_key_is_allowed(self) -> None:
         """Given readback proves no Goal was created, when root retries, then a new operation key may launch."""
@@ -508,7 +630,131 @@ class RunStateScenarios(unittest.TestCase):
         self.ready_worker("first")
         self.finish_pr_ready("first")
         second = self.start("second")
-        self.assertTrue(second["claims_acquired"])
+        self.assertEqual(second["acquired_assignment_ids"], ["spec-01"])
+
+    def test_given_one_assignment_ready_when_sibling_remains_active_then_only_ready_claim_releases(self) -> None:
+        """Given two workers, when one becomes PR-ready, then its Spec claim releases without ending the run."""
+        self.start("partial-ready", assignment_count=2)
+        self.create_goal("partial-ready")
+        self.create_worker("partial-ready", 1)
+        self.create_worker("partial-ready", 2)
+        result = self.ready_worker("partial-ready", 1)
+        self.assertTrue(result["claim_released"])
+        shown = self.invoke("run", "show", "--run-id", "partial-ready")
+        self.assertEqual([row["active"] for row in shown["spec_claims"]], [0, 1])
+        self.assertEqual(shown["status"], "active")
+        self.assertEqual(shown["goal_state"], "active")
+
+    def test_given_terminal_postbootstrap_owner_when_waiter_reconciles_then_claim_transfers_atomically(self) -> None:
+        """Given authoritative terminal worker proof, when waiter reconciles, then old work is abandoned and the Spec acquires."""
+        self.start("terminal-owner")
+        self.create_goal("terminal-owner")
+        self.create_worker("terminal-owner")
+        self.start("terminal-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "terminal-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("terminal-owner")),
+            "repository_identity": "github:example/project",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "completed",
+            "checkout_state": "released",
+            "readback_ref": "app-read:terminal-owner-worker",
+        }
+        result = self.invoke(
+            "claim", "reconcile", "--run-id", "terminal-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("terminal-waiter"),
+            "--observation", str(self.write_json("terminal-recovery.json", observation)),
+        )
+        self.assertEqual(result["outcome"], "abandoned")
+        self.assertTrue(result["claim_acquired"])
+        owner = self.invoke("run", "show", "--run-id", "terminal-owner")
+        waiter = self.invoke("run", "show", "--run-id", "terminal-waiter")
+        self.assertEqual(owner["assignments"][0]["state"], "abandoned")
+        self.assertEqual(waiter["assignments"][0]["state"], "planned")
+
+    def test_given_active_owner_when_waiter_reconciles_then_claim_is_preserved(self) -> None:
+        """Given authoritative active worker proof, when waiter reconciles, then no takeover or revision change occurs."""
+        self.start("active-owner")
+        self.create_goal("active-owner")
+        self.create_worker("active-owner")
+        self.start("active-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "active-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("active-owner")),
+            "repository_identity": "github:example/project",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "active",
+            "checkout_state": "present",
+            "readback_ref": "app-read:active-owner-worker",
+        }
+        result = self.invoke(
+            "claim", "reconcile", "--run-id", "active-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("active-waiter"),
+            "--observation", str(self.write_json("active-recovery.json", observation)),
+        )
+        self.assertEqual(result["outcome"], "owner-active")
+        self.assertFalse(result["claim_acquired"])
+
+    def test_given_terminal_worker_with_bound_checkout_when_reconciled_then_claim_is_preserved(self) -> None:
+        """Given a completed task still owns its checkout, when reconciled, then a duplicate branch worktree cannot start."""
+        self.start("bound-owner")
+        self.create_goal("bound-owner")
+        self.create_worker("bound-owner")
+        self.start("bound-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "bound-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("bound-owner")),
+            "repository_identity": "github:example/project",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "completed",
+            "checkout_state": "present",
+            "readback_ref": "app-read:bound-owner-worker",
+        }
+        result = self.invoke(
+            "claim", "reconcile", "--run-id", "bound-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("bound-waiter"),
+            "--observation", str(self.write_json("bound-recovery.json", observation)),
+        )
+        self.assertEqual(result["outcome"], "checkout-still-bound")
+        self.assertFalse(result["claim_acquired"])
+
+    def test_given_unknown_recovery_when_explicit_abandon_runs_then_exact_claim_transfers(self) -> None:
+        """Given irrecoverable App evidence, when explicit abandon is invoked, then only that Spec claim transfers."""
+        self.start("unknown-owner")
+        self.create_goal("unknown-owner")
+        self.create_worker("unknown-owner")
+        self.start("unknown-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "unknown-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("unknown-owner")),
+            "repository_identity": "github:example/project",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "unknown",
+            "checkout_state": "unknown",
+            "readback_ref": "app-read:unknown-owner-worker",
+        }
+        reconciled = self.invoke(
+            "claim", "reconcile", "--run-id", "unknown-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("unknown-waiter"),
+            "--observation", str(self.write_json("unknown-recovery.json", observation)),
+        )
+        self.assertEqual(reconciled["state"], "abandoned-recovery-required")
+        abandoned = self.invoke(
+            "claim", "abandon", "--run-id", "unknown-waiter",
+            "--assignment-id", "spec-01", "--expected-revision", self.revision("unknown-waiter"),
+            "--owner-run-id", "unknown-owner", "--owner-assignment-id", "spec-01",
+            "--owner-expected-revision", self.revision("unknown-owner"),
+        )
+        self.assertEqual(abandoned["outcome"], "manual-abandon")
+        self.assertTrue(abandoned["claim_acquired"])
 
     def test_given_unknown_bootstrap_effect_when_readback_arrives_then_same_key_reconciles(self) -> None:
         """Given ambiguous App delivery, when receipt readback resolves, then the same key succeeds without hashes."""
@@ -593,7 +839,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("started")
         error = self.invoke("run", "finish", "--run-id", "started", "--expected-revision", self.revision("started"), "--outcome", "preimplementation-aborted", expected=4)
         self.assertEqual(error["error"]["code"], "implementation-already-started")
-        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project")
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--source-spec-ref", "example/project#1")
         self.assertEqual(owner["owner"]["run_id"], "started")
 
     def test_given_schema_when_inspected_then_only_allowlisted_state_and_no_text_hashes_exist(self) -> None:
@@ -603,9 +849,17 @@ class RunStateScenarios(unittest.TestCase):
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
             columns = [row[1] for table in tables for row in connection.execute(f"PRAGMA table_info({table})")]
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(tables, {"metadata", "runs", "assignments", "repository_claims", "app_operations"})
+        self.assertEqual(tables, {"metadata", "runs", "assignments", "spec_claims", "app_operations"})
         self.assertEqual(version, 1)
         self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
+
+    def test_given_previous_schema_one_shape_when_read_then_runtime_rejects_without_migration(self) -> None:
+        """Given the retired repository-claim shape, when schema 1 opens, then the fresh runtime fails closed."""
+        self.start("retired-shape")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("ALTER TABLE spec_claims RENAME TO repository_claims")
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
 
 
 if __name__ == "__main__":

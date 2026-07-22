@@ -16,7 +16,7 @@ closure.
 The root coordinates; each visible App worker executes one Feature Spec end to
 end in its App-managed worktree. A worker that remains within the durable
 contract and continues producing coherent progress and evidence must not be
-micromanaged. Root owns scheduling, one lifecycle Goal, canonical repository
+micromanaged. Root owns scheduling, one lifecycle Goal, canonical Feature Spec
 claims, typed App-operation reconciliation, coarse status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, reviews and fixes, tracker proof, and
@@ -37,14 +37,14 @@ validation, blocker, or continuation question during the run.
 2. Start `scripts/run-state`. It uses one per-user schema-1 SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`. SQLite
    transactions and the fixed busy timeout are the only writer lock.
-3. If another root owns any requested repository, create no Goal, worker,
-   worktree, or mutation. Follow the bounded wait in
-   `references/recovery-validation.md`.
-4. After all repository claims are atomically acquired, create and read back
-   the one root Goal. Schedule up to three path-disjoint Feature Specs; serialize
-   overlap and dependency order. Several disjoint Specs may share the root
-   run's one repository claim while keeping distinct branches, worktrees, and
-   PRs.
+3. Atomically claim each free `(repository_identity, source_spec_ref)` pair.
+   Different Specs and head branches may run under different roots in the same
+   repository. Keep a conflicting assignment in its bounded Spec wait without
+   blocking claims already acquired by sibling assignments.
+4. When at least one assignment owns its claim, create and read back the one
+   root Goal. Schedule up to three path-disjoint Feature Specs; serialize
+   overlap and dependency order inside this root. Never create a worker for an
+   assignment whose Spec or head branch claim is waiting.
 5. For each worker, follow `references/app-orchestration.md` and send the full
    assignment once. A succeeded bootstrap receipt/readback starts its complete
    implementation authority; there is no baseline-only phase or later GO.
@@ -54,11 +54,13 @@ validation, blocker, or continuation question during the run.
    operation key.
 7. Apply `references/gates.md`. Root rereads authoritative tracker, App, Git,
    PR, CI, and review evidence without editing or judging criteria. Complete
-   the Goal and atomically release claims only when the whole run is PR-ready.
+   each assignment claim when its root-verified evidence becomes PR-ready, then
+   complete the Goal and run only when the whole requested run is PR-ready.
 
 If a worker observes compatible operational change, it adopts it and continues.
 If a stable durable field changes, it records `assignment block` and stops
-declaratively without asking. A post-bootstrap blocked run retains its claims.
+declaratively without asking. That post-bootstrap assignment retains only its
+own Feature Spec claim; independent assignments continue.
 
 ## Reference Routing
 

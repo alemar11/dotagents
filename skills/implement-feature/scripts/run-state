@@ -30,6 +30,17 @@ GITHUB_PULL_RE = re.compile(
     r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
     r"([a-z0-9._-]{1,100})/pull/([1-9][0-9]*)$"
 )
+GITHUB_SPEC_REF_RE = re.compile(
+    r"^([a-z0-9](?:[a-z0-9-]{0,38}))/([a-z0-9._-]{1,100})#([1-9][0-9]*)$"
+)
+GITHUB_SPEC_URL_RE = re.compile(
+    r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
+    r"([a-z0-9._-]{1,100})/issues/([1-9][0-9]*)$"
+)
+LOCAL_SPEC_REF_RE = re.compile(
+    r"^[a-z0-9][a-z0-9._-]{0,100}/planning/features/"
+    r"[a-z0-9][a-z0-9._/-]*/(?:integration/)?SPEC\.md$"
+)
 
 APP_ACTIONS = {
     "create-goal",
@@ -153,7 +164,7 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
             f"expected schema 1, found {version}; migrations are not supported",
             4,
         )
-    expected = {"metadata", "runs", "assignments", "repository_claims", "app_operations"}
+    expected = {"metadata", "runs", "assignments", "spec_claims", "app_operations"}
     actual = {
         row[0]
         for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -170,15 +181,13 @@ def create_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT PRIMARY KEY,
             root_task_id TEXT NOT NULL,
             status TEXT NOT NULL CHECK(status IN (
-                'waiting-for-repository', 'active', 'blocked',
-                'blocked-by-active-run', 'pr-ready', 'preimplementation-aborted'
+                'waiting-for-spec', 'active', 'blocked',
+                'pr-ready', 'preimplementation-aborted'
             )),
             goal_state TEXT NOT NULL DEFAULT 'not-created'
                 CHECK(goal_state IN ('not-created', 'active', 'completed')),
             implementation_started INTEGER NOT NULL DEFAULT 0 CHECK(implementation_started IN (0,1)),
             revision INTEGER NOT NULL,
-            unchanged_wait_sweeps INTEGER NOT NULL DEFAULT 0,
-            waiting_owner_runs_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             finished_at TEXT
@@ -186,15 +195,22 @@ def create_schema(connection: sqlite3.Connection) -> None:
         """CREATE TABLE assignments (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             assignment_id TEXT NOT NULL,
-            source_ref TEXT NOT NULL,
+            source_spec_ref TEXT NOT NULL,
+            claim_spec_identity TEXT NOT NULL,
             repository_identity TEXT NOT NULL,
             project_id TEXT NOT NULL,
             title TEXT NOT NULL,
             target_branch_name TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN (
-                'planned', 'worker-created', 'active', 'pr-ready',
-                'blocked-durable-contract', 'preimplementation-aborted'
+                'waiting-for-spec', 'planned', 'worker-created', 'active',
+                'pr-ready', 'blocked-durable-contract',
+                'blocked-by-active-spec', 'preimplementation-aborted',
+                'abandoned', 'abandoned-recovery-required'
             )),
+            unchanged_wait_sweeps INTEGER NOT NULL DEFAULT 0,
+            waiting_owner_run_id TEXT,
+            waiting_owner_assignment_id TEXT,
+            waiting_owner_root_task_id TEXT,
             thread_id TEXT,
             checkout_path TEXT,
             git_common_dir TEXT,
@@ -205,21 +221,29 @@ def create_schema(connection: sqlite3.Connection) -> None:
             provider_observation_ref TEXT,
             updated_at TEXT NOT NULL,
             PRIMARY KEY(run_id, assignment_id),
-            UNIQUE(run_id, source_ref),
+            UNIQUE(run_id, source_spec_ref),
             UNIQUE(run_id, repository_identity, target_branch_name)
         )""",
-        """CREATE TABLE repository_claims (
+        """CREATE TABLE spec_claims (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            assignment_id TEXT NOT NULL,
             repository_identity TEXT NOT NULL,
+            claim_spec_identity TEXT NOT NULL,
+            target_branch_name TEXT NOT NULL,
             git_common_dir TEXT NOT NULL,
             git_common_dir_device INTEGER NOT NULL,
             git_common_dir_inode INTEGER NOT NULL,
             active INTEGER NOT NULL CHECK(active IN (0,1)),
             acquired_at TEXT,
             released_at TEXT,
-            PRIMARY KEY(run_id, repository_identity)
+            release_reason TEXT,
+            recovery_readback_ref TEXT,
+            PRIMARY KEY(run_id, assignment_id),
+            FOREIGN KEY(run_id, assignment_id)
+                REFERENCES assignments(run_id, assignment_id) ON DELETE RESTRICT
         )""",
-        "CREATE UNIQUE INDEX one_active_repository_owner ON repository_claims(repository_identity) WHERE active=1",
+        "CREATE UNIQUE INDEX one_active_spec_owner ON spec_claims(repository_identity,claim_spec_identity) WHERE active=1",
+        "CREATE UNIQUE INDEX one_active_head_branch_owner ON spec_claims(repository_identity,target_branch_name) WHERE active=1",
         """CREATE TABLE app_operations (
             sequence INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
@@ -333,6 +357,28 @@ def repository_identity(value: Any, git_common_dir: str) -> str:
     return identity
 
 
+def canonical_source_spec_ref(value: Any, identity: str) -> tuple[str, str]:
+    source_ref = string(value, "source_spec_ref", 4096)
+    github_repository = GITHUB_ID_RE.fullmatch(identity)
+    if github_repository:
+        match = GITHUB_SPEC_REF_RE.fullmatch(source_ref) or GITHUB_SPEC_URL_RE.fullmatch(source_ref)
+        if match is None:
+            raise StateError(
+                "invalid-input",
+                "GitHub source_spec_ref must be owner/repository#number or its canonical issue URL",
+            )
+        owner, repository, number = match.groups()
+        if (owner, repository) != github_repository.groups():
+            raise StateError("invalid-input", "source_spec_ref belongs to another repository")
+        return source_ref, f"github:{owner}/{repository}#{number}"
+    if not LOCAL_SPEC_REF_RE.fullmatch(source_ref) or "//" in source_ref or "/../" in source_ref:
+        raise StateError(
+            "invalid-input",
+            "local source_spec_ref must be a canonical repository-scoped Feature Spec path",
+        )
+    return source_ref, source_ref
+
+
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     exact_keys(raw, {"schema_version", "run_id", "root_task_id", "repositories", "assignments"}, "manifest")
     if raw["schema_version"] != 1:
@@ -357,24 +403,28 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         raise StateError("invalid-input", "assignments must be a nonempty list")
     assignments: list[dict[str, Any]] = []
     assignment_ids: set[str] = set()
-    source_refs: set[str] = set()
+    claim_spec_identities: set[tuple[str, str]] = set()
     delivery_pairs: set[tuple[str, str]] = set()
     used_identities: set[str] = set()
     project_repositories: dict[str, str] = {}
-    keys = {"assignment_id", "source_ref", "repository_identity", "project_id", "title", "target_branch_name"}
+    keys = {"assignment_id", "source_spec_ref", "repository_identity", "project_id", "title", "target_branch_name"}
     for index, item in enumerate(raw["assignments"]):
         if not isinstance(item, dict):
             raise StateError("invalid-input", f"assignments[{index}] must be an object")
         exact_keys(item, keys, f"assignments[{index}]")
         assignment_id = token(item["assignment_id"], f"assignments[{index}].assignment_id")
-        source_ref = string(item["source_ref"], f"assignments[{index}].source_ref", 4096)
         identity = string(item["repository_identity"], f"assignments[{index}].repository_identity", 8192)
-        target_branch = branch_name(item["target_branch_name"])
-        pair = (identity, target_branch)
-        if assignment_id in assignment_ids or source_ref in source_refs or pair in delivery_pairs:
-            raise StateError("invalid-input", "assignment ids, source refs, and repository/branch pairs must be unique")
         if identity not in identities:
             raise StateError("invalid-input", f"assignments[{index}] uses an undeclared repository")
+        source_spec_ref, claim_spec_identity = canonical_source_spec_ref(item["source_spec_ref"], identity)
+        target_branch = branch_name(item["target_branch_name"])
+        pair = (identity, target_branch)
+        claim_key = (identity, claim_spec_identity)
+        if assignment_id in assignment_ids or claim_key in claim_spec_identities or pair in delivery_pairs:
+            raise StateError(
+                "invalid-input",
+                "assignment ids, canonical Feature Specs, and repository/branch pairs must be unique",
+            )
         project_id = string(item["project_id"], f"assignments[{index}].project_id", 256)
         prior_repository = project_repositories.get(project_id)
         if prior_repository is not None and prior_repository != identity:
@@ -385,14 +435,15 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         project_repositories[project_id] = identity
         assignments.append({
             "assignment_id": assignment_id,
-            "source_ref": source_ref,
+            "source_spec_ref": source_spec_ref,
+            "claim_spec_identity": claim_spec_identity,
             "repository_identity": identity,
             "project_id": project_id,
             "title": string(item["title"], f"assignments[{index}].title", 256),
             "target_branch_name": target_branch,
         })
         assignment_ids.add(assignment_id)
-        source_refs.add(source_ref)
+        claim_spec_identities.add(claim_key)
         delivery_pairs.add(pair)
         used_identities.add(identity)
     if used_identities != identities:
@@ -427,37 +478,81 @@ def advance(connection: sqlite3.Connection, run: sqlite3.Row) -> int:
     return revision
 
 
-def active_conflicts(connection: sqlite3.Connection, identities: list[str]) -> list[dict[str, Any]]:
-    placeholders = ",".join("?" for _ in identities)
-    rows = connection.execute(
-        f"""SELECT c.repository_identity,c.run_id,r.root_task_id
-            FROM repository_claims c JOIN runs r ON r.run_id=c.run_id
-            WHERE c.active=1 AND c.repository_identity IN ({placeholders})
-            ORDER BY c.repository_identity""",
-        identities,
-    ).fetchall()
-    result: list[dict[str, Any]] = []
-    for row in rows:
-        workers = [
-            item[0]
-            for item in connection.execute(
-                "SELECT thread_id FROM assignments WHERE run_id=? AND thread_id IS NOT NULL ORDER BY assignment_id",
-                (row["run_id"],),
-            )
-        ]
-        result.append({**dict(row), "worker_thread_ids": workers})
-    return result
+def active_spec_owner(
+    connection: sqlite3.Connection,
+    repository: str,
+    claim_spec_identity: str,
+) -> dict[str, Any] | None:
+    row = connection.execute(
+        """SELECT c.repository_identity,c.claim_spec_identity,c.run_id,c.assignment_id,
+                  r.root_task_id,a.thread_id,a.state
+           FROM spec_claims c
+           JOIN runs r ON r.run_id=c.run_id
+           JOIN assignments a ON a.run_id=c.run_id AND a.assignment_id=c.assignment_id
+           WHERE c.active=1 AND c.repository_identity=? AND c.claim_spec_identity=?""",
+        (repository, claim_spec_identity),
+    ).fetchone()
+    return dict(row) if row else None
 
 
-def stable_conflict_owners(conflicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        {
-            "repository_identity": item["repository_identity"],
-            "run_id": item["run_id"],
-            "root_task_id": item["root_task_id"],
-        }
-        for item in conflicts
+def active_assignment_conflict(
+    connection: sqlite3.Connection,
+    repository: str,
+    claim_spec_identity: str,
+    target_branch_name: str,
+) -> dict[str, Any] | None:
+    row = connection.execute(
+        """SELECT c.repository_identity,c.claim_spec_identity,c.target_branch_name,
+                  c.run_id,c.assignment_id,r.root_task_id,a.thread_id,a.state,
+                  CASE WHEN c.claim_spec_identity=? THEN 'feature-spec' ELSE 'head-branch' END AS conflict_kind
+           FROM spec_claims c
+           JOIN runs r ON r.run_id=c.run_id
+           JOIN assignments a ON a.run_id=c.run_id AND a.assignment_id=c.assignment_id
+           WHERE c.active=1 AND c.repository_identity=?
+             AND (c.claim_spec_identity=? OR c.target_branch_name=?)
+           ORDER BY CASE WHEN c.claim_spec_identity=? THEN 0 ELSE 1 END
+           LIMIT 1""",
+        (
+            claim_spec_identity, repository, claim_spec_identity,
+            target_branch_name, claim_spec_identity,
+        ),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def assignment_claim(connection: sqlite3.Connection, run_id: str, assignment_id: str) -> sqlite3.Row:
+    row = connection.execute(
+        "SELECT * FROM spec_claims WHERE run_id=? AND assignment_id=?",
+        (run_id, assignment_id),
+    ).fetchone()
+    if row is None:
+        raise StateError("claim-not-found", f"assignment has no claim: {assignment_id}", 3)
+    return row
+
+
+def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
+    states = [
+        row[0]
+        for row in connection.execute(
+            "SELECT state FROM assignments WHERE run_id=? ORDER BY assignment_id", (run_id,)
+        )
     ]
+    runnable = {"planned", "worker-created", "active"}
+    blockers = {"blocked-durable-contract", "blocked-by-active-spec", "abandoned-recovery-required", "abandoned"}
+    if any(state in runnable for state in states):
+        status = "active"
+    elif any(state == "waiting-for-spec" for state in states):
+        status = "waiting-for-spec"
+    elif any(state in blockers for state in states):
+        status = "blocked"
+    elif states and all(state == "pr-ready" for state in states):
+        status = "active"
+    elif states and all(state == "preimplementation-aborted" for state in states):
+        status = "active"
+    else:
+        status = "blocked"
+    connection.execute("UPDATE runs SET status=? WHERE run_id=?", (status, run_id))
+    return status
 
 
 def insert_run(
@@ -465,35 +560,52 @@ def insert_run(
     run: dict[str, str],
     repositories: list[dict[str, Any]],
     assignments: list[dict[str, Any]],
-    conflicts: list[dict[str, Any]],
-) -> None:
+    conflicts: dict[str, dict[str, Any]],
+) -> tuple[list[str], list[dict[str, Any]]]:
     now = utc_now()
-    status = "waiting-for-repository" if conflicts else "active"
+    acquired = [item["assignment_id"] for item in assignments if item["assignment_id"] not in conflicts]
+    status = "active" if acquired else "waiting-for-spec"
     connection.execute(
-        """INSERT INTO runs(run_id,root_task_id,status,revision,waiting_owner_runs_json,created_at,updated_at)
-           VALUES (?,?,?,1,?,?,?)""",
-        (run["run_id"], run["root_task_id"], status, canonical_json(conflicts), now, now),
+        """INSERT INTO runs(run_id,root_task_id,status,revision,created_at,updated_at)
+           VALUES (?,?,?,1,?,?)""",
+        (run["run_id"], run["root_task_id"], status, now, now),
     )
-    for repository in repositories:
-        connection.execute(
-            "INSERT INTO repository_claims VALUES (?,?,?,?,?,?,?,NULL)",
-            (
-                run["run_id"], repository["repository_identity"], repository["git_common_dir"],
-                repository["device"], repository["inode"], 0 if conflicts else 1,
-                None if conflicts else now,
-            ),
-        )
+    repositories_by_identity = {item["repository_identity"]: item for item in repositories}
+    waiting: list[dict[str, Any]] = []
     for assignment in assignments:
+        conflict = conflicts.get(assignment["assignment_id"])
+        state = "waiting-for-spec" if conflict else "planned"
         connection.execute(
             """INSERT INTO assignments(
-                run_id,assignment_id,source_ref,repository_identity,project_id,title,target_branch_name,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?)""",
+                run_id,assignment_id,source_spec_ref,claim_spec_identity,repository_identity,
+                project_id,title,target_branch_name,state,waiting_owner_run_id,
+                waiting_owner_assignment_id,waiting_owner_root_task_id,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                run["run_id"], assignment["assignment_id"], assignment["source_ref"],
-                assignment["repository_identity"], assignment["project_id"], assignment["title"],
-                assignment["target_branch_name"], now,
+                run["run_id"], assignment["assignment_id"], assignment["source_spec_ref"],
+                assignment["claim_spec_identity"], assignment["repository_identity"],
+                assignment["project_id"], assignment["title"], assignment["target_branch_name"],
+                state, conflict["run_id"] if conflict else None,
+                conflict["assignment_id"] if conflict else None,
+                conflict["root_task_id"] if conflict else None, now,
             ),
         )
+        repository = repositories_by_identity[assignment["repository_identity"]]
+        connection.execute(
+            """INSERT INTO spec_claims(
+                run_id,assignment_id,repository_identity,claim_spec_identity,target_branch_name,git_common_dir,
+                git_common_dir_device,git_common_dir_inode,active,acquired_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                run["run_id"], assignment["assignment_id"], assignment["repository_identity"],
+                assignment["claim_spec_identity"], assignment["target_branch_name"], repository["git_common_dir"],
+                repository["device"], repository["inode"], 0 if conflict else 1,
+                None if conflict else now,
+            ),
+        )
+        if conflict:
+            waiting.append({"assignment_id": assignment["assignment_id"], "owner": conflict})
+    return acquired, waiting
 
 
 def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
@@ -502,7 +614,7 @@ def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
         return {"ready": True, "state": "uninitialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": 1, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "writes_performed": False}
     connection = connect(write=False)
     try:
-        active = connection.execute("SELECT COUNT(*) FROM runs WHERE status IN ('active','blocked')").fetchone()[0]
+        active = connection.execute("SELECT COUNT(*) FROM runs WHERE status IN ('waiting-for-spec','active','blocked')").fetchone()[0]
         return {"ready": True, "state": "initialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": 1, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
     finally:
         connection.close()
@@ -516,7 +628,7 @@ def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("run-already-exists", f"run already exists: {run['run_id']}", 4)
         root_owner = connection.execute(
             """SELECT run_id,status FROM runs
-               WHERE root_task_id=? AND status IN ('waiting-for-repository','active','blocked')""",
+               WHERE root_task_id=? AND status IN ('waiting-for-spec','active','blocked')""",
             (run["root_task_id"],),
         ).fetchone()
         if root_owner:
@@ -525,16 +637,22 @@ def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
                 f"root task already owns unfinished run {root_owner['run_id']} ({root_owner['status']})",
                 4,
             )
-        identities = [item["repository_identity"] for item in repositories]
-        conflicts = active_conflicts(connection, identities)
-        insert_run(connection, run, repositories, assignments, conflicts)
+        conflicts: dict[str, dict[str, Any]] = {}
+        for assignment in assignments:
+            conflict = active_assignment_conflict(
+                connection, assignment["repository_identity"], assignment["claim_spec_identity"],
+                assignment["target_branch_name"],
+            )
+            if conflict:
+                conflicts[assignment["assignment_id"]] = conflict
+        acquired, waiting = insert_run(connection, run, repositories, assignments, conflicts)
         connection.commit()
         return {
             "run_id": run["run_id"], "revision": 1,
-            "status": "waiting-for-repository" if conflicts else "active",
-            "claims_acquired": not conflicts,
-            "may_create_goal_or_worker": not conflicts,
-            "conflicting_owners": conflicts,
+            "status": "active" if acquired else "waiting-for-spec",
+            "acquired_assignment_ids": acquired,
+            "waiting_assignments": waiting,
+            "may_create_goal_or_worker": bool(acquired),
             "max_unchanged_wait_sweeps": MAX_UNCHANGED_WAIT_SWEEPS,
         }
     except Exception:
@@ -546,33 +664,63 @@ def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_run_wait_sweep(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
-        if run["status"] != "waiting-for-repository":
-            raise StateError("run-not-waiting", f"run is {run['status']}", 4)
-        identities = [row[0] for row in connection.execute("SELECT repository_identity FROM repository_claims WHERE run_id=? ORDER BY repository_identity", (run_id,))]
-        conflicts = active_conflicts(connection, identities)
-        if not conflicts:
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] != "waiting-for-spec":
+            raise StateError("assignment-not-waiting", f"assignment is {assignment['state']}", 4)
+        conflict = active_assignment_conflict(
+            connection, assignment["repository_identity"], assignment["claim_spec_identity"],
+            assignment["target_branch_name"],
+        )
+        if not conflict:
             now = utc_now()
-            connection.execute("UPDATE repository_claims SET active=1,acquired_at=? WHERE run_id=?", (now, run_id))
+            connection.execute(
+                "UPDATE spec_claims SET active=1,acquired_at=? WHERE run_id=? AND assignment_id=?",
+                (now, run_id, assignment_id),
+            )
+            connection.execute(
+                """UPDATE assignments SET state='planned',unchanged_wait_sweeps=0,
+                   waiting_owner_run_id=NULL,waiting_owner_assignment_id=NULL,
+                   waiting_owner_root_task_id=NULL,updated_at=?
+                   WHERE run_id=? AND assignment_id=?""",
+                (now, run_id, assignment_id),
+            )
             revision = advance(connection, run)
-            connection.execute("UPDATE runs SET status='active',unchanged_wait_sweeps=0,waiting_owner_runs_json='[]' WHERE run_id=?", (run_id,))
+            connection.execute("UPDATE runs SET status='active' WHERE run_id=?", (run_id,))
             connection.commit()
-            return {"run_id": run_id, "revision": revision, "status": "active", "claims_acquired": True, "may_create_goal_or_worker": True, "conflicting_owners": []}
-        prior = json.loads(run["waiting_owner_runs_json"])
-        unchanged_owner = stable_conflict_owners(conflicts) == stable_conflict_owners(prior)
-        sweeps = run["unchanged_wait_sweeps"] + 1 if unchanged_owner else 1
+            return {
+                "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+                "state": "planned", "claim_acquired": True, "may_create_worker": True,
+            }
+        unchanged_owner = (
+            assignment["waiting_owner_run_id"] == conflict["run_id"]
+            and assignment["waiting_owner_assignment_id"] == conflict["assignment_id"]
+        )
+        sweeps = assignment["unchanged_wait_sweeps"] + 1 if unchanged_owner else 1
         terminal = sweeps >= MAX_UNCHANGED_WAIT_SWEEPS
-        status = "blocked-by-active-run" if terminal else "waiting-for-repository"
+        state = "blocked-by-active-spec" if terminal else "waiting-for-spec"
         revision = advance(connection, run)
         connection.execute(
-            "UPDATE runs SET status=?,unchanged_wait_sweeps=?,waiting_owner_runs_json=?,finished_at=? WHERE run_id=?",
-            (status, sweeps, canonical_json(conflicts), utc_now() if terminal else None, run_id),
+            """UPDATE assignments SET state=?,unchanged_wait_sweeps=?,waiting_owner_run_id=?,
+               waiting_owner_assignment_id=?,waiting_owner_root_task_id=?,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (
+                state, sweeps, conflict["run_id"], conflict["assignment_id"],
+                conflict["root_task_id"], utc_now(), run_id, assignment_id,
+            ),
         )
+        status = recompute_run_status(connection, run_id)
         connection.commit()
-        return {"run_id": run_id, "revision": revision, "status": status, "claims_acquired": False, "may_create_goal_or_worker": False, "unchanged_wait_sweeps": sweeps, "conflicting_owners": conflicts}
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": state, "run_status": status, "claim_acquired": False,
+            "may_create_worker": False, "unchanged_wait_sweeps": sweeps,
+            "conflicting_owner": conflict,
+        }
     except Exception:
         connection.rollback()
         raise
@@ -589,11 +737,10 @@ def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
     try:
         run = get_run(connection, token(args.run_id, "run_id"))
         assignments = [assignment_projection(row) for row in connection.execute("SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
-        claims = [dict(row) for row in connection.execute("SELECT * FROM repository_claims WHERE run_id=? ORDER BY repository_identity", (run["run_id"],))]
+        claims = [dict(row) for row in connection.execute("SELECT * FROM spec_claims WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
         unresolved = [dict(row) for row in connection.execute("SELECT sequence,operation_key,action,subject_id,status FROM app_operations WHERE run_id=? AND status IN ('pending','unknown') ORDER BY sequence", (run["run_id"],))]
         result = dict(run)
-        result["waiting_owner_runs"] = json.loads(result.pop("waiting_owner_runs_json"))
-        result.update({"assignments": assignments, "repository_claims": claims, "unresolved_app_operations": unresolved})
+        result.update({"assignments": assignments, "spec_claims": claims, "unresolved_app_operations": unresolved})
         return result
     finally:
         connection.close()
@@ -613,10 +760,15 @@ def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
     identity = string(args.repository_identity, "repository_identity", 8192)
+    _, claim_spec_identity = canonical_source_spec_ref(args.source_spec_ref, identity)
     connection = connect(write=False)
     try:
-        rows = active_conflicts(connection, [identity])
-        return {"repository_identity": identity, "owner": rows[0] if rows else None}
+        owner = active_spec_owner(connection, identity, claim_spec_identity)
+        return {
+            "repository_identity": identity,
+            "claim_spec_identity": claim_spec_identity,
+            "owner": owner,
+        }
     finally:
         connection.close()
 
@@ -630,6 +782,13 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     if action in {"create-worker", "set-worker-title", "send-bootstrap", "send-worker-message", "archive-worker"}:
         assignment = get_assignment(connection, run["run_id"], subject_id)
         assignment_id = assignment["assignment_id"]
+        claim = assignment_claim(connection, run["run_id"], assignment_id)
+        if not claim["active"]:
+            raise StateError(
+                "assignment-claim-not-active",
+                "worker App operations require the assignment's active Feature Spec claim",
+                4,
+            )
         if run["goal_state"] != "active":
             raise StateError(
                 "goal-not-active",
@@ -649,8 +808,8 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
         elif action == "send-worker-message" and assignment["state"] != "active":
             raise StateError("invalid-assignment-transition", "worker messages require an active worker", 4)
-        elif action == "archive-worker" and (run["implementation_started"] or assignment["state"] not in {"worker-created"}):
-            raise StateError("implementation-already-started", "archive is allowed only before bootstrap authority", 4)
+        elif action == "archive-worker" and assignment["state"] != "worker-created":
+            raise StateError("implementation-already-started", "archive is allowed only before this assignment's bootstrap authority", 4)
         if action == "archive-worker":
             bootstrap = connection.execute(
                 """SELECT status FROM app_operations
@@ -798,7 +957,7 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         connection.execute("UPDATE runs SET goal_state='active' WHERE run_id=?", (run["run_id"],))
     elif action == "create-worker":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
-        claim = connection.execute("SELECT * FROM repository_claims WHERE run_id=? AND repository_identity=?", (run["run_id"], assignment["repository_identity"])).fetchone()
+        claim = assignment_claim(connection, run["run_id"], assignment["assignment_id"])
         common = Path(observed["git_common_dir"]).stat()
         if (common.st_dev, common.st_ino) != (claim["git_common_dir_device"], claim["git_common_dir_inode"]):
             raise StateError("worker-repository-drift", "worker Git common-directory identity differs from the claimed repository", 4)
@@ -951,9 +1110,21 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
                 utc_now(), run_id, assignment_id,
             ),
         )
+        now = utc_now()
+        updated = connection.execute(
+            """UPDATE spec_claims SET active=0,released_at=?,release_reason='pr-ready'
+               WHERE run_id=? AND assignment_id=? AND active=1""",
+            (now, run_id, assignment_id),
+        ).rowcount
+        if updated != 1:
+            raise StateError("assignment-claim-not-active", "ready assignment has no active claim", 4)
+        recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
-        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "state": "pr-ready"}
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "pr-ready", "claim_released": True,
+        }
     except Exception:
         connection.rollback()
         raise
@@ -969,13 +1140,297 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] != "active" or not run["implementation_started"]:
+        if assignment["state"] != "active":
             raise StateError("invalid-assignment-transition", "durable-contract blocking requires an active post-bootstrap worker", 4)
         connection.execute("UPDATE assignments SET state='blocked-durable-contract',updated_at=? WHERE run_id=? AND assignment_id=?", (utc_now(), run_id, assignment_id))
-        connection.execute("UPDATE runs SET status='blocked' WHERE run_id=?", (run_id,))
+        run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
-        return {"run_id": run_id, "revision": revision, "assignment_id": assignment_id, "state": "blocked-durable-contract", "claims_retained": True}
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "blocked-durable-contract", "run_status": run_status,
+            "claim_retained": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_assignment_abort(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] not in {"planned", "preimplementation-aborted"}:
+            raise StateError(
+                "invalid-assignment-transition",
+                "assignment abort requires no worker or a reconciled archived pre-bootstrap worker",
+                4,
+            )
+        bootstrap = connection.execute(
+            """SELECT status FROM app_operations
+               WHERE run_id=? AND assignment_id=? AND action='send-bootstrap'
+                 AND status IN ('pending','unknown','succeeded') LIMIT 1""",
+            (run_id, assignment_id),
+        ).fetchone()
+        if bootstrap:
+            raise StateError(
+                "bootstrap-reconciliation-required",
+                "assignment abort requires proof that bootstrap authority was never delivered",
+                4,
+            )
+        unresolved = connection.execute(
+            """SELECT COUNT(*) FROM app_operations
+               WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')""",
+            (run_id, assignment_id),
+        ).fetchone()[0]
+        if unresolved:
+            raise StateError("unresolved-app-operation", "reconcile assignment App operations before abort", 4)
+        now = utc_now()
+        connection.execute(
+            """UPDATE assignments SET state='preimplementation-aborted',updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (now, run_id, assignment_id),
+        )
+        updated = connection.execute(
+            """UPDATE spec_claims SET active=0,released_at=?,release_reason='preimplementation-aborted'
+               WHERE run_id=? AND assignment_id=? AND active=1""",
+            (now, run_id, assignment_id),
+        ).rowcount
+        if updated != 1:
+            raise StateError("assignment-claim-not-active", "assignment abort requires an active claim", 4)
+        status = recompute_run_status(connection, run_id)
+        revision = advance(connection, run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "preimplementation-aborted", "run_status": status,
+            "claim_released": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]:
+    exact_keys(
+        value,
+        {
+            "schema_version", "owner_run_id", "owner_assignment_id", "owner_expected_revision",
+            "repository_identity", "source_spec_ref", "worker_state", "checkout_state", "readback_ref",
+        },
+        "claim recovery observation",
+    )
+    if value["schema_version"] != 1:
+        raise StateError("unsupported-input-schema", "claim recovery observation schema_version must be 1")
+    if not isinstance(value["owner_expected_revision"], int) or value["owner_expected_revision"] < 1:
+        raise StateError("invalid-input", "owner_expected_revision must be a positive integer")
+    worker_state = string(value["worker_state"], "worker_state", 32)
+    if worker_state not in {"active", "archived", "completed", "not-found", "unknown"}:
+        raise StateError("invalid-input", "worker_state is not supported")
+    checkout_state = string(value["checkout_state"], "checkout_state", 32)
+    if checkout_state not in {"present", "released", "not-found", "unknown"}:
+        raise StateError("invalid-input", "checkout_state is not supported")
+    repository = string(value["repository_identity"], "repository_identity", 8192)
+    source_spec_ref, claim_identity = canonical_source_spec_ref(value["source_spec_ref"], repository)
+    return {
+        "owner_run_id": token(value["owner_run_id"], "owner_run_id"),
+        "owner_assignment_id": token(value["owner_assignment_id"], "owner_assignment_id"),
+        "owner_expected_revision": value["owner_expected_revision"],
+        "repository_identity": repository,
+        "source_spec_ref": source_spec_ref,
+        "claim_spec_identity": claim_identity,
+        "worker_state": worker_state,
+        "checkout_state": checkout_state,
+        "readback_ref": string(value["readback_ref"], "readback_ref", 2048),
+    }
+
+
+def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    observed = validate_claim_recovery_observation(
+        read_json_file(args.observation, "claim recovery observation")
+    )
+    connection = connect(write=True)
+    try:
+        waiter_run = get_run(connection, run_id)
+        require_revision(waiter_run, args.expected_revision)
+        waiter = get_assignment(connection, run_id, assignment_id)
+        if waiter["state"] not in {"waiting-for-spec", "blocked-by-active-spec"}:
+            raise StateError("assignment-not-waiting", f"assignment is {waiter['state']}", 4)
+        if (
+            waiter["repository_identity"] != observed["repository_identity"]
+            or waiter["claim_spec_identity"] != observed["claim_spec_identity"]
+        ):
+            raise StateError("claim-identity-drift", "recovery evidence belongs to another Feature Spec", 4)
+        owner = active_spec_owner(
+            connection, waiter["repository_identity"], waiter["claim_spec_identity"]
+        )
+        if owner is None:
+            raise StateError("claim-owner-changed", "the observed owner no longer holds the claim", 4)
+        if (
+            owner["run_id"] != observed["owner_run_id"]
+            or owner["assignment_id"] != observed["owner_assignment_id"]
+        ):
+            raise StateError("claim-owner-changed", "the active claim owner differs from the observation", 4)
+        owner_run = get_run(connection, owner["run_id"])
+        require_revision(owner_run, observed["owner_expected_revision"])
+
+        if observed["worker_state"] == "active" or observed["checkout_state"] == "present":
+            connection.rollback()
+            return {
+                "run_id": run_id, "revision": waiter_run["revision"],
+                "assignment_id": assignment_id, "state": waiter["state"],
+                "outcome": "owner-active" if observed["worker_state"] == "active" else "checkout-still-bound",
+                "claim_acquired": False,
+            }
+
+        unresolved = connection.execute(
+            """SELECT COUNT(*) FROM app_operations
+               WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')""",
+            (owner["run_id"], owner["assignment_id"]),
+        ).fetchone()[0]
+        if (
+            observed["worker_state"] == "unknown"
+            or observed["checkout_state"] == "unknown"
+            or unresolved
+        ):
+            now = utc_now()
+            connection.execute(
+                """UPDATE assignments SET state='abandoned-recovery-required',updated_at=?
+                   WHERE run_id=? AND assignment_id=?""",
+                (now, run_id, assignment_id),
+            )
+            status = recompute_run_status(connection, run_id)
+            revision = advance(connection, waiter_run)
+            connection.commit()
+            return {
+                "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+                "state": "abandoned-recovery-required", "run_status": status,
+                "outcome": "insufficient-evidence", "claim_acquired": False,
+            }
+
+        bootstrap_succeeded = connection.execute(
+            """SELECT 1 FROM app_operations
+               WHERE run_id=? AND assignment_id=? AND action='send-bootstrap' AND status='succeeded'
+               LIMIT 1""",
+            (owner["run_id"], owner["assignment_id"]),
+        ).fetchone() is not None
+        terminal_state = "abandoned" if bootstrap_succeeded else "preimplementation-aborted"
+        release_reason = terminal_state
+        now = utc_now()
+        connection.execute(
+            "UPDATE assignments SET state=?,updated_at=? WHERE run_id=? AND assignment_id=?",
+            (terminal_state, now, owner["run_id"], owner["assignment_id"]),
+        )
+        released = connection.execute(
+            """UPDATE spec_claims SET active=0,released_at=?,release_reason=?,recovery_readback_ref=?
+               WHERE run_id=? AND assignment_id=? AND active=1""",
+            (
+                now, release_reason, observed["readback_ref"],
+                owner["run_id"], owner["assignment_id"],
+            ),
+        ).rowcount
+        if released != 1:
+            raise StateError("claim-owner-changed", "the owner claim changed during reconciliation", 4)
+        recompute_run_status(connection, owner["run_id"])
+        owner_revision = advance(connection, owner_run)
+
+        acquired = connection.execute(
+            """UPDATE spec_claims SET active=1,acquired_at=?,released_at=NULL,
+               release_reason=NULL,recovery_readback_ref=NULL
+               WHERE run_id=? AND assignment_id=? AND active=0""",
+            (now, run_id, assignment_id),
+        ).rowcount
+        if acquired != 1:
+            raise StateError("claim-acquisition-failed", "waiting claim could not be acquired", 4)
+        connection.execute(
+            """UPDATE assignments SET state='planned',unchanged_wait_sweeps=0,
+               waiting_owner_run_id=NULL,waiting_owner_assignment_id=NULL,
+               waiting_owner_root_task_id=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (now, run_id, assignment_id),
+        )
+        connection.execute("UPDATE runs SET status='active' WHERE run_id=?", (run_id,))
+        revision = advance(connection, waiter_run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "planned", "outcome": release_reason,
+            "claim_acquired": True, "owner_run_id": owner["run_id"],
+            "owner_revision": owner_revision,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_claim_abandon(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    owner_run_id = token(args.owner_run_id, "owner_run_id")
+    owner_assignment_id = token(args.owner_assignment_id, "owner_assignment_id")
+    connection = connect(write=True)
+    try:
+        waiter_run = get_run(connection, run_id)
+        require_revision(waiter_run, args.expected_revision)
+        waiter = get_assignment(connection, run_id, assignment_id)
+        if waiter["state"] != "abandoned-recovery-required":
+            raise StateError(
+                "manual-abandon-not-authorized",
+                "manual abandon requires a prior abandoned-recovery-required result",
+                4,
+            )
+        owner_run = get_run(connection, owner_run_id)
+        require_revision(owner_run, args.owner_expected_revision)
+        owner = active_spec_owner(
+            connection, waiter["repository_identity"], waiter["claim_spec_identity"]
+        )
+        if owner is None or (owner["run_id"], owner["assignment_id"]) != (owner_run_id, owner_assignment_id):
+            raise StateError("claim-owner-changed", "the active claim owner differs from the explicit override", 4)
+        now = utc_now()
+        connection.execute(
+            "UPDATE assignments SET state='abandoned',updated_at=? WHERE run_id=? AND assignment_id=?",
+            (now, owner_run_id, owner_assignment_id),
+        )
+        connection.execute(
+            """UPDATE spec_claims SET active=0,released_at=?,release_reason='manual-abandon'
+               WHERE run_id=? AND assignment_id=? AND active=1""",
+            (now, owner_run_id, owner_assignment_id),
+        )
+        recompute_run_status(connection, owner_run_id)
+        owner_revision = advance(connection, owner_run)
+        connection.execute(
+            """UPDATE spec_claims SET active=1,acquired_at=?,released_at=NULL,release_reason=NULL
+               WHERE run_id=? AND assignment_id=? AND active=0""",
+            (now, run_id, assignment_id),
+        )
+        connection.execute(
+            """UPDATE assignments SET state='planned',unchanged_wait_sweeps=0,
+               waiting_owner_run_id=NULL,waiting_owner_assignment_id=NULL,
+               waiting_owner_root_task_id=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (now, run_id, assignment_id),
+        )
+        connection.execute("UPDATE runs SET status='active' WHERE run_id=?", (run_id,))
+        revision = advance(connection, waiter_run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "planned", "outcome": "manual-abandon",
+            "claim_acquired": True, "owner_run_id": owner_run_id,
+            "owner_revision": owner_revision,
+        }
     except Exception:
         connection.rollback()
         raise
@@ -998,6 +1453,11 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
         if args.outcome == "pr-ready":
             if run["goal_state"] != "completed" or any(state != "pr-ready" for state in states):
                 raise StateError("run-incomplete", "PR-ready finish requires completed Goal and every assignment PR-ready", 4)
+            active_claims = connection.execute(
+                "SELECT COUNT(*) FROM spec_claims WHERE run_id=? AND active=1", (run_id,)
+            ).fetchone()[0]
+            if active_claims:
+                raise StateError("claims-not-released", "every PR-ready assignment must release its claim before run finish", 4)
         else:
             if run["implementation_started"]:
                 raise StateError("implementation-already-started", "preimplementation abort cannot release a post-bootstrap claim", 4)
@@ -1012,9 +1472,22 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
         now = utc_now()
         terminal = "pr-ready" if args.outcome == "pr-ready" else "preimplementation-aborted"
         connection.execute("UPDATE runs SET status=?,revision=?,updated_at=?,finished_at=? WHERE run_id=?", (terminal, run["revision"] + 1, now, now, run_id))
-        connection.execute("UPDATE repository_claims SET active=0,released_at=? WHERE run_id=? AND active=1", (now, run_id))
+        if args.outcome == "preimplementation-aborted":
+            connection.execute(
+                """UPDATE assignments SET state='preimplementation-aborted',updated_at=?
+                   WHERE run_id=? AND state='planned'""",
+                (now, run_id),
+            )
+            connection.execute(
+                """UPDATE spec_claims SET active=0,released_at=?,release_reason='preimplementation-aborted'
+                   WHERE run_id=? AND active=1""",
+                (now, run_id),
+            )
         connection.commit()
-        return {"run_id": run_id, "revision": run["revision"] + 1, "outcome": terminal, "claims_released": True}
+        return {
+            "run_id": run_id, "revision": run["revision"] + 1, "outcome": terminal,
+            "claims_released": args.outcome == "preimplementation-aborted",
+        }
     except Exception:
         connection.rollback()
         raise
@@ -1032,18 +1505,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="start, wait, inspect, list, or finish root runs")
     run_commands = run.add_subparsers(dest="run_command", required=True)
-    start = run_commands.add_parser("start", help="atomically acquire all repositories or enter bounded wait")
+    start = run_commands.add_parser("start", help="atomically acquire each free Feature Spec claim")
     start.add_argument("--manifest", required=True)
     start.set_defaults(handler=command_run_start, command_name="run start")
-    wait = run_commands.add_parser("wait-sweep", help="perform one bounded repository-owner sweep")
+    wait = run_commands.add_parser("wait-sweep", help="perform one bounded Feature Spec owner sweep")
     wait.add_argument("--run-id", required=True)
+    wait.add_argument("--assignment-id", required=True)
     wait.add_argument("--expected-revision", type=int, required=True)
     wait.set_defaults(handler=command_run_wait_sweep, command_name="run wait-sweep")
     show = run_commands.add_parser("show", help="read one run, its assignments, claims, and unresolved App operations")
     show.add_argument("--run-id", required=True)
     show.set_defaults(handler=command_run_show, command_name="run show")
     listing = run_commands.add_parser("list", help="list root runs")
-    listing.add_argument("--status", choices=("waiting-for-repository", "active", "blocked", "blocked-by-active-run", "pr-ready", "preimplementation-aborted", "all"), default="active")
+    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "preimplementation-aborted", "all"), default="active")
     listing.set_defaults(handler=command_run_list, command_name="run list")
     finish = run_commands.add_parser("finish", help="release claims after PR-ready closeout or verified preimplementation abort")
     finish.add_argument("--run-id", required=True)
@@ -1051,11 +1525,26 @@ def build_parser() -> argparse.ArgumentParser:
     finish.add_argument("--outcome", choices=("pr-ready", "preimplementation-aborted"), required=True)
     finish.set_defaults(handler=command_run_finish, command_name="run finish")
 
-    claim = commands.add_parser("claim", help="inspect canonical repository ownership")
+    claim = commands.add_parser("claim", help="inspect or reconcile canonical Feature Spec ownership")
     claim_commands = claim.add_subparsers(dest="claim_command", required=True)
-    find = claim_commands.add_parser("find", help="find the active owner of one canonical repository")
+    find = claim_commands.add_parser("find", help="find the active owner of one canonical Feature Spec")
     find.add_argument("--repository-identity", required=True)
+    find.add_argument("--source-spec-ref", required=True)
     find.set_defaults(handler=command_claim_find, command_name="claim find")
+    reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative App readback")
+    reconcile.add_argument("--run-id", required=True)
+    reconcile.add_argument("--assignment-id", required=True)
+    reconcile.add_argument("--expected-revision", type=int, required=True)
+    reconcile.add_argument("--observation", required=True)
+    reconcile.set_defaults(handler=command_claim_reconcile, command_name="claim reconcile")
+    abandon = claim_commands.add_parser("abandon", help="explicitly abandon an irrecoverable owner after failed recovery")
+    abandon.add_argument("--run-id", required=True)
+    abandon.add_argument("--assignment-id", required=True)
+    abandon.add_argument("--expected-revision", type=int, required=True)
+    abandon.add_argument("--owner-run-id", required=True)
+    abandon.add_argument("--owner-assignment-id", required=True)
+    abandon.add_argument("--owner-expected-revision", type=int, required=True)
+    abandon.set_defaults(handler=command_claim_abandon, command_name="claim abandon")
 
     operation = commands.add_parser("app-operation", help="journal and reconcile one App mutation")
     operation_commands = operation.add_subparsers(dest="operation_command", required=True)
@@ -1090,6 +1579,11 @@ def build_parser() -> argparse.ArgumentParser:
     block.add_argument("--expected-revision", type=int, required=True)
     block.add_argument("--assignment-id", required=True)
     block.set_defaults(handler=command_assignment_block, command_name="assignment block")
+    abort = assignment_commands.add_parser("abort", help="release one verified pre-bootstrap Feature Spec claim")
+    abort.add_argument("--run-id", required=True)
+    abort.add_argument("--expected-revision", type=int, required=True)
+    abort.add_argument("--assignment-id", required=True)
+    abort.set_defaults(handler=command_assignment_abort, command_name="assignment abort")
     return parser
 
 

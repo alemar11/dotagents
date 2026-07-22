@@ -16,18 +16,22 @@ For each assignment, root rereads:
 - configured CI success or authoritative not-configured evidence;
 - tracker readback, mergeability, conflicts, rules, and required approvals.
 
-If authoritative final evidence agrees, record `assignment ready`. If it does
-not, report coarse mismatch to the same worker and let the worker own repair.
+If authoritative final evidence agrees, record `assignment ready`; that same
+transaction releases only this Feature Spec claim. If it does not, report
+coarse mismatch to the same worker and let the worker own repair.
 If stable durable contract drift caused the mismatch, record `assignment block`
 and retain claims.
 
 After every assignment is ready, journal root Goal completion, read the same
 Goal back as completed, finish that App operation, and call
-`run finish --outcome pr-ready`. The transaction releases all repository claims.
-The terminal result is PR-ready for merge, never merged.
+`run finish --outcome pr-ready`. Run finish verifies that assignment-level
+release already occurred; it does not perform a repository-wide release. The
+terminal result is PR-ready for merge, never merged.
 
-Before any bootstrap authority, a verified abort may archive exact created
-workers, complete and read back an already-created Goal, reconcile all App
-operations, and call
-`run finish --outcome preimplementation-aborted`. After bootstrap authority,
-abort and claim release are forbidden.
+Before one assignment's bootstrap authority, a verified abort may archive its
+exact created worker, reconcile its App operations, and call `assignment abort`
+to release only its claim. A whole run that never started implementation may
+then complete any created Goal and call
+`run finish --outcome preimplementation-aborted`. After an assignment's
+bootstrap authority, ordinary abort is forbidden; terminal owner recovery
+follows `recovery-validation.md`.

@@ -17,14 +17,17 @@ Each selected Spec must establish stable fields for:
 
 Every cross-Spec dependency must already be merged and integration-proven.
 An unmerged dependency remains outside the run even when the upstream worker has
-reached PR-ready and released its repository claim. Never use claim release as
+reached PR-ready and released its Feature Spec claim. Never use claim release as
 merge proof.
 
-One selected Spec owns one repository, branch, App worktree, worker, and PR. A
-root run may select several Specs in the same repository when their allowed paths
-are disjoint; they share the root's repository claim but retain distinct
-branches, worktrees, and PRs. Overlapping paths or issue dependencies serialize.
-Across repositories, acquire the complete canonical repository set atomically.
+One selected Spec owns one repository, head branch, App worktree, worker, PR,
+and claim. Its claim identity is the canonical repository plus canonical durable
+`source_spec_ref`; an active head branch is also unique within that repository.
+Different roots may therefore execute different Specs in the same repository
+through distinct head branches and worktrees. Each root serializes its own
+work: overlapping paths or issue dependencies serialize. Cross-root integration
+conflict is ordinary worker-owned Git and PR evidence, not a controller path
+claim.
 
 ## Drift Classification
 

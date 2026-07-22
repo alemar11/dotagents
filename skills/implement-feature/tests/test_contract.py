@@ -74,8 +74,36 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         skill = self.text("SKILL.md")
         app = self.text("references/app-orchestration.md")
         self.assertIn("Schedule up to three path-disjoint", skill)
-        self.assertIn("Overlapping paths or issue dependencies serialize", self.text("references/spec-backed-delivery.md"))
+        self.assertIn("overlapping paths or issue dependencies serialize", self.text("references/spec-backed-delivery.md"))
         self.assertIn("At most three workers may be live", app)
+
+    def test_given_root_assignments_when_title_is_set_then_it_uses_exact_coarse_progress(self) -> None:
+        """Given one or many Specs, when root title changes, then exact ready/total UI evidence is used."""
+        app = self.text("references/app-orchestration.md")
+        self.assertIn("`👨🏻‍💻 Feature Orchestrator`", app)
+        self.assertIn("`👨🏻‍💻 Multi-Feature Orchestrator (R/N)`", app)
+        self.assertIn("`N` is the immutable total", app)
+        self.assertIn("`R` is the number currently recorded `ready`", app)
+        self.assertIn("Start at\n   `0/N`", app)
+        self.assertIn("update the title only when `R` changes", app)
+        self.assertIn("UI evidence only, never task\n   identity or durable run state", app)
+
+    def test_given_two_roots_when_specs_and_head_branches_differ_then_same_repo_is_allowed(self) -> None:
+        """Given distinct Specs and worktree branches, when roots coordinate, then repository identity alone does not block."""
+        spec = self.text("references/spec-backed-delivery.md")
+        recovery = self.text("references/recovery-validation.md")
+        state = self.text("references/run-state.md")
+        self.assertIn("Different roots may therefore execute different Specs in the same repository", spec)
+        self.assertIn("Repository identity alone never conflicts", recovery)
+        self.assertIn("canonical repository plus\ncanonical Feature Spec identity", state)
+
+    def test_given_orphaned_spec_when_recovery_runs_then_only_terminal_proof_releases(self) -> None:
+        """Given an old owner, when recovery classifies it, then active or unknown evidence cannot take over."""
+        recovery = self.text("references/recovery-validation.md")
+        self.assertIn("`active`, or a terminal worker whose checkout remains present", recovery)
+        self.assertIn("a released or absent checkout", recovery)
+        self.assertIn("`abandoned-recovery-required`", recovery)
+        self.assertIn("There is no TTL, heartbeat lease, implicit takeover", recovery)
 
     def test_given_dependency_pr_ready_release_when_downstream_is_selected_then_merge_proof_is_still_required(self) -> None:
         """Given upstream claim release, when downstream is considered, then it still waits for merge proof."""

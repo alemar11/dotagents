@@ -32,7 +32,7 @@ Root is a lightweight control plane. Before mutation:
   "assignments": [
     {
       "assignment_id": "spec-42",
-      "source_ref": "https://github.com/owner/repository/issues/42",
+      "source_spec_ref": "owner/repository#42",
       "repository_identity": "github:owner/repository",
       "project_id": "current-app-project-id",
       "title": "🛠️ Exact Feature Spec title",
@@ -49,8 +49,14 @@ hashes. Those remain authoritative at their sources.
 One root task may own only one unfinished run and lifecycle Goal. A second run
 from that task starts only after the first is terminal.
 
-Call `scripts/run-state --json run start --manifest <absolute-file>`. The single
-transaction either acquires every canonical repository or none. On success,
-create and read back the one root Goal, set the root title/progress, and schedule
-up to three disjoint assignments. On conflict, follow the bounded wait path and
-create no Goal, worker, worktree, branch, or provider mutation.
+Call `scripts/run-state --json run start --manifest <absolute-file>`. One
+transaction claims every free canonical Feature Spec and head branch and leaves
+only conflicting assignments in `waiting-for-spec`. A GitHub URL and
+`owner/repository#number` normalize to the same claim identity; a local ref is
+the globally unambiguous repository-scoped Spec path produced by Plan Feature.
+
+When at least one assignment acquires its claim, create and read back the one
+root Goal, set title/progress, and schedule up to three disjoint claimed
+assignments. When every assignment waits, create no Goal, worker, worktree,
+branch, or provider mutation. Never use a default PR base such as `main` as a
+head-branch collision: only the implementation head branch is exclusive.
