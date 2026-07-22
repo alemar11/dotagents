@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
+import gc
 import io
 import json
 import os
@@ -10,44 +10,37 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
-from concurrent.futures import ThreadPoolExecutor
+import warnings
 from pathlib import Path
 from unittest import mock
+from urllib.parse import quote
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
 
 
-class RunStateTests(unittest.TestCase):
+class RunStateScenarios(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.base = Path(self.temp.name)
-        self.state_home = self.base / "state home"
         self.home = self.base / "home"
         self.home.mkdir()
-        self.env = {
-            **os.environ,
-            "HOME": str(self.home),
-            "XDG_STATE_HOME": str(self.state_home),
-            "PYTHONDONTWRITEBYTECODE": "1",
-        }
+        self.env = {**os.environ, "HOME": str(self.home), "PYTHONDONTWRITEBYTECODE": "1"}
         self.inputs = self.base / "inputs"
         self.inputs.mkdir()
-        self.repo = self.base / "repository with spaces"
-        self.repo.mkdir()
-        self.revision = 0
+        self.common_a = self.base / "repo a" / ".git"
+        self.common_b = self.base / "repo b" / ".git"
+        self.common_a.mkdir(parents=True)
+        self.common_b.mkdir(parents=True)
+        self.revisions: dict[str, int] = {}
 
     def tearDown(self) -> None:
         self.temp.cleanup()
 
     @property
-    def state_root(self) -> Path:
-        return self.state_home / "dotagents" / "skills" / "implement-feature"
-
-    @property
     def database(self) -> Path:
-        return self.state_root / "run-state-v1.sqlite3"
+        return self.home / ".cache" / "dotagents" / "skills" / "implement-feature" / "run-state.sqlite3"
 
     def write_json(self, name: str, value: object) -> Path:
         path = self.inputs / name
@@ -56,1731 +49,502 @@ class RunStateTests(unittest.TestCase):
 
     def invoke(self, *args: str, expected: int = 0) -> dict[str, object]:
         result = subprocess.run(
-            [str(TOOL), "--json", *args],
-            env=self.env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
+            [str(TOOL), "--json", *args], env=self.env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
         self.assertEqual(result.returncode, expected, result.stderr + result.stdout)
         payload = json.loads(result.stdout)
-        if payload.get("ok") and isinstance(payload.get("revision"), int):
-            self.revision = payload["revision"]
+        if isinstance(payload.get("run_id"), str) and isinstance(payload.get("revision"), int):
+            self.revisions[payload["run_id"]] = payload["revision"]
         return payload
 
-    def manifest(self, *, run_id: str = "run-one", assignments: int = 1) -> dict[str, object]:
-        sources = []
-        task_rows = []
-        for index in range(1, assignments + 1):
-            source_ref = f"https://github.com/example/project/issues/{index}"
-            sources.append(
+    def revision(self, run_id: str) -> str:
+        return str(self.revisions[run_id])
+
+    @staticmethod
+    def local_identity(path: Path) -> str:
+        resolved = str(path.resolve())
+        info = path.stat()
+        return f"local:git-common-dir:{info.st_dev}:{info.st_ino}:{quote(resolved, safe='')}"
+
+    def manifest(
+        self,
+        run_id: str,
+        *,
+        repositories: list[tuple[str, Path]] | None = None,
+        assignment_count: int = 1,
+        project_prefix: str = "project",
+    ) -> dict[str, object]:
+        repositories = repositories or [("github:example/project", self.common_a)]
+        repo_rows = [
+            {"repository_identity": identity, "git_common_dir": str(common)}
+            for identity, common in repositories
+        ]
+        assignments = []
+        for index in range(assignment_count):
+            identity, _ = repositories[index % len(repositories)]
+            assignments.append(
                 {
-                    "kind": "github-issue",
-                    "ref": source_ref,
-                    "sha256": hashlib.sha256(f"spec-{index}".encode()).hexdigest(),
-                }
-            )
-            task_rows.append(
-                {
-                    "assignment_id": f"spec-{index:02d}",
-                    "source_ref": source_ref,
-                    "title": f"🛠️ Feature {index}",
-                    "repository_claim": "repository:github:example/project",
-                    "target_branch_name": f"feature/example-{index}",
-                    "allowed_paths": [f"src/feature-{index}/**"],
-                    "acceptance_criteria": [f"Feature {index} works"],
-                    "validation_commands": ["python3 -m unittest -q"],
-                    "integration_gates": [],
-                    "domain_closeout": None,
+                    "assignment_id": f"spec-{index + 1:02d}",
+                    "source_ref": f"https://github.com/example/project/issues/{index + 1}",
+                    "repository_identity": identity,
+                    "project_id": f"{project_prefix}-{index % len(repositories) + 1}",
+                    "title": f"🛠️ Feature {index + 1}",
+                    "target_branch_name": f"feature/example-{index + 1}",
                 }
             )
         return {
             "schema_version": 1,
             "run_id": run_id,
-            "root_task_id": run_id,
-            "goal_objective": "Implement the dependency-ready Feature Spec frontier",
-            "sources": sources,
-            "repositories": [
-                {
-                    "repository_claim": "repository:github:example/project",
-                    "repository_path": str(self.repo),
-                    "project_id": "project-one",
-                    "default_branch_name": "main",
-                    "git_common_dir": str(self.repo),
-                }
-            ],
-            "assignments": task_rows,
+            "root_task_id": f"root-{run_id}",
+            "repositories": repo_rows,
+            "assignments": assignments,
         }
 
-    def start(self, *, run_id: str = "run-one", assignments: int = 1) -> dict[str, object]:
-        path = self.write_json(f"{run_id}-manifest.json", self.manifest(run_id=run_id, assignments=assignments))
-        return self.invoke("run", "start", "--manifest", str(path))
+    def start(self, run_id: str, **kwargs: object) -> dict[str, object]:
+        manifest = self.manifest(run_id, **kwargs)
+        return self.invoke("run", "start", "--manifest", str(self.write_json(f"{run_id}.json", manifest)))
 
     def operation(
         self,
-        *,
+        run_id: str,
         key: str,
         action: str,
         subject: str,
-        result: dict[str, object],
-        owner: str = "app",
+        extra: dict[str, object],
+        *,
         status: str = "succeeded",
-        run_id: str = "run-one",
-        head_sha: str | None = None,
-        request_payload: dict[str, object] | None = None,
-    ) -> None:
-        request = self.write_json(
-            f"{key}-request.json",
-            request_payload or {"action": action, "subject": subject},
-        )
-        begin_args = [
-            "operation",
-            "begin",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            key,
-            "--owner",
-            owner,
-            "--action",
-            action,
-            "--subject-id",
-            subject,
-        ]
-        if head_sha is not None:
-            begin_args.extend(["--head-sha", head_sha])
-        begin_args.extend(["--request", str(request)])
-        self.invoke(*begin_args)
-        result_path = self.write_json(f"{key}-{status}.json", result)
+    ) -> dict[str, object]:
         self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            key,
-            "--status",
-            status,
-            "--result",
-            str(result_path),
+            "app-operation", "begin", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id), "--operation-key", key,
+            "--action", action, "--subject-id", subject,
         )
-
-    def bind_goal(self, *, source: str = "adopted", run_id: str = "run-one") -> str:
-        digest = hashlib.sha256(
-            "Implement the dependency-ready Feature Spec frontier".encode()
-        ).hexdigest()
-        if source == "created":
-            self.operation(
-                key="create-goal",
-                action="create-goal",
-                subject=run_id,
-                result={"status": "active", "objective_sha256": digest},
-                run_id=run_id,
-            )
-        self.invoke(
-            "goal",
-            "bind",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--source",
-            source,
-            "--objective-sha256",
-            digest,
-        )
-        return digest
-
-    def block_goal(
-        self, digest: str, *, run_id: str = "run-one", key: str = "block-goal"
-    ) -> None:
-        self.operation(
-            key=key,
-            action="block-goal",
-            subject=run_id,
-            result={"status": "blocked", "objective_sha256": digest},
-            run_id=run_id,
-        )
-
-    def resume_goal(
-        self, *, run_id: str = "run-one", key: str = "resume-goal"
-    ) -> None:
-        authorization_ref = f"owner:resume-goal:{run_id}:{key}"
-        self.operation(
-            key=key,
-            action="resume-goal",
-            subject=run_id,
-            owner="owner",
-            request_payload={"authorization_ref": authorization_ref},
-            result={"status": "granted", "authorization_ref": authorization_ref},
-            run_id=run_id,
-        )
-
-    def abandon_run(self, *, run_id: str = "run-one") -> None:
-        authorization_ref = f"owner:abandon-run:{run_id}:abandon-run"
-        self.operation(
-            key="abandon-run",
-            action="abandon-run",
-            subject=run_id,
-            owner="owner",
-            request_payload={"authorization_ref": authorization_ref},
-            result={"status": "granted", "authorization_ref": authorization_ref},
-            run_id=run_id,
-        )
-
-    def bind_task(self, assignment: int, *, run_id: str = "run-one") -> str:
-        assignment_id = f"spec-{assignment:02d}"
-        thread_id = f"thread-{assignment}"
-        self.operation(
-            key=f"create-task-{assignment}",
-            action="create-task",
-            subject=assignment_id,
-            result={"thread_id": thread_id},
-            run_id=run_id,
-        )
-        self.operation(
-            key=f"title-task-{assignment}",
-            action="set-task-title",
-            subject=assignment_id,
-            result={"thread_id": thread_id, "title": f"🛠️ Feature {assignment}"},
-            run_id=run_id,
-        )
-        checkout = self.base / f"checkout {assignment}"
-        checkout.mkdir(exist_ok=True)
-        observation = self.write_json(
-            f"task-{assignment}-bind.json",
-            {
-                "schema_version": 1,
-                "assignment_id": assignment_id,
-                "thread_id": thread_id,
-                "observed_title": f"🛠️ Feature {assignment}",
-                "project_id": "project-one",
-                "repository_claim": "repository:github:example/project",
-                "git_common_dir": str(self.repo),
-                "checkout_path": str(checkout),
-                "git_top_level": str(checkout),
-                "checkout_branch": f"codex/work-{assignment}",
-                "baseline_head": f"{assignment:040x}",
-            },
-        )
-        self.invoke(
-            "task",
-            "bind",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
-        )
-        return thread_id
-
-    def pass_baseline(self, assignment: int, *, run_id: str = "run-one") -> None:
-        assignment_id = f"spec-{assignment:02d}"
-        thread_id = f"thread-{assignment}"
-        self.operation(
-            key=f"bootstrap-{assignment}",
-            action="send-worker-bootstrap",
-            subject=assignment_id,
-            result={"thread_id": thread_id},
-            run_id=run_id,
-        )
-        observation = self.write_json(
-            f"baseline-{assignment}.json",
-            {
-                "schema_version": 1,
-                "assignment_id": assignment_id,
-                "thread_id": thread_id,
-                "head_sha": f"{assignment:040x}",
-                "status": "passed",
-            },
-        )
-        self.invoke(
-            "task",
-            "baseline",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
-        )
-
-    def authorize_task(self, assignment: int, *, run_id: str = "run-one") -> None:
-        assignment_id = f"spec-{assignment:02d}"
-        self.operation(
-            key=f"authorize-{assignment}",
-            action="authorize-implementation",
-            subject=assignment_id,
-            result={"thread_id": f"thread-{assignment}"},
-            run_id=run_id,
-        )
-        self.invoke(
-            "task",
-            "authorize",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--assignment-id",
-            assignment_id,
-        )
-
-    def ready_task(self, assignment: int, *, run_id: str = "run-one") -> None:
-        head_sha = f"{assignment + 100:040x}"
-        ready_result = {
-            "pr_url": f"https://github.com/example/project/pull/{assignment}",
-            "head_sha": head_sha,
-            "head_branch_name": f"feature/example-{assignment}",
-            "base_branch_name": "main",
-            "default_branch_name": "main",
-            "status": "ready-for-review",
-        }
-        self.operation(
-            key=f"ensure-pr-ready-{assignment}",
-            action="ensure-pull-request-ready",
-            subject=f"spec-{assignment:02d}",
-            result=ready_result,
-            owner="gitstack",
-            run_id=run_id,
-            head_sha=head_sha,
-        )
-        observation = self.write_json(
-            f"ready-{assignment}.json",
-            {
-                "schema_version": 1,
-                "assignment_id": f"spec-{assignment:02d}",
-                "thread_id": f"thread-{assignment}",
-                "head_sha": head_sha,
-                "head_branch_name": f"feature/example-{assignment}",
-                "base_branch_name": "main",
-                "default_branch_name": "main",
-                "pr_url": f"https://github.com/example/project/pull/{assignment}",
-                "status": "ready-for-merge",
-            },
-        )
-        self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            run_id,
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
-        )
-
-    def complete_one_task(self, assignment: int = 1) -> None:
-        self.bind_task(assignment)
-        self.pass_baseline(assignment)
-        self.authorize_task(assignment)
-        self.ready_task(assignment)
-
-    def test_doctor_is_read_only_and_reports_fresh_schema(self) -> None:
-        payload = self.invoke("doctor")
-        self.assertEqual(payload["state"], "uninitialized")
-        self.assertEqual(payload["state_schema_version"], 1)
-        self.assertEqual(payload["tool_version"], "1.0.0")
-        self.assertFalse(self.state_root.exists())
-
-    def test_reader_treats_an_unpublished_empty_schema_as_uninitialized(self) -> None:
-        self.state_root.mkdir(mode=0o700, parents=True)
-        descriptor = os.open(self.database, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        os.close(descriptor)
-
-        doctor = self.invoke("doctor")
-        self.assertEqual(doctor["state"], "uninitialized")
-        self.assertFalse(doctor["writes_performed"])
-        error = self.invoke("run", "list", "--status", "all", expected=3)
-        self.assertEqual(error["error"]["code"], "state-uninitialized")
-        started = self.start()
-        self.assertTrue(started["start_authorized"])
-
-    def test_start_persists_typed_sources_projects_and_assignments(self) -> None:
-        start = self.start(assignments=2)
-        self.assertTrue(start["start_authorized"])
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["goal"]["status"], "unbound")
-        self.assertEqual(shown["unbound_assignment_ids"], ["spec-01", "spec-02"])
-        self.assertEqual(shown["assignments"][0]["project_id"], "project-one")
-        self.assertEqual(shown["manifest"]["sources"][0]["sha256"], hashlib.sha256(b"spec-1").hexdigest())
-
-    def test_root_controller_correlation_key_must_equal_run_id(self) -> None:
-        manifest = self.manifest()
-        manifest["root_task_id"] = "guessed-thread-id"
-        error = self.invoke(
-            "run",
-            "start",
-            "--manifest",
-            str(self.write_json("wrong-root-id.json", manifest)),
-            expected=2,
-        )
-        self.assertEqual(error["error"]["code"], "invalid-input")
-        self.assertIn("root_task_id must equal run_id", error["error"]["message"])
-
-    def test_sqlite_is_the_only_lock_and_bootstrap_returns_a_write_transaction(self) -> None:
-        namespace = runpy.run_path(str(TOOL), run_name="run_state_test")
-        with mock.patch.dict(os.environ, self.env, clear=True):
-            connection = namespace["connect"](write=True)
-            try:
-                self.assertTrue(connection.in_transaction)
-                connection.execute(
-                    "INSERT INTO metadata(key, value) VALUES ('rollback-probe', 'present')"
-                )
-                connection.rollback()
-            finally:
-                connection.close()
-
-        self.assertFalse((self.state_root / "run-state-v1.lock").exists())
-        with contextlib.closing(sqlite3.connect(self.database)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 1)
-            self.assertEqual(
-                connection.execute(
-                    "SELECT COUNT(*) FROM metadata WHERE key = 'rollback-probe'"
-                ).fetchone()[0],
-                0,
-            )
-            self.assertEqual(connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
-
-    def test_busy_writer_returns_a_bounded_structured_error(self) -> None:
-        namespace = runpy.run_path(str(TOOL), run_name="run_state_busy_test")
-        manifest = self.write_json("busy-manifest.json", self.manifest())
-        with mock.patch.dict(os.environ, self.env, clear=True):
-            connection = namespace["connect"](write=True)
-            connection.rollback()
-            connection.close()
-
-            blocker = sqlite3.connect(self.database, isolation_level=None)
-            blocker.execute("BEGIN IMMEDIATE")
-            namespace["connect"].__globals__["SQLITE_BUSY_TIMEOUT_MS"] = 1
-            output = io.StringIO()
-            try:
-                with contextlib.redirect_stdout(output):
-                    exit_code = namespace["main"](
-                        ["--json", "run", "start", "--manifest", str(manifest)]
-                    )
-            finally:
-                blocker.rollback()
-                blocker.close()
-
-        self.assertEqual(exit_code, 4)
-        payload = json.loads(output.getvalue())
-        self.assertEqual(payload["error"]["code"], "state-busy")
-
-    def test_local_source_digest_is_verified_and_claimed_by_path_and_identity(self) -> None:
-        source = self.base / "feature spec.md"
-        source.write_text("accepted", encoding="utf-8")
-        manifest = self.manifest()
-        manifest["sources"] = [
-            {
-                "kind": "local-file",
-                "ref": str(source),
-                "sha256": hashlib.sha256(b"accepted").hexdigest(),
-            }
-        ]
-        manifest["assignments"][0]["source_ref"] = str(source.resolve())
-        path = self.write_json("local.json", manifest)
-        payload = self.invoke("run", "start", "--manifest", str(path))
-        self.assertTrue(any(item.startswith("source:path:") for item in payload["claim_keys"]))
-        self.assertTrue(any(item.startswith("source:local:") for item in payload["claim_keys"]))
-
-        source.write_text("drift", encoding="utf-8")
-        changed = self.manifest(run_id="run-two")
-        changed["sources"] = manifest["sources"]
-        changed["assignments"][0]["source_ref"] = str(source.resolve())
-        error = self.invoke(
-            "run", "start", "--manifest", str(self.write_json("drift.json", changed)), expected=4
-        )
-        self.assertEqual(error["error"]["code"], "source-drift")
-
-    def test_local_source_is_reobserved_inside_the_start_transaction(self) -> None:
-        source = self.base / "replaced feature spec.md"
-        source.write_text("accepted", encoding="utf-8")
-        original_identity = source.stat().st_ino
-        manifest = self.manifest()
-        manifest["sources"] = [
-            {
-                "kind": "local-file",
-                "ref": str(source),
-                "sha256": hashlib.sha256(b"accepted").hexdigest(),
-            }
-        ]
-        manifest["assignments"][0]["source_ref"] = str(source.resolve())
-        manifest_path = self.write_json("replaced-source.json", manifest)
-        namespace = runpy.run_path(str(TOOL), run_name="run_state_source_race_test")
-        real_connect = namespace["connect"]
-
-        def replace_after_transaction_is_acquired(*, write: bool) -> sqlite3.Connection:
-            connection = real_connect(write=write)
-            replacement = self.base / "source replacement.tmp"
-            replacement.write_text("accepted", encoding="utf-8")
-            os.replace(replacement, source)
-            return connection
-
-        namespace["command_run_start"].__globals__["connect"] = replace_after_transaction_is_acquired
-        output = io.StringIO()
-        with mock.patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(output):
-            exit_code = namespace["main"](
-                ["--json", "run", "start", "--manifest", str(manifest_path)]
-            )
-
-        self.assertEqual(exit_code, 0, output.getvalue())
-        new_identity = source.stat().st_ino
-        self.assertNotEqual(original_identity, new_identity)
-        payload = json.loads(output.getvalue())
-        old_claim = f"source:local:{source.stat().st_dev}:{original_identity}"
-        new_claim = f"source:local:{source.stat().st_dev}:{new_identity}"
-        self.assertNotIn(old_claim, payload["claim_keys"])
-        self.assertIn(new_claim, payload["claim_keys"])
-        with contextlib.closing(sqlite3.connect(self.database)) as connection:
-            stored_claims = json.loads(
-                connection.execute(
-                    "SELECT claim_keys_json FROM sources WHERE run_id = 'run-one'"
-                ).fetchone()[0]
-            )
-        self.assertEqual(stored_claims, [f"source:path:{source.resolve()}", new_claim])
-
-    def test_same_spec_cannot_create_two_repository_tasks(self) -> None:
-        second_repo = self.base / "second repo"
-        second_repo.mkdir()
-        manifest = self.manifest()
-        manifest["repositories"].append(
-            {
-                "repository_claim": "repository:github:example/second",
-                "repository_path": str(second_repo),
-                "project_id": "project-two",
-                "default_branch_name": "main",
-                "git_common_dir": str(second_repo),
-            }
-        )
-        duplicate = dict(manifest["assignments"][0])
-        duplicate["assignment_id"] = "spec-02"
-        duplicate["repository_claim"] = "repository:github:example/second"
-        duplicate["target_branch_name"] = "feature/second"
-        manifest["assignments"].append(duplicate)
-        error = self.invoke(
-            "run", "start", "--manifest", str(self.write_json("multi-repo-spec.json", manifest)), expected=2
-        )
-        self.assertEqual(error["error"]["code"], "invalid-input")
-        self.assertIn("one Feature Spec source", error["error"]["message"])
-
-    def test_repository_claims_require_distinct_physical_identities(self) -> None:
-        second_repo = self.base / "second repository"
-        second_repo.mkdir()
-        manifest = self.manifest()
-        manifest["repositories"].append(
-            {
-                "repository_claim": "repository:github:example/second",
-                "repository_path": str(second_repo),
-                "project_id": "project-two",
-                "default_branch_name": "main",
-                "git_common_dir": str(self.repo),
-            }
-        )
-        error = self.invoke(
-            "run",
-            "start",
-            "--manifest",
-            str(self.write_json("duplicate-common-dir.json", manifest)),
-            expected=2,
-        )
-        self.assertEqual(error["error"]["code"], "invalid-input")
-        self.assertIn("Git common-directory identity", error["error"]["message"])
-
-        third_common = self.base / "third common"
-        third_common.mkdir()
-        manifest["repositories"][1]["repository_path"] = str(self.repo)
-        manifest["repositories"][1]["git_common_dir"] = str(third_common)
-        error = self.invoke(
-            "run",
-            "start",
-            "--manifest",
-            str(self.write_json("duplicate-repository-path.json", manifest)),
-            expected=2,
-        )
-        self.assertEqual(error["error"]["code"], "invalid-input")
-        self.assertIn("repository_path", error["error"]["message"])
-
-    def test_claim_conflict_is_atomic(self) -> None:
-        self.start()
-        error = self.invoke(
-            "run",
-            "start",
-            "--manifest",
-            str(self.write_json("second.json", self.manifest(run_id="run-two"))),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "claim-conflict")
-        listed = self.invoke("run", "list", "--status", "all")
-        self.assertEqual([item["run_id"] for item in listed["runs"]], ["run-one"])
-
-    def test_concurrent_starts_have_one_claim_winner(self) -> None:
-        paths = [
-            self.write_json("race-one.json", self.manifest(run_id="race-one")),
-            self.write_json("race-two.json", self.manifest(run_id="race-two")),
-        ]
-
-        def launch(path: Path) -> tuple[int, dict[str, object]]:
-            result = subprocess.run(
-                [str(TOOL), "--json", "run", "start", "--manifest", str(path)],
-                env=self.env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-            return result.returncode, json.loads(result.stdout)
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(executor.map(launch, paths))
-        self.assertEqual(sorted(code for code, _ in results), [0, 4], results)
-        winner = [payload for code, payload in results if code == 0][0]
-        loser = [payload for code, payload in results if code == 4][0]
-        self.assertTrue(winner["start_authorized"])
-        self.assertEqual(loser["error"]["code"], "claim-conflict", loser)
-
-    def test_goal_creation_operation_is_bound_to_exact_objective(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(
-            shown["goal"],
-            {
-                "source": "created",
-                "status": "active",
-                "blocked_resume_authorized": False,
-                "objective_sha256": digest,
-            },
-        )
-
-    def test_task_binding_requires_goal_and_exact_app_operations(self) -> None:
-        self.start()
-        request = self.write_json("create-without-goal.json", {"task": "spec-01"})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "create-task-1",
-            "--owner",
-            "app",
-            "--action",
-            "create-task",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "invalid-operation-transition")
-
-    def test_worker_cannot_be_authorized_before_bootstrap_and_baseline(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.bind_task(1)
-        error = self.invoke(
-            "task",
-            "authorize",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--assignment-id",
-            "spec-01",
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "invalid-task-transition")
-
-    def test_explicit_go_operation_is_required_after_baseline(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.bind_task(1)
-        self.pass_baseline(1)
-        error = self.invoke(
-            "task",
-            "authorize",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--assignment-id",
-            "spec-01",
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "missing-app-operation")
-        self.authorize_task(1)
-
-    def test_go_launch_waits_for_every_dispatched_baseline(self) -> None:
-        self.start(assignments=2)
-        self.bind_goal()
-        self.bind_task(1)
-        self.bind_task(2)
-        self.pass_baseline(1)
-        request = self.write_json("early-go.json", {"assignment": "spec-01"})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "authorize-1",
-            "--owner",
-            "app",
-            "--action",
-            "authorize-implementation",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "baseline-fan-in-incomplete")
-
-    def test_task_binding_rejects_project_repository_and_checkout_reuse(self) -> None:
-        self.start(assignments=2)
-        self.bind_goal()
-        self.bind_task(1)
-        self.operation(
-            key="create-task-2",
-            action="create-task",
-            subject="spec-02",
-            result={"thread_id": "thread-2"},
-        )
-        self.operation(
-            key="title-task-2",
-            action="set-task-title",
-            subject="spec-02",
-            result={"thread_id": "thread-2", "title": "🛠️ Feature 2"},
-        )
-        checkout = self.base / "checkout 1"
-        base_observation = {
-            "schema_version": 1,
-            "assignment_id": "spec-02",
-            "thread_id": "thread-2",
-            "observed_title": "🛠️ Feature 2",
-            "project_id": "wrong-project",
-            "repository_claim": "repository:github:example/project",
-            "git_common_dir": str(self.repo),
-            "checkout_path": str(checkout),
-            "git_top_level": str(checkout),
-            "checkout_branch": "codex/work-2",
-            "baseline_head": f"{2:040x}",
-        }
-        wrong_project = self.write_json("task-2-wrong-project.json", base_observation)
-        error = self.invoke(
-            "task",
-            "bind",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_project),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "task-repository-drift")
-
-        base_observation["project_id"] = "project-one"
-        base_observation["git_common_dir"] = str(self.base)
-        wrong_git_identity = self.write_json("task-2-wrong-git-identity.json", base_observation)
-        error = self.invoke(
-            "task",
-            "bind",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_git_identity),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "task-repository-drift")
-
-        base_observation["git_common_dir"] = str(self.repo)
-        reused_checkout = self.write_json("task-2-reused-checkout.json", base_observation)
-        error = self.invoke(
-            "task",
-            "bind",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(reused_checkout),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "checkout-conflict")
-
-    def test_ready_requires_target_branch_and_assignment_repository_pr(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.bind_task(1)
-        self.pass_baseline(1)
-        self.authorize_task(1)
         observation = {
             "schema_version": 1,
-            "assignment_id": "spec-01",
-            "thread_id": "thread-1",
-            "head_sha": f"{101:040x}",
-            "head_branch_name": "feature/wrong",
+            "status": status,
+            "receipt_ref": f"receipt:{key}",
+            "readback_ref": f"readback:{key}",
+            **extra,
+        }
+        return self.invoke(
+            "app-operation", "finish", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id), "--operation-key", key,
+            "--observation", str(self.write_json(f"{key}-{status}.json", observation)),
+        )
+
+    def create_goal(self, run_id: str) -> None:
+        self.operation(run_id, f"goal-{run_id}", "create-goal", f"root-{run_id}", {"observed_state": "active"})
+
+    def create_worker(self, run_id: str, number: int = 1) -> None:
+        assignment = f"spec-{number:02d}"
+        thread = f"thread-{run_id}-{number}"
+        checkout = self.base / f"checkout {run_id} {number}"
+        checkout.mkdir()
+        self.operation(
+            run_id, f"create-{run_id}-{number}", "create-worker", assignment,
+            {
+                "thread_id": thread,
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        self.operation(
+            run_id, f"title-{run_id}-{number}", "set-worker-title", assignment,
+            {"thread_id": thread, "observed_title": f"🛠️ Feature {number}"},
+        )
+        self.operation(
+            run_id, f"bootstrap-{run_id}-{number}", "send-bootstrap", assignment,
+            {"thread_id": thread},
+        )
+
+    def ready_worker(self, run_id: str, number: int = 1) -> None:
+        observation = {
+            "schema_version": 1,
+            "assignment_id": f"spec-{number:02d}",
+            "thread_id": f"thread-{run_id}-{number}",
+            "head_sha": f"{100 + number:040x}",
+            "head_branch_name": f"feature/example-{number}",
             "base_branch_name": "main",
             "default_branch_name": "main",
-            "pr_url": "https://github.com/example/project/pull/1",
-            "status": "ready-for-merge",
+            "pr_url": f"https://github.com/example/project/pull/{number}",
+            "provider_observation_ref": f"provider:pr:{number}:head:{100 + number}",
+            "status": "pr-ready-for-merge",
         }
-        wrong_branch = self.write_json("ready-wrong-branch.json", observation)
+        self.invoke(
+            "assignment", "ready", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id),
+            "--observation", str(self.write_json(f"ready-{run_id}-{number}.json", observation)),
+        )
+
+    def finish_pr_ready(self, run_id: str) -> None:
+        self.operation(run_id, f"complete-{run_id}", "complete-goal", f"root-{run_id}", {"observed_state": "completed"})
+        self.invoke(
+            "run", "finish", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id), "--outcome", "pr-ready",
+        )
+
+    def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
+        """Given no DB, when doctor runs, then it reports schema 1 without creating cache state."""
+        result = self.invoke("doctor")
+        self.assertEqual(result["tool_version"], "1.0.0")
+        self.assertEqual(result["state_schema_version"], 1)
+        self.assertEqual(result["busy_timeout_ms"], 5000)
+        self.assertFalse(self.database.exists())
+
+    def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
+        """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
+        self.start("run-a", repositories=[("github:example/a", self.common_a)], project_prefix="alpha")
+        self.start("run-b", repositories=[("github:example/b", self.common_b)], project_prefix="beta")
+        listing = self.invoke("run", "list", "--status", "active")
+        self.assertEqual({row["run_id"] for row in listing["runs"]}, {"run-a", "run-b"})
+        self.assertEqual(list(self.database.parent.glob("*.sqlite3")), [self.database])
+
+    def test_given_one_root_task_when_second_unfinished_run_starts_then_it_is_rejected(self) -> None:
+        """Given a root task owns an active run, when it starts another disjoint run, then one Goal owner is preserved."""
+        self.start("first-root", repositories=[("github:example/a", self.common_a)])
+        second = self.manifest("second-root", repositories=[("github:example/b", self.common_b)])
+        second["root_task_id"] = "root-first-root"
         error = self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_branch),
+            "run", "start", "--manifest", str(self.write_json("same-root.json", second)), expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "root-task-already-active")
+
+    def test_given_one_app_project_for_two_repositories_when_manifest_is_validated_then_it_fails_before_state(self) -> None:
+        """Given distinct repositories share a project ID, when start validates mapping, then no worker can target the wrong repo."""
+        manifest = self.manifest(
+            "bad-project",
+            repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)],
+            assignment_count=2,
+        )
+        manifest["assignments"][1]["project_id"] = manifest["assignments"][0]["project_id"]
+        error = self.invoke(
+            "run", "start", "--manifest", str(self.write_json("bad-project.json", manifest)), expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-input")
+
+    def test_given_state_writes_when_inspected_then_sqlite_is_the_only_lock(self) -> None:
+        """Given a writer, when state is initialized, then BEGIN IMMEDIATE and no lock file coordinate it."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            namespace = runpy.run_path(str(TOOL), run_name="run_state_test")
+            with mock.patch.dict(os.environ, self.env, clear=True):
+                connection = namespace["connect"](write=True)
+                try:
+                    self.assertTrue(connection.in_transaction)
+                    connection.rollback()
+                finally:
+                    connection.close()
+            del namespace
+            gc.collect()
+        self.assertFalse(any(self.database.parent.glob("*.lock")))
+
+    def test_given_busy_writer_when_timeout_expires_then_error_is_bounded(self) -> None:
+        """Given a held transaction, when a second writer exceeds the fixed wait, then it fails state-busy."""
+        manifest = self.write_json("busy.json", self.manifest("busy"))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            namespace = runpy.run_path(str(TOOL), run_name="busy_test")
+            with mock.patch.dict(os.environ, self.env, clear=True):
+                first = namespace["connect"](write=True)
+                first.rollback()
+                first.close()
+                blocker = sqlite3.connect(self.database, isolation_level=None)
+                blocker.execute("BEGIN IMMEDIATE")
+                namespace["connect"].__globals__["SQLITE_BUSY_TIMEOUT_MS"] = 1
+                output = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(output):
+                        code = namespace["main"](["--json", "run", "start", "--manifest", str(manifest)])
+                finally:
+                    blocker.rollback()
+                    blocker.close()
+            del namespace
+            gc.collect()
+        self.assertEqual(code, 4)
+        self.assertEqual(json.loads(output.getvalue())["error"]["code"], "state-busy")
+
+    def test_given_same_github_repo_in_different_workspaces_when_second_starts_then_it_waits(self) -> None:
+        """Given two paths for github:owner/repo, when roots start, then canonical identity conflicts."""
+        self.start("owner", repositories=[("github:example/project", self.common_a)])
+        result = self.start("waiter", repositories=[("github:example/project", self.common_b)])
+        self.assertEqual(result["status"], "waiting-for-repository")
+        self.assertFalse(result["claims_acquired"])
+        self.assertEqual(result["conflicting_owners"][0]["run_id"], "owner")
+
+    def test_given_linked_local_worktrees_when_second_starts_then_common_dir_identity_collides(self) -> None:
+        """Given linked worktrees share a common dir, when both roots start, then local identity has one owner."""
+        identity = self.local_identity(self.common_a)
+        self.start("local-owner", repositories=[(identity, self.common_a)])
+        result = self.start("local-waiter", repositories=[(identity, self.common_a)])
+        self.assertEqual(result["status"], "waiting-for-repository")
+
+    def test_given_multi_repo_request_when_one_conflicts_then_claims_are_all_or_none(self) -> None:
+        """Given one of two repositories is owned, when a root starts, then neither requested claim activates."""
+        self.start("owner", repositories=[("github:example/b", self.common_b)])
+        result = self.start(
+            "multi", repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)],
+            assignment_count=2,
+        )
+        self.assertFalse(result["claims_acquired"])
+        shown = self.invoke("run", "show", "--run-id", "multi")
+        self.assertTrue(all(row["active"] == 0 for row in shown["repository_claims"]))
+
+    def test_given_three_same_repo_specs_when_bootstrapped_then_one_claim_owns_three_workers(self) -> None:
+        """Given three disjoint Specs in one repo, when root dispatches them, then one claim supports three workers."""
+        self.start("three", assignment_count=3)
+        self.create_goal("three")
+        for number in (1, 2, 3):
+            self.create_worker("three", number)
+        shown = self.invoke("run", "show", "--run-id", "three")
+        self.assertEqual(len(shown["repository_claims"]), 1)
+        self.assertEqual([row["state"] for row in shown["assignments"]], ["active"] * 3)
+
+    def test_given_three_live_workers_when_fourth_creation_begins_then_capacity_blocks(self) -> None:
+        """Given three live workers, when root tries a fourth, then the generic coordinator serializes it."""
+        self.start("four", assignment_count=4)
+        self.create_goal("four")
+        for number in (1, 2, 3):
+            self.create_worker("four", number)
+        error = self.invoke(
+            "app-operation", "begin", "--run-id", "four", "--expected-revision", self.revision("four"),
+            "--operation-key", "create-fourth", "--action", "create-worker", "--subject-id", "spec-04",
             expected=4,
         )
-        self.assertEqual(error["error"]["code"], "target-branch-drift")
+        self.assertEqual(error["error"]["code"], "worker-capacity-reached")
 
-        observation["head_branch_name"] = "feature/example-1"
-        observation["pr_url"] = "https://github.com/example/other/pull/1"
-        wrong_repository = self.write_json("ready-wrong-repository.json", observation)
+    def test_given_no_root_goal_when_worker_creation_begins_then_controller_rejects_it(self) -> None:
+        """Given claimed state but no Goal, when worker creation begins, then bootstrap authority cannot start."""
+        self.start("no-goal")
         error = self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_repository),
-            expected=4,
+            "app-operation", "begin", "--run-id", "no-goal",
+            "--expected-revision", self.revision("no-goal"),
+            "--operation-key", "early-worker", "--action", "create-worker",
+            "--subject-id", "spec-01", expected=4,
         )
-        self.assertEqual(error["error"]["code"], "pull-request-repository-drift")
+        self.assertEqual(error["error"]["code"], "goal-not-active")
 
-        observation["pr_url"] = "https://github.com/example/project/pull/1"
-        observation["base_branch_name"] = "release"
-        wrong_base = self.write_json("ready-wrong-base.json", observation)
+    def test_given_unresolved_app_effect_when_goal_completion_begins_then_controller_rejects_it(self) -> None:
+        """Given PR-ready delivery and an unknown App effect, when Goal completion begins, then reconciliation comes first."""
+        self.start("unresolved")
+        self.create_goal("unresolved")
+        self.create_worker("unresolved")
+        self.ready_worker("unresolved")
+        self.operation(
+            "unresolved", "root-title-unknown", "set-root-title", "root-unresolved",
+            {"observed_title": "Implementing"}, status="unknown",
+        )
         error = self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_base),
-            expected=4,
+            "app-operation", "begin", "--run-id", "unresolved",
+            "--expected-revision", self.revision("unresolved"),
+            "--operation-key", "complete-too-early", "--action", "complete-goal",
+            "--subject-id", "root-unresolved", expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "unresolved-app-operations")
+
+    def test_given_existing_worker_identity_when_stale_readback_reuses_it_then_binding_fails(self) -> None:
+        """Given one worker/worktree binding, when another assignment receives the same readback, then it cannot alias."""
+        self.start("alias", assignment_count=2)
+        self.create_goal("alias")
+        self.create_worker("alias", 1)
+        self.invoke(
+            "app-operation", "begin", "--run-id", "alias",
+            "--expected-revision", self.revision("alias"),
+            "--operation-key", "create-alias-2", "--action", "create-worker",
+            "--subject-id", "spec-02",
+        )
+        stale = {
+            "schema_version": 1, "status": "succeeded",
+            "receipt_ref": "receipt:create-alias-2", "readback_ref": "readback:create-alias-2",
+            "thread_id": "thread-alias-1", "project_id": "project-1",
+            "checkout_path": str(self.base / "checkout alias 1"),
+            "git_common_dir": str(self.common_a), "observed_state": "active",
+        }
+        error = self.invoke(
+            "app-operation", "finish", "--run-id", "alias",
+            "--expected-revision", self.revision("alias"),
+            "--operation-key", "create-alias-2",
+            "--observation", str(self.write_json("stale-alias.json", stale)), expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "worker-identity-conflict")
+
+    def test_given_nondefault_pr_base_when_ready_is_recorded_then_controller_rejects_it(self) -> None:
+        """Given provider default main but PR base release, when root records ready, then claims cannot release."""
+        self.start("wrong-base")
+        self.create_goal("wrong-base")
+        self.create_worker("wrong-base")
+        observation = {
+            "schema_version": 1, "assignment_id": "spec-01",
+            "thread_id": "thread-wrong-base-1", "head_sha": f"{101:040x}",
+            "head_branch_name": "feature/example-1", "base_branch_name": "release",
+            "default_branch_name": "main",
+            "pr_url": "https://github.com/example/project/pull/1",
+            "provider_observation_ref": "provider:wrong-base", "status": "pr-ready-for-merge",
+        }
+        error = self.invoke(
+            "assignment", "ready", "--run-id", "wrong-base",
+            "--expected-revision", self.revision("wrong-base"),
+            "--observation", str(self.write_json("wrong-base.json", observation)), expected=4,
         )
         self.assertEqual(error["error"]["code"], "pull-request-base-drift")
 
-        observation["default_branch_name"] = "release"
-        wrong_default = self.write_json("ready-wrong-default.json", observation)
-        error = self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(wrong_default),
-            expected=4,
+    def test_given_waiting_root_when_owner_releases_then_next_sweep_acquires_all(self) -> None:
+        """Given a bounded waiter, when the owner pre-GO aborts, then one transaction acquires the free repository."""
+        self.start("owner")
+        self.start("waiter")
+        self.invoke("run", "finish", "--run-id", "owner", "--expected-revision", self.revision("owner"), "--outcome", "preimplementation-aborted")
+        result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
+        self.assertTrue(result["claims_acquired"])
+        self.assertTrue(result["may_create_goal_or_worker"])
+
+    def test_given_unchanged_owner_when_three_sweeps_pass_then_waiter_blocks_before_app_objects(self) -> None:
+        """Given an active owner, when three unchanged sweeps pass, then waiter terminates before Goal or task."""
+        self.start("owner")
+        self.start("waiter")
+        for _ in range(3):
+            result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
+        self.assertEqual(result["status"], "blocked-by-active-run")
+        shown = self.invoke("run", "show", "--run-id", "waiter")
+        self.assertEqual(shown["goal_state"], "not-created")
+        self.assertTrue(all(row["thread_id"] is None for row in shown["assignments"]))
+        self.assertEqual(shown["unresolved_app_operations"], [])
+        self.assertEqual(result["conflicting_owners"][0]["root_task_id"], "root-owner")
+
+    def test_given_post_bootstrap_durable_block_when_other_root_waits_then_no_takeover_occurs(self) -> None:
+        """Given Root A has worker authority and blocks, when Root B waits, then A retains the repository."""
+        self.start("owner")
+        self.create_goal("owner")
+        self.create_worker("owner")
+        result = self.invoke(
+            "assignment", "block", "--run-id", "owner", "--expected-revision", self.revision("owner"),
+            "--assignment-id", "spec-01",
         )
-        self.assertEqual(error["error"]["code"], "pull-request-base-drift")
+        self.assertTrue(result["claims_retained"])
+        self.start("waiter")
+        for _ in range(3):
+            blocked = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--expected-revision", self.revision("waiter"))
+        self.assertEqual(blocked["status"], "blocked-by-active-run")
+        self.assertEqual(blocked["conflicting_owners"][0]["worker_thread_ids"], ["thread-owner-1"])
 
-        observation["base_branch_name"] = "main"
-        observation["default_branch_name"] = "main"
-        missing_provider_result = self.write_json("ready-missing-provider-result.json", observation)
-        error = self.invoke(
-            "task",
-            "ready",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(missing_provider_result),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "missing-owner-operation")
-
-    def test_fourth_task_refills_only_after_a_live_slot_finishes(self) -> None:
-        self.start(assignments=4)
-        self.bind_goal()
-        for assignment in (1, 2, 3):
-            self.bind_task(assignment)
-
-        request = self.write_json("create-task-4-request.json", {"task": "spec-04"})
-        blocked = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "create-task-4",
-            "--owner",
-            "app",
-            "--action",
-            "create-task",
-            "--subject-id",
-            "spec-04",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(blocked["error"]["code"], "task-capacity-reached")
-
-        checkout = self.base / "checkout 4"
+    def test_given_prebootstrap_abort_when_finished_then_claim_releases(self) -> None:
+        """Given a Goal and worker but no bootstrap authority, when both reconcile terminal, then claim releases."""
+        self.start("abort")
+        self.create_goal("abort")
+        assignment = "spec-01"
+        thread = "thread-abort-1"
+        checkout = self.base / "abort checkout"
         checkout.mkdir()
-        observation = self.write_json(
-            "task-4-bind.json",
-            {
-                "schema_version": 1,
-                "assignment_id": "spec-04",
-                "thread_id": "thread-4",
-                "observed_title": "🛠️ Feature 4",
-                "project_id": "project-one",
-                "repository_claim": "repository:github:example/project",
-                "git_common_dir": str(self.repo),
-                "checkout_path": str(checkout),
-                "git_top_level": str(checkout),
-                "checkout_branch": "codex/work-4",
-                "baseline_head": f"{4:040x}",
-            },
-        )
-        for assignment in (1, 2, 3):
-            self.pass_baseline(assignment)
-        self.authorize_task(1)
-        self.ready_task(1)
         self.operation(
-            key="create-task-4",
-            action="create-task",
-            subject="spec-04",
-            result={"thread_id": "thread-4"},
+            "abort", "create-abort", "create-worker", assignment,
+            {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"},
         )
         self.operation(
-            key="title-task-4",
-            action="set-task-title",
-            subject="spec-04",
-            result={"thread_id": "thread-4", "title": "🛠️ Feature 4"},
+            "abort", "archive-abort", "archive-worker", assignment,
+            {"thread_id": thread, "observed_state": "archived"},
         )
+        self.operation(
+            "abort", "complete-abort", "complete-goal", "root-abort",
+            {"observed_state": "completed"},
+        )
+        result = self.invoke("run", "finish", "--run-id", "abort", "--expected-revision", self.revision("abort"), "--outcome", "preimplementation-aborted")
+        self.assertTrue(result["claims_released"])
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project")
+        self.assertIsNone(owner["owner"])
+
+    def test_given_confirmed_failed_app_operation_when_retried_then_new_key_is_allowed(self) -> None:
+        """Given readback proves no Goal was created, when root retries, then a new operation key may launch."""
+        self.start("retry")
+        self.operation(
+            "retry", "goal-failed", "create-goal", "root-retry", {}, status="failed"
+        )
+        result = self.invoke(
+            "app-operation", "begin", "--run-id", "retry",
+            "--expected-revision", self.revision("retry"),
+            "--operation-key", "goal-retry", "--action", "create-goal",
+            "--subject-id", "root-retry",
+        )
+        self.assertTrue(result["launch_authorized"])
+
+    def test_given_pr_ready_release_when_independent_root_starts_then_it_acquires(self) -> None:
+        """Given an independent Spec after PR-ready release, when it starts, then merge is not required for ownership."""
+        self.start("first")
+        self.create_goal("first")
+        self.create_worker("first")
+        self.ready_worker("first")
+        self.finish_pr_ready("first")
+        second = self.start("second")
+        self.assertTrue(second["claims_acquired"])
+
+    def test_given_unknown_bootstrap_effect_when_readback_arrives_then_same_key_reconciles(self) -> None:
+        """Given ambiguous App delivery, when receipt readback resolves, then the same key succeeds without hashes."""
+        self.start("recover")
+        self.create_goal("recover")
+        assignment = "spec-01"
+        thread = "thread-recover-1"
+        checkout = self.base / "recover checkout"
+        checkout.mkdir()
+        self.operation("recover", "create-recover", "create-worker", assignment, {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"})
+        self.operation("recover", "title-recover", "set-worker-title", assignment, {"thread_id": thread, "observed_title": "🛠️ Feature 1"})
+        self.operation("recover", "bootstrap-recover", "send-bootstrap", assignment, {"thread_id": thread}, status="unknown")
+        relaunch = self.invoke(
+            "app-operation", "begin", "--run-id", "recover", "--expected-revision", self.revision("recover"),
+            "--operation-key", "bootstrap-recover-2", "--action", "send-bootstrap", "--subject-id", assignment,
+            expected=4,
+        )
+        self.assertEqual(relaunch["error"]["code"], "protected-operation-already-started")
+        observed = {"schema_version": 1, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
+        result = self.invoke(
+            "app-operation", "finish", "--run-id", "recover", "--expected-revision", self.revision("recover"),
+            "--operation-key", "bootstrap-recover", "--observation", str(self.write_json("reconciled.json", observed)),
+        )
+        self.assertEqual(result["status"], "succeeded")
+        with sqlite3.connect(self.database) as connection:
+            columns = [row[1] for row in connection.execute("PRAGMA table_info(app_operations)")]
+        self.assertFalse(any("hash" in column for column in columns))
+
+    def test_given_unknown_app_effect_before_receipt_when_recorded_then_no_reference_is_fabricated(self) -> None:
+        """Given transport ambiguity before any receipt, when unknown is recorded, then nullable typed facts preserve truth."""
+        self.start("no-receipt")
         self.invoke(
-            "task",
-            "bind",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
+            "app-operation", "begin", "--run-id", "no-receipt",
+            "--expected-revision", self.revision("no-receipt"),
+            "--operation-key", "goal-unknown", "--action", "create-goal",
+            "--subject-id", "root-no-receipt",
         )
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["live_task_count"], 3)
-        self.assertEqual(shown["unbound_assignment_ids"], [])
+        observation = {"schema_version": 1, "status": "unknown"}
+        result = self.invoke(
+            "app-operation", "finish", "--run-id", "no-receipt",
+            "--expected-revision", self.revision("no-receipt"),
+            "--operation-key", "goal-unknown",
+            "--observation", str(self.write_json("unknown-no-receipt.json", observation)),
+        )
+        self.assertEqual(result["status"], "unknown")
+        operations = self.invoke("app-operation", "list", "--run-id", "no-receipt")
+        self.assertIsNone(operations["operations"][0]["receipt_ref"])
+        self.assertIsNone(operations["operations"][0]["readback_ref"])
 
-    def test_goal_completion_operation_can_precede_goal_observation_and_finish(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.complete_one_task()
-        self.operation(
-            key="complete-goal",
-            action="complete-goal",
-            subject="run-one",
-            result={"status": "complete", "objective_sha256": digest},
-        )
-        self.invoke(
-            "goal",
-            "complete",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--objective-sha256",
-            digest,
-        )
-        finished = self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "completed",
-        )
-        self.assertTrue(finished["claims_released"])
-        self.assertEqual(finished["goal_status"], "completed")
-
-    def test_goal_cannot_complete_with_unready_tasks(self) -> None:
-        self.start()
-        self.bind_goal()
-        request = self.write_json("complete-request.json", {"goal": "run-one"})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "complete-goal",
-            "--owner",
-            "app",
-            "--action",
-            "complete-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "run-not-ready")
-
-    def test_blocked_goal_is_projected_and_preserves_active_claims(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.block_goal(digest)
-
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["goal"]["status"], "blocked")
-        error = self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "preimplementation-aborted",
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "owner-abandon-required")
-        claim = self.invoke(
-            "claim", "find", "--claim-key", "source:github:example/project#1"
-        )
-        self.assertEqual(claim["claim"]["run_id"], "run-one")
-        self.abandon_run()
-        request = self.write_json(
-            "resume-abandoned-request.json",
-            {"authorization_ref": "owner:resume-goal:run-one:resume-abandoned"},
-        )
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "resume-abandoned",
-            "--owner",
-            "owner",
-            "--action",
-            "resume-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "run-abandoned")
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertFalse(shown["goal"]["blocked_resume_authorized"])
-        finished = self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "preimplementation-aborted",
-        )
-        self.assertEqual(finished["goal_status"], "blocked")
-        released = self.invoke(
-            "claim", "find", "--claim-key", "source:github:example/project#1"
-        )
-        self.assertIsNone(released["claim"])
-
-    def test_owner_abandonment_requires_preimplementation_task_reconciliation(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.bind_task(1)
-        self.block_goal(digest)
-        request = self.write_json(
-            "abandon-unreconciled-request.json",
-            {"authorization_ref": "owner:abandon-run:run-one:abandon-unreconciled"},
-        )
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "abandon-unreconciled",
-            "--owner",
-            "owner",
-            "--action",
-            "abandon-run",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "tasks-not-reconciled")
-
-    def test_owner_abandonment_is_forbidden_after_implementation_go(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.bind_task(1)
-        self.pass_baseline(1)
-        self.authorize_task(1)
-        self.block_goal(digest)
-        request = self.write_json(
-            "abandon-after-go-request.json",
-            {"authorization_ref": "owner:abandon-run:run-one:abandon-after-go"},
-        )
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "abandon-after-go",
-            "--owner",
-            "owner",
-            "--action",
-            "abandon-run",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-            expected=4,
-        )
+    def test_given_post_bootstrap_worker_when_preimplementation_finish_is_attempted_then_release_fails(self) -> None:
+        """Given worker authority has started, when root requests pre-GO release, then the claim remains."""
+        self.start("started")
+        self.create_goal("started")
+        self.create_worker("started")
+        error = self.invoke("run", "finish", "--run-id", "started", "--expected-revision", self.revision("started"), "--outcome", "preimplementation-aborted", expected=4)
         self.assertEqual(error["error"]["code"], "implementation-already-started")
+        owner = self.invoke("claim", "find", "--repository-identity", "github:example/project")
+        self.assertEqual(owner["owner"]["run_id"], "started")
 
-    def test_blocked_goal_result_requires_the_exact_objective(self) -> None:
-        self.start()
-        self.bind_goal(source="created")
-        request = self.write_json("block-goal-request.json", {"goal": "run-one"})
-        self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "block-goal",
-            "--owner",
-            "app",
-            "--action",
-            "block-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-        )
-        result = self.write_json(
-            "block-goal-wrong-result.json",
-            {"status": "blocked", "objective_sha256": "f" * 64},
-        )
-        error = self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "block-goal",
-            "--status",
-            "succeeded",
-            "--result",
-            str(result),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "goal-objective-drift")
-
-    def test_blocked_goal_can_complete_after_explicitly_resumed_work(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.block_goal(digest)
-        self.resume_goal()
-        self.complete_one_task()
-        self.operation(
-            key="complete-goal",
-            action="complete-goal",
-            subject="run-one",
-            result={"status": "complete", "objective_sha256": digest},
-        )
-        completed = self.invoke(
-            "goal",
-            "complete",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--objective-sha256",
-            digest,
-        )
-        self.assertEqual(completed["goal_status"], "completed")
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["goal"]["status"], "completed")
-        self.assertFalse(shown["goal"]["blocked_resume_authorized"])
-
-    def test_owner_resume_result_must_match_the_requested_authorization(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.block_goal(digest)
-        invalid_request = self.write_json(
-            "resume-invalid-request.json",
-            {"authorization_ref": "owner:resume-goal:run-one:another-operation"},
-        )
-        invalid = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "resume-invalid",
-            "--owner",
-            "owner",
-            "--action",
-            "resume-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(invalid_request),
-            expected=4,
-        )
-        self.assertEqual(invalid["error"]["code"], "invalid-owner-authorization-ref")
-        request = self.write_json(
-            "resume-request.json",
-            {"authorization_ref": "owner:resume-goal:run-one:resume-goal"},
-        )
-        self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "resume-goal",
-            "--owner",
-            "owner",
-            "--action",
-            "resume-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-        )
-        result = self.write_json(
-            "resume-result.json",
-            {
-                "status": "granted",
-                "authorization_ref": "owner:resume-goal:run-one:another-operation",
-            },
-        )
-        error = self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "resume-goal",
-            "--status",
-            "succeeded",
-            "--result",
-            str(result),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "owner-authorization-drift")
-
-    def test_blocked_goal_rejects_worker_mutations_until_owner_resume(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        self.block_goal(digest)
-        request = self.write_json("create-task-blocked.json", {"task": "spec-01"})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "create-task-blocked",
-            "--owner",
-            "app",
-            "--action",
-            "create-task",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "goal-resume-required")
-        self.resume_goal()
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertTrue(shown["goal"]["blocked_resume_authorized"])
-        self.operation(
-            key="create-task-after-resume",
-            action="create-task",
-            subject="spec-01",
-            result={"thread_id": "thread-1"},
-        )
-
-    def test_unknown_operation_blocks_then_resumes_and_completes_under_same_key(self) -> None:
-        self.start()
-        digest = self.bind_goal(source="created")
-        request = self.write_json("unknown-request.json", {"external": "pending"})
-        self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "external-write",
-            "--owner",
-            "provider",
-            "--action",
-            "external-write",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-        )
-        unknown = self.write_json(
-            "external-unknown.json", {"provider_status": "indeterminate"}
-        )
-        self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "external-write",
-            "--status",
-            "unknown",
-            "--result",
-            str(unknown),
-        )
-        self.block_goal(digest)
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["goal"]["status"], "blocked")
-        self.assertEqual(
-            [item["operation_key"] for item in shown["unresolved_operations"]],
-            ["external-write"],
-        )
-        blocked_request = self.write_json("blocked-provider-request.json", {"new": True})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "new-provider-write",
-            "--owner",
-            "provider",
-            "--action",
-            "external-write",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(blocked_request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "goal-resume-required")
-        self.resume_goal()
-        reconciled = self.write_json(
-            "external-reconciled.json", {"provider_status": "confirmed"}
-        )
-        self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "external-write",
-            "--status",
-            "succeeded",
-            "--result",
-            str(reconciled),
-        )
-        self.complete_one_task()
-        self.operation(
-            key="complete-goal",
-            action="complete-goal",
-            subject="run-one",
-            result={"status": "complete", "objective_sha256": digest},
-        )
-        self.invoke(
-            "goal",
-            "complete",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--objective-sha256",
-            digest,
-        )
-        finished = self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "completed",
-        )
-        self.assertTrue(finished["claims_released"])
-
-    def test_repeatable_protected_action_rejects_an_unresolved_same_action(self) -> None:
-        self.start()
-        self.bind_goal(source="created")
-        request = self.write_json("block-pending.json", {"goal": "run-one"})
-        self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "block-goal-pending",
-            "--owner",
-            "app",
-            "--action",
-            "block-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-        )
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "block-goal-replacement",
-            "--owner",
-            "app",
-            "--action",
-            "block-goal",
-            "--subject-id",
-            "run-one",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "protected-operation-already-started")
-
-    def test_abort_requires_exact_terminal_task_identity(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.bind_task(1)
-        error = self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "preimplementation-aborted",
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "tasks-not-reconciled")
-        self.operation(
-            key="archive-task-1",
-            action="archive-task",
-            subject="spec-01",
-            result={"thread_id": "thread-1", "status": "archived"},
-        )
-        observation = self.write_json(
-            "abort-task.json",
-            {
-                "schema_version": 1,
-                "assignment_id": "spec-01",
-                "thread_id": "thread-1",
-                "app_status": "archived",
-                "observation_ref": "codex-task://thread-1/readback",
-            },
-        )
-        self.invoke(
-            "task",
-            "abort",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
-        )
-        shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["assignments"][0]["terminal_app_status"], "archived")
-        self.assertEqual(
-            shown["assignments"][0]["terminal_observation_ref"],
-            "codex-task://thread-1/readback",
-        )
-        self.invoke(
-            "run",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--outcome",
-            "preimplementation-aborted",
-        )
-        restarted = self.invoke(
-            "run",
-            "start",
-            "--manifest",
-            str(self.write_json("restart.json", self.manifest(run_id="run-two"))),
-        )
-        self.assertTrue(restarted["start_authorized"])
-
-    def test_authorized_task_cannot_use_preimplementation_start_over(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.bind_task(1)
-        self.pass_baseline(1)
-        self.authorize_task(1)
-        observation = self.write_json(
-            "unsafe-abort.json",
-            {
-                "schema_version": 1,
-                "assignment_id": "spec-01",
-                "thread_id": "thread-1",
-                "app_status": "archived",
-                "observation_ref": "codex-task://thread-1/readback",
-            },
-        )
-        error = self.invoke(
-            "task",
-            "abort",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--observation",
-            str(observation),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "implementation-already-started")
-
-    def test_operation_journal_is_pageable_for_recovery(self) -> None:
-        self.start()
-        self.bind_goal()
-        for index in range(3):
-            self.operation(
-                key=f"provider-{index}",
-                action="readback-marker",
-                subject=f"subject-{index}",
-                result={"index": index},
-                owner="gitstack",
-            )
-        first = self.invoke(
-            "operation", "list", "--run-id", "run-one", "--limit", "2"
-        )
-        self.assertTrue(first["has_more"])
-        second = self.invoke(
-            "operation",
-            "list",
-            "--run-id",
-            "run-one",
-            "--after-sequence",
-            str(first["next_after_sequence"]),
-            "--limit",
-            "2",
-        )
-        self.assertFalse(second["has_more"])
-        self.assertEqual(len(first["operations"]) + len(second["operations"]), 3)
-
-    def test_unknown_operation_reconciles_same_identity_without_relaunch(self) -> None:
-        self.start()
-        self.bind_goal()
-        request = self.write_json("unknown-request.json", {"action": "publish"})
-        self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "publish-one",
-            "--owner",
-            "gitstack",
-            "--action",
-            "publish-delivery",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-        )
-        unknown = self.write_json("unknown-result.json", {"delivery": "ambiguous"})
-        self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "publish-one",
-            "--status",
-            "unknown",
-            "--result",
-            str(unknown),
-        )
-        duplicate = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "publish-one",
-            "--owner",
-            "gitstack",
-            "--action",
-            "publish-delivery",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(duplicate["error"]["code"], "operation-already-started")
-        reconciled = self.write_json("reconciled-result.json", {"pr_url": "https://github.com/example/project/pull/1"})
-        self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "publish-one",
-            "--status",
-            "succeeded",
-            "--result",
-            str(reconciled),
-        )
-        shown = self.invoke(
-            "operation", "show", "--run-id", "run-one", "--operation-key", "publish-one"
-        )
-        self.assertEqual([item["status"] for item in shown["operation"]["results"]], ["unknown", "succeeded"])
-
-    def test_protected_app_action_cannot_use_a_second_key(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.operation(
-            key="create-task-one",
-            action="create-task",
-            subject="spec-01",
-            result={"thread_id": "thread-1"},
-        )
-        request = self.write_json("duplicate-create.json", {"task": "again"})
-        error = self.invoke(
-            "operation",
-            "begin",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "create-task-two",
-            "--owner",
-            "app",
-            "--action",
-            "create-task",
-            "--subject-id",
-            "spec-01",
-            "--request",
-            str(request),
-            expected=4,
-        )
-        self.assertEqual(error["error"]["code"], "protected-operation-already-started")
-
-    def test_completed_operation_replay_is_a_noop(self) -> None:
-        self.start()
-        self.bind_goal()
-        self.operation(
-            key="provider-readback",
-            action="provider-marker",
-            subject="spec-01",
-            result={"ok": True},
-            owner="gitstack",
-        )
-        before = self.revision
-        result = self.write_json("provider-replay.json", {"ok": True})
-        replay = self.invoke(
-            "operation",
-            "finish",
-            "--run-id",
-            "run-one",
-            "--expected-revision",
-            str(self.revision),
-            "--operation-key",
-            "provider-readback",
-            "--status",
-            "succeeded",
-            "--result",
-            str(result),
-        )
-        self.assertTrue(replay["replayed"])
-        self.assertEqual(replay["revision"], before)
-
-    def test_unsupported_database_schema_has_no_migration_path(self) -> None:
-        self.state_root.mkdir(parents=True)
-        connection = sqlite3.connect(self.database)
-        connection.execute("CREATE TABLE incompatible_state(value TEXT)")
-        connection.close()
-        os.chmod(self.database, 0o600)
-        error = self.invoke("doctor", expected=4)
-        self.assertEqual(error["error"]["code"], "unsupported-state-schema")
+    def test_given_schema_when_inspected_then_only_allowlisted_state_and_no_text_hashes_exist(self) -> None:
+        """Given initialized schema, when tables and columns are inspected, then storage is narrow and hash-free."""
+        self.start("schema")
+        with sqlite3.connect(self.database) as connection:
+            tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+            columns = [row[1] for table in tables for row in connection.execute(f"PRAGMA table_info({table})")]
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+        self.assertEqual(tables, {"metadata", "runs", "assignments", "repository_claims", "app_operations"})
+        self.assertEqual(version, 1)
+        self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
 
 
 if __name__ == "__main__":

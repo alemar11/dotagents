@@ -54,7 +54,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
-| `implement-feature` | Execute execution-ready Feature Spec bundles in visible ChatGPT desktop app tasks through one fixed GitHub PR-ready flow. |
+| `implement-feature` | Coordinate visible App workers that execute ready Feature Specs end to end through reviewed PR-ready delivery. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
@@ -82,7 +82,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `capture-idea` requires `$project-memory` for tracker routing and the canonical Idea marker mapping. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both write modes, plus applied tracker mutations.
-- `implement-feature` requires local `python3` for its sole shipped `scripts/run-state` SQLite helper, plus `$autoreview` and the relevant GitStack bundled skills for Git, GitHub issue lifecycle, configured CI, review, commit, and pull-request work. It executes the dependency-ready Feature Spec frontier as one visible App-managed worktree task per single-repository Spec, inherits App model defaults, and refills at most three live slots. Durable source, task, Goal, operation, and claim identity lives under the user state directory rather than a cache; the breaking schema-1 runtime has no migration, legacy reader, or retired-run compatibility. It never plans, repairs incomplete planning artifacts, or merges pull requests.
+- `implement-feature` requires local `python3` for its sole shipped `scripts/run-state` SQLite helper, plus `$autoreview` and relevant GitStack workflows. One startup permission covers visible App-managed worktree tasks whose workers own implementation, validation, publication, review fixes, and tracker proof end to end. The root coordinates at most three disjoint workers and owns one per-user schema-1 DB at `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; canonical repository claims are atomic across App projects and workspaces. It never plans, repairs planning artifacts, or merges pull requests.
 
 ## Project-Local Skills
 

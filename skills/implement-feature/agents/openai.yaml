@@ -1,7 +1,7 @@
 interface:
   display_name: "Implement Feature"
-  short_description: "Implement a ready Feature Spec frontier in App tasks."
+  short_description: "Coordinate end-to-end Feature Spec workers in App tasks."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $implement-feature to execute the dependency-ready Feature Spec frontier in visible App worktree tasks through implementation, validation, current-head review, configured CI, and merge-ready PR closeout."
+  default_prompt: "Use $implement-feature to coordinate visible App worktree workers that execute the dependency-ready Feature Spec frontier end to end through implementation, validation, current-head review, configured CI, tracker proof, and merge-ready PR closeout."
 policy:
   allow_implicit_invocation: false

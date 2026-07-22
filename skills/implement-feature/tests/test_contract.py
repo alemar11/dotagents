@@ -10,192 +10,115 @@ ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 
 
-class ImplementFeatureContractTests(unittest.TestCase):
+class ImplementFeatureContractScenarios(unittest.TestCase):
+    def text(self, name: str) -> str:
+        return (ROOT / name).read_text(encoding="utf-8")
+
     def runtime_text(self) -> str:
         return "\n".join(
             path.read_text(encoding="utf-8")
             for path in [ROOT / "SKILL.md", *(ROOT / "references").glob("*.md")]
         )
 
-    def test_one_shipped_cli_owns_state(self) -> None:
+    def test_given_startup_when_permission_is_resolved_then_it_is_the_only_user_question(self) -> None:
+        """Given startup, when permission is granted, then no later authority question is allowed."""
+        options = self.text("references/options.md")
+        skill = self.text("SKILL.md")
+        self.assertIn("Ask once", options)
+        self.assertIn("do not ask another user question", options)
+        self.assertIn("Never ask another authority, recovery", skill)
+        self.assertEqual(re.findall(r"`visible_app_task_permission`", options).count("`visible_app_task_permission`"), 1)
+
+    def test_given_compatible_operational_edits_when_worker_rereads_then_it_continues(self) -> None:
+        """Given compatible design or test edits, when reread occurs, then worker accepts them autonomously."""
+        spec = self.text("references/spec-backed-delivery.md")
+        worker = self.text("references/worker.md")
+        self.assertIn("implementation approach or internal technical design", spec)
+        self.assertIn("additional or equivalent tests", spec)
+        self.assertIn("accept compatible operational changes and continue autonomously", worker)
+
+    def test_given_stable_drift_when_worker_rereads_then_it_blocks_without_asking(self) -> None:
+        """Given outcome or acceptance drift, when detected, then worker declaratively blocks."""
+        spec = self.text("references/spec-backed-delivery.md")
+        self.assertIn("acceptance text", spec)
+        self.assertIn("material validation budget/terminal result changes", spec)
+        self.assertIn("blocked-durable-contract", spec)
+        self.assertIn("without asking", spec)
+
+    def test_given_github_or_local_tracker_when_checkbox_changes_then_readback_and_invalidation_are_required(self) -> None:
+        """Given GitHub or local Markdown, when proof changes, then checkboxes update and invalid proof is unchecked."""
+        tracker = self.text("references/tracker-proof.md")
+        self.assertIn("GitHub or local", tracker)
+        self.assertIn("only after that current-head proof exists", tracker)
+        self.assertIn("uncheck it immediately", tracker)
+        self.assertIn("Read the authoritative issue again", tracker)
+
+    def test_given_worker_handoff_when_root_closes_then_root_is_read_only(self) -> None:
+        """Given PR-ready worker evidence, when root verifies, then it never judges or edits criteria."""
+        gates = self.text("references/gates.md")
+        tracker = self.text("references/tracker-proof.md")
+        self.assertIn("performs read-only verification", gates)
+        self.assertIn("does not edit code", gates)
+        self.assertIn("must not edit, check, uncheck, reinterpret, or adjudicate", tracker)
+
+    def test_given_bootstrap_recovery_when_state_is_ambiguous_then_app_receipts_replace_text_hashes(self) -> None:
+        """Given ambiguous delivery, when recovering, then receipt/readback owns identity without text hashes."""
+        app = self.text("references/app-orchestration.md")
+        recovery = self.text("references/recovery-validation.md")
+        self.assertIn("authoritative App receipt", app)
+        self.assertRegex(app, r"Fail closed if the exact\s+baseline cannot be\s+recovered")
+        self.assertIn("No state row, packet, body, result, or message hash", recovery)
+
+    def test_given_same_repo_assignments_when_paths_overlap_then_root_serializes_them(self) -> None:
+        """Given overlap in one repository, when scheduling, then root serializes while disjoint work may reach three."""
+        skill = self.text("SKILL.md")
+        app = self.text("references/app-orchestration.md")
+        self.assertIn("Schedule up to three path-disjoint", skill)
+        self.assertIn("Overlapping paths or issue dependencies serialize", self.text("references/spec-backed-delivery.md"))
+        self.assertIn("At most three workers may be live", app)
+
+    def test_given_dependency_pr_ready_release_when_downstream_is_selected_then_merge_proof_is_still_required(self) -> None:
+        """Given upstream claim release, when downstream is considered, then it still waits for merge proof."""
+        spec = self.text("references/spec-backed-delivery.md")
+        recovery = self.text("references/recovery-validation.md")
+        self.assertIn("must already be merged and integration-proven", spec)
+        self.assertRegex(spec, r"Never use claim release as\s+merge proof")
+        self.assertIn("dependent Specs still wait", recovery)
+
+    def test_given_cli_when_structurally_inspected_then_it_is_one_executable_schema_one_artifact(self) -> None:
+        """Given the package, when CLI structure is inspected, then one executable owns fresh schema 1."""
         scripts = sorted(path.name for path in (ROOT / "scripts").iterdir() if path.is_file())
+        source = self.text("scripts/run-state")
         self.assertEqual(scripts, ["run-state"])
-        tool = ROOT / "scripts" / "run-state"
-        self.assertTrue(os.access(tool, os.X_OK))
-        source = tool.read_text(encoding="utf-8")
+        self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertIn('CLI_VERSION = "1.0.0"', source)
         self.assertIn("STATE_SCHEMA_VERSION = 1", source)
         self.assertIn("BEGIN IMMEDIATE", source)
-        for retired in ("fcntl", "StateConnection", "executescript", "run-state-v1.lock"):
-            self.assertNotIn(retired, source)
+        self.assertNotIn(".lock", source)
+        self.assertNotIn("migrate", source.lower())
 
-    def test_retired_runtime_surfaces_and_controller_are_absent(self) -> None:
-        retired_scripts = {
-            "active-root-claim",
-            "delivery-preflight",
-            "execution-manifest",
-            "gitstack-installation-parity",
-            "ledger-cache",
-        }
-        retired_references = {
-            "app-control-plane-delays.md",
-            "cache-lifecycle.md",
-            "controller.md",
-            "execution-manifest.md",
-            "gitstack-installation-parity.md",
-            "task-model-policy.md",
-        }
-        for name in retired_scripts:
-            self.assertFalse((ROOT / "scripts" / name).exists())
-        for name in retired_references:
-            self.assertFalse((ROOT / "references" / name).exists())
-        text = self.runtime_text()
-        self.assertNotIn("controller next", text)
-        self.assertNotIn("stale_run_retirement_permission", text)
-
-    def test_every_reference_is_directly_routed_from_skill(self) -> None:
-        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    def test_given_runtime_docs_when_references_are_routed_then_every_reference_is_reachable(self) -> None:
+        """Given progressive disclosure, when routes are inspected, then every reference is linked by SKILL."""
+        skill = self.text("SKILL.md")
         routed = set(re.findall(r"`references/([^`]+\.md)`", skill))
         actual = {path.name for path in (ROOT / "references").glob("*.md")}
         self.assertEqual(routed, actual)
 
-    def test_durable_state_is_not_a_cache_and_has_no_migration(self) -> None:
-        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-        run_state = (ROOT / "references" / "run-state.md").read_text(encoding="utf-8")
-        readme = (REPO / "README.md").read_text(encoding="utf-8")
+    def test_given_root_policy_when_shared_docs_are_read_then_controller_ownership_is_generic(self) -> None:
+        """Given shared docs, when policy is inspected, then root coordinates and workers own end-to-end delivery."""
         agents = (REPO / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("run-state-v1.sqlite3", skill)
-        self.assertIn("not a cache", skill)
-        self.assertIn("never migrates or imports", run_state)
-        self.assertIn("SQLite is the sole writer-coordination surface", run_state)
-        self.assertNotIn("run-state-v1.lock", run_state)
-        self.assertIn("scripts/run-state", readme)
-        self.assertIn("scripts/run-state", agents)
-        self.assertNotIn("ledgers/archive", skill + run_state + readme)
+        readme = (REPO / "README.md").read_text(encoding="utf-8")
+        self.assertIn("The root coordinates", agents)
+        self.assertIn("run-state.sqlite3", readme)
+        self.assertIn("One startup permission", readme)
 
-    def test_only_fresh_state_schema_is_documented(self) -> None:
-        joined = self.runtime_text()
-        self.assertNotRegex(joined, r"schema[- ](?:[2-9]|1[0-9])")
-        self.assertNotRegex(joined, r"schema(?:_version)?[^\n]*\b(?:[2-9]|1[0-9])\.0\.0\b")
-
-    def test_app_contract_maps_projects_and_inherits_model_defaults(self) -> None:
-        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
-        for tool in (
-            "codex_app__list_projects",
-            "codex_app__list_threads",
-            "codex_app__create_thread",
-            "codex_app__read_thread",
-            "codex_app__send_message_to_thread",
-            "codex_app__set_thread_title",
-            "codex_app__set_thread_archived",
-            "get_goal",
-            "create_goal",
-            "update_goal",
-        ):
-            self.assertIn(tool, app)
-        self.assertIn("Do not pass `model` or `thinking`", app)
-        self.assertIn("project ID and one App-managed worktree", app)
-        self.assertNotIn("wait_threads", app)
-        self.assertIn("After three\nunchanged sweeps", app)
-
-    def test_fast_start_uses_fresh_project_ids_and_does_not_claim_blocked_frontier(self) -> None:
-        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
-        self.assertIn("project ID from memory, state, or an earlier run", bootstrap)
-        self.assertIn("Blocked next-frontier Specs are output evidence", bootstrap)
-        self.assertIn("because every manifest source is claimed", bootstrap)
-        self.assertIn("Never duplicate an unchanged intake read", bootstrap)
-
-    def test_blocked_goal_preserves_the_original_run(self) -> None:
-        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
-        run_state = (ROOT / "references" / "run-state.md").read_text(encoding="utf-8")
-        worker = (ROOT / "references" / "worker-implementation.md").read_text(encoding="utf-8")
-        review = (ROOT / "references" / "review-mutation-authority.md").read_text(encoding="utf-8")
-        self.assertIn("journal App `block-goal`", app)
-        self.assertIn("Keep that run and its claims active", app)
-        self.assertIn("keeps its claims by default", run_state)
-        self.assertIn("Every new\njournaled mutation then fails closed", run_state)
-        self.assertIn("protected\nblocked-resume Goal authority", worker)
-        self.assertIn("protected blocked-resume Goal evidence", review)
-        self.assertIn("owner:<action>:<run_id>:<operation_key>", run_state)
-
-    def test_root_controller_identity_and_read_fallback_are_deterministic(self) -> None:
-        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
-        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
-        self.assertIn("`root_task_id` is the local controller correlation key", bootstrap)
-        self.assertIn("set it equal to\n`run_id`", bootstrap)
-        self.assertIn("After three\nunchanged sweeps", app)
-
-    def test_goal_is_bound_before_tasks_but_does_not_grant_edit_authority(self) -> None:
-        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
-        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
-        self.assertLess(bootstrap.index("Create or adopt and read back the root Goal"), bootstrap.index("Dispatch up to three"))
-        self.assertIn("Its existence does not grant a\nworker edit authority", app)
-
-    def test_explicit_go_follows_wave_baseline_fan_in(self) -> None:
-        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
-        baseline = (ROOT / "references" / "baseline-validation.md").read_text(encoding="utf-8")
-        self.assertLess(app.index("Accept the complete baseline set"), app.index("implementation_authority=granted"))
-        self.assertIn("fan in all wave baselines before authorizing any worker", baseline)
-        self.assertIn("task authorize", app)
-
-    def test_frontier_and_single_repository_task_topology_are_explicit(self) -> None:
-        multi = (ROOT / "references" / "multi-repo-workspace.md").read_text(encoding="utf-8")
-        worker = (ROOT / "references" / "worker.md").read_text(encoding="utf-8")
-        self.assertIn("exactly one affected Git\nrepository", multi)
-        self.assertIn("blocked downstream and integration Specs", multi)
-        self.assertIn("later `$implement-feature`\ninvocation", multi)
-        self.assertIn("one repository, one App project/worktree", worker)
-
-    def test_fast_start_defers_publication_checks(self) -> None:
-        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
-        self.assertIn("Defer CI, review access, rules,\n   approvals, mergeability, and queue eligibility", bootstrap)
-        self.assertIn("After an authorization wait, stale observation, or drift", bootstrap)
-        self.assertIn("may fan out to the three-task limit", bootstrap)
-        self.assertIn("do not load `run-state.md`\nduring a healthy fresh start", bootstrap)
-
-        normal_path = [
-            ROOT / "SKILL.md",
-            ROOT / "references" / "root-bootstrap.md",
-            ROOT / "references" / "spec-backed-delivery.md",
-            ROOT / "references" / "options.md",
-            ROOT / "references" / "app-orchestration.md",
-        ]
-        self.assertLess(sum(len(path.read_text(encoding="utf-8").splitlines()) for path in normal_path), 550)
-
-    def test_state_uses_typed_lifecycle_not_generic_receipts(self) -> None:
-        run_state = (ROOT / "references" / "run-state.md").read_text(encoding="utf-8")
-        for command in (
-            "goal bind",
-            "goal complete",
-            "task bind",
-            "task baseline",
-            "task authorize",
-            "task ready",
-            "task abort",
-            "operation list",
-        ):
-            self.assertIn(command, run_state)
-        for retired in ("event record", "event list", "task-set-verified", "evidence_refs"):
-            self.assertNotIn(retired, run_state)
-
-    def test_checkout_and_pull_request_identity_are_bound_before_ready(self) -> None:
-        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
-        run_state = (ROOT / "references" / "run-state.md").read_text(encoding="utf-8")
-        publication = (ROOT / "references" / "worker-publication.md").read_text(encoding="utf-8")
-        self.assertIn("git_common_dir", bootstrap)
-        self.assertIn("Git common-directory path and filesystem\nidentity", run_state)
-        self.assertIn("ensure-pull-request-ready", run_state)
-        self.assertIn("github_mark_pull_request_ready_for_review", publication)
-        self.assertIn("base equal to the observed default branch", run_state)
-        tool = (ROOT / "scripts" / "run-state").read_text(encoding="utf-8")
-        self.assertIn("git_common_paths", tool)
-        self.assertIn("git_common_fs_ids", tool)
-
-    def test_start_over_is_preimplementation_only(self) -> None:
-        recovery = (ROOT / "references" / "recovery-validation.md").read_text(encoding="utf-8")
-        self.assertIn("Use start over for preimplementation state only", recovery)
-        self.assertIn("Once any task received `implementation_authority=granted`", recovery)
-        self.assertIn("imports nothing", recovery)
+    def test_given_runtime_contract_when_state_boundary_is_read_then_text_content_stays_authoritative_elsewhere(self) -> None:
+        """Given generic coordinator docs, when state ownership is read, then raw delivery content is excluded structurally."""
+        state = self.text("references/run-state.md")
+        self.assertIn("Stored Data Allowlist", state)
+        self.assertIn("typed App-operation reconciliation facts", state)
+        self.assertIn("must not store raw Spec or issue bodies", state)
+        self.assertIn("Normal Git\nhead SHAs remain valid evidence", state)
 
 
 if __name__ == "__main__":

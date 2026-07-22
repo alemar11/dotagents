@@ -1,77 +1,39 @@
-# Recovery And Start Over
+# Recovery And Repository Waits
 
-Use this reference after compaction, an active claim, a missing worker, an
-unknown operation, or state/runtime trouble.
+## Bounded Repository Wait
 
-## Reconstruct Current Truth
+A conflicting `run start` creates only `waiting-for-repository` coordination
+state. It acquires no claim and authorizes no Goal, worker, worktree, branch, or
+provider mutation. Run `run wait-sweep` at bounded controller sweeps.
 
-1. Run `scripts/run-state --json doctor`.
-2. When the database is initialized and supported, resolve known source or
-   repository ownership with `claim find`, read the complete run projection
-   with `run show`, and page `operation list` from sequence zero until
-   `has_more=false`; use `operation show` for exact result history.
-3. When `doctor=uninitialized`, skip state reads and reconstruct identity only
-   from App project, task, Goal, source, Git, and provider evidence.
-4. Call `list_projects`, then read every stored or externally discovered thread
-   ID. Verify title, project, managed checkout, Git top-level, branch, and head.
-5. Read the root Goal and require its exact objective and supported state. A
-   journaled blocked Goal keeps the original run and claims active. Continue
-   mutations only after an explicit current owner turn records protected
-   `owner/resume-goal` with its canonical operation correlation ref and `run
-   show` reports `blocked_resume_authorized=true`.
-6. Re-read accepted source fingerprints and current Git/provider artifacts.
+- If every requested repository becomes free, one transaction acquires the
+  complete set and returns `may_create_goal_or_worker=true`.
+- If the same owner set remains for three unchanged sweeps, terminate
+  `blocked-by-active-run` and report each owner run, root task, and known worker
+  thread. Do not ask, wait indefinitely, or create App objects.
+- If owner identity changes, the unchanged-sweep count restarts. Partial claim
+  acquisition is never permitted.
 
-The stored manifest is the canonical assignment packet. App, Git, and provider
-readback is authoritative current truth. Never infer a live task or Goal from a
-title, an old message, or state alone.
+A post-bootstrap blocked owner retains every claim. Another root cannot take
+over. A verified preimplementation abort may reconcile and archive created
+workers, complete and read back an already-created Goal, finish
+`preimplementation-aborted`, and release. A whole run releases
+normally only after every assignment and the Goal are PR-ready/completed.
+Release is not merge proof: dependent Specs still wait for authoritative
+upstream merge and integration evidence, while an independent Spec may start.
 
-## Resume
+## App Recovery
 
-Resume the original thread when its identity and checkout remain provable.
-Reconcile `unknown` operations through owner/provider readback and finish the
-same key; never launch a replacement operation. `run show` exposes planned
-assignments and live-slot count so root can continue deterministic refill.
+Read `run show`, then page `app-operation list` to completion. For every pending
+or unknown App operation, use the stable thread/Goal identity plus receipt and
+readback to determine its effect. Finish the same operation; never relaunch or
+replace the worker.
 
-A disappeared or replaced worker after implementation authority is
-`needs-owner`. Preserve its managed checkout and Git work. Do not release its
-claims, create a second task, or silently reconstruct implementation elsewhere.
+Recover the exact bootstrap through App receipt and thread readback, then reread
+the current Feature Spec and issues. If exact baseline sections cannot be
+recovered, fail closed. No state row, packet, body, result, or message hash may
+stand in for readback.
 
-## Start Over
-
-This version has no migration, compatibility, takeover, or `retired` lifecycle.
-Use start over for preimplementation state only:
-
-- retired cache layouts and other versioned database filenames are ignored;
-- `doctor=uninitialized` starts a new schema-1 database only after App project,
-  task, Goal, source, Git, and provider reads prove no matching worker can still
-  mutate;
-- an active schema-1 run with no authorized task may end its exact created tasks,
-  record each `task abort`, and call
-  `run finish --outcome preimplementation-aborted` before a fresh run while the
-  Goal remains active, or after explicit protected owner abandonment if blocked;
-- an incompatible database at the current schema-1 path is never read or
-  rewritten. Preserve it and require owner direction before moving it aside;
-  after the same no-live-work proof, start with a clean schema-1 path.
-
-The fresh run uses new run, task, and operation identities, revalidates current
-source and projects, and imports nothing. It may adopt the same exact active
-Goal; after blocked-Goal abandonment, a new Goal needs owner direction.
-
-Once any task received `implementation_authority=granted`, an old/missing state
-error is not a start-over excuse. Recover from the original App task and Git
-work or stop for the owner. If the exact schema-1 database is missing, the CLI
-cannot adopt that existing task: preserve the checkout and report
-`needs-owner` unless the exact database can be restored.
-
-## Preimplementation Abort
-
-End and read back each created baseline-only task as `completed` or `archived`,
-then call `task abort` with that exact thread and observation ref. Reconcile all
-pending/unknown operations. Planned assignments require no fake task. Only then
-may `run finish --outcome preimplementation-aborted` release claims.
-
-Do not complete the root Goal for an aborted attempt. A fresh run may continue
-the same active objective. If the root Goal becomes blocked, journal its exact
-readback and preserve the original run and claims. Before any GO, explicit owner
-abandonment may release them only through protected `owner/abandon-run` after
-tasks and operations are reconciled; after GO, preserve and recover the run.
+After recovery the worker performs its normal pre-issue reread and continues
+compatible work autonomously. Stable drift becomes declarative
+`blocked-durable-contract`; operational drift does not trigger a question.

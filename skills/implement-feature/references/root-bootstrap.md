@@ -1,127 +1,56 @@
 # Root Bootstrap
 
-Load this reference before persistent state, visible worker tasks, a new Goal,
-or repository/provider mutation.
+Root is a lightweight control plane. Before mutation:
 
-## Load Path
-
-Always load:
-
-- `spec-backed-delivery.md` for source validation and frontier selection;
-- `options.md` for scope disclosure and authorization;
-- `app-orchestration.md` for current App project, task, and Goal tools.
-
-Load `multi-repo-workspace.md` when the requested bundle spans repositories.
-Workers load `baseline-validation.md` inside their managed checkouts. The exact
-ordinary start manifest and command are below, so do not load `run-state.md`
-during a healthy fresh start; load it only for CLI errors, recovery, or
-maintenance.
-
-## Fast-Start Order
-
-1. Resolve the supplied Feature Spec and traverse its complete connected bundle. Fetch
-   each source and repository once; reuse that snapshot until stale or drifted.
-2. Validate the bundle unchanged. Select only executable Specs whose authored
-   cross-Spec dependencies are already merged and integration-proven. Report
-   blocked downstream refs as the next frontier; do not claim them.
-3. Require exactly one affected repository per selected executable Spec and one
-   unique `(repository_claim, target_branch_name)` owner. Missing or conflicting
-   execution data is `planning-required`.
-4. Confirm the root exposes `list_projects`, task create/read/message/title
-   tools, and Goal get/create/update tools. Call `list_projects` once per current
-   snapshot and map every selected path only from that response; never reuse a
-   project ID from memory, state, or an earlier run. Use only bounded
-   `read_thread` sweeps for monitoring. Read the current root Goal and reject an
-   unrelated or blocked unfinished Goal unless recovery owns the exact active run.
-5. Resolve the current GitStack runtime from the loaded App catalog. In parallel
-   per repository, prove access, target/default branch existence, current head,
-   and conflicting branch or PR identity. Defer CI, review access, rules,
-   approvals, mergeability, and queue eligibility.
-6. Render the exact sources and fingerprints, repositories/projects, branches,
-   paths, validation commands, task titles, Goal objective, and expected PRs.
-   Resolve authority through `options.md`.
-7. After an authorization wait, stale observation, or drift, refresh source revisions, repository heads, and the App project snapshot.
-   Never duplicate an unchanged intake read merely to restate its result.
-8. Write the exact schema-1 manifest below to a private temporary JSON file and
-   call `scripts/run-state --json run start`. Continue only when
-   `start_authorized=true`.
-9. Create or adopt and read back the root Goal through
-   `app-orchestration.md`, then bind it in state.
-10. Dispatch up to three canonical non-overlapping assignments immediately.
-
-Independent repository reads, task creation, title observation, and worker
-baselines may fan out to the three-task limit. Fan in before each wave receives
-implementation authority.
-
-## Start Manifest
-
-Use exactly these fields:
+1. Read and validate the complete current Feature Spec frontier through
+   `spec-backed-delivery.md`.
+2. Resolve each repository's canonical identity. Use
+   `github:owner/repository` for GitHub repositories. For local-only repositories,
+   resolve `git rev-parse --path-format=absolute --git-common-dir`, stat that
+   real directory, and use the exact identity printed by the helper's local
+   identity rule. Linked worktrees therefore share one target.
+3. Map every selected repository path to a current App project. Never treat an
+   App project or workspace path as repository identity. One App project may
+   serve several Specs in one repository, but must not map to distinct
+   canonical repositories.
+4. Check branches and dependency merge proof, calculate allowed-path overlap,
+   derive the worker order, and disclose the startup scope.
+5. Resolve the one `visible_app_task_permission` from `options.md`.
+6. Write a private manifest containing only controller identity:
 
 ```json
 {
   "schema_version": 1,
-  "run_id": "019f-example",
-  "root_task_id": "019f-example",
-  "goal_objective": "Implement the dependency-ready Feature Spec frontier",
-  "sources": [
-    {
-      "kind": "github-issue",
-      "ref": "https://github.com/owner/repository/issues/42",
-      "sha256": "<sha256-of-accepted-source-body>"
-    }
-  ],
+  "run_id": "run-019f",
+  "root_task_id": "019f-root-task",
   "repositories": [
     {
-      "repository_claim": "repository:github:owner/repository",
-      "repository_path": "/absolute/repository",
-      "project_id": "<App-project-id>",
-      "default_branch_name": "main",
+      "repository_identity": "github:owner/repository",
       "git_common_dir": "/absolute/repository/.git"
     }
   ],
   "assignments": [
     {
-      "assignment_id": "spec-01",
+      "assignment_id": "spec-42",
       "source_ref": "https://github.com/owner/repository/issues/42",
-      "title": "🛠️ Exact authored Feature Spec title",
-      "repository_claim": "repository:github:owner/repository",
-      "target_branch_name": "feature/example",
-      "allowed_paths": ["src/example/**"],
-      "acceptance_criteria": ["Observed behavior matches the Spec"],
-      "validation_commands": ["literal accepted command"],
-      "integration_gates": [],
-      "domain_closeout": null
+      "repository_identity": "github:owner/repository",
+      "project_id": "current-app-project-id",
+      "title": "🛠️ Exact Feature Spec title",
+      "target_branch_name": "feature/example"
     }
   ]
 }
 ```
 
-`sources` includes the accepted selected Specs and only the coordination sources
-required to understand them. Blocked next-frontier Specs are output evidence,
-not manifest sources, because every manifest source is claimed. A GitHub issue
-ref is canonical and lowercase.
-For a local source use `kind=local-file`, an absolute regular-file `ref`, and
-its exact content SHA-256. The helper rechecks local bytes and claims both path
-and filesystem identity.
+The manifest deliberately omits raw Spec and issue bodies, checklists, allowed
+path text, validation attempts, worker technical state, provider state, and text
+hashes. Those remain authoritative at their sources.
 
-`root_task_id` is the local controller correlation key; set it equal to
-`run_id`. Goal tools implicitly target the calling App task and expose no
-separate current-task ID, so do not guess one from `list_threads`.
+One root task may own only one unfinished run and lifecycle Goal. A second run
+from that task starts only after the first is terminal.
 
-`repositories` comes from the one authoritative `list_projects` mapping plus
-the provider-read default branch. Resolve
-`git_common_dir` with `git rev-parse --path-format=absolute --git-common-dir`
-inside the mapped repository; the helper stores its filesystem identity. At
-task bind, resolve the same value independently inside the managed checkout.
-Repository claims, App project IDs, repository paths, and Git common-directory
-filesystem identities are one-to-one; any duplicate mapping is invalid.
-`assignments` contains exactly one row per selected executable Spec. The helper
-rejects two assignments for one source ref, undeclared sources or repositories,
-duplicate repository/branch pairs, and noncanonical fields.
-
-The manifest is the recovery packet. Keep source bodies, paths, acceptance,
-validation, and optional closeout data there instead of deriving them from old
-state after compaction.
-
-Any failure before `run start` proves zero run state, worker task, new Goal,
-repository write, or provider mutation.
+Call `scripts/run-state --json run start --manifest <absolute-file>`. The single
+transaction either acquires every canonical repository or none. On success,
+create and read back the one root Goal, set the root title/progress, and schedule
+up to three disjoint assignments. On conflict, follow the bounded wait path and
+create no Goal, worker, worktree, branch, or provider mutation.
