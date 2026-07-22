@@ -83,6 +83,55 @@ HARD_CUT_MARKERS = ("reject", "retired", "unsupported", "hard cut")
 
 
 class PlanFeatureCompleteBundleTests(unittest.TestCase):
+    def test_executor_brief_scenarios_cover_hybrid_contract(self) -> None:
+        scenarios = read("tests/executor-brief-scenarios.md")
+        headings = re.findall(r"^## Scenario: (.+)$", scenarios, re.MULTILINE)
+
+        self.assertEqual(
+            [
+                "Replace The Recommended Design Safely",
+                "Preserve Checkbox-Only Progress",
+                "Add Or Substitute Equivalent Tests",
+                "Block On Stable Semantic Drift",
+                "Require A Material-Validation Failure Policy",
+                "Enforce Checkbox Ownership",
+            ],
+            headings,
+        )
+        for scenario in re.split(r"(?=^## Scenario: )", scenarios, flags=re.MULTILINE)[1:]:
+            self.assertRegex(scenario, r"(?m)^Given ")
+            self.assertRegex(scenario, r"(?m)^when ")
+            self.assertRegex(scenario, r"(?m)^then ")
+
+    def test_templates_define_stable_and_mutable_executor_ownership(self) -> None:
+        skill = read("SKILL.md")
+        issue_phase = read("references/issue-phase.md")
+        issue_template = read("references/issue-body-template.md")
+        spec_template = read("references/spec-template.md")
+        normalized = " ".join((skill + issue_phase + issue_template).split())
+        normalized_issue_template = " ".join(issue_template.split())
+
+        self.assertIn("strong executor-ready starting briefs", normalized)
+        self.assertIn("worker-mutable execution record", normalized)
+        self.assertIn("planning-time recommended approach", issue_template)
+        self.assertIn("simpler or safer design", issue_template)
+        self.assertIn("text/count/order", normalized)
+        self.assertIn("Before starting this issue", normalized_issue_template)
+        self.assertIn("after any recovery or handoff", normalized_issue_template)
+        self.assertIn("before final verification", normalized_issue_template)
+        self.assertIn("Root coordination never edits or judges", issue_template)
+        self.assertIn("restores an unchecked marker", issue_template)
+        self.assertIn("source_spec_ref", normalized_issue_template)
+        self.assertIn("target_branch_name", normalized_issue_template)
+        self.assertIn("normal fixed App flow", normalized_issue_template)
+        self.assertIn("non_app_delivery_target", normalized_issue_template)
+        self.assertIn("individually provable", spec_template)
+        self.assertIn("attempt/retry budget", spec_template)
+        self.assertIn(
+            "preserving current acceptance checkbox markers",
+            read("references/spec-phase.md"),
+        )
+
     def test_run_registry_has_only_write_mode(self) -> None:
         options = read("references/options.md")
         registry = section(options, "## Run Registry", "## Project Memory Facts")
@@ -396,12 +445,12 @@ class PlanFeatureCompleteBundleTests(unittest.TestCase):
             "resume only exact missing label provisioning, hosted create, edit, local-file create, or metadata operations",
             fixture,
         )
-        self.assertIn("parameterized body-template hash", fixture)
+        self.assertIn("complete parameterized body template", fixture)
         self.assertIn("mixed-backend bundle", fixture)
         self.assertIn("all-local bundle", fixture)
-        self.assertIn("complete templates and hashes", fixture)
+        self.assertIn("role-to-ref map, complete templates", fixture)
         self.assertIn("selected Idea refs plus verified prior outcome refs", fixture)
-        self.assertIn("a hash alone is insufficient", fixture)
+        self.assertIn("a digest alone is insufficient", fixture)
         self.assertIn("optional final-only body metadata", fixture)
         self.assertIn("insert exact body metadata", fixture)
         self.assertIn("publication-continuation handoff", spec_phase)
@@ -489,7 +538,7 @@ class PlanFeatureCompleteBundleTests(unittest.TestCase):
 
         self.assertIn("contract-equivalent existing active file", issue_phase)
         self.assertIn("repair exactly those header lines", issue_phase)
-        self.assertIn("rest of the file is byte-identical", issue_phase)
+        self.assertIn("all mutable execution content remain unchanged", issue_phase)
         self.assertIn("Never perform this repair on a file in `done/`", issue_phase)
 
     def test_incomplete_artifacts_are_withheld(self) -> None:
@@ -755,10 +804,10 @@ class PlanFeatureCompleteBundleTests(unittest.TestCase):
 
         self.assertIn("`source_spec_ref`", options)
         self.assertIn("derived execution data", " ".join(options.split()))
-        self.assertIn("Always run the canonical source-contract validation", skill)
-        self.assertIn("Return each original body and ref", " ".join(skill.split()))
+        self.assertIn("always run the canonical source-contract validation", " ".join(skill.split()))
+        self.assertIn("Return each current body and ref", " ".join(skill.split()))
         self.assertIn("derive `source_route=existing-source`", runtime.lower())
-        self.assertIn("original durable body", runtime)
+        self.assertIn("current durable body", runtime)
         self.assertIn(
             "skip Feature Spec drafting and publication",
             " ".join(options.split()),
@@ -766,7 +815,7 @@ class PlanFeatureCompleteBundleTests(unittest.TestCase):
         self.assertIn("incompatible structured input", normalized)
         self.assertIn("Never interpret absence as an empty edge set", normalized)
         self.assertIn("do not draft or update the source", spec_phase)
-        self.assertIn("return that exact source", spec_phase)
+        self.assertIn("return that current source", spec_phase)
         self.assertIn("separate explicitly authorized Feature Spec update", spec_phase)
         self.assertIn(
             "exact existing section without adding, removing, or rewriting",
@@ -780,7 +829,10 @@ class PlanFeatureCompleteBundleTests(unittest.TestCase):
             " ".join(issue_phase.split()),
         )
         self.assertIn("A `proposed-spec:` ref is not durable route evidence", probe)
-        self.assertIn("source_body_action: read-and-validate-unchanged", probe)
+        self.assertIn(
+            "source_body_action: preserve-stable-fields-and-current-checkbox-markers",
+            probe,
+        )
         self.assertIn("feature_spec_drafting: skipped", probe)
         self.assertIn("feature_spec_publication: skipped", probe)
         self.assertIn("`issue_operation=set-type`", spec_phase)

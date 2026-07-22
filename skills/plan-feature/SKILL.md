@@ -114,7 +114,7 @@ Resolve `write_mode` once:
   Predeclare every role, parameterized final-body template, and allowed ref
   slot plus the optional exact final-only body-metadata insertion. Stage only
   hosted roles whose refs are not yet known without that final metadata, resolve
-  every durable or deterministic ref, materialize and hash the final bodies,
+  every durable or deterministic ref, materialize the final bodies,
   finalize only the predeclared ref substitutions and metadata insertion, and
   verify the complete Spec set before issue generation. In a mixed-backend bundle, keep local bodies
   unwritten until hosted refs and bodies are final. In an all-local bundle,
@@ -122,11 +122,11 @@ Resolve `write_mode` once:
   same-transaction artifact is not a foreign race; any other appeared or
   changed target blocks.
 - Until that transaction and the complete bundle converge, every partial-
-  failure handoff must retain the complete parameterized body templates and
-  hashes, allowed ref and body-metadata slots, role-to-target/ref map, selected
+  failure handoff must retain the complete parameterized body templates,
+  allowed ref and body-metadata slots, role-to-target/ref map, selected
   `source_idea_refs` plus verified prior outcome refs, completed operations, and
   exact missing operations. A retry resumes only when that payload exactly
-  matches current state; a hash without its reconstructable template is
+  matches current state through direct field and body comparison; a digest is
   insufficient recovery evidence.
 - Withhold incomplete artifacts. Return concrete blockers instead of
   publishing or labeling partial work agent-ready. The uniquely marked staging
@@ -142,6 +142,23 @@ Resolve `write_mode` once:
   `source_spec_ref`, `feature_slug`, `affected_repositories`, `allowed_paths`,
   `target_branch_name`, and `dependency_ids`. Do not duplicate these values in
   another delivery, handoff, or option section.
+- Treat the Feature Spec and generated issues as strong executor-ready starting
+  briefs, not immutable technical scripts. Protect the stable planning contract
+  directly: goal/outcome and Non-Goals; repositories, allowed paths, source and
+  branch identity, and delivery type; dependencies; acceptance-criterion
+  text/count/order; safety constraints; and material validation constraints,
+  including attempt budgets and required terminal outcome. Preserve the
+  worker-mutable execution record: checkbox markers, implementation approach
+  and internal design, safer or simpler rewrites, additional or equivalent
+  tests, compatible clarifications, progress/status/evidence, and concrete
+  in-scope refactors or fixes. Never compute a whole-body tracker digest. On an
+  existing-source route, `unchanged` means these stable fields are unchanged;
+  preserve executor-owned acceptance checkbox markers without authorizing Plan
+  Feature to edit them.
+  In generated issues, source and branch identity are the rendered
+  `source_spec_ref` and `target_branch_name`. Derive delivery type as the normal
+  fixed App flow when `non_app_delivery_target` is absent, or as that exact
+  conditional target when its row is present; do not add duplicate fields.
 - For every local Markdown issue, include the tracker-owning repository in
   `affected_repositories` and include both the exact active issue path and its
   exact derived `done/` destination in `allowed_paths`. This is execution scope,
@@ -224,6 +241,12 @@ Resolve `write_mode` once:
   Persist only the final stable result and one provenance line.
 - Keep worker surfaces, task counts, App permissions, checkout paths, and
   runtime scheduling out of Feature Specs and generated issues.
+- Prefer concise behavioral or scenario prose for decisions and failure policy;
+  use tables only for exact identity or scope facts. Acceptance criteria must be
+  unique, individually provable checkboxes with stable wording and order. A
+  paid, external, non-repeatable, or otherwise constrained validation must have
+  an explicit prose failure policy before `ready-for-agent`. Treat any document
+  line-count budget as a review warning, never a correctness gate.
 - Publish only portable evidence: repo-relative paths, repo-qualified sibling
   paths, hosted links, or descriptive source labels. Never publish
   developer-machine absolute paths.
@@ -280,7 +303,7 @@ For a multi-repository workspace, derive workspace behavior from
 `repository_layout`; do not ask for another workspace-mode option.
 
 On the existing-source route, collect the union of exact `- Source Idea:` refs
-from the unchanged intake Spec and every required linked partial as
+from the stable intake Spec content and every required linked partial as
 `bound_source_idea_refs`. Treat this as derived continuation evidence, never as
 an option or permission to draft from an Idea again. When the invocation also
 supplies `source_idea_refs`, require exact set equality with the bound set. An
@@ -344,7 +367,8 @@ Only a terminal run exit waiting for one specific requester answer may
 reconcile that Idea to `needs-info` under `write_mode=apply`.
 
 On the existing-source route, inspect open questions only to validate whether
-the durable source can be consumed unchanged. Accept `knowledge_delta` only as
+the durable source's stable contract can be consumed unchanged. Accept
+`knowledge_delta` only as
 explicit accepted invocation data or an exact continuation handoff supplied
 separately from the source; never infer it from or write it into the Feature
 Spec. Require every target surface to resolve inside the unchanged source scope;
@@ -355,11 +379,12 @@ Keep `planning_blockers` separate and capture no durable knowledge in planning.
 
 ### 3. Run The Feature Spec Phase
 
-Always run the canonical source-contract validation from
+Preserve current executor-owned checkbox markers and always run the canonical
+source-contract validation from
 `references/spec-phase.md`, including the exact Feature Dependencies heading
 and columns. On the existing-source route, start from any intake member and
-traverse its links to require the complete connected unchanged Spec set. Return
-each original body and ref without drafting or publication; a coordination-only
+traverse its links to require the complete connected stable Spec set. Return
+each current body and ref without drafting or publication; a coordination-only
 parent owns no issues. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:

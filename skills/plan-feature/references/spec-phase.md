@@ -6,8 +6,10 @@ it as a public skill.
 
 ## Goal
 
-Produce, publish, or validate unchanged a Feature Spec that can feed the issue
-phase. If the source is too vague, return the smallest blocking question set
+Produce, publish, or validate a Feature Spec that can feed the issue phase. An
+existing source preserves stable fields while accepting current executor-owned
+acceptance checkbox markers. If the source is too vague, return the smallest
+blocking question set
 through the caller.
 
 ## Boundaries
@@ -56,7 +58,7 @@ Receive:
   validation and later lifecycle reconciliation;
 - optional exact multi-repository publication-continuation handoff containing
   transaction identity, role-to-target/ref map, reconstructable parameterized
-  templates and hashes, ref and optional body-metadata slots, selected Idea and
+  templates, ref and optional body-metadata slots, selected Idea and
   prior-outcome refs, any complete `knowledge_delta`, and verified completed
   plus exact missing operations;
 - authored Feature Spec dependency rows;
@@ -211,9 +213,12 @@ decisions that materially change scope, acceptance, dependencies, validation,
 or repository ownership.
 
 On the existing-source route, do not draft or update the source. Carry the
-original durable body and intake `source_spec_ref` unchanged through the
-dependency and body gates below. After both gates pass, return that exact source
-to the issue phase and skip Apply Or Propose. If a missing section, blocking
+current durable body and intake `source_spec_ref` through the dependency and
+body gates below. Compare stable fields directly while treating acceptance
+checkbox markers as executor-owned progress: preserve their current state, but
+require criterion text, count, and order to remain unchanged. After both gates
+pass, return that current source to the issue phase and skip Apply Or Propose.
+If a missing section, blocking
 question, new decision, schema repair, or content correction would change the
 source, stop and require a separate explicitly authorized Feature Spec update
 before issue generation. Never rewrite the source or publish a repaired copy.
@@ -230,7 +235,8 @@ source or a future issue to accommodate it.
 When the intake source is any member of a multi-repository bundle, traverse its
 canonical parent, repo-to-child, sibling, and Feature Dependency links to load
 the complete connected coordination, implementation, and dedicated integration
-Spec set. Validate every body and ref unchanged through the same gates. The
+Spec set. Validate every body's stable fields and ref through the same gates,
+preserving current acceptance checkbox markers. The
 coordination parent owns no generated implementation issues; pass only
 implementation-eligible partials to issue generation. A missing, ambiguous,
 disconnected, or incompatible linked source blocks the run instead of being
@@ -257,6 +263,15 @@ implementation-facing:
 - acceptance criteria and validation expectations;
 - cross-repository contracts and integration gates;
 - risks, open questions, and issue-splitting notes.
+
+Acceptance criteria must be unique, individually provable checkboxes with
+stable wording and order. Describe decisions and failure behavior as concise
+behavioral or scenario prose; reserve tables for exact identity and scope facts.
+For every paid, external, non-repeatable, or otherwise constrained validation,
+state the attempt/retry budget, allowed fallback, evidence to retain, and
+required terminal outcome before the Spec can become agent-ready. Treat
+implementation and issue-splitting sections as planning-time recommendations,
+not immutable technical scripts.
 
 When durable Idea refs were supplied, transform their normalized evidence
 through the mapping in `idea-source.md`. Before publication, trace every
@@ -333,6 +348,11 @@ Then verify:
 - no runtime worker or App-session setting is present;
 - the source, scope, acceptance, validation, and dependency contract are
   complete;
+- acceptance criteria are unique, individually provable checkboxes with stable
+  text and order;
+- every materially constrained validation has an explicit prose failure policy
+  with its attempt/retry budget, allowed fallback, retained evidence, and
+  required terminal outcome;
 - open questions are empty or proven non-blocking;
 - a present phase-level knowledge delta has explicit portable decisions,
   targets, and evidence, while no Feature Spec body contains `knowledge_delta`
@@ -372,14 +392,15 @@ disabled. Immediately before reporting or applying a repair, re-read the exact
 source body/ref, current metadata, and mapping row; restart validation or block
 on any drift rather than mutating against a stale immutable source. Local
 Feature Specs have no separate source metadata mutation. Then return the
-unchanged durable source after the dependency and body gates pass.
+current durable source, including preserved executor-owned checkbox markers,
+after the dependency and body gates pass.
 
 Read tracker and type mappings immediately before output.
 
 For a new-source apply, resolve the configured `feature` metadata transport
 before publication. `native-type` and `label` transports are applied only after
 the final hosted body verifies. A configured `body-field` is rendered
-into the applied final body before its hash is computed. In proposal mode, omit
+into the applied final body before final-body verification. In proposal mode, omit
 applied metadata from the body and report the intended transport and value as
 proposal metadata only.
 
@@ -414,11 +435,11 @@ creation; deterministic local refs are resolved before mutation:
    template and predeclare the complete parent, implementation, integration,
    sibling, and Feature Dependency ref slots plus the exact optional configured
    body-metadata slot and value. Generate one transaction identity and record
-   each role, exact target, title, template hash, allowed ref slots, and allowed
-   body-metadata insertion. A final-body hash does not exist until every ref
-   used by that body is resolved and the optional final-only body metadata is
-   inserted; all-local bodies may therefore be materialized before the first
-   write.
+   each role, exact target, title, complete reconstructable template, allowed
+   ref slots, and allowed body-metadata insertion. Materialize final bodies only
+   after every ref used by that body is resolved and the optional final-only
+   body metadata is inserted; all-local bodies may therefore be materialized
+   before the first write. Do not compute whole-body tracker digests.
 2. Re-read every target, then immediately re-read and prove exact-target absence
    before each missing predeclared hosted-role create with
    `issue_operation=create`. A hosted staged body contains all final content
@@ -428,10 +449,10 @@ creation; deterministic local refs are resolved before mutation:
    remains staged. Do not apply final feature metadata, generate issues, or
    present a staged issue as a Feature Spec.
 3. After every hosted ref is known, combine those refs with deterministic local
-   refs, materialize every final body, and record its final-body hash. Invoke
+   refs and materialize every final body. Invoke
    `issue_operation=edit` only to replace the predeclared ref slots, insert the
    exact predeclared final-only `body-field` metadata when configured, remove the
-   staging marker and notice, and produce that recorded final body. Reject every
+   staging marker and notice, and produce that predeclared final body. Reject every
    other body difference. Verify a body convention as part of that final body;
    apply any native Issue Type or label transport only after the body verifies.
 4. Verify every hosted final body and globally qualified ref, then immediately
@@ -443,15 +464,15 @@ creation; deterministic local refs are resolved before mutation:
 
 After each transaction mutation, retain the verified role-to-ref map and return
 it in any partial-failure continuation handoff together with every complete
-parameterized body template and hash, allowed ref slot, optional exact
+parameterized body template, allowed ref slot, optional exact
 body-metadata slot and value, selected `source_idea_refs`, all verified prior
 outcome refs, the complete `knowledge_delta` when present, completed operations,
 and exact missing operations. On retry, recognize a new-source continuation
 only when the supplied or reconstructable transaction identity, role map,
-reconstructable templates and hashes, allowed ref slots, optional body-metadata
-slot and value, any materialized final hashes, and current tracker state match
-exactly. A template hash without the corresponding reconstructable template is
-insufficient. Resume only missing `create`,
+reconstructable templates, allowed ref slots, optional body-metadata slot and
+value, materialized final bodies when available, and current tracker state
+match directly. A digest is insufficient recovery evidence.
+Resume only missing `create`,
 predeclared `edit`, exact local-file create, or metadata operations. This exact
 continuation rule also covers an all-local partial write. A mixed partial/final
 set without sufficient exact recovery evidence blocks; never adopt it as an
@@ -481,7 +502,7 @@ member and traverses the whole connected set.
   `planning/features/<feature-slug>/integration/issues/`, and use
   `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` as
   its qualified multi-repository ref. On exact continuation, create only missing
-  predeclared local files whose targets and final-body hashes still match; never
+  predeclared local files whose targets and final bodies still match; never
   overwrite or repair a conflicting file.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
   location, mapped metadata, and deterministic source identity:

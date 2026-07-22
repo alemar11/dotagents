@@ -252,6 +252,10 @@ settings.
 
 Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
 
+This is the planning-time recommended approach. The implementing Codex task may
+replace it with a simpler or safer design when the accepted goal, scope,
+constraints and acceptance criteria remain unchanged.
+
 Implement export assembly and authorization together with focused contract
 coverage.
 
@@ -264,6 +268,16 @@ coverage.
 
 - Preferred: focused account-settings export tests.
 - Fallback: equivalent repository test runner plus a manual archive assembly.
+
+## Executor Update Contract
+
+Re-read the current Spec and complete issue set before starting, after recovery,
+and before final verification. Preserve stable planning fields and block on
+semantic drift. Delivery is the normal fixed App flow because no
+`non_app_delivery_target` row is present. After current-head proof and a fresh artifact read, the
+implementing Codex task owns this issue's checkbox markers; it updates parent
+criteria only after Spec-level proof and restores unchecked state if invalidated.
+Root coordination never edits or judges individual criteria.
 
 ## Completion
 
@@ -309,6 +323,10 @@ integrated behavior, and reconcile the accepted durable contract.
 
 Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
 
+This is the planning-time recommended approach. The implementing Codex task may
+replace it with a simpler or safer design when the accepted goal, scope,
+constraints and acceptance criteria remain unchanged.
+
 Implement the download boundary, exercise the complete export path, then hand
 the accepted durable delta to Project Memory and verify its documentation diff.
 
@@ -324,6 +342,16 @@ the accepted durable delta to Project Memory and verify its documentation diff.
 - Preferred: focused account-settings export integration tests.
 - Fallback: equivalent repository test runner plus a manual authorized and
   cross-account download check.
+
+## Executor Update Contract
+
+Re-read the current Spec and complete issue set before starting, after recovery,
+and before final verification. Preserve stable planning fields and block on
+semantic drift. Delivery is the normal fixed App flow because no
+`non_app_delivery_target` row is present. After current-head proof and a fresh artifact read, the
+implementing Codex task owns this issue's checkbox markers; it updates parent
+criteria only after Spec-level proof and restores unchecked state if invalidated.
+Root coordination never edits or judges individual criteria.
 
 ## Domain Knowledge Closeout
 
@@ -460,33 +488,33 @@ staging_contract:
   marker: unique transaction and role
   state: explicitly non-executable and not yet a Feature Spec
   excluded_final_content: durable refs and optional final-only body metadata
-  predeclared_inputs: role, target, title, reconstructable template and hash, allowed ref slots, and optional exact body-metadata slot/value
+  predeclared_inputs: role, target, title, complete reconstructable template, allowed ref slots, and optional exact body-metadata slot/value
   allowed_finalization: replace predeclared durable-ref slots, insert exact body metadata, and remove staging notice
 finalization_contract:
   operation: edit
-  materialization: compute final bodies and hashes after durable refs are known
-  verification: final body hash, qualified refs, metadata, and cross-links
+  materialization: compute final bodies after durable refs are known
+  verification: direct final-body comparison, qualified refs, metadata, and cross-links
 foreign_race_policy: stop
 recognized_retry_policy: resume only exact missing label provisioning, hosted create, edit, local-file create, or metadata operations
 ```
 
-Every role, target, parameterized body-template hash, and allowed ref slot is
+Every role, target, complete parameterized body template, and allowed ref slot is
 known before creation, and the complete templates remain reconstructable.
-Final-body hashes are computed only after durable refs exist. Refs returned by
+Final bodies are materialized only after durable refs exist. Refs returned by
 the transaction's own creates are expected state, not a foreign race. Issue
 generation starts only after all staging markers are gone and the complete
 connected Spec set verifies. A partial failure returns the transaction identity,
-role-to-ref map, complete templates and hashes, ref slots, any materialized
-final-body hashes, the optional body-metadata slot and value, selected Idea refs
+role-to-ref map, complete templates, ref slots, any materialized final bodies,
+the optional body-metadata slot and value, selected Idea refs
 plus verified prior outcome refs,
 the complete `knowledge_delta`, completed operations, and exact missing
-operations; a hash alone is
-insufficient and the retry never creates duplicate roles.
+operations; a digest alone is insufficient and the retry never creates
+duplicate roles.
 
 For an all-local bundle, every deterministic ref is resolved and every final
-body hash is recorded before the first file create. If a later file create
+body is materialized before the first file create. If a later file create
 fails, the exact continuation remains on the new-source route and creates only
-missing predeclared paths whose targets and hashes still match. An absent or
+missing predeclared paths whose targets and final bodies still match. An absent or
 mismatched continuation blocks; existing final files are never overwritten or
 reinterpreted as a complete immutable bundle.
 
@@ -500,7 +528,7 @@ remainder. A `proposed-spec:` ref is not durable route evidence.
 ```text
 source_spec_ref: acme/account-settings#88
 source_state: durable-and-canonical
-source_body_action: read-and-validate-unchanged
+source_body_action: preserve-stable-fields-and-current-checkbox-markers
 feature_spec_drafting: skipped
 feature_spec_publication: skipped
 reconciliation_outcomes:

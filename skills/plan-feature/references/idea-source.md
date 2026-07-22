@@ -59,12 +59,13 @@ line, at most one `workflow_state` whose value is `needs-triage` or
 the marker and consumed workflow-state rows.
 
 For existing-source continuation, first verify every bound ref appears in the
-unchanged Spec set and no `- Source Idea:` ref was omitted. Then read each
+stable Spec content and no `- Source Idea:` ref was omitted. Then read each
 bound Idea and its complete outcome history. Accept an open marker-valid,
 untyped source, or a closed or consumed source only when its latest canonical
 full outcome exactly matches the verified cumulative Spec set and scope.
-Derive coverage from the Idea's accepted material elements and the unchanged
-Specs; never infer full coverage from the source link alone. Any marker,
+Derive coverage from the Idea's accepted material elements and stable Spec
+content; ignore acceptance checkbox marker differences while preserving their
+current state, and never infer full coverage from the source link alone. Any marker,
 identity, scope, outcome, or linkage mismatch blocks both bundle continuation
 and Idea mutation.
 
