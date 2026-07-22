@@ -1,8 +1,8 @@
 # Baseline Validation
 
 Run the accepted baseline inside each newly bound App-managed worktree before
-that worker receives implementation authority. The root Goal is already active;
-Goal state is not edit authority.
+that worker receives implementation authority. The root run already has active
+or explicit blocked-resume authority; Goal state alone is not edit authority.
 
 ## Worker Procedure
 

@@ -11,7 +11,8 @@ external predicates below from current App, Git, GitHub, review, and CI reads.
 - Authorization binds exact source fingerprints, assignments, branches, paths,
   validation, Goal objective, and publication scope.
 - The run owns every selected source and repository claim.
-- The root Goal is authoritatively active.
+- The root Goal is authoritatively active, or is blocked with a protected
+  current-epoch owner resume recorded in run state.
 - Each worker thread, title, managed checkout, branch, baseline head, and
   isolation is observed before implementation authority.
 - The current wave's complete baseline set is accepted before any GO message.

@@ -98,7 +98,7 @@ class RunStateTests(unittest.TestCase):
         return {
             "schema_version": 1,
             "run_id": run_id,
-            "root_task_id": "root-thread",
+            "root_task_id": run_id,
             "goal_objective": "Implement the dependency-ready Feature Spec frontier",
             "sources": sources,
             "repositories": [
@@ -128,8 +128,12 @@ class RunStateTests(unittest.TestCase):
         status: str = "succeeded",
         run_id: str = "run-one",
         head_sha: str | None = None,
+        request_payload: dict[str, object] | None = None,
     ) -> None:
-        request = self.write_json(f"{key}-request.json", {"action": action, "subject": subject})
+        request = self.write_json(
+            f"{key}-request.json",
+            request_payload or {"action": action, "subject": subject},
+        )
         begin_args = [
             "operation",
             "begin",
@@ -174,7 +178,7 @@ class RunStateTests(unittest.TestCase):
             self.operation(
                 key="create-goal",
                 action="create-goal",
-                subject="root-thread",
+                subject=run_id,
                 result={"status": "active", "objective_sha256": digest},
                 run_id=run_id,
             )
@@ -191,6 +195,43 @@ class RunStateTests(unittest.TestCase):
             digest,
         )
         return digest
+
+    def block_goal(
+        self, digest: str, *, run_id: str = "run-one", key: str = "block-goal"
+    ) -> None:
+        self.operation(
+            key=key,
+            action="block-goal",
+            subject=run_id,
+            result={"status": "blocked", "objective_sha256": digest},
+            run_id=run_id,
+        )
+
+    def resume_goal(
+        self, *, run_id: str = "run-one", key: str = "resume-goal"
+    ) -> None:
+        authorization_ref = f"owner:resume-goal:{run_id}:{key}"
+        self.operation(
+            key=key,
+            action="resume-goal",
+            subject=run_id,
+            owner="owner",
+            request_payload={"authorization_ref": authorization_ref},
+            result={"status": "granted", "authorization_ref": authorization_ref},
+            run_id=run_id,
+        )
+
+    def abandon_run(self, *, run_id: str = "run-one") -> None:
+        authorization_ref = f"owner:abandon-run:{run_id}:abandon-run"
+        self.operation(
+            key="abandon-run",
+            action="abandon-run",
+            subject=run_id,
+            owner="owner",
+            request_payload={"authorization_ref": authorization_ref},
+            result={"status": "granted", "authorization_ref": authorization_ref},
+            run_id=run_id,
+        )
 
     def bind_task(self, assignment: int, *, run_id: str = "run-one") -> str:
         assignment_id = f"spec-{assignment:02d}"
@@ -368,6 +409,19 @@ class RunStateTests(unittest.TestCase):
         self.assertEqual(shown["unbound_assignment_ids"], ["spec-01", "spec-02"])
         self.assertEqual(shown["assignments"][0]["project_id"], "project-one")
         self.assertEqual(shown["manifest"]["sources"][0]["sha256"], hashlib.sha256(b"spec-1").hexdigest())
+
+    def test_root_controller_correlation_key_must_equal_run_id(self) -> None:
+        manifest = self.manifest()
+        manifest["root_task_id"] = "guessed-thread-id"
+        error = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("wrong-root-id.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-input")
+        self.assertIn("root_task_id must equal run_id", error["error"]["message"])
 
     def test_sqlite_is_the_only_lock_and_bootstrap_returns_a_write_transaction(self) -> None:
         namespace = runpy.run_path(str(TOOL), run_name="run_state_test")
@@ -594,7 +648,15 @@ class RunStateTests(unittest.TestCase):
         self.start()
         digest = self.bind_goal(source="created")
         shown = self.invoke("run", "show", "--run-id", "run-one")
-        self.assertEqual(shown["goal"], {"source": "created", "status": "active", "objective_sha256": digest})
+        self.assertEqual(
+            shown["goal"],
+            {
+                "source": "created",
+                "status": "active",
+                "blocked_resume_authorized": False,
+                "objective_sha256": digest,
+            },
+        )
 
     def test_task_binding_requires_goal_and_exact_app_operations(self) -> None:
         self.start()
@@ -936,7 +998,7 @@ class RunStateTests(unittest.TestCase):
         self.operation(
             key="complete-goal",
             action="complete-goal",
-            subject="root-thread",
+            subject="run-one",
             result={"status": "complete", "objective_sha256": digest},
         )
         self.invoke(
@@ -965,7 +1027,7 @@ class RunStateTests(unittest.TestCase):
     def test_goal_cannot_complete_with_unready_tasks(self) -> None:
         self.start()
         self.bind_goal()
-        request = self.write_json("complete-request.json", {"goal": "root-thread"})
+        request = self.write_json("complete-request.json", {"goal": "run-one"})
         error = self.invoke(
             "operation",
             "begin",
@@ -980,12 +1042,476 @@ class RunStateTests(unittest.TestCase):
             "--action",
             "complete-goal",
             "--subject-id",
-            "root-thread",
+            "run-one",
             "--request",
             str(request),
             expected=4,
         )
         self.assertEqual(error["error"]["code"], "run-not-ready")
+
+    def test_blocked_goal_is_projected_and_preserves_active_claims(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.block_goal(digest)
+
+        shown = self.invoke("run", "show", "--run-id", "run-one")
+        self.assertEqual(shown["goal"]["status"], "blocked")
+        error = self.invoke(
+            "run",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--outcome",
+            "preimplementation-aborted",
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "owner-abandon-required")
+        claim = self.invoke(
+            "claim", "find", "--claim-key", "source:github:example/project#1"
+        )
+        self.assertEqual(claim["claim"]["run_id"], "run-one")
+        self.abandon_run()
+        request = self.write_json(
+            "resume-abandoned-request.json",
+            {"authorization_ref": "owner:resume-goal:run-one:resume-abandoned"},
+        )
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "resume-abandoned",
+            "--owner",
+            "owner",
+            "--action",
+            "resume-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "run-abandoned")
+        shown = self.invoke("run", "show", "--run-id", "run-one")
+        self.assertFalse(shown["goal"]["blocked_resume_authorized"])
+        finished = self.invoke(
+            "run",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--outcome",
+            "preimplementation-aborted",
+        )
+        self.assertEqual(finished["goal_status"], "blocked")
+        released = self.invoke(
+            "claim", "find", "--claim-key", "source:github:example/project#1"
+        )
+        self.assertIsNone(released["claim"])
+
+    def test_owner_abandonment_requires_preimplementation_task_reconciliation(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.bind_task(1)
+        self.block_goal(digest)
+        request = self.write_json(
+            "abandon-unreconciled-request.json",
+            {"authorization_ref": "owner:abandon-run:run-one:abandon-unreconciled"},
+        )
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "abandon-unreconciled",
+            "--owner",
+            "owner",
+            "--action",
+            "abandon-run",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "tasks-not-reconciled")
+
+    def test_owner_abandonment_is_forbidden_after_implementation_go(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.bind_task(1)
+        self.pass_baseline(1)
+        self.authorize_task(1)
+        self.block_goal(digest)
+        request = self.write_json(
+            "abandon-after-go-request.json",
+            {"authorization_ref": "owner:abandon-run:run-one:abandon-after-go"},
+        )
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "abandon-after-go",
+            "--owner",
+            "owner",
+            "--action",
+            "abandon-run",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "implementation-already-started")
+
+    def test_blocked_goal_result_requires_the_exact_objective(self) -> None:
+        self.start()
+        self.bind_goal(source="created")
+        request = self.write_json("block-goal-request.json", {"goal": "run-one"})
+        self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "block-goal",
+            "--owner",
+            "app",
+            "--action",
+            "block-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+        )
+        result = self.write_json(
+            "block-goal-wrong-result.json",
+            {"status": "blocked", "objective_sha256": "f" * 64},
+        )
+        error = self.invoke(
+            "operation",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "block-goal",
+            "--status",
+            "succeeded",
+            "--result",
+            str(result),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "goal-objective-drift")
+
+    def test_blocked_goal_can_complete_after_explicitly_resumed_work(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.block_goal(digest)
+        self.resume_goal()
+        self.complete_one_task()
+        self.operation(
+            key="complete-goal",
+            action="complete-goal",
+            subject="run-one",
+            result={"status": "complete", "objective_sha256": digest},
+        )
+        completed = self.invoke(
+            "goal",
+            "complete",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--objective-sha256",
+            digest,
+        )
+        self.assertEqual(completed["goal_status"], "completed")
+        shown = self.invoke("run", "show", "--run-id", "run-one")
+        self.assertEqual(shown["goal"]["status"], "completed")
+        self.assertFalse(shown["goal"]["blocked_resume_authorized"])
+
+    def test_owner_resume_result_must_match_the_requested_authorization(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.block_goal(digest)
+        invalid_request = self.write_json(
+            "resume-invalid-request.json",
+            {"authorization_ref": "owner:resume-goal:run-one:another-operation"},
+        )
+        invalid = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "resume-invalid",
+            "--owner",
+            "owner",
+            "--action",
+            "resume-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(invalid_request),
+            expected=4,
+        )
+        self.assertEqual(invalid["error"]["code"], "invalid-owner-authorization-ref")
+        request = self.write_json(
+            "resume-request.json",
+            {"authorization_ref": "owner:resume-goal:run-one:resume-goal"},
+        )
+        self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "resume-goal",
+            "--owner",
+            "owner",
+            "--action",
+            "resume-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+        )
+        result = self.write_json(
+            "resume-result.json",
+            {
+                "status": "granted",
+                "authorization_ref": "owner:resume-goal:run-one:another-operation",
+            },
+        )
+        error = self.invoke(
+            "operation",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "resume-goal",
+            "--status",
+            "succeeded",
+            "--result",
+            str(result),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "owner-authorization-drift")
+
+    def test_blocked_goal_rejects_worker_mutations_until_owner_resume(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        self.block_goal(digest)
+        request = self.write_json("create-task-blocked.json", {"task": "spec-01"})
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "create-task-blocked",
+            "--owner",
+            "app",
+            "--action",
+            "create-task",
+            "--subject-id",
+            "spec-01",
+            "--request",
+            str(request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "goal-resume-required")
+        self.resume_goal()
+        shown = self.invoke("run", "show", "--run-id", "run-one")
+        self.assertTrue(shown["goal"]["blocked_resume_authorized"])
+        self.operation(
+            key="create-task-after-resume",
+            action="create-task",
+            subject="spec-01",
+            result={"thread_id": "thread-1"},
+        )
+
+    def test_unknown_operation_blocks_then_resumes_and_completes_under_same_key(self) -> None:
+        self.start()
+        digest = self.bind_goal(source="created")
+        request = self.write_json("unknown-request.json", {"external": "pending"})
+        self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "external-write",
+            "--owner",
+            "provider",
+            "--action",
+            "external-write",
+            "--subject-id",
+            "spec-01",
+            "--request",
+            str(request),
+        )
+        unknown = self.write_json(
+            "external-unknown.json", {"provider_status": "indeterminate"}
+        )
+        self.invoke(
+            "operation",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "external-write",
+            "--status",
+            "unknown",
+            "--result",
+            str(unknown),
+        )
+        self.block_goal(digest)
+        shown = self.invoke("run", "show", "--run-id", "run-one")
+        self.assertEqual(shown["goal"]["status"], "blocked")
+        self.assertEqual(
+            [item["operation_key"] for item in shown["unresolved_operations"]],
+            ["external-write"],
+        )
+        blocked_request = self.write_json("blocked-provider-request.json", {"new": True})
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "new-provider-write",
+            "--owner",
+            "provider",
+            "--action",
+            "external-write",
+            "--subject-id",
+            "spec-01",
+            "--request",
+            str(blocked_request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "goal-resume-required")
+        self.resume_goal()
+        reconciled = self.write_json(
+            "external-reconciled.json", {"provider_status": "confirmed"}
+        )
+        self.invoke(
+            "operation",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "external-write",
+            "--status",
+            "succeeded",
+            "--result",
+            str(reconciled),
+        )
+        self.complete_one_task()
+        self.operation(
+            key="complete-goal",
+            action="complete-goal",
+            subject="run-one",
+            result={"status": "complete", "objective_sha256": digest},
+        )
+        self.invoke(
+            "goal",
+            "complete",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--objective-sha256",
+            digest,
+        )
+        finished = self.invoke(
+            "run",
+            "finish",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--outcome",
+            "completed",
+        )
+        self.assertTrue(finished["claims_released"])
+
+    def test_repeatable_protected_action_rejects_an_unresolved_same_action(self) -> None:
+        self.start()
+        self.bind_goal(source="created")
+        request = self.write_json("block-pending.json", {"goal": "run-one"})
+        self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "block-goal-pending",
+            "--owner",
+            "app",
+            "--action",
+            "block-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+        )
+        error = self.invoke(
+            "operation",
+            "begin",
+            "--run-id",
+            "run-one",
+            "--expected-revision",
+            str(self.revision),
+            "--operation-key",
+            "block-goal-replacement",
+            "--owner",
+            "app",
+            "--action",
+            "block-goal",
+            "--subject-id",
+            "run-one",
+            "--request",
+            str(request),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "protected-operation-already-started")
 
     def test_abort_requires_exact_terminal_task_identity(self) -> None:
         self.start()
@@ -1084,6 +1610,7 @@ class RunStateTests(unittest.TestCase):
 
     def test_operation_journal_is_pageable_for_recovery(self) -> None:
         self.start()
+        self.bind_goal()
         for index in range(3):
             self.operation(
                 key=f"provider-{index}",
@@ -1111,6 +1638,7 @@ class RunStateTests(unittest.TestCase):
 
     def test_unknown_operation_reconciles_same_identity_without_relaunch(self) -> None:
         self.start()
+        self.bind_goal()
         request = self.write_json("unknown-request.json", {"action": "publish"})
         self.invoke(
             "operation",
@@ -1218,6 +1746,7 @@ class RunStateTests(unittest.TestCase):
 
     def test_completed_operation_replay_is_a_noop(self) -> None:
         self.start()
+        self.bind_goal()
         self.operation(
             key="provider-readback",
             action="provider-marker",

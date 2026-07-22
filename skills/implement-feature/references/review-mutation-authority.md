@@ -1,7 +1,7 @@
 # Review Mutation Authority
 
-Load before a GitStack review mutation or its recovery. Authority is available
-only after accepted baseline and active root Goal evidence.
+Load before a GitStack review mutation or its recovery. Authority requires an
+accepted baseline and active or protected blocked-resume Goal evidence.
 
 GitStack owns request recognition, provider transport, receipts, findings,
 replies, resolutions, waits, warnings, and readback reconciliation. Implement

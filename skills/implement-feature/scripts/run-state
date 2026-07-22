@@ -44,9 +44,13 @@ APP_ASSIGNMENT_ACTIONS = {
     "authorize-implementation",
     "archive-task",
 }
-APP_GOAL_ACTIONS = {"create-goal", "complete-goal"}
+APP_GOAL_ACTIONS = {"create-goal", "block-goal", "complete-goal"}
 PROTECTED_APP_ACTIONS = APP_ASSIGNMENT_ACTIONS | APP_GOAL_ACTIONS
 GITSTACK_ASSIGNMENT_ACTIONS = {"ensure-pull-request-ready"}
+OWNER_GOAL_ACTIONS = {"resume-goal"}
+OWNER_RUN_ACTIONS = {"abandon-run"}
+PROTECTED_OWNER_ACTIONS = OWNER_GOAL_ACTIONS | OWNER_RUN_ACTIONS
+REPEATABLE_PROTECTED_ACTIONS = {"block-goal", "resume-goal"}
 
 
 class StateError(Exception):
@@ -495,6 +499,11 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
         raise StateError("unsupported-input-schema", "manifest schema_version must be 1")
     run_id = require_token(raw["run_id"], "run_id")
     root_task_id = require_string(raw["root_task_id"], "root_task_id", maximum=256)
+    if root_task_id != run_id:
+        raise StateError(
+            "invalid-input",
+            "root_task_id must equal run_id as the local controller correlation key",
+        )
     goal_objective = require_string(raw["goal_objective"], "goal_objective", maximum=4000)
 
     if not isinstance(raw["sources"], list) or not raw["sources"]:
@@ -693,6 +702,55 @@ def assignment_projection(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def latest_successful_operation_sequence(
+    connection: sqlite3.Connection, run_id: str, owner: str, action: str
+) -> int | None:
+    row = connection.execute(
+        """SELECT MAX(sequence) FROM operations
+           WHERE run_id = ? AND owner = ? AND action = ? AND status = 'succeeded'""",
+        (run_id, owner, action),
+    ).fetchone()
+    return row[0] if row is not None else None
+
+
+def effective_goal_status(connection: sqlite3.Connection, run: sqlite3.Row) -> str:
+    if run["goal_status"] == "completed":
+        return "completed"
+    blocked = latest_successful_operation_sequence(
+        connection, run["run_id"], "app", "block-goal"
+    )
+    return "blocked" if blocked is not None else run["goal_status"]
+
+
+def blocked_resume_authorized(connection: sqlite3.Connection, run: sqlite3.Row) -> bool:
+    if run["goal_status"] == "completed":
+        return False
+    blocked = latest_successful_operation_sequence(
+        connection, run["run_id"], "app", "block-goal"
+    )
+    if blocked is None:
+        return False
+    resumed = latest_successful_operation_sequence(
+        connection, run["run_id"], "owner", "resume-goal"
+    )
+    abandoned = latest_successful_operation_sequence(
+        connection, run["run_id"], "owner", "abandon-run"
+    )
+    return (
+        resumed is not None
+        and resumed > blocked
+        and (abandoned is None or abandoned < resumed)
+    )
+
+
+def goal_work_authorized(connection: sqlite3.Connection, run: sqlite3.Row) -> bool:
+    if run["goal_status"] != "active":
+        return False
+    return effective_goal_status(connection, run) == "active" or blocked_resume_authorized(
+        connection, run
+    )
+
+
 def run_projection(connection: sqlite3.Connection, run_id: str) -> dict[str, Any]:
     row = get_run(connection, run_id)
     assignments = [
@@ -719,7 +777,8 @@ def run_projection(connection: sqlite3.Connection, run_id: str) -> dict[str, Any
         "manifest": json.loads(row["manifest_json"]),
         "goal": {
             "source": row["goal_source"],
-            "status": row["goal_status"],
+            "status": effective_goal_status(connection, row),
+            "blocked_resume_authorized": blocked_resume_authorized(connection, row),
             "objective_sha256": row["goal_objective_sha256"],
         },
         "assignments": assignments,
@@ -950,6 +1009,8 @@ def validate_operation_subject(
             raise StateError("invalid-operation-subject", "App assignment operation subject is unknown")
     elif owner == "app" and action in APP_GOAL_ACTIONS and subject_id != run["root_task_id"]:
         raise StateError("invalid-operation-subject", "App Goal operation subject must be root_task_id")
+    elif owner == "owner" and action in PROTECTED_OWNER_ACTIONS and subject_id != run["root_task_id"]:
+        raise StateError("invalid-operation-subject", "owner operation subject must be root_task_id")
     elif owner == "gitstack" and action in GITSTACK_ASSIGNMENT_ACTIONS:
         exists = connection.execute(
             "SELECT 1 FROM assignments WHERE run_id = ? AND assignment_id = ?",
@@ -969,9 +1030,19 @@ def validate_app_operation_launch(
         if run["goal_status"] != "unbound":
             raise StateError("invalid-operation-transition", "root Goal is already bound", 4)
         return
+    if action == "block-goal":
+        if not goal_work_authorized(connection, run):
+            raise StateError(
+                "goal-not-active",
+                "only the active or explicitly resumed root Goal may be blocked",
+                4,
+            )
+        return
     if action == "complete-goal":
-        if run["goal_status"] != "active":
-            raise StateError("goal-not-active", "root Goal must be active before completion", 4)
+        if not goal_work_authorized(connection, run):
+            raise StateError(
+                "goal-not-active", "root Goal must be active or explicitly resumed before completion", 4
+            )
         unready = connection.execute(
             "SELECT COUNT(*) FROM assignments WHERE run_id = ? AND task_state != 'ready-for-merge'",
             (run["run_id"],),
@@ -992,8 +1063,20 @@ def validate_app_operation_launch(
 
     assignment = get_assignment(connection, run["run_id"], subject_id)
     state = assignment["task_state"]
+    if action != "archive-task" and not goal_work_authorized(connection, run):
+        if effective_goal_status(connection, run) != "blocked":
+            raise StateError(
+                "invalid-operation-transition",
+                "worker mutations require the active bound root Goal",
+                4,
+            )
+        raise StateError(
+            "goal-resume-required",
+            "blocked root Goal requires explicit owner resume before worker mutations",
+            4,
+        )
     if action == "create-task":
-        if run["goal_status"] != "active" or state != "planned":
+        if state != "planned":
             raise StateError(
                 "invalid-operation-transition",
                 "task creation requires an active Goal and a planned assignment",
@@ -1058,6 +1141,12 @@ def validate_gitstack_operation_launch(
 ) -> None:
     if action != "ensure-pull-request-ready":
         return
+    if not goal_work_authorized(connection, run):
+        raise StateError(
+            "goal-resume-required",
+            "blocked root Goal requires explicit owner resume before provider mutations",
+            4,
+        )
     assignment = get_assignment(connection, run["run_id"], subject_id)
     if assignment["task_state"] != "implementation-authorized":
         raise StateError(
@@ -1069,6 +1158,82 @@ def validate_gitstack_operation_launch(
         raise StateError(
             "operation-head-required",
             "pull-request ready transition must be bound to the exact current head",
+            4,
+        )
+
+
+def validate_owner_operation_launch(
+    connection: sqlite3.Connection, run: sqlite3.Row, action: str
+) -> None:
+    if effective_goal_status(connection, run) != "blocked":
+        raise StateError("goal-not-blocked", f"{action} requires the blocked root Goal", 4)
+    if action == "resume-goal":
+        abandoned = latest_successful_operation_sequence(
+            connection, run["run_id"], "owner", "abandon-run"
+        )
+        if abandoned is not None:
+            raise StateError("run-abandoned", "an abandoned run cannot resume work", 4)
+        if blocked_resume_authorized(connection, run):
+            raise StateError(
+                "goal-resume-already-authorized",
+                "the current blocked epoch is already resumed",
+                4,
+            )
+        return
+
+    implementation_started = connection.execute(
+        """SELECT 1 FROM operations WHERE run_id = ? AND owner = 'app'
+           AND action = 'authorize-implementation'
+           AND status IN ('pending', 'unknown', 'succeeded') LIMIT 1""",
+        (run["run_id"],),
+    ).fetchone()
+    if implementation_started is not None:
+        raise StateError(
+            "implementation-already-started",
+            "owner abandonment is forbidden after implementation authority begins",
+            4,
+        )
+    unreconciled = connection.execute(
+        """SELECT assignment_id, task_state FROM assignments WHERE run_id = ?
+           AND task_state NOT IN ('planned', 'terminal-aborted')
+           ORDER BY assignment_id""",
+        (run["run_id"],),
+    ).fetchall()
+    if unreconciled:
+        raise StateError(
+            "tasks-not-reconciled",
+            f"owner abandonment requires planned or terminal-aborted tasks: {canonical_json([dict(row) for row in unreconciled])}",
+            4,
+        )
+    unresolved = connection.execute(
+        """SELECT operation_key, status FROM operations WHERE run_id = ?
+           AND status IN ('pending', 'unknown') ORDER BY sequence""",
+        (run["run_id"],),
+    ).fetchall()
+    if unresolved:
+        raise StateError(
+            "unresolved-operations",
+            f"owner abandonment requires reconciled operations: {canonical_json([dict(row) for row in unresolved])}",
+            4,
+        )
+
+
+def owner_authorization_ref(run_id: str, action: str, operation_key: str) -> str:
+    return f"owner:{action}:{run_id}:{operation_key}"
+
+
+def validate_owner_operation_request(
+    run: sqlite3.Row, action: str, operation_key: str, request: dict[str, Any]
+) -> None:
+    require_exact_keys(request, {"authorization_ref"}, f"{action} request")
+    authorization_ref = require_string(
+        request["authorization_ref"], "authorization_ref", maximum=512
+    )
+    expected = owner_authorization_ref(run["run_id"], action, operation_key)
+    if authorization_ref != expected:
+        raise StateError(
+            "invalid-owner-authorization-ref",
+            f"{action} authorization_ref must be {expected}",
             4,
         )
 
@@ -1093,12 +1258,21 @@ def command_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         ).fetchone()
         if existing is not None:
             raise StateError("operation-already-started", f"operation already exists with status {existing['status']}", 4)
-        protected = (owner == "app" and action in PROTECTED_APP_ACTIONS) or (
-            owner == "gitstack" and action in GITSTACK_ASSIGNMENT_ACTIONS
+        protected = (
+            (owner == "app" and action in PROTECTED_APP_ACTIONS)
+            or (owner == "gitstack" and action in GITSTACK_ASSIGNMENT_ACTIONS)
+            or (owner == "owner" and action in PROTECTED_OWNER_ACTIONS)
         )
         if protected:
+            if owner == "owner":
+                validate_owner_operation_request(run, action, operation_key, request)
+            duplicate_statuses = (
+                "AND status IN ('pending', 'unknown')"
+                if action in REPEATABLE_PROTECTED_ACTIONS
+                else ""
+            )
             duplicate = connection.execute(
-                "SELECT operation_key, status FROM operations WHERE run_id = ? AND owner = ? AND action = ? AND subject_id = ?",
+                f"SELECT operation_key, status FROM operations WHERE run_id = ? AND owner = ? AND action = ? AND subject_id = ? {duplicate_statuses}",
                 (run_id, owner, action, subject_id),
             ).fetchone()
             if duplicate is not None:
@@ -1109,10 +1283,24 @@ def command_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
                 )
             if owner == "app":
                 validate_app_operation_launch(connection, run, action, subject_id)
-            else:
+            elif owner == "gitstack":
                 validate_gitstack_operation_launch(
                     connection, run, action, subject_id, head_sha
                 )
+            else:
+                validate_owner_operation_launch(connection, run, action)
+        elif not goal_work_authorized(connection, run):
+            if effective_goal_status(connection, run) == "blocked":
+                raise StateError(
+                    "goal-resume-required",
+                    "blocked root Goal requires explicit owner resume before mutations",
+                    4,
+                )
+            raise StateError(
+                "goal-not-active",
+                "mutations require the active or explicitly resumed root Goal",
+                4,
+            )
         now = utc_now()
         connection.execute(
             """INSERT INTO operations(
@@ -1137,7 +1325,7 @@ def command_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def validate_protected_result(
-    operation: sqlite3.Row, status: str, result: dict[str, Any]
+    run: sqlite3.Row, operation: sqlite3.Row, status: str, result: dict[str, Any]
 ) -> None:
     if status != "succeeded":
         return
@@ -1170,6 +1358,24 @@ def validate_protected_result(
         for field in ("head_branch_name", "base_branch_name", "default_branch_name"):
             require_string(result[field], field, maximum=255)
         return
+    if operation["owner"] == "owner" and action in PROTECTED_OWNER_ACTIONS:
+        require_exact_keys(result, {"status", "authorization_ref"}, f"{action} result")
+        if result["status"] != "granted":
+            raise StateError("invalid-operation-result", f"{action} result status must be granted")
+        authorization_ref = require_string(
+            result["authorization_ref"], "authorization_ref", maximum=512
+        )
+        request = json.loads(operation["request_json"])
+        expected = owner_authorization_ref(
+            run["run_id"], action, operation["operation_key"]
+        )
+        if request != {"authorization_ref": expected} or authorization_ref != expected:
+            raise StateError(
+                "owner-authorization-drift",
+                f"{action} result does not match {expected}",
+                4,
+            )
+        return
     if operation["owner"] != "app":
         return
     if action == "create-task":
@@ -1187,12 +1393,22 @@ def validate_protected_result(
         require_string(result["thread_id"], "thread_id", maximum=256)
         if result["status"] != "archived":
             raise StateError("invalid-operation-result", "archive-task result status must be archived")
-    elif action in {"create-goal", "complete-goal"}:
+    elif action in {"create-goal", "block-goal", "complete-goal"}:
         require_exact_keys(result, {"status", "objective_sha256"}, f"{action} result")
-        expected_status = "active" if action == "create-goal" else "complete"
+        expected_status = {
+            "create-goal": "active",
+            "block-goal": "blocked",
+            "complete-goal": "complete",
+        }[action]
         if result["status"] != expected_status:
             raise StateError("invalid-operation-result", f"{action} result status must be {expected_status}")
-        require_sha256(result["objective_sha256"], "objective_sha256")
+        objective_sha = require_sha256(result["objective_sha256"], "objective_sha256")
+        if objective_sha != run["goal_objective_sha256"]:
+            raise StateError(
+                "goal-objective-drift",
+                f"{action} result does not match the run Goal objective",
+                4,
+            )
 
 
 def command_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
@@ -1244,7 +1460,7 @@ def command_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                     "replayed": True,
                 }
             raise StateError("operation-unknown", "reconcile the existing unknown operation instead of adding another unknown result", 4)
-        validate_protected_result(operation, status, result)
+        validate_protected_result(run, operation, status, result)
         result_index = connection.execute(
             "SELECT COALESCE(MAX(result_index), 0) + 1 FROM operation_results WHERE run_id = ? AND operation_key = ?",
             (run_id, operation_key),
@@ -1470,8 +1686,14 @@ def command_task_bind(args: argparse.Namespace) -> dict[str, Any]:
     try:
         run = get_run(connection, run_id)
         require_active_revision(run, args.expected_revision)
-        if run["goal_status"] != "active":
-            raise StateError("goal-not-active", "bind the observed root Goal before worker tasks", 4)
+        if not goal_work_authorized(connection, run):
+            if effective_goal_status(connection, run) != "blocked":
+                raise StateError("goal-not-active", "bind the active root Goal before worker tasks", 4)
+            raise StateError(
+                "goal-resume-required",
+                "bind the active Goal or record explicit owner resume before worker tasks",
+                4,
+            )
         assignment = get_assignment(connection, run_id, assignment_id)
         if assignment["task_state"] != "planned":
             raise StateError("task-already-bound", f"assignment is already {assignment['task_state']}", 4)
@@ -1603,6 +1825,16 @@ def command_task_authorize(args: argparse.Namespace) -> dict[str, Any]:
     try:
         run = get_run(connection, run_id)
         require_active_revision(run, args.expected_revision)
+        if not goal_work_authorized(connection, run):
+            if effective_goal_status(connection, run) != "blocked":
+                raise StateError(
+                    "goal-not-active", "root Goal must be active before implementation authority", 4
+                )
+            raise StateError(
+                "goal-resume-required",
+                "blocked root Goal requires explicit owner resume before implementation authority",
+                4,
+            )
         assignment = get_assignment(connection, run_id, assignment_id)
         if assignment["task_state"] != "baseline-passed":
             raise StateError("invalid-task-transition", "implementation authority requires a passed baseline", 4)
@@ -1803,8 +2035,14 @@ def command_goal_complete(args: argparse.Namespace) -> dict[str, Any]:
     try:
         run = get_run(connection, run_id)
         require_active_revision(run, args.expected_revision)
-        if run["goal_status"] != "active":
-            raise StateError("goal-not-active", "only the active bound Goal can complete", 4)
+        if not goal_work_authorized(connection, run):
+            if effective_goal_status(connection, run) != "blocked":
+                raise StateError("goal-not-active", "root Goal must be active before completion", 4)
+            raise StateError(
+                "goal-resume-required",
+                "only the active or explicitly resumed root Goal can complete",
+                4,
+            )
         if objective_sha != run["goal_objective_sha256"]:
             raise StateError("goal-objective-drift", "observed Goal objective does not match the run", 4)
         incomplete = [
@@ -1857,8 +2095,9 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                 (run_id,),
             )
         )
+        goal_status = effective_goal_status(connection, run)
         if args.outcome == "completed":
-            if run["goal_status"] != "completed" or any(row["task_state"] != "ready-for-merge" for row in assignments):
+            if goal_status != "completed" or any(row["task_state"] != "ready-for-merge" for row in assignments):
                 raise StateError("run-incomplete", "completed outcome requires the completed Goal and every task ready-for-merge", 4)
         else:
             unsafe = [
@@ -1868,8 +2107,25 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
             ]
             if unsafe:
                 raise StateError("tasks-not-reconciled", f"preimplementation abort requires planned or terminal-aborted tasks: {canonical_json(unsafe)}", 4)
-            if run["goal_status"] == "completed":
-                raise StateError("goal-already-completed", "a completed Goal cannot be attached to an aborted run", 4)
+            if goal_status == "blocked":
+                try:
+                    successful_operation_result(
+                        connection, run_id, "owner", "abandon-run", run["root_task_id"]
+                    )
+                except StateError as error:
+                    if error.code == "missing-owner-operation":
+                        raise StateError(
+                            "owner-abandon-required",
+                            "blocked preimplementation abort requires explicit owner abandonment",
+                            4,
+                        ) from error
+                    raise
+            elif goal_status != "active":
+                raise StateError(
+                    "goal-not-active-for-abort",
+                    f"preimplementation abort requires the active root Goal, found {goal_status}",
+                    4,
+                )
         now = utc_now()
         connection.execute(
             "UPDATE runs SET status = ?, revision = ?, updated_at = ?, finished_at = ? WHERE run_id = ?",
@@ -1885,7 +2141,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
             "revision": run["revision"] + 1,
             "outcome": args.outcome,
             "claims_released": True,
-            "goal_status": run["goal_status"],
+            "goal_status": goal_status,
         }
     except Exception:
         connection.rollback()

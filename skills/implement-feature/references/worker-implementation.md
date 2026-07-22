@@ -2,8 +2,9 @@
 
 Load for a dependency-ready Feature Spec.
 
-Reverify assignment, App-managed checkout, accepted baseline, active root
-Goal, source fingerprints, repository instructions, and dependency integration.
+Reverify assignment, App-managed checkout, accepted baseline, source fingerprints,
+repository instructions, dependency integration, and active or protected
+blocked-resume Goal authority.
 Implement the accepted issue graph in order and only inside allowed paths.
 
 The App-generated checkout branch is bootstrap-only and may differ from the

@@ -12,10 +12,13 @@ unknown operation, or state/runtime trouble.
    `has_more=false`; use `operation show` for exact result history.
 3. When `doctor=uninitialized`, skip state reads and reconstruct identity only
    from App project, task, Goal, source, Git, and provider evidence.
-4. Call `list_projects`, then read or wait on every stored or externally
-   discovered thread ID. Verify
-   title, project, managed checkout, Git top-level, branch, and current head.
-5. Read the root Goal and require its exact objective and supported state.
+4. Call `list_projects`, then read every stored or externally discovered thread
+   ID. Verify title, project, managed checkout, Git top-level, branch, and head.
+5. Read the root Goal and require its exact objective and supported state. A
+   journaled blocked Goal keeps the original run and claims active. Continue
+   mutations only after an explicit current owner turn records protected
+   `owner/resume-goal` with its canonical operation correlation ref and `run
+   show` reports `blocked_resume_authorized=true`.
 6. Re-read accepted source fingerprints and current Git/provider artifacts.
 
 The stored manifest is the canonical assignment packet. App, Git, and provider
@@ -44,14 +47,15 @@ Use start over for preimplementation state only:
   mutate;
 - an active schema-1 run with no authorized task may end its exact created tasks,
   record each `task abort`, and call
-  `run finish --outcome preimplementation-aborted` before a fresh run;
+  `run finish --outcome preimplementation-aborted` before a fresh run while the
+  Goal remains active, or after explicit protected owner abandonment if blocked;
 - an incompatible database at the current schema-1 path is never read or
   rewritten. Preserve it and require owner direction before moving it aside;
   after the same no-live-work proof, start with a clean schema-1 path.
 
 The fresh run uses new run, task, and operation identities, revalidates current
-source and projects, and imports nothing. It may adopt the same still-active
-root Goal when that objective remains exact.
+source and projects, and imports nothing. It may adopt the same exact active
+Goal; after blocked-Goal abandonment, a new Goal needs owner direction.
 
 Once any task received `implementation_authority=granted`, an old/missing state
 error is not a start-over excuse. Recover from the original App task and Git
@@ -67,4 +71,7 @@ pending/unknown operations. Planned assignments require no fake task. Only then
 may `run finish --outcome preimplementation-aborted` release claims.
 
 Do not complete the root Goal for an aborted attempt. A fresh run may continue
-the same objective.
+the same active objective. If the root Goal becomes blocked, journal its exact
+readback and preserve the original run and claims. Before any GO, explicit owner
+abandonment may release them only through protected `owner/abandon-run` after
+tasks and operations are reconciled; after GO, preserve and recover the run.

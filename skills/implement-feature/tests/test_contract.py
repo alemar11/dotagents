@@ -85,7 +85,6 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "codex_app__list_threads",
             "codex_app__create_thread",
             "codex_app__read_thread",
-            "codex_app__wait_threads",
             "codex_app__send_message_to_thread",
             "codex_app__set_thread_title",
             "codex_app__set_thread_archived",
@@ -95,7 +94,36 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(tool, app)
         self.assertIn("Do not pass `model` or `thinking`", app)
-        self.assertIn("one project and one App-managed worktree", app)
+        self.assertIn("project ID and one App-managed worktree", app)
+        self.assertNotIn("wait_threads", app)
+        self.assertIn("After three\nunchanged sweeps", app)
+
+    def test_fast_start_uses_fresh_project_ids_and_does_not_claim_blocked_frontier(self) -> None:
+        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
+        self.assertIn("project ID from memory, state, or an earlier run", bootstrap)
+        self.assertIn("Blocked next-frontier Specs are output evidence", bootstrap)
+        self.assertIn("because every manifest source is claimed", bootstrap)
+        self.assertIn("Never duplicate an unchanged intake read", bootstrap)
+
+    def test_blocked_goal_preserves_the_original_run(self) -> None:
+        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
+        run_state = (ROOT / "references" / "run-state.md").read_text(encoding="utf-8")
+        worker = (ROOT / "references" / "worker-implementation.md").read_text(encoding="utf-8")
+        review = (ROOT / "references" / "review-mutation-authority.md").read_text(encoding="utf-8")
+        self.assertIn("journal App `block-goal`", app)
+        self.assertIn("Keep that run and its claims active", app)
+        self.assertIn("keeps its claims by default", run_state)
+        self.assertIn("Every new\njournaled mutation then fails closed", run_state)
+        self.assertIn("protected\nblocked-resume Goal authority", worker)
+        self.assertIn("protected blocked-resume Goal evidence", review)
+        self.assertIn("owner:<action>:<run_id>:<operation_key>", run_state)
+
+    def test_root_controller_identity_and_read_fallback_are_deterministic(self) -> None:
+        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
+        app = (ROOT / "references" / "app-orchestration.md").read_text(encoding="utf-8")
+        self.assertIn("`root_task_id` is the local controller correlation key", bootstrap)
+        self.assertIn("set it equal to\n`run_id`", bootstrap)
+        self.assertIn("After three\nunchanged sweeps", app)
 
     def test_goal_is_bound_before_tasks_but_does_not_grant_edit_authority(self) -> None:
         bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
@@ -121,7 +149,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def test_fast_start_defers_publication_checks(self) -> None:
         bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
         self.assertIn("Defer CI, review access, rules,\n   approvals, mergeability, and queue eligibility", bootstrap)
-        self.assertIn("only when authorization caused\n   a user wait", bootstrap)
+        self.assertIn("After an authorization wait, stale observation, or drift", bootstrap)
         self.assertIn("may fan out to the three-task limit", bootstrap)
         self.assertIn("do not load `run-state.md`\nduring a healthy fresh start", bootstrap)
 

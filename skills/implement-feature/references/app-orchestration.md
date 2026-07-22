@@ -1,37 +1,33 @@
 # App Orchestration
 
-This reference owns the root's visible App task and Goal sequence. Workers must
-not use any task-management or Goal tool.
+This reference owns root App task and Goal sequencing; workers never use those
+tools.
 
 ## Surface And Project Mapping
 
 Require these current root capabilities before state:
 
-- `codex_app__list_projects` and `codex_app__list_threads`;
-- `codex_app__create_thread`, `codex_app__read_thread`,
-  `codex_app__wait_threads`, `codex_app__send_message_to_thread`, and
-  `codex_app__set_thread_title`, plus `codex_app__set_thread_archived` only for
-  verified preimplementation reconciliation;
+- `codex_app__list_projects`, `codex_app__list_threads`,
+  `codex_app__create_thread`, `codex_app__read_thread`,
+  `codex_app__send_message_to_thread`, and `codex_app__set_thread_title`;
+- `codex_app__set_thread_archived` only for verified preimplementation reconciliation;
 - `get_goal`, `create_goal`, and `update_goal`.
 
-Call `list_projects` before `create_thread`, as required by the App contract.
-Map every repository's resolved absolute path to exactly one project ID. A
-thread targets one project and one App-managed worktree; never pretend one
-thread can own several repositories.
+Call `list_projects` once per fresh intake snapshot and use only that response.
+After a real wait, staleness, or drift, replace the whole snapshot; never reuse
+an ID from memory, earlier state, or an old manifest. Map each path to one
+project ID and one App-managed worktree.
 
-Do not pass `model` or `thinking` when creating or messaging a task unless the
-owner explicitly requested exact values. Otherwise inherit the platform and
-thread defaults.
+Do not pass `model` or `thinking` unless the owner requested exact values;
+otherwise inherit platform and thread defaults.
 
 ## Root Goal
 
 Read the current Goal before `run start`:
 
-- no unfinished Goal: put the intended exact objective in the start manifest;
-  after start, journal `owner=app`, `action=create-goal`, and
-  `subject_id=<root_task_id>`, invoke `create_goal`, read back `active`, finish
-  the operation with `{status,objective_sha256}`, then call `goal bind` with
-  `source=created`;
+- no unfinished Goal: put the exact objective in the manifest; after start,
+  journal App `create-goal` for `<root_task_id>`, invoke it, read back `active`,
+  finish with `{status,objective_sha256}`, then `goal bind source=created`;
 - an active Goal whose objective covers exactly this invocation: preserve its
   exact objective in the manifest, re-read it after start, and call `goal bind`
   with `source=adopted`;
@@ -47,9 +43,8 @@ Use the assignment's exact project ID and `environment=worktree`:
 
 1. Journal App `create-task` with the assignment ID as subject. Call
    `create_thread` once. If it returns `clientThreadId`, poll recent
-   `list_threads` results until that queued identity resolves to one thread ID;
-   only then use `wait_threads`/`read_thread`. Never create a replacement.
-   Finish with `{thread_id}`.
+   `list_threads` until that queued identity resolves to one thread ID; only then
+   read it. Never create a replacement. Finish with `{thread_id}`.
 2. Journal App `set-task-title`, call `set_thread_title`, then read the same
    thread until its exact immutable assignment title is observed. Finish with
    `{thread_id,title}`.
@@ -84,9 +79,34 @@ dispatched task is still `baseline-pending`, before a GO message can be sent.
 
 ## Monitor And Refill
 
-Use `wait_threads` for bounded multi-task waits and `read_thread` for
-authoritative transitions. Persist only material state in `run-state`; task
-commentary remains App evidence.
+One monitoring sweep reads every live task once in canonical order. After three
+unchanged sweeps in one controller turn, emit one liveness line and continue on
+the next Goal turn. `read_thread` is authoritative; persist only material state.
+
+## Root Goal Blockers
+
+Keep recoverable blockers in the active run. At the platform blocked threshold,
+an unrelated pending or unknown operation must not prevent the Goal transition:
+
+1. journal App `block-goal` for the root task;
+2. call `update_goal(status=blocked)` and read back the exact objective and
+   `blocked` state;
+3. finish the operation with `{status:"blocked",objective_sha256}`;
+4. re-read `run show` and require `goal.status=blocked`.
+
+Keep that run and its claims active; preimplementation abort needs explicit
+abandonment. Only in an explicit owner turn, journal protected
+`owner/resume-goal` and use the exact correlation ref
+`owner:resume-goal:<run_id>:<operation_key>` in request and result. Finish with
+`{status:"granted",authorization_ref}`. Require `run show` to report
+`blocked_resume_authorized=true` before worker or provider mutations. The Goal
+stays blocked and may later complete directly; never invent `active`.
+
+Before GO, the owner may abandon a permanently blocked run: reconcile tasks and
+operations, then in that explicit owner turn journal protected `owner/abandon-run`
+with `owner:abandon-run:<run_id>:<operation_key>`, finish with
+`{status:"granted",authorization_ref}`, then abort. After GO, abandonment and
+claim release are forbidden; after abandonment, work cannot resume.
 
 Keep at most three tasks in `baseline-pending`, `baseline-passed`, or
 `implementation-authorized`. When a task becomes `ready-for-merge`, call
@@ -116,12 +136,13 @@ never reopened or falsified.
 
 ## Preimplementation Start Over
 
-Before any task receives implementation authority, a failed baseline or broken
-task may finish naturally or be journaled and archived through
-`codex_app__set_thread_archived`, then read back as `completed` or `archived`. Record that exact
-identity with `task abort`. When every created task is terminal and every other
-assignment remains planned, `run finish --outcome preimplementation-aborted`
-releases claims. The root Goal stays active and may be adopted by the fresh run.
+Before GO, a failed baseline task may finish naturally or be journaled and
+archived, then read back as `completed|archived` and recorded with `task abort`.
+When every created task is terminal and others remain planned,
+`run finish --outcome preimplementation-aborted` releases claims for an active
+Goal; start the fresh run in the same controller flow so it can adopt that Goal.
+A blocked Goal preserves the run and claims unless explicit preimplementation
+`owner/abandon-run` authorizes release.
 
 After implementation authority, use recovery. Do not archive, replace, or
 discard the worker as a start-over shortcut.

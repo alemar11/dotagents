@@ -7,44 +7,37 @@ description: Implement dependency-ready durable Feature Specs in visible ChatGPT
 
 ## Contract
 
-Use this skill only after the owner explicitly invokes `$implement-feature` in
-the ChatGPT desktop app. Consume durable execution-ready Feature Specs; never
-plan, repair, rewrite, or publish planning artifacts.
+Use this skill only after explicit `$implement-feature` invocation in the
+ChatGPT desktop app. Consume execution-ready durable Feature Specs; never plan, repair, rewrite, or publish them.
 
-One run owns the dependency-ready frontier selected from the requested bundle.
-Every executable Feature Spec in that frontier must name exactly one affected
-Git repository and becomes one visible App task in that repository's App-managed
-worktree. Cross-Spec dependencies must already be merged and integration-proven;
-leave blocked Specs for a later invocation. Never merge on their behalf.
+One run owns the requested bundle's dependency-ready frontier. Every executable
+Feature Spec must name one Git repository and becomes one visible App task in
+its App-managed worktree. Cross-Spec dependencies must be merged and
+integration-proven; leave blocked Specs for later and never merge them.
 
-The root owns one lifecycle Goal, the task queue, durable state, provider
-operations, reconciliation, and final verification. Workers implement and
-report only. Neither root nor workers create raw Git worktrees, implement in the
-root checkout, use background execution, merge, enqueue, deploy, release, or
-perform post-merge closure.
+Root owns one lifecycle Goal, queue, durable state, provider operations,
+reconciliation, and final verification; workers only implement and report.
+Neither creates raw worktrees, implements in root, uses background execution,
+merges, enqueues, deploys, releases, or performs post-merge closure.
 
 ## Fast Start
 
-Load `references/root-bootstrap.md`. Before persistent state, validate the
-source and ready frontier, map each repository through the App project list,
-perform only the repository/branch/collision reads needed to start, disclose
-the exact scope, and resolve authorization. Defer CI, review access, branch
-rules, approvals, mergeability, and merge-queue reads to publication or
-closeout, where they must be fresh.
+Load `references/root-bootstrap.md`. Before state, validate source and frontier,
+map repositories through the App project list, perform only start-critical
+repository/branch/collision reads, disclose scope, and resolve authorization.
+Defer CI, review access, branch rules, approvals, mergeability, and queue reads
+to publication or closeout, where they must be fresh.
 
-Start fresh schema-1 state with `scripts/run-state`, then create or adopt the
-root Goal before creating workers. The state database is durable user state at
+Start schema-1 state with `scripts/run-state`, then create or adopt the root Goal
+before workers. Durable state lives at
 `$XDG_STATE_HOME/dotagents/skills/implement-feature/run-state-v1.sqlite3` or
-`~/.local/state/dotagents/skills/implement-feature/run-state-v1.sqlite3`. It is
-not a cache. This hard cut has no migration, legacy reader, archive format, or
-compatibility aliases.
+`~/.local/state/dotagents/skills/implement-feature/run-state-v1.sqlite3`; it is
+not a cache. This hard cut has no migration, legacy reader, archive, or aliases.
 
 ## App Orchestration
 
-Load `references/app-orchestration.md` before creating the Goal or a task. Use
-the current App task and Goal tools exactly as routed there. Inherit the App's
-model and thinking defaults unless the owner explicitly requested particular
-values.
+Load `references/app-orchestration.md` before the Goal or tasks. Use current App
+tools exactly as routed and inherit model/thinking defaults unless explicitly set.
 
 Keep at most three live worker tasks. Fill slots in canonical assignment order,
 skipping work whose paths overlap a live task. For each task:
@@ -55,8 +48,8 @@ skipping work whose paths overlap a live task. For each task:
    record `task baseline`.
 3. Journal and send the explicit implementation-authorized message, then
    record `task authorize`. No edit may precede this step.
-4. Monitor with bounded waits and authoritative task reads. Load only the
-   current phase reference: `worker-implementation.md`,
+4. Monitor with bounded authoritative task-read sweeps. Load only the current
+   phase: `worker-implementation.md`,
    `worker-validation.md`, `worker-publication.md`, the review references, or
    `worker-closeout.md`.
 5. Record `task ready` only after the exact-head, reviewed, CI-classified,

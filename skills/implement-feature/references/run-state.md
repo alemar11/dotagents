@@ -75,12 +75,19 @@ actions have one protected identity per subject and exact successful results:
 | Action | Subject | Result |
 | --- | --- | --- |
 | `create-goal` | root task ID | `{status:"active",objective_sha256}` |
+| `block-goal` | root task ID | `{status:"blocked",objective_sha256}` |
 | `complete-goal` | root task ID | `{status:"complete",objective_sha256}` |
 | `create-task` | assignment ID | `{thread_id}` |
 | `set-task-title` | assignment ID | `{thread_id,title}` |
 | `send-worker-bootstrap` | assignment ID | `{thread_id}` |
 | `authorize-implementation` | assignment ID | `{thread_id}` |
 | `archive-task` | assignment ID | `{thread_id,status:"archived"}` |
+| `resume-goal` (`owner`) | root task ID | `{status:"granted",authorization_ref}` |
+| `abandon-run` (`owner`) | root task ID | `{status:"granted",authorization_ref}` |
+
+Owner request and result refs are exactly
+`owner:<action>:<run_id>:<operation_key>`. They correlate a typed operation to
+the explicit current owner turn; they are not a fabricated App message ID.
 
 The protected GitStack action `ensure-pull-request-ready` uses an assignment ID
 subject, requires an exact operation head, and returns
@@ -111,7 +118,7 @@ authoritative recovery surface and must be paged until `has_more=false`.
 }
 ```
 
-It requires the active bound Goal, exact manifest project/repository identity,
+It requires the active or explicitly resumed bound Goal, exact manifest project/repository identity,
 the same independently observed Git common-directory path and filesystem
 identity, a checkout not bound to another active assignment, and matching
 successful task-create and title operations. `task baseline` accepts `schema_version`,
@@ -135,8 +142,22 @@ implementation authority.
 Successful finish requires every assignment `ready-for-merge`, the exact Goal
 observed `completed`, and no pending or unknown operation. Preimplementation
 abort requires every created task `terminal-aborted`, all uncreated assignments
-still `planned`, no task ever authorized, and no unresolved operation. Both
-finish paths release claims atomically while preserving the run row.
+still `planned`, no task ever authorized, no unresolved operation, and either
+an active Goal or protected owner abandonment of a blocked Goal. Both finish
+paths release claims atomically while preserving the run row.
+
+A succeeded protected `block-goal` operation projects `goal.status=blocked`
+without changing schema 1 and makes `blocked_resume_authorized=false`. Every new
+journaled mutation then fails closed except Goal blocking, task reconciliation,
+and protected owner decisions; existing operations remain finishable under the
+same key. A later protected `owner/resume-goal` sets that projection to true and
+resumes the same run without falsifying the App Goal as active. Repeated epochs require
+new block and resume operation keys. Exact completion supersedes both.
+
+A blocked run keeps its claims by default. Before implementation authority,
+protected `owner/abandon-run` plus reconciled tasks and operations permits
+`preimplementation-aborted` and closes further work authority; after GO,
+abandonment and claim release remain forbidden.
 
 There is no `retired` state and no takeover or migration command. Recover an
 active schema-1 run from `run show` and the complete operation journal. A fresh

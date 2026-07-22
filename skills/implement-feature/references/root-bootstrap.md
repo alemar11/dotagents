@@ -19,17 +19,20 @@ maintenance.
 
 ## Fast-Start Order
 
-1. Resolve the supplied Feature Spec and traverse its complete connected bundle.
+1. Resolve the supplied Feature Spec and traverse its complete connected bundle. Fetch
+   each source and repository once; reuse that snapshot until stale or drifted.
 2. Validate the bundle unchanged. Select only executable Specs whose authored
    cross-Spec dependencies are already merged and integration-proven. Report
    blocked downstream refs as the next frontier; do not claim them.
 3. Require exactly one affected repository per selected executable Spec and one
    unique `(repository_claim, target_branch_name)` owner. Missing or conflicting
    execution data is `planning-required`.
-4. Confirm the root exposes `list_projects`, task create/read/wait/message/title
-   tools, and Goal get/create/update tools. Call `list_projects` once and map
-   every selected repository path to exactly one project ID. Read the current
-   root Goal and reject an unrelated or blocked unfinished Goal.
+4. Confirm the root exposes `list_projects`, task create/read/message/title
+   tools, and Goal get/create/update tools. Call `list_projects` once per current
+   snapshot and map every selected path only from that response; never reuse a
+   project ID from memory, state, or an earlier run. Use only bounded
+   `read_thread` sweeps for monitoring. Read the current root Goal and reject an
+   unrelated or blocked unfinished Goal unless recovery owns the exact active run.
 5. Resolve the current GitStack runtime from the loaded App catalog. In parallel
    per repository, prove access, target/default branch existence, current head,
    and conflicting branch or PR identity. Defer CI, review access, rules,
@@ -37,8 +40,8 @@ maintenance.
 6. Render the exact sources and fingerprints, repositories/projects, branches,
    paths, validation commands, task titles, Goal objective, and expected PRs.
    Resolve authority through `options.md`.
-7. Re-read source revisions and repository heads only when authorization caused
-   a user wait, an observation became stale, or drift is otherwise evidenced.
+7. After an authorization wait, stale observation, or drift, refresh source revisions, repository heads, and the App project snapshot.
+   Never duplicate an unchanged intake read merely to restate its result.
 8. Write the exact schema-1 manifest below to a private temporary JSON file and
    call `scripts/run-state --json run start`. Continue only when
    `start_authorized=true`.
@@ -58,7 +61,7 @@ Use exactly these fields:
 {
   "schema_version": 1,
   "run_id": "019f-example",
-  "root_task_id": "019f-root",
+  "root_task_id": "019f-example",
   "goal_objective": "Implement the dependency-ready Feature Spec frontier",
   "sources": [
     {
@@ -93,11 +96,17 @@ Use exactly these fields:
 }
 ```
 
-`sources` includes the accepted selected Specs and any coordination source
-required to understand them. A GitHub issue ref is canonical and lowercase.
+`sources` includes the accepted selected Specs and only the coordination sources
+required to understand them. Blocked next-frontier Specs are output evidence,
+not manifest sources, because every manifest source is claimed. A GitHub issue
+ref is canonical and lowercase.
 For a local source use `kind=local-file`, an absolute regular-file `ref`, and
 its exact content SHA-256. The helper rechecks local bytes and claims both path
 and filesystem identity.
+
+`root_task_id` is the local controller correlation key; set it equal to
+`run_id`. Goal tools implicitly target the calling App task and expose no
+separate current-task ID, so do not guess one from `list_threads`.
 
 `repositories` comes from the one authoritative `list_projects` mapping plus
 the provider-read default branch. Resolve
