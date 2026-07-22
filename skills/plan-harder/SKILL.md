@@ -52,6 +52,13 @@ Default to the smallest valid route:
 - Do not create or update repo files as part of this skill. Return the plan or
   hardened issue brief to the user or calling workflow so that owner can decide
   where to persist it.
+- With `planning_mode=issue-hardening`, preserve the supplied work item's goal,
+  scope, and outcome shape. When the input is a vertical slice, include every
+  layer required to prove that outcome and never reduce it to layer-only work.
+- If complete hardening would require widening caller-owned scope or changing
+  a caller-owned dependency graph, return `result_status=blocked` on the caller
+  surface or ask for the minimum required clarification on the standalone
+  surface. Never silently rewrite those boundaries.
 - If the broader request includes later implementation, issue creation, or
   orchestration, finish the plan first and make the handoff explicit instead of
   blending phases together.
@@ -218,6 +225,7 @@ Keep the brief small enough to paste into an issue body or issue comment.
   - unsafe ordering
   - rollout or rollback gaps
   - missing validation
+  - missing layers required to prove a supplied vertical outcome
 - If real gaps remain, ask the minimum follow-up questions needed and update
   the plan or issue brief before returning it.
 
