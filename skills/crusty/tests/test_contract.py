@@ -76,6 +76,22 @@ class CrustyContractTests(unittest.TestCase):
             "unless the user separately asks for " + "implementation", skill
         )
 
+    def test_skill_requires_independent_evidence_backed_judgment(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        skill_normalized = " ".join(skill.split())
+
+        self.assertIn("Form an independent judgment", skill)
+        self.assertIn(
+            "Do not adopt the invoker's preferred conclusion, confidence, or framing",
+            skill_normalized,
+        )
+        self.assertIn("treat it as a claim to examine", skill_normalized)
+        self.assertIn("Do not be contrarian for sport", skill)
+        self.assertIn(
+            "Independent judgment does not authorize ignoring the user's stated goals",
+            skill_normalized,
+        )
+
     def test_runtime_docs_do_not_authorize_crusty_mutations(self) -> None:
         runtime_docs = "\n".join(
             path.read_text(encoding="utf-8")
@@ -147,8 +163,9 @@ class CrustyContractTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(short_description), 25)
         self.assertLessEqual(len(short_description), 64)
-        self.assertIn("Advisory-only critique", short_description)
+        self.assertIn("Independent advisory-only critique", short_description)
         self.assertIn("$crusty", default_prompt)
+        self.assertIn("do not adopt my preferred conclusion or framing", default_prompt)
         self.assertIn("local or supplied evidence", default_prompt)
         self.assertIn("without editing project files", default_prompt)
         self.assertEqual(
@@ -164,7 +181,7 @@ class CrustyContractTests(unittest.TestCase):
                 )
             )
         self.assertIn(
-            "`crusty` | Direct-only advisory critique for decisions, "
+            "`crusty` | Direct-only independent advisory critique for decisions, "
             "implementations, architecture, naming, and tradeoffs.",
             readme,
         )
