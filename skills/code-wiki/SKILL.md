@@ -45,8 +45,11 @@ This skill is Codex-dependent. It can use:
   and reasoning-effort selection, non-bypass workspace sandboxing, and named
   filesystem permission profiles with restricted reads. Its candidate
   generation path is exactly one complete repository `study` call followed by
-  one source-free `render` call; optional bounded repair is a visible third
-  generation call, and reader evaluation is metered separately.
+  one source-free `render` call. Study emits a deterministically validated typed
+  adaptive JSON handoff with structured evidence; safe contained tracked source
+  links are identity-bound while generated outputs remain symlink-free. Optional
+  bounded repair is a visible third generation call, reader evaluation is
+  metered separately, and exactly two repository decisions can be aggregated.
 
 Never put the final wiki in the cache. The durable wiki belongs in the
 user-chosen output folder. If the user explicitly asks to store cloned source
@@ -61,13 +64,17 @@ not infer it from an ordinary Code Wiki request.
 
 Open `references/pilot.md` before a pilot run. It owns the shipped commands,
 clean snapshot boundary, Markdown node contracts, typed manifests, actual
-Codex token fields, identical reader evaluation, deterministic comparison
+Codex token fields, typed adaptive study JSON, identical reader evaluation,
+deterministic comparison and two-result aggregation
 gates, and the `promote|revise|reject|inconclusive` result contract. A pilot
 result is evidence only and never promotes or mutates the default workflow.
 The current candidate rejects the retired three-study-plus-synthesis topology.
-Its 2026-07-19 matched live canary is `inconclusive`: identity and live
-provenance matched, but the candidate stopped after `study` and never produced
-a complete two-call run. The default workflow remains unchanged.
+The retained 2026-07-22 two-repository evaluation is `reject`: the complete
+React pair rejected on candidate reader quality and candidate-only omissions,
+while the GitHub CLI pair is `inconclusive` because its candidate stopped after
+study on a typed-contract error. A later transport-failed campaign produced no
+replacement decision. The ordinary workflow and the PR #13 baseline at commit
+`94f6652e92a19ddfecae7bc202061c17201f2994` remain unchanged.
 
 ## Workflow
 

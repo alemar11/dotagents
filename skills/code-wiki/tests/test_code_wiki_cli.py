@@ -107,7 +107,7 @@ class CodeWikiCliTests(unittest.TestCase):
     def test_help_and_version_use_public_launcher(self) -> None:
         version = self.run_code_wiki("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertIn("code-wiki 0.7.0", version.stdout)
+        self.assertIn("code-wiki 0.8.0", version.stdout)
 
         help_result = self.run_code_wiki("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
@@ -120,6 +120,7 @@ class CodeWikiCliTests(unittest.TestCase):
         self.assertEqual(pilot_help.returncode, 0, pilot_help.stderr)
         self.assertIn("run", pilot_help.stdout)
         self.assertIn("compare", pilot_help.stdout)
+        self.assertIn("aggregate", pilot_help.stdout)
         self.assertNotIn("provenance", pilot_help.stdout)
 
         for invalid_args in (

@@ -10,7 +10,7 @@ from pathlib import Path
 from code_wiki.claim_matrix import synthesize_claim_matrix
 from code_wiki.evidence import render_evidence_chip, source_url_for_evidence
 from code_wiki.inventory import build_inventory, write_json
-from code_wiki.pilot.comparison import compare_runs
+from code_wiki.pilot.comparison import aggregate_comparisons, compare_runs
 from code_wiki.pilot.doctor import doctor
 from code_wiki.pilot.runner import REASONING_EFFORTS, run_pilot, skill_root
 from code_wiki.scaffold import scaffold
@@ -102,6 +102,21 @@ def cmd_pilot_compare(args: argparse.Namespace) -> int:
         "comparison_markdown": str(Path(args.out).expanduser().resolve() / "comparison.md"),
     }
     print(json.dumps(result, indent=2, sort_keys=True) if args.json else f"promotion_status={result['promotion_status']}\nwrote comparison to {result['comparison_json']}")
+    return exit_code
+
+
+def cmd_pilot_aggregate(args: argparse.Namespace) -> int:
+    exit_code, aggregate = aggregate_comparisons(args.comparison, args.out)
+    result = {
+        "aggregate_status": aggregate["aggregate_status"],
+        "aggregate_json": str(Path(args.out).expanduser().resolve() / "aggregate.json"),
+        "aggregate_markdown": str(Path(args.out).expanduser().resolve() / "aggregate.md"),
+    }
+    print(
+        json.dumps(result, indent=2, sort_keys=True)
+        if args.json
+        else f"aggregate_status={result['aggregate_status']}\nwrote aggregate to {result['aggregate_json']}"
+    )
     return exit_code
 
 
@@ -273,6 +288,18 @@ def build_parser() -> argparse.ArgumentParser:
     pilot_compare_parser.add_argument("--candidate-run", required=True, help="node-graph run.json path")
     pilot_compare_parser.add_argument("--out", required=True, help="comparison output directory")
     pilot_compare_parser.set_defaults(func=cmd_pilot_compare)
+
+    pilot_aggregate_parser = pilot_subparsers.add_parser(
+        "aggregate", help="aggregate exactly two canonical repository comparisons"
+    )
+    pilot_aggregate_parser.add_argument(
+        "--comparison",
+        required=True,
+        action="append",
+        help="repository-key=comparison.json; provide exactly twice",
+    )
+    pilot_aggregate_parser.add_argument("--out", required=True, help="aggregate output directory")
+    pilot_aggregate_parser.set_defaults(func=cmd_pilot_aggregate)
 
     return parser
 

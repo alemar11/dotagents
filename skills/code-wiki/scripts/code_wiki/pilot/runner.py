@@ -6,7 +6,6 @@ import hashlib
 import io
 import json
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -18,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 from code_wiki.claim_matrix import synthesize_claim_matrix
-from code_wiki.evidence import parse_evidence_ref
 from code_wiki.inventory import build_inventory, write_json as write_inventory
 from code_wiki.pilot.common import git_output, hash_path, utc_now, write_json
 from code_wiki.pilot.contracts import GraphContract, NodeContract, load_graph
@@ -40,29 +38,16 @@ from code_wiki.pilot.snapshot import (
     create_snapshot,
     source_status,
 )
+from code_wiki.pilot.study import load_and_validate_study, normalize_study_output
 from code_wiki.scaffold import scaffold
 from code_wiki.validation import validate
+from code_wiki.validation.source_state import large_repo_requires_deep_dives
 from code_wiki.version import VERSION
 from code_wiki.wiki_contract import REQUIRED_PAGES
 
 
 REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 RUN_SCHEMA_VERSION = 1
-STUDY_PAGE_RE = re.compile(r"^## Page: `([^`]+)`$", re.MULTILINE)
-STUDY_EVIDENCE_RE = re.compile(r"(?:\[|`)([^\]\r\n`]+:\d+(?:-\d+)?)(?:\]|`)")
-STUDY_REQUIRED_TOPICS = (
-    "architecture",
-    "interface",
-    "lifecycle",
-    "flow",
-    "operation",
-    "test",
-    "failure",
-    "change",
-    "risk",
-    "validation",
-    "rollback",
-)
 BASELINE_WORKFLOW_FILES = (
     "SKILL.md",
     "references/repo-study-playbook.md",
@@ -383,6 +368,8 @@ def _new_manifest(
             "snapshot_path": str(snapshot.snapshot_path),
             "snapshot_tree_sha256_before": snapshot.snapshot_tree_hash,
             "snapshot_tree_sha256_after": None,
+            "tracked_symlinks": list(snapshot.source_symlinks),
+            "tracked_symlink_identity_sha256": snapshot.source_symlink_identity_sha256,
             "source_mutation": False,
         },
         "output": {
@@ -492,66 +479,12 @@ Safety and output rules:
 
 
 def _validate_study_brief(output_root: Path, snapshot: SourceSnapshot) -> None:
-    path = output_root / "artifacts" / "study.md"
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise RuntimeError(f"cannot read study brief: {exc}") from exc
-    matches = list(STUDY_PAGE_RE.finditer(text))
-    pages = [match.group(1) for match in matches]
-    if pages != REQUIRED_PAGES:
-        raise RuntimeError(
-            "study brief page sections must exactly match required pages in order: "
-            + ", ".join(REQUIRED_PAGES)
-        )
-    lowered_brief = text.lower()
-    missing_topics = [topic for topic in STUDY_REQUIRED_TOPICS if topic not in lowered_brief]
-    if missing_topics:
-        raise RuntimeError(
-            "study brief is missing required cross-page coverage topics: "
-            + ", ".join(missing_topics)
-        )
-    for index, match in enumerate(matches):
-        page = pages[index]
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        section = text[match.end():end]
-        words = re.findall(r"\b[A-Za-z0-9][A-Za-z0-9_-]*\b", section)
-        if len(words) < 120:
-            raise RuntimeError(f"study brief section is too thin for {page}: {len(words)} words")
-        evidence: set[tuple[str, int, int]] = set()
-        for found in STUDY_EVIDENCE_RE.finditer(section):
-            raw_ref = found.group(1)
-            parsed = parse_evidence_ref(raw_ref)
-            if parsed is None:
-                raise RuntimeError(f"study brief evidence path is unsafe: {raw_ref}")
-            evidence.add(
-                (
-                    str(parsed["path"]),
-                    int(parsed["start"]),
-                    int(parsed["end"]),
-                )
-            )
-        if len(evidence) < 2:
-            raise RuntimeError(f"study brief section needs two distinct evidence refs: {page}")
-        for relative, start, finish in evidence:
-            relative_path = Path(relative)
-            if relative_path.is_absolute() or not relative_path.parts or any(
-                part in {"", ".", ".."} for part in relative_path.parts
-            ):
-                raise RuntimeError(f"study brief evidence path is unsafe: {relative}")
-            source_root = snapshot.snapshot_path.resolve()
-            source_path = (source_root / relative_path).resolve()
-            try:
-                source_path.relative_to(source_root)
-            except ValueError as exc:
-                raise RuntimeError(f"study brief evidence escapes source: {relative}") from exc
-            if not source_path.is_file():
-                raise RuntimeError(f"study brief evidence path does not exist: {relative}")
-            line_count = len(source_path.read_text(encoding="utf-8", errors="replace").splitlines())
-            if start < 1 or finish < start or finish > line_count:
-                raise RuntimeError(
-                    f"study brief evidence range is invalid: {relative}:{start}-{finish}"
-                )
+    load_and_validate_study(
+        output_root / "artifacts" / "study.json",
+        source_root=snapshot.snapshot_path,
+        inventory_path=output_root / "wiki" / "data" / "inventory.json",
+        claim_matrix_path=output_root / "wiki" / "data" / "claim-matrix.json",
+    )
 
 
 def _invoke_agent(
@@ -660,6 +593,8 @@ def _invoke_agent(
             raw_root=raw_root,
             source_allowed="source" in node.input_artifacts,
         )
+        if node.node_kind == "agent-study":
+            normalize_study_output(staging_root / "artifacts" / "study.json")
         after = assert_snapshot_clean(snapshot)
         if "source" not in node.input_artifacts:
             _restore_source_metadata(output_root, staging_root)
@@ -781,7 +716,17 @@ def _prepare(
     write_inventory(str(inventory_path), inventory)
     with redirect_stdout(io.StringIO()):
         scaffold(str(wiki), title, False)
-    synthesize_claim_matrix(str(snapshot.snapshot_path), str(inventory_path), str(matrix_path))
+    matrix = synthesize_claim_matrix(str(snapshot.snapshot_path), str(inventory_path), str(matrix_path))
+    deep_dive_targets = matrix["deep_dive_targets"]
+    if large_repo_requires_deep_dives(inventory):
+        deep_dive_targets["status"] = "required"
+        deep_dive_targets["not_applicable_reason"] = ""
+    else:
+        deep_dive_targets["status"] = "not_applicable"
+        deep_dive_targets["not_applicable_reason"] = (
+            "prepared inventory is below deterministic file and root thresholds"
+        )
+    write_json(matrix_path, matrix)
     after = assert_snapshot_clean(snapshot)
     output_hashes = _artifact_hashes(output_root, snapshot, node.output_artifacts)
     output_evidence_path = _persist_artifact_evidence(

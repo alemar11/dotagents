@@ -206,6 +206,36 @@ def _read_manifest(path: Path, expected_mode: str) -> tuple[dict[str, Any], list
         source.get("snapshot_tree_sha256_before") != source.get("snapshot_tree_sha256_after")
     ):
         errors.append(f"{expected_mode} snapshot mutation proof is inconsistent")
+    tracked_symlinks = source.get("tracked_symlinks")
+    if not isinstance(tracked_symlinks, list):
+        errors.append(f"{expected_mode} source tracked_symlinks must be a list")
+        tracked_symlinks = []
+    validated_symlinks: list[dict[str, str]] = []
+    for index, record in enumerate(tracked_symlinks):
+        if not isinstance(record, dict) or set(record) != {
+            "link_path",
+            "raw_target",
+            "resolved_target",
+            "resolved_content_sha256",
+        }:
+            errors.append(f"{expected_mode} source tracked_symlinks entry {index} is invalid")
+            continue
+        if any(not isinstance(record.get(field), str) or not record[field] for field in record):
+            errors.append(f"{expected_mode} source tracked_symlinks entry {index} is incomplete")
+            continue
+        if not re.fullmatch(r"[0-9a-f]{64}", record["resolved_content_sha256"]):
+            errors.append(f"{expected_mode} source tracked_symlinks entry {index} hash is invalid")
+            continue
+        validated_symlinks.append(record)
+    if [record["link_path"] for record in validated_symlinks] != sorted(
+        record["link_path"] for record in validated_symlinks
+    ):
+        errors.append(f"{expected_mode} source tracked_symlinks are not canonically ordered")
+    symlink_identity = hashlib.sha256(
+        json.dumps(validated_symlinks, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    if source.get("tracked_symlink_identity_sha256") != symlink_identity:
+        errors.append(f"{expected_mode} source tracked-symlink identity hash is invalid")
 
     metrics = value.get("metrics")
     if not isinstance(metrics, dict):
@@ -540,7 +570,7 @@ def _read_manifest(path: Path, expected_mode: str) -> tuple[dict[str, Any], list
         study_state = nodes.get("study")
         study_attempts = study_state.get("attempts") if isinstance(study_state, dict) else None
         if isinstance(study_attempts, list) and study_attempts:
-            durable_artifact_path("study", "artifacts/study.md")
+            durable_artifact_path("study", "artifacts/study.json")
 
     validation_artifact = durable_artifact("validate", "artifacts/validation.json")
     if validation_artifact is not None:
@@ -764,6 +794,12 @@ def build_decision(
     )
     if not reader_hash_match:
         mismatches.append("reader_contract_hash")
+    if (
+        baseline_source.get("tracked_symlink_identity_sha256")
+        != candidate_source.get("tracked_symlink_identity_sha256")
+        or baseline_source.get("tracked_symlinks") != candidate_source.get("tracked_symlinks")
+    ):
+        mismatches.append("tracked_symlink_identity")
     gates["identity_match"] = {"pass": not mismatches, "mismatched_fields": mismatches}
     if mismatches:
         reasons.append("comparison identity mismatch: " + ", ".join(mismatches))
@@ -816,14 +852,19 @@ def build_decision(
         for field in (*USAGE_FIELDS, "model_call_count", "failed_terminal_calls", "wall_time_ms")
     }
 
-    baseline_quality = (
+    baseline_reader_evidence = baseline.get("reader_evaluation")
+    baseline_evaluable = (
         baseline.get("terminal_status") == "completed"
         and baseline.get("validation_status") == "pass"
-        and isinstance(baseline.get("reader_evaluation"), dict)
-        and baseline["reader_evaluation"].get("reader_status") == "pass"
+        and isinstance(baseline_reader_evidence, dict)
+        and baseline_reader_evidence.get("reader_status") in {"pass", "fail"}
         and baseline_source.get("original_checkout_unchanged") is True
         and baseline_source.get("source_mutation") is False
         and baseline_generation["failed_terminal_calls"] == 0
+        and baseline_call_shape.get("pass") is True
+    )
+    baseline_quality = bool(
+        baseline_evaluable and baseline_reader_evidence.get("reader_status") == "pass"
     )
     candidate_quality = (
         candidate.get("terminal_status") == "completed"
@@ -836,6 +877,8 @@ def build_decision(
     )
     candidate_only_omissions = sorted(_reader_omissions(candidate) - _reader_omissions(baseline))
     candidate_regressions: list[str] = []
+    if candidate.get("terminal_status") != "completed":
+        candidate_regressions.append("candidate run did not complete")
     if baseline.get("validation_status") == "pass" and candidate.get("validation_status") != "pass":
         candidate_regressions.append("candidate strict validation did not pass")
     baseline_reader_status = (
@@ -848,18 +891,24 @@ def build_decision(
         if isinstance(candidate.get("reader_evaluation"), dict)
         else None
     )
-    if baseline_reader_status == "pass" and candidate_reader_status == "fail":
-        candidate_regressions.append("candidate reader evaluation failed")
+    candidate_reader_complete = candidate_reader_status in {"pass", "fail"}
+    if candidate_reader_status != "pass":
+        candidate_regressions.append("candidate reader evaluation did not pass")
     if candidate_source.get("source_mutation") is True and baseline_source.get("source_mutation") is False:
         candidate_regressions.append("candidate mutated its source snapshot")
+    if candidate_source.get("original_checkout_unchanged") is not True:
+        candidate_regressions.append("candidate original checkout changed")
     if candidate_generation["failed_terminal_calls"] > baseline_generation["failed_terminal_calls"]:
         candidate_regressions.append("candidate recorded an additional failed terminal model call")
     if candidate_only_omissions:
         candidate_regressions.append("candidate has material omissions absent from baseline")
     gates["quality_and_safety"] = {
-        "pass": baseline_quality and candidate_quality and not candidate_regressions,
-        "baseline_pass": baseline_quality,
+        "pass": baseline_evaluable and candidate_quality and not candidate_regressions,
+        "baseline_evaluable": baseline_evaluable,
+        "baseline_quality_pass": baseline_quality,
         "candidate_pass": candidate_quality,
+        "baseline_reader_status": baseline_reader_status,
+        "candidate_reader_status": candidate_reader_status,
         "candidate_only_material_omissions": candidate_only_omissions,
         "candidate_regressions": candidate_regressions,
     }
@@ -883,6 +932,8 @@ def build_decision(
         and live_evidence
         and call_shape_pass
         and denominators_defined
+        and baseline_evaluable
+        and candidate_quality
     )
     token_reduction_pass = (
         efficiency_evaluable and candidate_uncached * 100 <= baseline_uncached * 80
@@ -929,12 +980,15 @@ def build_decision(
         or not denominators_defined
     ):
         status = "inconclusive"
-    elif candidate_regressions:
-        status = "reject"
-        reasons.extend(candidate_regressions)
-    elif not baseline_quality or not candidate_quality:
+    elif not baseline_evaluable:
         status = "inconclusive"
-        reasons.append("both runs do not provide complete passing quality and safety evidence")
+        reasons.append("baseline run is not evaluable from complete validation, safety, call, and reader evidence")
+    elif candidate.get("validation_status") == "pass" and not candidate_reader_complete:
+        status = "inconclusive"
+        reasons.append("candidate reader evidence is incomplete")
+    elif candidate_regressions or not candidate_quality:
+        status = "reject"
+        reasons.extend(candidate_regressions or ["candidate quality and safety requirements did not pass"])
     elif token_reduction_pass and total_tokens_pass and wall_time_pass:
         status = "promote"
         reasons.append("all quality, safety, identity, and efficiency gates passed")
@@ -1021,6 +1075,119 @@ def render_markdown(decision: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def build_aggregate(decisions: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    if len(decisions) != 2:
+        raise RuntimeError("pilot aggregation requires exactly two repository decisions")
+    statuses: dict[str, str] = {}
+    for repository, decision in sorted(decisions.items()):
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", repository):
+            raise RuntimeError(f"aggregate repository key is noncanonical: {repository}")
+        required_fields = {
+            "schema_version",
+            "promotion_status",
+            "reasons",
+            "inputs",
+            "identity",
+            "metrics",
+            "quality",
+            "call_shape",
+            "gates",
+        }
+        if (
+            not isinstance(decision, dict)
+            or decision.get("schema_version") != 1
+            or not required_fields.issubset(decision)
+            or not isinstance(decision.get("reasons"), list)
+            or any(not isinstance(reason, str) for reason in decision.get("reasons", []))
+            or any(not isinstance(decision.get(field), dict) for field in required_fields - {
+                "schema_version", "promotion_status", "reasons"
+            })
+        ):
+            raise RuntimeError(f"aggregate decision is invalid for {repository}")
+        status = decision.get("promotion_status")
+        if status not in PROMOTION_STATUSES:
+            raise RuntimeError(f"aggregate promotion status is invalid for {repository}")
+        statuses[repository] = status
+    if "reject" in statuses.values():
+        aggregate_status = "reject"
+    elif "inconclusive" in statuses.values():
+        aggregate_status = "inconclusive"
+    elif "revise" in statuses.values():
+        aggregate_status = "revise"
+    else:
+        aggregate_status = "promote"
+    return {
+        "schema_version": 1,
+        "aggregate_status": aggregate_status,
+        "component_statuses": statuses,
+        "repository_decisions": {
+            repository: decisions[repository] for repository in sorted(decisions)
+        },
+        "reasons": [
+            f"{repository}: {status}" for repository, status in sorted(statuses.items())
+        ],
+    }
+
+
+def render_aggregate_markdown(aggregate: dict[str, Any]) -> str:
+    lines = [
+        "# Code Wiki Structured Study Pilot Aggregate",
+        "",
+        f"Aggregate status: `{aggregate['aggregate_status']}`",
+        "",
+        "## Repository Decisions",
+        "",
+        "| Repository | Status | Reasons |",
+        "| --- | --- | --- |",
+    ]
+    for repository, decision in aggregate["repository_decisions"].items():
+        reasons = "; ".join(str(reason) for reason in decision.get("reasons", []))
+        lines.append(f"| `{repository}` | `{decision['promotion_status']}` | {reasons} |")
+    lines.extend(
+        [
+            "",
+            "The aggregate is evidence only. It never changes Code Wiki's default workflow.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def aggregate_comparisons(comparison_args: list[str], out: str) -> tuple[int, dict[str, Any]]:
+    if len(comparison_args) != 2:
+        raise RuntimeError("pilot aggregate requires exactly two --comparison name=path values")
+    decisions: dict[str, dict[str, Any]] = {}
+    for raw in comparison_args:
+        repository, separator, path_value = raw.partition("=")
+        if not separator or not repository or not path_value or repository in decisions:
+            raise RuntimeError(f"invalid or duplicate aggregate comparison: {raw}")
+        path = Path(path_value).expanduser().resolve()
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"cannot read aggregate comparison {repository}: {exc}") from exc
+        if not isinstance(value, dict):
+            raise RuntimeError(f"aggregate comparison must be an object: {repository}")
+        decisions[repository] = value
+
+    output_root = Path(out).expanduser().resolve()
+    if output_root.exists():
+        unexpected = [
+            path
+            for path in output_root.iterdir()
+            if path.name not in {"aggregate.json", "aggregate.md"}
+            or path.is_symlink()
+            or not path.is_file()
+        ]
+        if unexpected:
+            raise RuntimeError(f"aggregate output contains unsafe or unexpected entries: {output_root}")
+    output_root.mkdir(parents=True, exist_ok=True)
+    aggregate = build_aggregate(decisions)
+    write_json(output_root / "aggregate.json", aggregate)
+    write_text_atomic(output_root / "aggregate.md", render_aggregate_markdown(aggregate))
+    return 0, aggregate
 
 
 def compare_runs(baseline_run: str, candidate_run: str, out: str) -> tuple[int, dict[str, Any]]:

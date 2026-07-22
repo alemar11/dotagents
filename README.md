@@ -42,7 +42,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | Skill | Purpose |
 | --- | --- |
 | `autoreview` | Send selected change bundles to a separate read-only Codex execution for structured closeout review and reuse verified clean evidence for unchanged targets. |
-| `code-wiki` | Generate an evidence-backed linked HTML wiki and optionally benchmark its opt-in two-node study-to-render pilot. |
+| `code-wiki` | Generate an evidence-backed linked HTML wiki and optionally benchmark its opt-in typed-study, source-free-render pilot. |
 | `crusty` | Direct-only advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
@@ -76,7 +76,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki. Its optional two-node study-to-render pilot additionally requires local `python3`, `git`, and a Codex CLI that supports ephemeral JSON execution with explicit model, effort, working-directory, workspace-sandbox controls, and named filesystem permission profiles with restricted reads.
+- `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki. Its optional typed-study, source-free-render pilot additionally requires local `python3`, `git`, and a Codex CLI that supports ephemeral JSON execution with explicit model, effort, working-directory, workspace-sandbox controls, and named filesystem permission profiles with restricted reads. Check readiness from the repository root with `skills/code-wiki/scripts/code-wiki --json doctor`. The retained 2026-07-22 live aggregate is `reject` (React=`reject`, GitHub CLI=`inconclusive`); it is evidence only, and the ordinary Code Wiki workflow remains the default.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires `$autoreview` for non-trivial implementation closeout.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.

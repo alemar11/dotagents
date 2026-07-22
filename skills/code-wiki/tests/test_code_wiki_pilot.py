@@ -17,7 +17,12 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 CMD = SKILL_ROOT / "scripts" / "code-wiki"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
-from code_wiki.pilot.comparison import _read_manifest, build_decision  # noqa: E402
+from code_wiki.pilot.comparison import (  # noqa: E402
+    _read_manifest,
+    build_aggregate,
+    build_decision,
+    render_aggregate_markdown,
+)
 from code_wiki.pilot.common import hash_path  # noqa: E402
 from code_wiki.pilot.contracts import ContractError, load_graph, parse_node  # noqa: E402
 from code_wiki.pilot.provenance import (  # noqa: E402
@@ -50,7 +55,12 @@ from code_wiki.pilot.runtime import (  # noqa: E402
     _write_source_free_config,
     parse_terminal_usage,
 )
-from code_wiki.pilot.snapshot import SourceSnapshot, create_snapshot  # noqa: E402
+from code_wiki.pilot.snapshot import (  # noqa: E402
+    SourceSnapshot,
+    assert_snapshot_clean,
+    create_snapshot,
+)
+from code_wiki.pilot.study import normalize_study_output  # noqa: E402
 from code_wiki.wiki_contract import REQUIRED_PAGES  # noqa: E402
 
 
@@ -231,35 +241,91 @@ class CodeWikiPilotTests(unittest.TestCase):
         return writes
 
     @staticmethod
-    def study_brief(
+    def study_artifact(
         *,
         omit_page: str | None = None,
         invalid_evidence: bool = False,
         missing_topic: str | None = None,
     ) -> str:
-        sections = []
-        second_evidence = "pkg/missing.py:1-4" if invalid_evidence else "pkg/main.py:1-4"
+        pages = []
+        second_evidence = "pkg/missing.py" if invalid_evidence else "pkg/main.py"
         for page in REQUIRED_PAGES:
             if page == omit_page:
                 continue
-            sections.append(
-                f"## Page: `{page}`\n\n"
-                "The architecture section names the representative package boundary and explains how its "
-                "public interface participates in the runtime lifecycle and state model. The basic call flow "
-                "starts at the documented entrypoint, crosses the package operation, and returns the normalized "
-                "result. The advanced flow covers failure behavior, retry limits, cleanup ownership, and observable "
-                "errors. Maintainer operations include the exact test and validation commands, expected artifacts, "
-                "and source ownership. The change recipe starts with the implementation, updates its public contract, "
-                "runs focused tests, and checks compatibility. Risk analysis covers unsupported input and accidental "
-                "boundary changes; rollback reverts the implementation and validates the restored behavior. The page "
-                "will render two distinct ready claims: one about implementation ownership and one about verification "
-                "ownership. Evidence demonstrates both the documented project context and concrete executable path, "
-                "so the renderer does not need another repository study. Interface, lifecycle, flow, operation, test, "
-                "failure, change, risk, validation, rollback, and architecture coverage are all explicit. "
-                f"[README.md:1-10] [{second_evidence}]\n"
+            topic = {"status": "covered", "details": [f"Concrete {page} guidance"]}
+            page_record = {
+                "output_path": page,
+                "title": page.replace("/", " ").replace(".html", "").title(),
+                "purpose": "Explain `inline code` beside structured evidence without parsing prose.",
+                "claims": [
+                    {
+                        "text": f"{page} documents the representative repository boundary",
+                        "evidence": [{"path": "README.md", "start": 1, "end": 10}],
+                    },
+                    {
+                        "text": f"{page} traces the representative executable behavior",
+                        "evidence": [{"path": second_evidence, "start": 1, "end": 4}],
+                    },
+                ],
+                "section_plan": ["Contract and ownership", "Operation and verification"],
+                "flows_and_lifecycles": dict(topic),
+                "operations_and_tests": dict(topic),
+                "failures_and_risks": dict(topic),
+                "change_recipes": dict(topic),
+                "validation": dict(topic),
+                "rollback": dict(topic),
+            }
+            if missing_topic and page == REQUIRED_PAGES[0]:
+                page_record.pop(missing_topic)
+            pages.append(page_record)
+        return json.dumps(
+            {
+                "schema": "code-wiki-study",
+                "schema_version": 1,
+                "fixed_pages": pages,
+                "deep_dives": [],
+                "deep_dives_applicability": {
+                    "status": "not-applicable",
+                    "reason": "Prepared fixture repository is below deterministic deep-dive thresholds.",
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+
+    @staticmethod
+    def write_study_targets(output_root: Path, snapshot_path: Path) -> None:
+        data_root = output_root / "wiki" / "data"
+        data_root.mkdir(parents=True, exist_ok=True)
+        (data_root / "inventory.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "repo": {"path": str(snapshot_path)},
+                    "counts": {"files": 4},
+                    "source_roots": ["pkg"],
+                    "interface_roots": [],
+                },
+                indent=2,
             )
-        result = "\n".join(sections)
-        return result.replace(missing_topic, "omitted-topic") if missing_topic else result
+            + "\n",
+            encoding="utf-8",
+        )
+        (data_root / "claim-matrix.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "page_targets": [{"page": page} for page in REQUIRED_PAGES],
+                    "deep_dive_targets": {
+                        "status": "not_applicable",
+                        "not_applicable_reason": "fixture is below deterministic thresholds",
+                    },
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
     def write_fixture(self, root: Path, mode: str, *, repair: bool = False, failure: str | None = None) -> Path:
         success = self.usage_event()
@@ -291,7 +357,7 @@ class CodeWikiPilotTests(unittest.TestCase):
             study: dict[str, object] = {
                 "events": [success],
                 "writes": {
-                    "artifacts/study.md": self.study_brief(
+                    "artifacts/study.json": self.study_artifact(
                         omit_page=REQUIRED_PAGES[-1] if failure == "study-missing-page" else None,
                         invalid_evidence=failure == "study-invalid-evidence",
                         missing_topic="rollback" if failure == "study-missing-topic" else None,
@@ -363,7 +429,7 @@ class CodeWikiPilotTests(unittest.TestCase):
             result = self.run_cli("--json", "doctor", env=env)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["cli_version"], "0.7.0")
+            self.assertEqual(payload["cli_version"], "0.8.0")
             self.assertTrue(payload["ok"])
             self.assertFalse(payload["live_pilot_ready"])
             self.assertFalse(payload["model_invoked"])
@@ -379,7 +445,7 @@ class CodeWikiPilotTests(unittest.TestCase):
             {"prepare", "study", "render", "validate", "repair", "reader"},
         )
         self.assertEqual(candidate.nodes["study"].dependencies, ("prepare",))
-        self.assertEqual(candidate.nodes["study"].output_artifacts, ("artifacts/study.md",))
+        self.assertEqual(candidate.nodes["study"].output_artifacts, ("artifacts/study.json",))
         self.assertEqual(candidate.nodes["render"].dependencies, ("prepare", "study"))
         self.assertNotIn("source", candidate.nodes["render"].input_artifacts)
         self.assertEqual(candidate.nodes["repair"].repair_target, "validate")
@@ -610,7 +676,7 @@ class CodeWikiPilotTests(unittest.TestCase):
         self.assertEqual(environment["OPENAI_API_KEY"], "fixture-key")
         self.assertNotIn("CODE_WIKI_UNRELATED", environment)
 
-    def test_snapshot_rejects_tracked_symlinks_before_execution(self) -> None:
+    def test_snapshot_rejects_unsafe_tracked_symlinks_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             repo, _ = self.create_repo(root)
@@ -643,7 +709,101 @@ class CodeWikiPilotTests(unittest.TestCase):
                 "--cache-root", str(root / "cache"),
             )
             self.assertEqual(result.returncode, 2)
-            self.assertIn("cannot contain tracked symlinks", result.stdout)
+            self.assertIn("tracked symlink target must be relative", result.stdout)
+
+    def test_snapshot_accepts_safe_tracked_symlink_chain_and_binds_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, _ = self.create_repo(root)
+            os.symlink("main.py", repo / "pkg" / "current.py")
+            os.symlink("current.py", repo / "pkg" / "current-chain.py")
+            subprocess.run(["git", "add", "pkg/current.py", "pkg/current-chain.py"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "add safe source links"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            snapshot = create_snapshot(str(repo), commit, str(root / "cache"))
+            self.assertEqual(
+                [record["link_path"] for record in snapshot.source_symlinks],
+                ["pkg/current-chain.py", "pkg/current.py"],
+            )
+            self.assertTrue(
+                all(record["resolved_target"] == "pkg/main.py" for record in snapshot.source_symlinks)
+            )
+            self.assertEqual(assert_snapshot_clean(snapshot), snapshot.snapshot_tree_hash)
+            (snapshot.snapshot_path / "pkg" / "main.py").write_text("retargeted bytes\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "source snapshot"):
+                assert_snapshot_clean(snapshot)
+
+    def test_pinned_uv_tracked_directory_link_shape_passes_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, _ = self.create_repo(root)
+            (repo / "python").mkdir()
+            (repo / "python" / "uv.py").write_text("def main():\n    return 0\n", encoding="utf-8")
+            link_parent = repo / "test" / "packages" / "fake-uv"
+            link_parent.mkdir(parents=True)
+            os.symlink("../../../python/", link_parent / "src", target_is_directory=True)
+            subprocess.run(["git", "add", "python", "test/packages/fake-uv/src"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "model uv 336535f tracked link"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            snapshot = create_snapshot(str(repo), commit, str(root / "cache"))
+            self.assertEqual(
+                snapshot.source_symlinks,
+                (
+                    {
+                        "link_path": "test/packages/fake-uv/src",
+                        "raw_target": "../../../python/",
+                        "resolved_target": "python",
+                        "resolved_content_sha256": hash_path(snapshot.snapshot_path / "python"),
+                    },
+                ),
+            )
+            self.assertEqual(assert_snapshot_clean(snapshot), snapshot.snapshot_tree_hash)
+
+    def test_snapshot_rejects_relative_escape_broken_and_cyclic_links(self) -> None:
+        cases = (
+            ("escape", {"pkg/escape": "../../../../../../etc/hosts"}, "escapes source snapshot"),
+            ("broken", {"pkg/broken": "missing.py"}, "must exist and be acyclic"),
+            ("cyclic", {"pkg/a": "b", "pkg/b": "a"}, "must exist and be acyclic"),
+        )
+        for name, links, expected in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                repo, _ = self.create_repo(root)
+                for relative, target in links.items():
+                    os.symlink(target, repo / relative)
+                subprocess.run(["git", "add", *links], cwd=repo, check=True)
+                subprocess.run(
+                    ["git", "commit", "-m", f"add {name} link"],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                commit = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    create_snapshot(str(repo), commit, str(root / "cache"))
 
     def test_artifact_hash_includes_nested_git_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -976,7 +1136,7 @@ class CodeWikiPilotTests(unittest.TestCase):
             )
             (output_root / "wiki" / "index.html").write_text("scaffold\n", encoding="utf-8")
             (output_root / "artifacts").mkdir()
-            (output_root / "artifacts" / "study.md").write_text(
+            (output_root / "artifacts" / "study.json").write_text(
                 "source-backed brief without local checkout paths\n", encoding="utf-8"
             )
             (output_root / "run.json").write_text(
@@ -1065,10 +1225,9 @@ class CodeWikiPilotTests(unittest.TestCase):
             (snapshot_path / "pkg" / "main.py").write_text("line\n" * 20, encoding="utf-8")
             (root / "outside.md").write_text("outside\n" * 20, encoding="utf-8")
             (output_root / "artifacts").mkdir(parents=True)
-            escaped = self.study_brief().replace(
-                "pkg/main.py:1-4", "../outside.md:1-4"
-            )
-            (output_root / "artifacts" / "study.md").write_text(escaped, encoding="utf-8")
+            self.write_study_targets(output_root, snapshot_path)
+            escaped = self.study_artifact().replace('"path": "pkg/main.py"', '"path": "../outside.md"')
+            (output_root / "artifacts" / "study.json").write_text(escaped, encoding="utf-8")
             snapshot = SourceSnapshot(
                 original_checkout=root / "original",
                 original_head_before="0" * 40,
@@ -1077,7 +1236,7 @@ class CodeWikiPilotTests(unittest.TestCase):
                 snapshot_path=snapshot_path,
                 snapshot_tree_hash="fixture",
             )
-            with self.assertRaisesRegex(RuntimeError, "evidence path is unsafe"):
+            with self.assertRaisesRegex(RuntimeError, "canonical repository-relative"):
                 _validate_study_brief(output_root, snapshot)
 
     def test_study_evidence_accepts_canonical_paths_with_spaces(self) -> None:
@@ -1091,10 +1250,11 @@ class CodeWikiPilotTests(unittest.TestCase):
                 "line\n" * 20, encoding="utf-8"
             )
             (output_root / "artifacts").mkdir(parents=True)
-            spaced = self.study_brief().replace(
-                "pkg/main.py:1-4", "docs/API Guide.md:1-4"
+            self.write_study_targets(output_root, snapshot_path)
+            spaced = self.study_artifact().replace(
+                '"path": "pkg/main.py"', '"path": "docs/API Guide.md"'
             )
-            (output_root / "artifacts" / "study.md").write_text(spaced, encoding="utf-8")
+            (output_root / "artifacts" / "study.json").write_text(spaced, encoding="utf-8")
             snapshot = SourceSnapshot(
                 original_checkout=root / "original",
                 original_head_before="0" * 40,
@@ -1102,6 +1262,236 @@ class CodeWikiPilotTests(unittest.TestCase):
                 original_status_before="",
                 snapshot_path=snapshot_path,
                 snapshot_tree_hash="fixture",
+            )
+            _validate_study_brief(output_root, snapshot)
+
+    def test_typed_study_accepts_inline_code_and_three_adaptive_deep_dives(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot_path = root / "snapshot"
+            output_root = root / "output"
+            (snapshot_path / "pkg").mkdir(parents=True)
+            (snapshot_path / "README.md").write_text("line\n" * 40, encoding="utf-8")
+            (snapshot_path / "pkg" / "main.py").write_text("line\n" * 40, encoding="utf-8")
+            (output_root / "artifacts").mkdir(parents=True)
+            self.write_study_targets(output_root, snapshot_path)
+            inventory_path = output_root / "wiki" / "data" / "inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["counts"]["files"] = 1200
+            inventory_path.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+            matrix_path = output_root / "wiki" / "data" / "claim-matrix.json"
+            matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+            matrix["deep_dive_targets"] = {
+                "status": "required",
+                "not_applicable_reason": "",
+            }
+            matrix_path.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")
+
+            study = json.loads(self.study_artifact())
+            study["deep_dives_applicability"] = {
+                "status": "applicable",
+                "reason": "Prepared cli-shaped inventory has multiple large surfaces.",
+            }
+            template = study["fixed_pages"][0]
+            deep_dives = []
+            for slug in ("api-boundaries", "command-routing", "runtime-lifecycle"):
+                page = json.loads(json.dumps(template))
+                page["output_path"] = f"pages/deep-dives/{slug}.html"
+                page["title"] = slug.replace("-", " ").title()
+                page["claims"].append(
+                    {
+                        "text": f"{slug} records an adaptive repository-specific claim",
+                        "evidence": [{"path": "README.md", "start": 11, "end": 20}],
+                    }
+                )
+                deep_dives.append(page)
+            study["deep_dives"] = deep_dives
+            study_path = output_root / "artifacts" / "study.json"
+            study_path.write_text(json.dumps(study, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            snapshot = SourceSnapshot(
+                original_checkout=root / "original",
+                original_head_before="0" * 40,
+                commit="0" * 40,
+                original_status_before="",
+                snapshot_path=snapshot_path,
+                snapshot_tree_hash="fixture",
+            )
+            _validate_study_brief(output_root, snapshot)
+
+            study["deep_dives"] = list(reversed(deep_dives))
+            study_path.write_text(json.dumps(study, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "canonical order"):
+                _validate_study_brief(output_root, snapshot)
+
+    def test_study_normalizes_live_topic_shaped_deep_dive_applicability(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            study_path = root / "study.json"
+            study = json.loads(self.study_artifact())
+            details = [
+                "The prepared inventory reports 7,271 files and many independent runtime, renderer, server, tooling, and compiler source roots, so adaptive deep dives are required.",
+                "Three unique leaf pages are ordered by output path and isolate the highest-complexity public and lifecycle boundaries: React Compiler, React DOM and Fizz, and Reconciler and Scheduler.",
+            ]
+            study["deep_dives_applicability"] = {
+                "status": "covered",
+                "details": details,
+            }
+            study_path.write_text(json.dumps(study), encoding="utf-8")
+
+            self.assertTrue(normalize_study_output(study_path))
+            normalized = json.loads(study_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                normalized["deep_dives_applicability"],
+                {"status": "applicable", "reason": " ".join(details)},
+            )
+
+    def test_study_normalization_does_not_mask_other_applicability_shapes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            study_path = Path(tmp) / "study.json"
+            study = json.loads(self.study_artifact())
+            offending = {
+                "status": "covered",
+                "details": ["Deep dives are required."],
+                "unexpected": True,
+            }
+            study["deep_dives_applicability"] = offending
+            study_path.write_text(json.dumps(study), encoding="utf-8")
+
+            self.assertFalse(normalize_study_output(study_path))
+            unchanged = json.loads(study_path.read_text(encoding="utf-8"))
+            self.assertEqual(unchanged["deep_dives_applicability"], offending)
+
+    def test_study_normalizes_live_topic_shaped_section_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            study_path = Path(tmp) / "study.json"
+            study = json.loads(self.study_artifact())
+            details = [
+                "Repository identity and analyzed snapshot",
+                "Choose a reading path by maintainer task",
+                "Page cards for product context, public surfaces, architecture, runtime state, dependencies, patterns, flows, operations, change recipes, source map, and deep dives",
+                "Compact system-at-a-glance call path",
+            ]
+            study["fixed_pages"][0]["section_plan"] = {
+                "status": "covered",
+                "details": details,
+            }
+            study_path.write_text(json.dumps(study), encoding="utf-8")
+
+            self.assertTrue(normalize_study_output(study_path))
+            normalized = json.loads(study_path.read_text(encoding="utf-8"))
+            self.assertEqual(normalized["fixed_pages"][0]["section_plan"], details)
+
+    def test_study_does_not_normalize_one_entry_topic_shaped_section_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot_path = root / "snapshot"
+            output_root = root / "output"
+            (snapshot_path / "pkg").mkdir(parents=True)
+            (snapshot_path / "README.md").write_text("line\n" * 20, encoding="utf-8")
+            (snapshot_path / "pkg" / "main.py").write_text("line\n" * 20, encoding="utf-8")
+            (output_root / "artifacts").mkdir(parents=True)
+            self.write_study_targets(output_root, snapshot_path)
+            study_path = output_root / "artifacts" / "study.json"
+            study = json.loads(self.study_artifact())
+            offending = {
+                "status": "covered",
+                "details": ["Only one section"],
+            }
+            study["fixed_pages"][0]["section_plan"] = offending
+            study_path.write_text(json.dumps(study), encoding="utf-8")
+
+            self.assertFalse(normalize_study_output(study_path))
+            unchanged = json.loads(study_path.read_text(encoding="utf-8"))
+            self.assertEqual(unchanged["fixed_pages"][0]["section_plan"], offending)
+            snapshot = SourceSnapshot(
+                original_checkout=root / "original",
+                original_head_before="0" * 40,
+                commit="0" * 40,
+                original_status_before="",
+                snapshot_path=snapshot_path,
+                snapshot_tree_hash="fixture",
+            )
+            with self.assertRaisesRegex(RuntimeError, "section_plan must contain at least 2"):
+                _validate_study_brief(output_root, snapshot)
+
+    def test_complete_observed_study_shapes_normalize_and_validate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot_path = root / "snapshot"
+            output_root = root / "output"
+            (snapshot_path / "pkg").mkdir(parents=True)
+            (snapshot_path / "README.md").write_text("line\n" * 60, encoding="utf-8")
+            (snapshot_path / "pkg" / "main.py").write_text("line\n" * 60, encoding="utf-8")
+            (output_root / "artifacts").mkdir(parents=True)
+            self.write_study_targets(output_root, snapshot_path)
+            inventory_path = output_root / "wiki" / "data" / "inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["counts"]["files"] = 1200
+            inventory_path.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+            matrix_path = output_root / "wiki" / "data" / "claim-matrix.json"
+            matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+            matrix["deep_dive_targets"] = {
+                "status": "required",
+                "not_applicable_reason": "",
+            }
+            matrix_path.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")
+            snapshot = SourceSnapshot(
+                original_checkout=root / "original",
+                original_head_before="0" * 40,
+                commit="0" * 40,
+                original_status_before="",
+                snapshot_path=snapshot_path,
+                snapshot_tree_hash="fixture",
+            )
+            study_path = output_root / "artifacts" / "study.json"
+
+            def observed_study(slugs: tuple[str, ...]) -> dict[str, object]:
+                study = json.loads(self.study_artifact())
+                study["deep_dives_applicability"] = {
+                    "status": "applicable",
+                    "reason": "Prepared inventory requires adaptive subsystem pages.",
+                }
+                template = study["fixed_pages"][0]
+                for slug in slugs:
+                    page = json.loads(json.dumps(template))
+                    page["output_path"] = f"pages/deep-dives/{slug}.html"
+                    page["title"] = slug.replace("-", " ").title()
+                    page["claims"].append(
+                        {
+                            "text": f"{slug} records an adaptive repository-specific claim",
+                            "evidence": [{"path": "README.md", "start": 21, "end": 30}],
+                        }
+                    )
+                    study["deep_dives"].append(page)
+                return study
+
+            react_shape = observed_study(("compiler", "reconciler", "server-components"))
+            study_path.write_text(
+                json.dumps(react_shape, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(normalize_study_output(study_path))
+            _validate_study_brief(output_root, snapshot)
+
+            cli_shape = observed_study(
+                ("authentication", "command-dispatch", "extensions", "repository-resolution")
+            )
+            pages = cli_shape["fixed_pages"] + cli_shape["deep_dives"]
+            expected_plans = []
+            for page in pages:
+                plan = page["section_plan"]
+                expected_plans.append(plan)
+                page["section_plan"] = {"status": "covered", "details": plan}
+            study_path.write_text(
+                json.dumps(cli_shape, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(normalize_study_output(study_path))
+            normalized = json.loads(study_path.read_text(encoding="utf-8"))
+            normalized_pages = normalized["fixed_pages"] + normalized["deep_dives"]
+            self.assertEqual(
+                [page["section_plan"] for page in normalized_pages],
+                expected_plans,
             )
             _validate_study_brief(output_root, snapshot)
 
@@ -1141,8 +1531,8 @@ class CodeWikiPilotTests(unittest.TestCase):
                 render_attempt["input_artifacts"]["wiki"],
             )
             self.assertEqual(
-                render_attempt["input_source_artifacts"]["artifacts/study.md"],
-                render_attempt["input_artifacts"]["artifacts/study.md"],
+                render_attempt["input_source_artifacts"]["artifacts/study.json"],
+                render_attempt["input_artifacts"]["artifacts/study.json"],
             )
             self.assertEqual(
                 render_attempt["input_source_evidence_path"],
@@ -1173,7 +1563,7 @@ class CodeWikiPilotTests(unittest.TestCase):
             self.assertEqual(source_inventory["repo"]["path"], candidate["source"]["snapshot_path"])
             self.assertEqual(renderer_inventory["repo"]["path"], "source-not-declared")
             self.assertIsNone(renderer_inventory["repo"]["remote_url"])
-            self.assertTrue((candidate_out / "artifacts" / "study.md").is_file())
+            self.assertTrue((candidate_out / "artifacts" / "study.json").is_file())
             for manifest, out in ((baseline, baseline_out), (candidate, candidate_out)):
                 self.assertEqual(manifest["terminal_status"], "completed")
                 self.assertEqual(manifest["identity"]["execution_evidence"], "fixture")
@@ -1251,9 +1641,9 @@ class CodeWikiPilotTests(unittest.TestCase):
             root = Path(tmp)
             repo, commit = self.create_repo(root)
             cases = (
-                ("study-missing-page", "study brief page sections"),
-                ("study-invalid-evidence", "evidence path does not exist"),
-                ("study-missing-topic", "cross-page coverage topics: rollback"),
+                ("study-missing-page", "study.fixed_pages output paths"),
+                ("study-invalid-evidence", ".path is missing or escapes the source snapshot"),
+                ("study-missing-topic", "missing=rollback"),
                 ("study-failure", "exited 1"),
             )
             for index, (failure, expected_error) in enumerate(cases):
@@ -1422,14 +1812,14 @@ class CodeWikiPilotTests(unittest.TestCase):
                 2,
             )
 
-            study_path = candidate_out / "artifacts" / "study.md"
+            study_path = candidate_out / "artifacts" / "study.json"
             study_bytes = study_path.read_bytes()
             study_path.write_text("tampered durable study\n", encoding="utf-8")
             _, durable_tamper_errors = _read_manifest(
                 candidate_out / "run.json", "node-graph"
             )
             self.assertIn(
-                "node-graph durable artifact hash is invalid: artifacts/study.md",
+                "node-graph durable artifact hash is invalid: artifacts/study.json",
                 durable_tamper_errors,
             )
             study_path.write_bytes(study_bytes)
@@ -1441,7 +1831,7 @@ class CodeWikiPilotTests(unittest.TestCase):
                 / "output"
                 / "study-attempt-1"
                 / "artifacts"
-                / "study.md"
+                / "study.json"
             )
             study_evidence_bytes = study_evidence_path.read_bytes()
             study_evidence_path.write_text("tampered evidence copy\n", encoding="utf-8")
@@ -1449,7 +1839,7 @@ class CodeWikiPilotTests(unittest.TestCase):
                 candidate_out / "run.json", "node-graph"
             )
             self.assertIn(
-                "node-graph study output artifact hash is invalid: artifacts/study.md",
+                "node-graph study output artifact hash is invalid: artifacts/study.json",
                 evidence_tamper_errors,
             )
             study_evidence_path.write_bytes(study_evidence_bytes)
@@ -1591,7 +1981,9 @@ class CodeWikiPilotTests(unittest.TestCase):
 
             cases = (
                 ("promote", {}, {}),
+                ("promote", {"reader_failure": True}, {}),
                 ("revise", {}, {"candidate_input": 901}),
+                ("revise", {"reader_failure": True}, {"candidate_input": 901}),
                 ("reject", {}, {"candidate_quality_regression": True}),
                 ("inconclusive", {}, {"identity_mismatch": True}),
                 ("inconclusive", {}, {"model_mismatch": True}),
@@ -1625,6 +2017,16 @@ class CodeWikiPilotTests(unittest.TestCase):
                         reasoning=200,
                         wall=1250,
                     )
+                    if baseline_changes.get("reader_failure"):
+                        baseline["reader_evaluation"].update(
+                            {
+                                "reader_status": "fail",
+                                "required_page_completeness": "fail",
+                                "unsupported_claim_risk": "material",
+                                "material_omissions": ["baseline omitted a maintainer path"],
+                                "summary": "Baseline reader evidence is complete but fails quality.",
+                            }
+                        )
                     if candidate_changes.get("candidate_quality_regression"):
                         candidate["reader_evaluation"]["reader_status"] = "fail"
                         candidate["reader_evaluation"]["evidence_fidelity"] = "fail"
@@ -1666,7 +2068,7 @@ class CodeWikiPilotTests(unittest.TestCase):
                     self.assertEqual(report["promotion_status"], expected)
                     if index == 0:
                         self.assertTrue(report["gates"]["uncached_input_reduction"]["pass"])
-                    elif index == 1:
+                    elif expected == "revise":
                         self.assertFalse(report["gates"]["uncached_input_reduction"]["pass"])
 
             boundary_cases = (
@@ -1716,6 +2118,69 @@ class CodeWikiPilotTests(unittest.TestCase):
                         "wall_time",
                     } - {failed_gate}:
                         self.assertTrue(report["gates"][gate]["pass"])
+
+    def test_two_repository_aggregation_has_exact_precedence(self) -> None:
+        def decision(status: str, reason: str) -> dict[str, object]:
+            return {
+                "schema_version": 1,
+                "promotion_status": status,
+                "reasons": [reason],
+                "inputs": {},
+                "identity": {},
+                "metrics": {},
+                "quality": {},
+                "call_shape": {},
+                "gates": {},
+            }
+
+        cases = (
+            (("promote", "promote"), "promote"),
+            (("promote", "revise"), "revise"),
+            (("revise", "inconclusive"), "inconclusive"),
+            (("inconclusive", "reject"), "reject"),
+            (("revise", "reject"), "reject"),
+        )
+        for statuses, expected in cases:
+            with self.subTest(statuses=statuses):
+                aggregate = build_aggregate(
+                    {
+                        "cli": decision(statuses[0], "cli fixture"),
+                        "react": decision(statuses[1], "react fixture"),
+                    }
+                )
+                self.assertEqual(aggregate["aggregate_status"], expected)
+                self.assertEqual(set(aggregate["repository_decisions"]), {"cli", "react"})
+                markdown = render_aggregate_markdown(aggregate)
+                self.assertIn(f"Aggregate status: `{expected}`", markdown)
+                self.assertIn("`cli`", markdown)
+                self.assertIn("`react`", markdown)
+        with self.assertRaisesRegex(RuntimeError, "exactly two"):
+            build_aggregate({})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cli_path = root / "cli-comparison.json"
+            react_path = root / "react-comparison.json"
+            cli_path.write_text(json.dumps(decision("promote", "cli passed")), encoding="utf-8")
+            react_path.write_text(json.dumps(decision("revise", "react missed one gate")), encoding="utf-8")
+            output = root / "aggregate"
+            result = self.run_cli(
+                "--json",
+                "pilot",
+                "aggregate",
+                "--comparison",
+                f"cli={cli_path}",
+                "--comparison",
+                f"react={react_path}",
+                "--out",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["aggregate_status"], "revise")
+            aggregate = json.loads((output / "aggregate.json").read_text(encoding="utf-8"))
+            self.assertEqual(aggregate["component_statuses"], {"cli": "promote", "react": "revise"})
+            self.assertIn("Aggregate status: `revise`", (output / "aggregate.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
