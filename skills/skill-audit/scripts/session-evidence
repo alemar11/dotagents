@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "0.2.0"
+VERSION = "1.0.0"
 SKILL_INJECTION_RE = re.compile(r"<skill>\s*<name>([^<]+)</name>", re.S)
 
 
@@ -46,6 +47,7 @@ class Evidence:
     session_id: str | None
     cwd: str | None
     path: str | None
+    item_id: str | None = None
     prompt: str = ""
     detail: str = ""
     transport: str = ""
@@ -224,6 +226,11 @@ def runtime_matches(text: str, target: Target) -> bool:
     return any(pattern.search(text) for pattern in target.runtime_patterns)
 
 
+def response_item_id(item: dict[str, Any], payload: dict[str, Any]) -> str | None:
+    value = payload.get("id") or item.get("id")
+    return value if isinstance(value, str) and value else None
+
+
 def scan_file(
     path: Path, targets: list[Target], since: str | None
 ) -> tuple[list[Evidence], str | None]:
@@ -265,6 +272,7 @@ def scan_file(
             if item_type == "event_msg" and payload.get("type") == "user_message":
                 prompt = payload.get("message") or ""
                 last_user_prompt = prompt
+                item_id = response_item_id(item, payload)
                 for target in targets:
                     if alias_in_user_text(prompt, target):
                         evidence.append(
@@ -275,6 +283,7 @@ def scan_file(
                                 session_id=meta.session_id,
                                 cwd=meta.cwd,
                                 path=meta.path,
+                                item_id=item_id,
                                 prompt=normalize_text(prompt),
                                 transport="user-message",
                                 thread_source=meta.thread_source,
@@ -288,6 +297,7 @@ def scan_file(
                 continue
 
             response_type = payload.get("type")
+            item_id = response_item_id(item, payload)
             if response_type == "message" and payload.get("role") == "user":
                 text = read_message_text(payload)
                 for target in targets:
@@ -300,6 +310,7 @@ def scan_file(
                                 session_id=meta.session_id,
                                 cwd=meta.cwd,
                                 path=meta.path,
+                                item_id=item_id,
                                 prompt=normalize_text(last_user_prompt),
                                 transport="skill-injection",
                                 thread_source=meta.thread_source,
@@ -333,6 +344,7 @@ def scan_file(
                             session_id=meta.session_id,
                             cwd=meta.cwd,
                             path=meta.path,
+                            item_id=item_id,
                             prompt=normalize_text(last_user_prompt),
                             detail=normalize_text(detail),
                             transport=transport,
@@ -350,6 +362,7 @@ def scan_file(
                             session_id=meta.session_id,
                             cwd=meta.cwd,
                             path=meta.path,
+                            item_id=item_id,
                             prompt=normalize_text(last_user_prompt),
                             detail=normalize_text(detail),
                             transport=transport,
@@ -363,10 +376,25 @@ def scan_file(
 
 
 def dedupe(records: list[Evidence]) -> list[Evidence]:
-    seen: set[tuple[str, str, str | None, str]] = set()
+    seen: set[tuple[str, ...]] = set()
     result: list[Evidence] = []
     for record in records:
-        key = (record.target, record.source, record.session_id, record.prompt[:180])
+        if record.item_id:
+            key = ("item", record.target, record.source, record.item_id)
+        else:
+            fallback = json.dumps(
+                {
+                    "target": record.target,
+                    "source": record.source,
+                    "session_id": record.session_id,
+                    "timestamp": record.timestamp,
+                    "prompt": record.prompt,
+                    "detail": record.detail,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            key = ("legacy", hashlib.sha256(fallback).hexdigest())
         if key in seen:
             continue
         seen.add(key)
@@ -391,7 +419,6 @@ def summarize(
 
     summary: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "version": VERSION,
         "scan": {
             "since": since,
             "roots": [str(root) for root in roots],
@@ -409,7 +436,7 @@ def summarize(
         timestamps = sorted(item.timestamp for item in items if item.timestamp)
         sessions = {item.session_id for item in items if item.session_id}
         summary["targets"][target] = {
-            "events": len(items),
+            "evidence_records": len(items),
             "sessions": len(sessions),
             "first": timestamps[0] if timestamps else None,
             "last": timestamps[-1] if timestamps else None,
@@ -428,6 +455,7 @@ def summarize(
                     "session_id": item.session_id,
                     "cwd": item.cwd,
                     "path": item.path,
+                    "item_id": item.item_id,
                     "prompt": item.prompt[:500],
                     "detail": item.detail[:500] if item.detail else "",
                     "transport": item.transport,
@@ -442,11 +470,11 @@ def summarize(
 
 
 def print_text(summary: dict[str, Any]) -> None:
-    print(f"session-evidence {summary['version']}")
+    print(f"session-evidence {VERSION}")
     for target, data in summary["targets"].items():
         print(f"\n## {target}")
         print(
-            "events={events} sessions={sessions} first={first} last={last}".format(
+            "evidence_records={evidence_records} sessions={sessions} first={first} last={last}".format(
                 **data
             )
         )
@@ -587,7 +615,7 @@ def main() -> int:
         sessions_scanned=len(session_ids),
     )
     if args.json:
-        print(json.dumps(summary, indent=2, sort_keys=True))
+        emit_json("scan", summary)
     else:
         print_text(summary)
     return 0

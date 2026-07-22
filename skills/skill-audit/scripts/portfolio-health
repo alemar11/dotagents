@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "0.2.0"
+VERSION = "1.0.0"
 LIVE_LINE_RE = re.compile(r"^\s*-\s+([^:]+(?::[^:]+)?):\s*(.*?)\s+\(file:\s*(.*?)\)\s*$")
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 SKILL_ROOT_RE = re.compile(r"^\s*-\s+`([^`]+)`\s*=\s*`([^`]+)`")
@@ -302,18 +302,31 @@ def usage_counts(records: list[SkillRecord], roots: list[Path], months: int, max
     files = iter_log_files(roots, since)
     max_bytes = max_log_mb * 1024 * 1024
     scanned_bytes = 0
+    files_scanned = 0
+    files_skipped_budget = 0
     counters: dict[str, Counter[str]] = {record.name: Counter() for record in records}
     sessions: dict[str, set[str]] = {record.name: set() for record in records}
     needles = {record.name: evidence_needles(record) for record in records}
 
     for path in files:
         try:
-            data = path.read_bytes()
+            size = path.stat().st_size
         except OSError:
             continue
-        if scanned_bytes + len(data) > max_bytes:
-            break
+        remaining = max_bytes - scanned_bytes
+        if size > remaining:
+            files_skipped_budget += 1
+            continue
+        try:
+            with path.open("rb") as handle:
+                data = handle.read(remaining + 1)
+        except OSError:
+            continue
+        if len(data) > remaining:
+            files_skipped_budget += 1
+            continue
         scanned_bytes += len(data)
+        files_scanned += 1
         text = data.decode("utf-8", errors="replace").lower()
         session_id = path.stem
         for name, checks in needles.items():
@@ -330,7 +343,10 @@ def usage_counts(records: list[SkillRecord], roots: list[Path], months: int, max
         for name, counter in counters.items()
     } | {
         "_scan": {
-            "files": len(files),
+            "status": "completed",
+            "files_considered": len(files),
+            "files_scanned": files_scanned,
+            "files_skipped_budget": files_skipped_budget,
             "bytes": scanned_bytes,
             "since": since.date().isoformat(),
             "max_log_mb": max_log_mb,
@@ -377,7 +393,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     records: list[SkillRecord]
     live_error = None
     inventory_source = "filesystem"
-    if args.no_live:
+    if args.inventory_source == "filesystem":
         records = scan_inventory(roots)
     else:
         records, live_error = live_inventory()
@@ -386,7 +402,15 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         else:
             records = scan_inventory(roots)
 
-    usage: dict[str, Any] = {"_scan": {"skipped": True}}
+    usage: dict[str, Any] = {
+        "_scan": {
+            "status": "skipped",
+            "files_considered": 0,
+            "files_scanned": 0,
+            "files_skipped_budget": 0,
+            "bytes": 0,
+        }
+    }
     if not args.no_logs:
         usage = usage_counts(records, args.log_root or default_log_roots(args.deep_logs), args.months, args.max_log_mb)
 
@@ -435,7 +459,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 "sessions": usage.get(record.name, {}).get("sessions", 0),
             }
             for record in records
-            if usage.get(record.name, {}).get("mentions", 0) == 0
+            if usage["_scan"]["status"] == "completed"
+            and usage.get(record.name, {}).get("mentions", 0) == 0
         ],
         key=lambda item: item["name"].lower(),
     )
@@ -443,7 +468,6 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "version": VERSION,
         "inventory_source": inventory_source,
         "live_error": live_error,
         "skill_count": len(records),
@@ -492,7 +516,7 @@ def doctor() -> dict[str, Any]:
 
 
 def print_text(report: dict[str, Any]) -> None:
-    print(f"portfolio-health {report['version']}")
+    print(f"portfolio-health {VERSION}")
     print(f"inventory: {report['skill_count']} skills from {report['inventory_source']}")
     if report.get("live_error"):
         print(f"live inventory fallback: {report['live_error']}")
@@ -531,7 +555,7 @@ def print_text(report: dict[str, Any]) -> None:
         print("- none")
 
     print("\n## Unused candidates")
-    if report["usage_scan"].get("skipped"):
+    if report["usage_scan"]["status"] == "skipped":
         print("- skipped (--no-logs)")
     elif report["unused_candidates"]:
         for item in report["unused_candidates"]:
@@ -556,7 +580,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--months", type=int, default=3, help="Recent log window for usage evidence.")
     parser.add_argument("--max-log-mb", type=int, default=500, help="Maximum JSONL bytes to scan.")
     parser.add_argument("--deep-logs", action="store_true", help="Include archived Codex sessions.")
-    parser.add_argument("--no-live", action="store_true", help="Skip codex debug prompt-input and use filesystem roots only.")
+    parser.add_argument(
+        "--inventory-source",
+        choices=("auto", "filesystem"),
+        default="auto",
+        help="Inventory discovery mode: auto tries Codex prompt input then falls back; filesystem skips prompt input.",
+    )
     parser.add_argument("--no-logs", action="store_true", help="Skip session/history usage evidence.")
     parser.add_argument("--context-tokens", type=int, default=272000, help="Context window used for budget estimates.")
     parser.add_argument("--budget-percent", type=float, default=2.0, help="Prompt budget percentage reserved for skill inventory.")

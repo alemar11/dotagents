@@ -17,7 +17,7 @@ scripts/portfolio-health scan --months 3
 Useful variants:
 
 ```bash
-scripts/portfolio-health scan --no-live --no-logs
+scripts/portfolio-health scan --inventory-source filesystem --no-logs
 scripts/portfolio-health scan --months 6 --deep-logs --max-log-mb 800
 scripts/portfolio-health scan --context-tokens 272000 --budget-percent 2
 scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/skills
@@ -52,6 +52,9 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
   repeated trigger branches from useful shared vocabulary.
 - `unused_candidates`: no recent heuristic evidence in scanned logs. Inspect at
   least one representative surface before claiming a skill is low-value.
+- `usage_scan.status`: `completed` when usage evidence was scanned and
+  `skipped` when `--no-logs` was selected. A skipped scan emits no unused
+  candidates.
 - `root_summary`: where the inventory came from, useful for spotting cache
   copies, symlink farms, or unexpected roots.
 
@@ -81,5 +84,5 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
 scripts/portfolio-health --help
 scripts/portfolio-health --version
 scripts/portfolio-health --json doctor
-scripts/portfolio-health scan --no-live --no-logs --root .
+scripts/portfolio-health scan --inventory-source filesystem --no-logs --root .
 ```

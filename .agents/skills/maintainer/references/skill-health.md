@@ -29,7 +29,7 @@ for structural, discovery, instruction, reference-path, and validation health.
 
    ```bash
    skills/skill-audit/scripts/portfolio-health --json scan \
-     --no-live --no-logs --root <skill-or-skill-root>
+     --inventory-source filesystem --no-logs --root <skill-or-skill-root>
    ```
 
 4. Interpret size without turning it into a correctness gate:

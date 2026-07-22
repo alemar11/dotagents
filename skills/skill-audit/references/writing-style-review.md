@@ -80,10 +80,10 @@ versioning, asset, and cache findings in `references/plugins.md`.
    - Flag no-op instructions only when they do not change likely model
      behavior in this target context.
 6. Map the recommendation to an owner.
-   - Use `skill` for contract, trigger, reference, or metadata text.
-   - Use `bundled plugin skill` when the issue is isolated inside a plugin's
+   - Use `standalone-skill` for contract, trigger, reference, or metadata text.
+   - Use `bundled-plugin-skill` when the issue is isolated inside a plugin's
      bundled skill.
-   - Use `plugin` only when package-level text or packaging drives the issue.
+   - Use `plugin-package` only when package-level text or packaging drives the issue.
    - Use `docs` when the missing context is project-specific and should not
      live in the reusable skill.
 
@@ -120,7 +120,7 @@ separate style-only report:
 - `writing-style diagnosis: <label> - <finding>`
 - `evidence: <repo file, metadata, portfolio-health output, memory, or session>`
 - `highest-value next update: <compact recommendation>`
-- `owner: skill | bundled plugin skill | plugin | docs`
+- `owner: standalone-skill | bundled-plugin-skill | plugin-package | docs`
 
 Only include this diagnosis when it changes prioritization or makes the
 recommended fix clearer.

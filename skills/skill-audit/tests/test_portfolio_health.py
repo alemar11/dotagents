@@ -48,6 +48,11 @@ def write_skill(root: Path, name: str, body: str) -> Path:
 
 
 class PortfolioHealthTests(unittest.TestCase):
+    def test_inventory_source_defaults_to_auto(self) -> None:
+        args = PORTFOLIO_HEALTH.build_parser().parse_args([])
+
+        self.assertEqual(args.inventory_source, "auto")
+
     def test_entrypoint_size_band_boundaries(self) -> None:
         classify = PORTFOLIO_HEALTH.entrypoint_size_band
 
@@ -71,7 +76,8 @@ class PortfolioHealthTests(unittest.TestCase):
             result = run_script(
                 "--json",
                 "scan",
-                "--no-live",
+                "--inventory-source",
+                "filesystem",
                 "--no-logs",
                 "--root",
                 str(root),
@@ -82,8 +88,15 @@ class PortfolioHealthTests(unittest.TestCase):
         data = payload["data"]
         skills = {item["name"]: item for item in data["skills"]}
 
+        self.assertEqual(set(payload), {"ok", "version", "command", "data"})
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["command"], ["scan"])
+        self.assertNotIn("version", data)
         self.assertEqual(data["entrypoint_policy"]["estimator"], "ceil(utf8_bytes/4)")
         self.assertFalse(data["entrypoint_policy"]["size_alone_fails_health"])
+        self.assertEqual(data["usage_scan"]["status"], "skipped")
+        self.assertEqual(data["unused_candidates"], [])
         self.assertEqual(skills["normal-skill"]["entrypoint_size_band"], "normal")
         self.assertEqual(skills["review-skill"]["entrypoint_size_band"], "review")
         self.assertEqual(skills["high-density-skill"]["entrypoint_size_band"], "high-density")
@@ -93,7 +106,6 @@ class PortfolioHealthTests(unittest.TestCase):
 
         for field in (
             "generated_at",
-            "version",
             "inventory_source",
             "live_error",
             "skill_count",
@@ -140,7 +152,8 @@ class PortfolioHealthTests(unittest.TestCase):
             write_skill(root, "review-skill", "x" * 10_100)
             result = run_script(
                 "scan",
-                "--no-live",
+                "--inventory-source",
+                "filesystem",
                 "--no-logs",
                 "--root",
                 str(root),
@@ -153,14 +166,52 @@ class PortfolioHealthTests(unittest.TestCase):
     def test_version_and_doctor(self) -> None:
         version = run_script("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "portfolio-health 0.2.0")
+        self.assertEqual(version.stdout.strip(), "portfolio-health 1.0.0")
 
         doctor = run_script("--json", "doctor")
         self.assertEqual(doctor.returncode, 0, doctor.stderr)
         payload = json.loads(doctor.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "0.2.0")
+        self.assertEqual(payload["version"], "1.0.0")
         self.assertFalse(payload["data"]["network_required"])
+
+    def test_retired_no_live_flag_is_rejected(self) -> None:
+        result = run_script("scan", "--no-live", "--no-logs")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unrecognized arguments: --no-live", result.stderr)
+
+    def test_usage_budget_skips_large_file_and_continues(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "skills"
+            logs = Path(temp) / "logs"
+            logs.mkdir()
+            write_skill(root, "fixture-skill", "Fixture body")
+            (logs / "a-large.jsonl").write_bytes(b"x" * (1024 * 1024 + 1))
+            (logs / "b-small.jsonl").write_text(
+                '{"message":"Use $fixture-skill"}\n', encoding="utf-8"
+            )
+
+            result = run_script(
+                "--json",
+                "scan",
+                "--inventory-source",
+                "filesystem",
+                "--root",
+                str(root),
+                "--log-root",
+                str(logs),
+                "--max-log-mb",
+                "1",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)["data"]
+        self.assertEqual(data["usage_scan"]["status"], "completed")
+        self.assertEqual(data["usage_scan"]["files_considered"], 2)
+        self.assertEqual(data["usage_scan"]["files_scanned"], 1)
+        self.assertEqual(data["usage_scan"]["files_skipped_budget"], 1)
+        self.assertEqual(data["skills"][0]["usage"]["sessions"], 1)
 
 
 if __name__ == "__main__":

@@ -40,30 +40,17 @@ skill roots.
 - whether `references/writing-style-review.md` is needed to diagnose trigger
   clarity, prompt load, information hierarchy, or pruning issues
 
-## Evidence Workflow
+## Historical Evidence Hints
 
-1. Search the memory index first.
-   - Search `MEMORY.md` with `rg` using repo name, repo basename, current
-     `cwd`, skill names, and important files.
-2. Open targeted rollout summaries.
-   - Prefer summaries whose filenames, `cwd`, or `rollout_path` match the
-     project or skill name.
-3. Check cheap maintenance signals before raw sessions.
-   - Use `git log -- <skill-dir>` for local skills.
-   - If the skill lives outside the current repo, use `git -C <skills-root> log
-     -- <relative-skill-dir>` when the owning repo is available.
-4. Use raw sessions when behavior is in question, and as a fallback otherwise.
-   - For repeated checks, run `scripts/session-evidence` from the
-     `skill-audit` owner root with explicit `--target`, optional
-     `--target-path`, and target-bound `--runtime-pattern TARGET=REGEX`
-     arguments before falling back to ad hoc parsing.
-   - Search by skill name, `SKILL.md` path, `agents/openai.yaml` path, prompt
-     text such as `Use $skill-name`, exact `cwd`, repo basename, thread ID from
-     a rollout summary, or specific failure text.
+Use `references/historical-evidence.md` without changing its order. Useful
+target-specific keys include skill name, `SKILL.md` and `agents/openai.yaml`
+paths, exact `cwd`, repository basename, and specific failure text. Use
+`git -C <skills-root> log -- <relative-skill-dir>` when the owning repository
+is outside the current checkout.
 
 ## Ownership Guidance
 
-- Put findings on `skill` when the problem is in the skill contract,
+- Put findings on `standalone-skill` when the problem is in the skill contract,
   references, scripts, or metadata.
 - Put findings on `docs` when the missing context is project-specific but does
   not justify a skill change.

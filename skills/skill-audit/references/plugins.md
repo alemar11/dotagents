@@ -43,41 +43,24 @@ itself, not just its bundled skills.
 - whether gaps belong in the plugin package, a bundled skill, repo docs, or an
   owner-specific maintenance workflow
 
-## Evidence Workflow
+## Historical Evidence Hints
 
-1. Search the memory index first.
-   - Search `MEMORY.md` with repo name, repo basename, current `cwd`, plugin
-     names, manifests, runtime scripts, and package files.
-2. Open targeted rollout summaries.
-   - Prefer summaries whose filenames, `cwd`, or `rollout_path` match the
-     current project or plugin names.
-3. Check cheap maintenance signals before raw sessions.
-   - Use `git log -- <plugin-dir>` and compare repo docs against the package.
-4. Use raw sessions when package behavior is in question, and as a fallback
-   otherwise.
-   - For repeated checks, run `scripts/session-evidence` from the
-     `skill-audit` owner root with explicit plugin or bundled-skill targets,
-     cached `SKILL.md` paths as `--target-path` values, and only meaningful
-     target-bound runtime patterns.
-   - Search by plugin name, `.codex-plugin/plugin.json`, marketplace path,
-     exact `cwd`, thread ID, or specific failure text.
+Use `references/historical-evidence.md` without changing its order. Useful
+target-specific keys include plugin name, manifest and marketplace paths,
+runtime scripts, exact `cwd`, repository basename, and specific failure text.
+Use `git log -- <plugin-dir>` for cheap package history.
 
-## Cache Rules
+## Cache Branch
 
-- Treat `~/.codex/plugins/cache/...` as verification only.
-- Use cache inspection to answer questions such as:
-  - version drift
-  - stale installed packaging
-  - missing runtime artifacts
-  - asset or manifest shipping gaps
-- Never route fixes or edits to the cache path.
+When cache evidence is relevant, load `references/cache-resolution.md`. That
+reference owns cache-to-editable-source resolution and the no-mutation rule.
 
 ## Ownership Guidance
 
-- Put findings on `plugin` when the issue is in the package manifest,
+- Put findings on `plugin-package` when the issue is in the package manifest,
   marketplace registration, bundled-skill boundaries, runtime package layout,
   assets, or version/cache behavior.
-- Put findings on `bundled plugin skill` when the issue is isolated to one
+- Put findings on `bundled-plugin-skill` when the issue is isolated to one
   bundled skill contract.
 - Put findings on `docs` when the package is fine but the repo guidance is the
   real source of drift.

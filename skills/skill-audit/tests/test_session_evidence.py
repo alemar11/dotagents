@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -50,6 +51,7 @@ class SessionEvidenceTests(unittest.TestCase):
                     "type": "response_item",
                     "payload": {
                         "type": "custom_tool_call",
+                        "id": "call-1",
                         "name": "exec",
                         "input": (
                             "const a = await tools.exec_command({cmd:\"sed -n '1,80p' "
@@ -87,6 +89,7 @@ class SessionEvidenceTests(unittest.TestCase):
             {"opened-skill-doc", "runtime-command"},
         )
         for record in records:
+            self.assertEqual(record.item_id, "call-1")
             self.assertEqual(record.transport, "code-mode-custom-tool")
             self.assertEqual(record.thread_source, "subagent")
             self.assertEqual(record.forked_from_id, "root-1")
@@ -183,10 +186,122 @@ class SessionEvidenceTests(unittest.TestCase):
         )
 
         data = summary["targets"]["autoreview"]
+        self.assertEqual(data["evidence_records"], 1)
+        self.assertNotIn("events", data)
         self.assertEqual(data["transports"], {"code-mode-custom-tool": 1})
         self.assertEqual(data["thread_sources"], {"subagent": 1})
         self.assertEqual(data["examples"][0]["forked_from_id"], "root-1")
         self.assertEqual(data["examples"][0]["parent_thread_id"], "root-1")
+
+    def test_copied_item_identity_is_deduplicated_across_sessions(self) -> None:
+        records = [
+            cli.Evidence(
+                target="autoreview",
+                source="runtime-command",
+                timestamp="2026-07-11T10:00:00Z",
+                session_id=session_id,
+                cwd="/repo",
+                path=f"{session_id}.jsonl",
+                item_id="call-shared",
+                detail=detail,
+            )
+            for session_id, detail in (
+                ("root-1", "scripts/autoreview --mode local"),
+                ("worker-copy", "copied detail should not create another record"),
+            )
+        ]
+
+        deduped = cli.dedupe(records)
+
+        self.assertEqual(len(deduped), 1)
+        self.assertEqual(deduped[0].session_id, "root-1")
+
+    def test_legacy_calls_with_distinct_details_are_retained(self) -> None:
+        records = [
+            cli.Evidence(
+                target="autoreview",
+                source="runtime-command",
+                timestamp="2026-07-11T10:00:00Z",
+                session_id="root-1",
+                cwd="/repo",
+                path="root-1.jsonl",
+                prompt="Review this branch",
+                detail=detail,
+            )
+            for detail in (
+                "scripts/autoreview --mode local",
+                "scripts/autoreview --mode branch",
+            )
+        ]
+
+        self.assertEqual(len(cli.dedupe(records)), 2)
+
+    def test_scan_json_uses_v1_envelope_and_evidence_records(self) -> None:
+        path = self.write_session(
+            [
+                {
+                    "type": "session_meta",
+                    "payload": {"id": "root-1", "cwd": "/repo"},
+                },
+                {
+                    "timestamp": "2026-07-11T10:00:00Z",
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "user_message",
+                        "id": "user-1",
+                        "message": "Use $skill-audit",
+                    },
+                },
+            ]
+        )
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        result = subprocess.run(
+            [
+                str(SCRIPT_PATH),
+                "--json",
+                "scan",
+                "--target",
+                "skill-audit",
+                "--root",
+                str(path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["command"], ["scan"])
+        self.assertTrue(payload["ok"])
+        target = payload["data"]["targets"]["skill-audit"]
+        self.assertEqual(target["evidence_records"], 1)
+        self.assertNotIn("events", target)
+        self.assertEqual(target["examples"][0]["item_id"], "user-1")
+
+    def test_version_and_doctor_use_v1_contract(self) -> None:
+        version = subprocess.run(
+            [str(SCRIPT_PATH), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(version.returncode, 0, version.stderr)
+        self.assertEqual(version.stdout.strip(), "session-evidence 1.0.0")
+
+        doctor = subprocess.run(
+            [str(SCRIPT_PATH), "--json", "doctor"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(doctor.returncode, 0, doctor.stderr)
+        payload = json.loads(doctor.stdout)
+        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["command"], ["doctor"])
+        self.assertTrue(payload["ok"])
 
 
 if __name__ == "__main__":

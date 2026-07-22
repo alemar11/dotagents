@@ -40,28 +40,18 @@ Do not assume the problem belongs to the bundled skill alone.
 - whether `references/writing-style-review.md` is needed for bundled-skill
   trigger clarity, prompt load, information hierarchy, or pruning issues
 
-## Evidence Workflow
+## Historical Evidence Hints
 
-1. Search the memory index first.
-   - Use repo name, plugin name, bundled skill name, and important paths.
-2. Open targeted rollout summaries.
-   - Prefer summaries matching the plugin name, bundled skill name, or owning
-     project.
-3. Check cheap maintenance signals.
-   - Use `git log -- <bundled-skill-dir>` and `git log -- <plugin-dir>` when
-     both are available.
-4. Use raw sessions when behavior is in question, and as a fallback otherwise.
-   - For repeated checks, run `scripts/session-evidence` from the
-     `skill-audit` owner root with both the bundled skill target and the
-     installed or cached `SKILL.md` path when available.
-   - Search by bundled skill name, skill path, plugin name, `.codex-plugin`,
-     exact `cwd`, thread ID, or failure text.
+Use `references/historical-evidence.md` without changing its order. Useful
+target-specific keys include bundled skill name and path, owning plugin name and
+manifest, exact `cwd`, and specific failure text. Use both
+`git log -- <bundled-skill-dir>` and `git log -- <plugin-dir>` when available.
 
 ## Ownership Guidance
 
-- Put findings on `bundled plugin skill` when the issue is in that skill's
+- Put findings on `bundled-plugin-skill` when the issue is in that skill's
   triggers, guardrails, references, or bundled-skill metadata.
-- Put findings on `plugin` when the issue is package-level:
+- Put findings on `plugin-package` when the issue is package-level:
   - `.codex-plugin/plugin.json`
   - marketplace registration
   - bundled-skill exposure

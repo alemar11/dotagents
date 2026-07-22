@@ -1,6 +1,6 @@
 ---
 name: skill-audit
-description: Audit installed Codex skills, plugins, and bundled plugin skills for usage, overlap, prompt budget, and improvement roadmap.
+description: Audit installed Codex skills, plugins, and bundled plugin skills from historical evidence or by monitoring their behavior in active Codex App tasks.
 ---
 
 # Skill Audit
@@ -11,6 +11,11 @@ Audit installed standalone skills, plugin packages, and bundled plugin skills
 before proposing new surfaces. Prefer improving, merging, or disabling an
 existing owner when the evidence supports it.
 
+Use live monitoring when the user asks to observe active tasks, evaluate a
+skill or plugin while it runs, or annotate defects from current behavior. Live
+monitoring reads App task state directly and does not substitute session
+archives for unavailable current evidence.
+
 This skill is Codex-dependent. Repo files and installed manifests are the
 editable source of truth; Codex memory, rollout summaries, session JSONL, and
 cache copies are evidence only.
@@ -19,6 +24,9 @@ cache copies are evidence only.
 
 - Audits are read-only. Record findings; edit, commit, or publish only after the
   user explicitly switches the named target to implementation mode.
+- Live audits never message, steer, pause, archive, or otherwise mutate a
+  monitored task. Keep annotations in the audit task unless the user separately
+  authorizes another destination and workflow.
 - Never edit session archives or `~/.codex/plugins/cache/...`.
 - Named targets are the primary and normally exclusive scope. Include another
   target only to explain a concrete overlap or ownership conflict.
@@ -26,83 +34,45 @@ cache copies are evidence only.
   full-portfolio audit, exclude it and offer a separate follow-up.
 - Keep findings decision-oriented and evidence-backed.
 
-## Target Resolution
+## Canonical Audit DAG
 
-1. Resolve each named target before broader discovery.
-2. Classify it as `standalone skill`, `plugin package`, or `bundled plugin
-   skill`.
-3. If a target cannot be resolved, report the miss; do not substitute a near
-   match.
-4. For an unnamed portfolio audit, start from the current workflow and relevant
-   installed surfaces, then widen only when the question requires it.
+Follow this directed acyclic workflow. References add branch-specific rules;
+they do not replace or reorder these nodes.
 
-## Reference Routing
+1. Classify the request as `historical` or `live`.
+2. Discover candidate targets:
+   - historical named audit: use the named targets;
+   - historical portfolio audit: discover relevant installed surfaces;
+   - live audit: discover the selected active tasks, then attribute actual
+     repository-owned skill or plugin use from task evidence.
+3. Resolve each candidate to its editable owner. If resolution fails, report
+   the miss; do not substitute a near match. For cached or unclear plugin
+   paths, load `references/cache-resolution.md`.
+4. Classify each resolved target and load exactly one target overlay:
+   - `standalone-skill`: `references/standalone-skills.md`;
+   - `plugin-package`: `references/plugins.md`;
+   - `bundled-plugin-skill`: `references/bundled-plugin-skills.md` plus the owning
+     manifest.
+5. Collect behavior evidence through exactly one route:
+   - historical: `references/historical-evidence.md`;
+   - live: `references/live-monitoring.md`.
+6. Load optional lenses only when their predicates match:
+   - merge, disable, duplicate, usage, or prompt-budget decision:
+     `references/portfolio-hygiene.md`;
+   - trigger clarity or instruction-density review:
+     `references/writing-style-review.md`.
+7. Classify each finding by evidence strength and owning fix surface.
+8. Return the historical or live branch from `references/output-format.md`.
 
-Open only the branch needed for the current question:
-
-| Question | Reference |
-| --- | --- |
-| Standalone skill | `references/standalone-skills.md` |
-| Plugin package | `references/plugins.md` |
-| Bundled plugin skill | `references/bundled-plugin-skills.md` plus the owning manifest |
-| Cached or unclear editable owner | `references/cache-resolution.md` |
-| Merge, disable, duplicate, usage, or prompt-budget decision | `references/portfolio-hygiene.md` |
-| Trigger clarity or instruction-density review | `references/writing-style-review.md` |
-
-## Evidence Workflow
-
-1. Read the target's current discovery metadata, entrypoint, directly relevant
-   references, owning manifest, and adjacent repo docs.
-2. Check cheap history and consistency evidence such as `git log` before deep
-   session scans.
-3. Search the memory index first, then open only the one to three most relevant
-   rollout summaries.
-4. When claiming runtime behavior, false triggers, missed triggers, correctness,
-   or low value, inspect a representative raw session when practical. If none is
-   available, state that limitation.
-5. Use the helpers below instead of ad hoc parsers for repeated session or
-   portfolio checks. Treat their output as evidence, not automatic cleanup
-   authority.
-
-### Session evidence
-
-Run from the resolved skill root:
-
-```bash
-scripts/session-evidence \
-  --target my-skill \
-  --target-path /path/to/my-skill/SKILL.md \
-  --runtime-pattern 'my-skill=my-tool|my-command' \
-  --root "$CODEX_HOME/sessions" \
-  --since 2026-04-01 \
-  --include-zero
-```
-
-It reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
-`runtime-command` buckets from direct function calls and code-mode custom tool
-calls. Examples also record transport, `thread_source`, `parent_thread_id`, and
-the raw `forked_from_id` when present so worker-thread evidence can be
-attributed across supported session metadata shapes without counting tool
-outputs or tool discovery as usage. Read a representative trace before making
-a high-risk behavior claim.
-
-### Portfolio health
-
-```bash
-scripts/portfolio-health --help
-scripts/portfolio-health --version
-scripts/portfolio-health --json doctor
-scripts/portfolio-health scan --months 3
-```
-
-Use `references/portfolio-hygiene.md` to interpret its inventory, entrypoint,
-duplicate, prompt-budget, root, and heuristic usage signals. No recent usage
-alone is enough to delete, disable, or rewrite a surface.
+Named targets remain the primary and normally exclusive scope. An unnamed
+portfolio audit widens only as the question requires. A full-portfolio audit
+excludes `skill-audit` unless the user explicitly opts into self-audit.
 
 ## Output Expectations
 
 Return a compact audit using the format in
-`references/output-format.md`.
+`references/output-format.md`. Live runs use its live-monitor format and retain
+stable defect IDs for the duration of the monitor.
 
 ## CLI Maintenance
 
@@ -113,6 +83,10 @@ Return a compact audit using the format in
 - Keep each helper's `--version` output as its semver source of truth.
 - Re-verify touched helpers with `--help`, `--version`, and `--json doctor`
   before relying on them in an audit.
+- Both helpers use the JSON envelope `{ok, version, command, data}`. Their v1
+  contracts have no retired option or field aliases.
+- Bump major for breaking flags or fields, minor for backward-compatible
+  capabilities, and patch for backward-compatible fixes.
 
 ## Follow-up
 
