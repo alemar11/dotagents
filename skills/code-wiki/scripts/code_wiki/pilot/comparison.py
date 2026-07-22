@@ -1078,8 +1078,10 @@ def render_markdown(decision: dict[str, Any]) -> str:
 
 
 def build_aggregate(decisions: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    if len(decisions) != 2:
-        raise RuntimeError("pilot aggregation requires exactly two repository decisions")
+    if set(decisions) != {"cli", "react"}:
+        raise RuntimeError(
+            "pilot aggregation requires exactly two repository decisions named cli and react"
+        )
     statuses: dict[str, str] = {}
     for repository, decision in sorted(decisions.items()):
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", repository):

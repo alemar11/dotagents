@@ -2156,6 +2156,13 @@ class CodeWikiPilotTests(unittest.TestCase):
                 self.assertIn("`react`", markdown)
         with self.assertRaisesRegex(RuntimeError, "exactly two"):
             build_aggregate({})
+        with self.assertRaisesRegex(RuntimeError, "cli and react"):
+            build_aggregate(
+                {
+                    "alpha": decision("promote", "alpha passed"),
+                    "beta": decision("promote", "beta passed"),
+                }
+            )
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
