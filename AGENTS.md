@@ -1,11 +1,12 @@
 # Repository Guidelines
 
 ## Overview
+
 This repository hosts reusable Codex skills, project maintainer skills, optional repo-local plugins, and MCP install helpers. Reusable skills live under `skills/`, optional repo-local plugins live under `plugins/`, project maintainer skills live under `.agents/skills/`, and global MCP install helpers live under `mcps/`. Every reusable or bundled skill is documented by a `SKILL.md` entrypoint, and every plugin must ship `.codex-plugin/plugin.json`. Keep guidance lightweight and focused on building and evolving skills and plugins.
 Agent skills follow the specification at `https://agentskills.io/specification`.
 Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
-## Agent skills
+## Repository Context
 
 ### Issue tracker
 
@@ -22,7 +23,8 @@ This repository is a monorepo of independently planned skills and plugins. See
 Canonical planning vocabulary and GitHub label mappings live in
 `project-memory/config/triage-labels.md`.
 
-## How to Create a Skill
+## Creating Skills
+
 - Prefer `$skill-creator` as the canonical scaffold and workflow reference for new skills or substantial skill reshapes; follow its initialization, metadata, validation, and forward-testing guidance before repo-specific cleanup.
 - When a new or reshaped skill needs an embedded CLI under `scripts/` or a maintenance project under `projects/<tool>/`, route that CLI design and layout work through `$skill-cli-creator`.
 - Create a dedicated directory per skill with a clear, stable name.
@@ -32,7 +34,8 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Use the specification at `https://agentskills.io/specification` and `https://developers.openai.com/codex/skills/` when creating new skills.
 - Keep `README.md` updated with current reusable and project skill lists, with a one-line description for each.
 
-## How to Create a Plugin
+## Creating Plugins
+
 - Prefer `$plugin-creator` as the canonical scaffold and marketplace-entry workflow reference for new plugins or substantial plugin reshapes; follow it for normalized naming, manifest shape, optional folders, and marketplace generation before repo-specific cleanup.
 - When a new or reshaped plugin needs an embedded CLI under `scripts/`, `skills/<skill>/scripts/`, or a maintenance project under `projects/<tool>/`, route that CLI design and layout work through `$skill-cli-creator`.
 - Use the specification at `https://developers.openai.com/codex/plugins` when creating new plugins.
@@ -43,19 +46,27 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep shared plugin runtime artifacts under `plugins/<name>/scripts/` and any maintenance-only implementation under `plugins/<name>/projects/<tool>/`.
 - Keep `README.md` updated with the current plugin list and one-line descriptions, including bundled-skill summaries when that improves discoverability.
 
-## Git Commits
-- If changes affect multiple skills or plugins, split them into separate, meaningful commits.
+## Repository-Wide Rules
 
-## Rules
+### Documentation and Metadata
+
 - Keep README.md skill descriptions, list, and install prompts in sync with `agents/openai.yaml` and any skill adds/removes/renames.
 - Keep README.md plugin descriptions and list in sync with `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, and any plugin adds/removes/renames.
 - Keep a `Skill Dependencies` section in `README.md` only when one or more skills explicitly require loading other skills at runtime; list each such skill and the required companion skills, update the section when those requirements change, and remove or omit the section entirely when no such requirements exist.
 - Keep `AGENTS.md` focused on repository structure, ownership boundaries, implementation notes, maintenance routing, portability notes, and durable learnings; keep invocation behavior, trigger rules, workflows, outputs, and other user-facing runtime contracts in the relevant `SKILL.md` and reference docs.
 - Keep `AGENTS.md` lean: record only repo-specific rules or durable learnings that are hard to infer from the tree, and prefer linking or routing to `SKILL.md`, reference docs, or local package manifests instead of duplicating detailed doctrine, migration history, or exhaustive anti-regression lists.
 - When new durable rules are discovered while creating or updating skills, add them to this AGENTS.md under the appropriate skill section.
-- Use this section only as a fallback when no more appropriate section exists in AGENTS.md.
-- Keep behavior-affecting option contracts canonical across this repository: use `snake_case` field names and lower-kebab assigned values. Natural-language phrases may explain an option but must not be its value; resolve prose directly to canonical values and emit and persist only canonical values. Outside `skills/postgres/`, runtime skills must reject noncanonical fields and values instead of accepting aliases, mapping retired syntax, or providing compatibility migrations. Keep an option value separate from associated prose, data, or references. Factual booleans and externally owned syntax are exempt. (Codex learning)
+- Use a repository-wide section only when a rule applies across packages; otherwise place it in the dedicated section for the owning skill or plugin.
+- In `references/` folders, keep `.md` filenames lowercase except for `README.md` and `AGENTS.md`.
+- If `brand_color` isn’t provided, pick a random hex color not already used by other skills in this repo and set it in `agents/openai.yaml`.
+
+### Runtime Contract Design
+
+- Keep behavior-affecting option contracts canonical across this repository: use `snake_case` field names and lower-kebab assigned values. Natural-language phrases may explain an option but must not be its value; resolve prose directly to canonical values and emit and persist only canonical values. Runtime skills must reject noncanonical fields and values instead of accepting aliases, mapping retired syntax, or providing compatibility migrations unless their dedicated section defines an exception. Keep an option value separate from associated prose, data, or references. Factual booleans and externally owned syntax are exempt. (Codex learning)
 - Build skill content through progressive disclosure: keep selection-critical metadata plus core routing and load-bearing workflow-order, safety/mutation, and output contracts in `SKILL.md`; give each behavior-affecting contract or field registry one canonical owner; move branch-specific detail behind directly linked references with explicit read conditions whose predicates are decidable from already-loaded content or the target artifact; and cross-reference instead of repeating canonical field lists or detailed prose. (Codex learning)
+
+### Testing and Validation
+
 - Measure compaction against always-loaded metadata and representative invoked paths (`SKILL.md` plus every reference required by that path), not total repository lines or text moved between files on the same path. Preserve trigger, workflow-order, safety, mutation, and output semantics with focused contract tests, and forward-test representative paths when static checks cannot prove equivalence. (Codex learning)
 - Keep skill and plugin tests meaningful: validate executable behavior or
   structural invariants by parsing representative artifacts, fixtures, state,
@@ -69,18 +80,31 @@ Canonical planning vocabulary and GitHub label mappings live in
   workflows, pair deterministic artifact validators with representative
   forward runs, and never claim runtime behavior from documentation-presence
   checks alone. (Codex learning)
-- In `references/` folders, keep `.md` filenames lowercase except for `README.md` and `AGENTS.md`.
-- If `brand_color` isn’t provided, pick a random hex color not already used by other skills in this repo and set it in `agents/openai.yaml`.
-- Plugin manifests must keep asset and bundled-skill paths repo-relative and valid from the plugin root; update them together with any plugin layout move. (Codex learning)
-- Bundled plugin skills must follow the same runtime/maintenance split as reusable skills under `skills/`: runtime guidance stays in their `SKILL.md`, while repo-maintenance routing stays in repo-level maintainer docs. (Codex learning)
+
+### Runtime and Maintenance Boundaries
+
 - Runtime skills must stay unaware of `.agents/skills/maintainer`: do not reference it, its runbooks, or maintainer-routing instructions from runtime `SKILL.md` files or runtime usage references. Keep that routing only in repo-level maintainer docs such as this `AGENTS.md`.
 - Runtime skills may surface runtime learnings or durable guidance candidates, but they must not perform self-upgrade, metadata-sync, reference-refresh, or other repo-maintenance workflows from their own runtime instructions.
 - Keep skill-maintenance and repo-maintenance workflows owned by `.agents/skills/maintainer` in repo-level maintainer docs, but invoke `$maintainer` only when the user selects it explicitly; ordinary change requests follow this `AGENTS.md` and the targeted package directly.
-- Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
-- Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
+
+### Cache Ownership
+
 - Scope per-user cache files under `~/.cache/dotagents/` by owner: reusable skills use `~/.cache/dotagents/skills/<skill-name>/...`, plugin-shared caches use `~/.cache/dotagents/plugins/<plugin-name>/...`, and plugin-bundled skill caches use `~/.cache/dotagents/plugins/<plugin-name>/skills/<skill-name>/...`. (Codex learning)
 
+### Repository Tooling
+
+- Keep `skills-link.sh` as the canonical local install helper for this repo's reusable skills: it links `skills/` into `~/.agents/skills` only and must not install, mirror, or rewrite plugin marketplace entries. (Codex learning)
+
+### Git Commits
+
+- If changes affect multiple skills or plugins, split them into separate, meaningful commits.
+
+## Package-Specific Rules
+
 ### Codex Dependency Classification
+
+- Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
+- Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
 - Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer`, `implement-feature`, and `skill-audit`.
 - Treat `skill-audit` as Codex-dependent because its live branch requires Codex App task discovery, authoritative task reads, and bounded task waits; historical audits also use Codex memory and session evidence.
@@ -105,14 +129,16 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.
 
 ### Repo-local Plugins
+
 - Keep repo-local plugin registration centralized in `.agents/plugins/marketplace.json`; do not add a plugin without wiring it there in the same rollout.
 - Treat `.codex-plugin/plugin.json` as the plugin-local source of truth for plugin name, version, assets, and bundled-skill exposure.
+- Plugin manifests must keep asset and bundled-skill paths repo-relative and valid from the plugin root; update them together with any plugin layout move. (Codex learning)
+- Bundled plugin skills must follow the same runtime/maintenance split as reusable skills under `skills/`: runtime guidance stays in their `SKILL.md`, while repo-maintenance routing stays in repo-level maintainer docs. (Codex learning)
 - Keep plugin-bundled skills discoverable under `plugins/<plugin>/skills/` and keep any plugin-owned shared runtime surfaces under `plugins/<plugin>/scripts/`.
-- Keep GitStack runtime self-contained: it must not locate, import, or execute another skill for authorization or state. Composing workflows may validate their own lifecycle state before invoking GitStack, while GitStack owns its exact operation start journal, provider transport, one-use markers, and reconciliation evidence. (Codex learning)
 - When a plugin grows a maintenance-only implementation tree, keep it under `plugins/<plugin>/projects/<tool>/` and document rebuild/runtime rules there with a local `AGENTS.md`.
-- Keep `skills-link.sh` as the canonical local install helper for this repo's reusable skills: it links `skills/` into `~/.agents/skills` only and must not install, mirror, or rewrite plugin marketplace entries. (Codex learning)
 
 ### Plugin Lifecycle and Versioning
+
 - Treat `.agents/plugins/marketplace.json` as the repo discovery surface for local plugins: Codex can discover a plugin from the workspace marketplace file and resolve each plugin `source.path` relative to the repo root.
 - Treat `~/.codex/plugins/cache/<developer>/<plugin>/<version>/` as the installed plugin cache: once a local plugin is installed, Codex may copy the plugin there and refresh that cached copy from the workspace source when the plugin changes. (Codex learning)
 - Keep plugin install and update assumptions cache-aware: if a plugin manifest, bundled skill, runtime script, asset, or other shipped plugin file changes, assume Codex may compare or load the cached copy rather than reading only from the workspace path. (Codex learning)
@@ -122,24 +148,30 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Use a minor version bump for backward-compatible feature additions or meaningful capability expansion under `plugins/<plugin>/`, such as adding a bundled skill, adding a new runtime command or workflow, or expanding the plugin's install surface without breaking existing behavior.
 - Use a patch version bump for backward-compatible fixes and maintenance updates under `plugins/<plugin>/`, including bug fixes, packaging fixes, icon or metadata corrections, prompt or docs adjustments, rebuilds that preserve behavior, and other hotfix-style changes.
 
-### Postgres skill
-- Keep Postgres runtime and operator guidance in `skills/postgres/SKILL.md` and `skills/postgres/references/*`, not in this repo-level file.
+### Postgres Skill
 
-### OKF skill
+- Keep Postgres runtime and operator guidance in `skills/postgres/SKILL.md` and `skills/postgres/references/*`, not in this repo-level file.
+- Postgres is exempt from the repository-wide hard-cut requirement for behavior-affecting option fields and values; its own runtime contract governs compatibility behavior.
+
+### OKF Skill
+
 - Keep OKF runtime guidance in `skills/okf/SKILL.md`, `skills/okf/references/*`, and the shipped `skills/okf/scripts/okf` CLI.
 - Keep official OKF spec refresh mechanics in `.agents/skills/maintainer`, using `.agents/skills/maintainer/references/okf-spec-runbook.md` as the canonical procedure.
 - Runtime OKF docs must not reference `.agents/skills/maintainer`, maintainer scripts, or maintainer-only routing.
 
-### Swift-DocC skill
+### Swift-DocC Skill
+
 - Keep Swift-DocC bundled-asset refresh and reference integrity checks in `.agents/skills/maintainer`, and use `.agents/skills/maintainer/references/swift-docc-runbook.md` as the canonical procedure.
 - Keep runtime Swift-DocC docs and fast-path reference design in `skills/swift-docc/`; keep maintainer-only refresh routing here. (Codex learning)
 
-### Swift API Design skill
+### Swift API Design Skill
+
 - Keep Swift API Design bundled-asset refresh and reference integrity checks in `.agents/skills/maintainer`, and use `.agents/skills/maintainer/references/swift-api-design-runbook.md` as the canonical procedure.
 - Keep runtime Swift API Design docs and bundled-source usage details in `skills/swift-api-design/`; keep maintainer-only refresh routing here.
 - Refresh `swift-api-design` from `swiftlang/swift-org-website/documentation/api-design-guidelines/index.md` until the live Swift.org page demonstrably migrates to a different substantive source. (Codex learning)
 
-### Plan Harder skill
+### Plan Harder Skill
+
 - Keep `plan-harder` as the single reusable home for higher-rigor planning support in this repo; do not reintroduce a separate lightweight clarification skill unless that package boundary is intentionally restored. (Codex learning)
 - Keep `plan-harder` runtime workflow, clarification behavior, and output details in `skills/plan-harder/SKILL.md` and its references, not in this `AGENTS.md`.
 - Keep `plan-harder` output-only: its standalone surface returns chat output and
@@ -147,13 +179,15 @@ Canonical planning vocabulary and GitHub label mappings live in
   invoking workflow. It must not create `plans/`, write Markdown plan files, or
   edit repo files as part of its own runtime workflow.
 
-### Grill and Project Memory composition
+### Grill and Project Memory Composition
+
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-me-with-context`.
 - Keep `grill-me-with-context` as the thin composition layer over `grill-me` and `$project-memory domain-memory`, not a duplicate questioning or domain-capture loop.
 - Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-me-with-context` before implementation rather than duplicating the documentation loop.
 - Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/config/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Use root `CONTEXT.md` as the single context entry point and route optional scoped `CONTEXT.md` files from its `Scoped Contexts` table.
 
-### Project Memory skill
+### Project Memory Skill
+
 - Keep `project-memory` as the normal public lifecycle surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/config/issue-tracker.md`, `project-memory/config/project-layout.md`, `project-memory/config/triage-labels.md`, root and optional scoped `CONTEXT.md`, optional `TRANSLATION.md`, and ADR routing or content in code repos, monorepos, and orchestrator workspaces.
 - Use exactly one `project-memory/` directory per memory-owning root: one at a Git repository root or one at a non-Git coordination-workspace root. Internal monorepo scopes use scoped `CONTEXT.md` files and optional subdirectories under the root `project-memory/adr/`; they must not create nested `project-memory/` directories. Child Git repositories in a multi-repository workspace remain independent memory-owning roots.
 - For context discovery, treat the current Git repository as a selected root and read its root `CONTEXT.md` when present. Follow every non-overlapping `Scoped Contexts` row matched by affected paths, reading each available scoped context; a row's context pointer is optional when no evidence-backed scoped file exists. In a multi-repository workspace, first read the coordination root `CONTEXT.md`, also follow its `Repository Registry` to every affected child repository, read each available child root context, then apply the same scoped routing. Inspect roots or matched paths without context directly rather than creating dangling pointers. (Codex learning)
@@ -173,13 +207,15 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Orchestrator workspace memory coordinates cross-repo planning only; child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs.
 - Resolve `write_mode=propose` for review-only or no-mutation work and `write_mode=apply` only with scoped write authority. Do not persist that run choice in project configuration.
 
-### Capture Idea skill
+### Capture Idea Skill
+
 - Keep `capture-idea` as the manual-only public surface for preserving tentative proposals before Feature Spec planning; ordinary brainstorming, issue creation, planning, and implementation requests must not auto-select it.
 - Keep `skills/capture-idea/references/options.md` limited to the run-scoped `write_mode` control. Consume tracker backend, repository layout, tracker owner, artifact-marker mapping, candidate decisions, queue intent, paths, and refs as execution facts or data.
 - Keep one durable Idea per independently plannable proposal and exactly one tracker-owning repository per Idea. GitHub Ideas use the configured `idea` label with native Issue Type unset; local Ideas use `planning/ideas/<idea-slug>.md` with `artifact_marker: idea`, no `issue_type`, and optional explicit `needs-triage` only at capture.
 - Keep Capture Idea separate from Feature Spec drafting and domain memory. `$plan-feature` owns durable Idea-source consumption and lifecycle reconciliation; Project Memory owns the marker and state registry; GitStack owns GitHub mutation mechanics.
 
-### Plan Feature skill
+### Plan Feature Skill
+
 - Keep `plan-feature` as the single public convergent planning surface: every successful run produces or completes one Feature Spec bundle with a nonempty hardened issue graph for each implementation-eligible Spec, tracker metadata, and relationships. Coordination-only parents own no issues. Never return a standalone Feature Spec as a successful terminal result; keep dense Feature Spec writing and issue splitting guidance in the internal `references/` phase files.
 - Keep `skills/plan-feature/references/options.md` as the owner of the sole default-path control, `write_mode`. Consume `tracker_backend` and `repository_layout` as validated Project Memory facts and derive the source route from intake evidence rather than adding run options. (Codex learning)
 - Treat explicitly selected durable `source_idea_refs` as planning input only when no durable `source_spec_ref` exists at intake. Reject proposed Idea refs. On the existing-source route, derive `bound_source_idea_refs` only from exact `- Source Idea:` lines in the complete Spec set; if explicit refs are also supplied, require exact set equality and reject additional, missing, different, or unbound refs. Use bound refs only for continuation validation and lifecycle reconciliation after complete-bundle convergence, never to redraft the Spec. Allow backlog discovery only from an explicit Idea-discovery request, keep it read-only until the user selects refs, and never scan Ideas during an ordinary planning run. Preserve Idea bodies, transform their canonical sections as tentative planning evidence, render refs only in each relevant Feature Spec `## Source`, and keep refs plus coverage maps out of generated issue Execution Contracts.
@@ -214,7 +250,8 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Never persist `knowledge_delta` or `## Domain Knowledge Handoff` in a Feature Spec. Carry accepted durable decisions as run/phase data and persist the exact payload only on the final integration issue, then require `$project-memory domain-memory` after integrated behavior is proven. Every target surface must be contained by that final issue's affected repositories and allowed paths; on the existing-source route, reject explicit knowledge data outside the authorized repository/path scope instead of widening it. Every multi-repository bundle has exactly one distinct repo-owned integration Feature Spec whose cross-Spec dependencies wait for every implementation partial to merge and at least one issue that owns a bounded repo/path change plus cross-repo proof; its existence is independent of the handoff. Keep issue dependencies intra-Spec. (Codex learning)
 - Both `plan-feature` phases should read `project-memory/config/issue-tracker.md`, `project-memory/config/project-layout.md`, and related project memory before deciding where Feature Specs or issues belong.
 
-### Maintainer skill
+### Maintainer Skill
+
 - Keep `maintainer` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary skill, plugin, metadata, docs, or repository change requests must not auto-select it. Use it only when the user invokes `$maintainer`, asks to run Maintainer, or an explicitly invoked parent workflow routes there. (Codex learning)
 - The `.agents/skills/maintainer` skill is the explicit maintainer for auditing health and improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.
 - `maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills and plugins in this repository.
@@ -230,14 +267,17 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Route substantial skill/plugin merges, removals, public invocation changes, and standalone-to-plugin moves through `$skill-creator` or `$plugin-creator` first. Return to `$maintainer` for lifecycle cleanup, metadata, validation, and release checks only when it was explicitly invoked or an explicitly invoked parent workflow routed there; otherwise apply those repository invariants directly.
 - Select maintainer validation by change type. Plugin and CLI maintenance must verify shipped artifacts and installed/cache state; composed-workflow changes require focused contract tests and bounded scenario proof when risk justifies it.
 
-### Codex Changelog skill
+### Codex Changelog Skill
+
 - Keep `codex-changelog` as a Codex-dependent reusable skill under `skills/codex-changelog/`; release-source selection and output formatting belong in its own `SKILL.md` and references, not in this `AGENTS.md`.
 
-### Code Wiki skill
+### Code Wiki Skill
+
 - Keep `code-wiki` as a Codex-dependent reusable skill under `skills/code-wiki/`; runtime repo-study workflow, HTML contract, and image rules belong in `skills/code-wiki/SKILL.md` and its references, not in this `AGENTS.md`.
 - Keep `code-wiki` final wiki outputs outside `.cache`; default git clones and temporary analysis artifacts belong under `~/.cache/dotagents/skills/code-wiki/`, while user-requested self-contained source storage belongs under `<wiki-root>/.cache/sources/` with an ignore-all `.gitignore`. (Codex learning)
 
-### Skill CLI Creator skill
+### Skill CLI Creator Skill
+
 - Route embedded-CLI design and layout work through `$skill-cli-creator`; keep detailed host, execution, and configuration doctrine in `skills/skill-cli-creator/SKILL.md` and its references.
 - Repo-level embedded-CLI invariants are: shipped artifacts live under `scripts/`, maintenance-only implementations live under `projects/<tool>/`, and ownership stays aligned when a CLI is skill-owned, plugin-shared, or owned by one bundled plugin skill. (Codex learning)
 - Use direct `scripts/<tool>` implementations for simple single-file CLIs; reserve `projects/<tool>/` for real multi-file, compiled, generated, dependency-managed, or build-backed CLI implementations. (Codex learning)
@@ -246,8 +286,10 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Require the shipped artifact to expose `--version` with one semver source of truth, and if `projects/<tool>/` exists require `projects/<tool>/AGENTS.md` plus a scoped `projects/<tool>/.gitignore` when generated state exists. (Codex learning)
 - Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)
 
-### GitStack plugin
+### GitStack Plugin
+
 - Keep GitStack as the sole repo-owned package for local Git and GitHub runtime workflows; do not maintain duplicate standalone `git-commit`, `github-*`, or `yeet` packages.
+- Keep GitStack runtime self-contained: it must not locate, import, or execute another skill for authorization or state. Composing workflows may validate their own lifecycle state before invoking GitStack, while GitStack owns its exact operation start journal, provider transport, one-use markers, and reconciliation evidence. (Codex learning)
 - Keep bundled skills provider-primitive and workflow-agnostic: caller-specific planning, orchestration, project-memory, queue-state, issue-body, and label-taxonomy policy belongs in the composing skill.
 - Prefer the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps or same-target fallback, and direct `git` for local repository state and mutation.
 - Keep the plugin-shared runtime artifact at `plugins/gitstack/scripts/gitstack`, its maintenance source at `plugins/gitstack/projects/gitstack/`, and its plugin and CLI semantic versions aligned.
@@ -256,7 +298,8 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep `$gitstack:github-triage` read-only and limited to current-repository queue grouping. Route evidence-backed issue disposition to `$gitstack:github-deep-review` and all issue lifecycle mutations to `$gitstack:github-issues`.
 - Keep `$gitstack:yeet` as publish orchestration over `$gitstack:git-commit` and focused GitStack GitHub workflows rather than duplicating their behavior.
 
-### Implement Feature skill
+### Implement Feature Skill
+
 - Keep `implement-feature` as the single App-only reusable orchestration entrypoint under `skills/implement-feature/`; do not add a terminal-session orchestration sibling or alternate worker surface.
 - Keep `skills/implement-feature/references/options.md` limited to `visible_app_task_permission`. Every other behavior is a fixed invariant, execution-bundle datum, or derived runtime observation. (Codex learning)
 - Keep `implement-feature` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary implementation, planning, triage, GitHub, commit, PR, or multi-repo requests must not auto-select it. (Codex learning)
@@ -268,13 +311,14 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Schedule at most three path-disjoint workers, including several Specs under one root repository claim; serialize overlaps and dependencies. Claim release never substitutes for upstream merge and integration proof. (Codex learning)
 - Keep runtime details in `skills/implement-feature/SKILL.md` and its references. The terminal result is PR-ready-for-merge-but-not-merged; merge and post-merge work remain outside this skill.
 
+### Learn Skill
 
-### Learn skill
 - Keep `learn` as the repo-facing persistence surface for durable `AGENTS.md` updates in this repository; broader memory-system files are outside this repo's editable scope.
 - When durable learnings are added through `learn`, place them in the most appropriate existing section when possible, otherwise create a fitting section; use `## Codex Learnings` only as a fallback, and suffix each inserted bullet with ` (Codex learning)`.
 - When the user says a rule is a "hard rule" or otherwise uses durable language and the correct persistence target is unclear, ask where to save it and recommend an `AGENTS.md` target by default. (Codex learning)
 
-### Skill Audit skill
+### Skill Audit Skill
+
 - Keep `skill-audit` as the single audit surface for installed Codex surfaces: standalone skills, plugin packages, and bundled plugin skills.
 - Keep `skill-audit` implementation centered on local discovery surfaces first, with shared or cached installations used as verification surfaces rather than editable sources. (Codex learning)
 - Keep portfolio-level duplicate, unused, prompt-budget, and root-summary analysis inside `skill-audit` rather than a separate cleanup skill; `scripts/portfolio-health` is audit evidence, not an automatic deletion workflow.
