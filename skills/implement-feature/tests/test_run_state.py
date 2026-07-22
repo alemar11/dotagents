@@ -326,6 +326,17 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "goal-not-active")
 
+    def test_given_no_root_goal_when_goal_completion_begins_then_controller_rejects_it(self) -> None:
+        """Given planned preimplementation state but no created Goal, when completion begins, then unrelated Goal mutation is blocked."""
+        self.start("no-goal-complete")
+        error = self.invoke(
+            "app-operation", "begin", "--run-id", "no-goal-complete",
+            "--expected-revision", self.revision("no-goal-complete"),
+            "--operation-key", "early-complete", "--action", "complete-goal",
+            "--subject-id", "root-no-goal-complete", expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "goal-not-active")
+
     def test_given_unresolved_app_effect_when_goal_completion_begins_then_controller_rejects_it(self) -> None:
         """Given PR-ready delivery and an unknown App effect, when Goal completion begins, then reconciliation comes first."""
         self.start("unresolved")

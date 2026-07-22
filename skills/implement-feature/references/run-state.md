@@ -74,7 +74,8 @@ preimplementation abort releases them.
 
 Worker creation and bootstrap require the active root Goal. Worker thread and
 active-checkout bindings are unique across active roots. Goal completion cannot
-launch while another App operation is pending or unknown. PR-ready evidence
+launch without this run's active Goal or while another App operation is pending
+or unknown. PR-ready evidence
 must bind the PR base to the provider-observed default branch.
 
 One root task may own only one unfinished run. One App project may map to

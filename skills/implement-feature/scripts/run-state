@@ -644,6 +644,12 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     if action == "create-goal" and run["goal_state"] != "not-created":
         raise StateError("goal-already-created", "root Goal already exists", 4)
     if action == "complete-goal":
+        if run["goal_state"] != "active":
+            raise StateError(
+                "goal-not-active",
+                "Goal completion requires this run's successfully created active Goal",
+                4,
+            )
         unresolved = connection.execute(
             """SELECT COUNT(*) FROM app_operations
                WHERE run_id=? AND status IN ('pending','unknown')""",
