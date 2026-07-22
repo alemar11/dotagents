@@ -106,10 +106,11 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
 - Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer`, `implement-feature`, and `skill-audit`.
+- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-review-rules`, `code-wiki`, `learn`, `maintainer`, `implement-feature`, and `skill-audit`.
 - Treat `skill-audit` as Codex-dependent because its live branch requires Codex App task discovery, authoritative task reads, and bounded task waits; historical audits also use Codex memory and session evidence.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
+- Treat `code-review-rules` as Codex-dependent because its historical evidence branch may inspect Codex session, memory, or task evidence scoped to the current repository; it composes with `$learn` for every approved durable `AGENTS.md` write.
 - Treat `implement-feature` as Codex-dependent and runtime-dependent on `python3` because it is App-only: implementation requires `scripts/run-state`, explicitly authorized visible ChatGPT desktop app tasks, one root-owned lifecycle Goal, App-managed worktrees, execution-ready Feature Spec bundles, `$autoreview`, and GitStack workflows. The App owns command execution and approval; GitStack owns Git and GitHub behavior. It has no planning, root/background implementation, raw Git worktree machinery, or merge authority.
 - Treat `.agents/skills/maintainer` as Codex-dependent because health diagnosis and workflow-family hardening conditionally use `$skill-audit` plus Codex memory/session evidence for portfolio, prompt-quality, overlap, or runtime invocation claims, substantial reshapes require `$skill-creator` or `$plugin-creator`, and non-trivial implementation closeout requires `$autoreview`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its advisory critique and implementation-evaluation workflows can run sequentially with generic web/search fallback.
@@ -316,6 +317,12 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep `learn` as the repo-facing persistence surface for durable `AGENTS.md` updates in this repository; broader memory-system files are outside this repo's editable scope.
 - When durable learnings are added through `learn`, place them in the most appropriate existing section when possible, otherwise create a fitting section; use `## Codex Learnings` only as a fallback, and suffix each inserted bullet with ` (Codex learning)`.
 - When the user says a rule is a "hard rule" or otherwise uses durable language and the correct persistence target is unclear, ask where to save it and recommend an `AGENTS.md` target by default. (Codex learning)
+
+### Code Review Rules Skill
+
+- Keep `code-review-rules` manual-only and proposal-first: it may inspect repository and bounded Codex historical evidence, but previous sessions are candidate evidence rather than authority and it must not auto-select itself for ordinary reviews or `AGENTS.md` maintenance.
+- Keep `$learn` as the sole writer and confirmation owner for Code Review Rule changes. `code-review-rules` owns discovery, scoping, evidence filtering, the violation/safe/unrelated/ordinary-bug evaluation matrix, and exact proposal rendering; it passes the unchanged target and wording to `$learn`, which shows them, pauses once for approval, and performs the approved write without a duplicate confirmation.
+- Do not bootstrap generic or empty review guidance by default. Create a missing `AGENTS.md` only for at least one approved evidence-backed rule, and prefer the closest applicable nested file over broad root rules.
 
 ### Skill Audit Skill
 

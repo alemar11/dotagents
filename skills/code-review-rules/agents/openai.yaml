@@ -1,0 +1,7 @@
+interface:
+  display_name: "Code Review Rules"
+  short_description: "Create evidence-backed Codex review rules for a repository."
+  brand_color: "#7C3AED"
+  default_prompt: "Use $code-review-rules to inspect this repository and bounded repo-scoped history, propose up to three consequential Code Review Rules with safe paths and a violation/safe/unrelated evaluation matrix, and show the exact AGENTS.md target and wording. Do not write until I explicitly approve; after approval, use $learn for the durable AGENTS.md update."
+policy:
+  allow_implicit_invocation: false

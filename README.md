@@ -43,6 +43,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | --- | --- |
 | `autoreview` | Send selected change bundles to a separate read-only Codex execution, reuse clean evidence, and verify committed review fixes through bounded delta prompts. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
+| `code-review-rules` | Discover, evaluate, and install evidence-backed Codex Code Review rules in the closest applicable `AGENTS.md`. |
 | `crusty` | Direct-only independent advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
@@ -77,6 +78,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
+- `code-review-rules` requires `$learn` for every approved durable `AGENTS.md` creation or update; it owns discovery and evaluation but never writes the file directly.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires `$autoreview` for non-trivial implementation closeout.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
@@ -151,7 +153,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/code-review-rules skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -178,6 +180,7 @@ Install all reusable skills globally for Codex:
 npx skills add alemar11/dotagents -a codex -g -y \
   --skill autoreview \
   --skill code-wiki \
+  --skill code-review-rules \
   --skill crusty \
   --skill okf \
   --skill grill-me-with-context \
