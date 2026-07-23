@@ -61,9 +61,21 @@ continuation question during the run.
    one startup authorization interaction only after this read-only preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
-2. Start `scripts/run-state`. It uses one per-user schema-2 SQLite DB at
-   `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`. SQLite
-   transactions and the fixed busy timeout are the only writer lock.
+2. Run read-only `scripts/run-state --json doctor`, then
+   `scripts/run-state --json state prepare`. It uses the permanently
+   unversioned per-user SQLite DB at
+   `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`, with schema
+   version `1` stored only in its singleton `runtime_metadata` row. If a
+   recognized older schema has active
+   owners, keep the root open and repeat bounded doctor/prepare sweeps until
+   they drain through the exact old runtime passed to `state prepare
+   --retained-runtime`; if that executable is unavailable, stop fail-closed.
+   Never start a worker or another run during that wait. Preparation then
+   drops and recreates the complete schema inside one exclusive SQLite
+   transaction without migrating state.
+   Unknown, newer, corrupt, unversioned, or same-version-invalid state stops
+   before claims. SQLite transactions and `target_schema_version` fence
+   concurrent CLI work; no filesystem lock is used.
 3. Atomically claim each free `(repository_identity, source_spec_ref)` pair.
    Different Specs and head branches may run under different roots in the same
    repository. Keep a conflicting assignment in its bounded Spec wait without

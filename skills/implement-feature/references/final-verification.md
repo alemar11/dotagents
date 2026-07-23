@@ -6,7 +6,7 @@ Root then performs read-only verification; it does not edit code, rerun implemen
 check boxes, uncheck boxes, or judge acceptance criteria.
 
 For `github-pr`, the worker-facing
-`pr-ready-for-merge-but-not-merged` result is also the schema-2 observation
+`pr-ready-for-merge-but-not-merged` result is also the schema-1 observation
 status. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
 all three names describe the same unmerged delivery boundary.
 

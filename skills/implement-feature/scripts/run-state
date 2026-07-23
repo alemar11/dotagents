@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import stat
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,8 +15,9 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "2.0.0"
-STATE_SCHEMA_VERSION = 2
+CLI_VERSION = "1.0.0"
+STATE_SCHEMA_VERSION = 1
+REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_LIVE_WORKERS = 3
@@ -107,19 +109,7 @@ def validate_database(path: Path) -> None:
         raise StateError("unsafe-state-permissions", f"database must be owner-only: {path}", 4)
 
 
-def connect(*, write: bool) -> sqlite3.Connection:
-    path = database_path()
-    if write:
-        ensure_private_cache_root()
-        try:
-            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            pass
-        else:
-            os.close(descriptor)
-    elif not path.exists():
-        raise StateError("state-uninitialized", "schema-2 state has not been initialized", 3)
-    validate_database(path)
+def open_database(path: Path, *, write: bool) -> sqlite3.Connection:
     target = path if write else f"{path.resolve().as_uri()}?mode=ro"
     connection = sqlite3.connect(
         target,
@@ -127,30 +117,34 @@ def connect(*, write: bool) -> sqlite3.Connection:
         isolation_level=None,
         uri=not write,
     )
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+    if not write:
+        connection.execute("PRAGMA query_only = ON")
+    return connection
+
+
+def connect(*, write: bool) -> sqlite3.Connection:
+    path = database_path()
+    if not path.exists():
+        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
     try:
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
-        if not write:
-            connection.execute("PRAGMA query_only = ON")
+        validate_database(path)
+        connection = open_database(path, write=write)
         if write:
             connection.execute("BEGIN IMMEDIATE")
-            created = ensure_schema(connection, allow_create=True)
-            if created:
-                connection.commit()
-                connection.execute("BEGIN IMMEDIATE")
-            os.chmod(path, 0o600)
-        else:
-            ensure_schema(connection, allow_create=False)
+        ensure_schema(connection, allow_create=False)
     except Exception:
-        connection.rollback()
-        connection.close()
+        if "connection" in locals():
+            connection.rollback()
+            connection.close()
         raise
     return connection
 
 
 EXPECTED_SCHEMA_COLUMNS = {
-    "metadata": ("key", "value"),
+    "runtime_metadata": ("singleton", "schema_version", "target_schema_version"),
     "runs": (
         "run_id", "root_task_id", "status", "implementation_started",
         "revision", "created_at", "updated_at", "finished_at",
@@ -208,26 +202,35 @@ def expected_schema_objects() -> dict[tuple[str, str], str]:
 
 
 def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool:
-    version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-    if version == 0:
-        tables = {
-            row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            )
-        }
-        if tables:
-            raise StateError("unsupported-state-schema", "unversioned tables are not supported", 4)
+    tables = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+    }
+    if not tables:
         if allow_create:
             create_schema(connection)
             return True
-        raise StateError("state-uninitialized", "schema-2 state has not been initialized", 3)
+        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+    if "runtime_metadata" not in tables:
+        raise StateError(
+            "unsupported-state-schema",
+            "unversioned or pre-lineage state is not supported",
+            4,
+        )
+    version, _ = read_runtime_metadata(connection)
     if version != STATE_SCHEMA_VERSION:
         raise StateError(
             "unsupported-state-schema",
-            f"expected schema {STATE_SCHEMA_VERSION}, found {version}; migrations are not supported",
+            f"runtime schema {STATE_SCHEMA_VERSION} cannot use database schema {version}",
             4,
         )
+    validate_schema_shape(connection, version)
+    return False
+
+
+def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
     expected = set(EXPECTED_SCHEMA_COLUMNS)
     actual = {
         row[0]
@@ -236,7 +239,7 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         )
     }
     if actual != expected:
-        raise StateError("invalid-state-schema", "state tables do not match schema 2", 4)
+        raise StateError("invalid-state-schema", f"state tables do not match schema {version}", 4)
     for table, expected_columns in EXPECTED_SCHEMA_COLUMNS.items():
         actual_columns = tuple(
             row[1] for row in connection.execute(f"PRAGMA table_info({table})")
@@ -244,21 +247,18 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         if actual_columns != expected_columns:
             raise StateError(
                 "invalid-state-schema",
-                f"state table {table} columns do not match schema 2",
+                f"state table {table} columns do not match schema {version}",
                 4,
             )
-    metadata_version = connection.execute(
-        "SELECT value FROM metadata WHERE key='schema_version'"
-    ).fetchone()
-    if (
-        metadata_version is None
-        or metadata_version["value"] != str(STATE_SCHEMA_VERSION)
-    ):
+    metadata_version, target_version = read_runtime_metadata(connection)
+    if metadata_version != version:
         raise StateError(
             "invalid-state-schema",
-            "state metadata does not match schema 2",
+            f"state metadata does not match schema {version}",
             4,
         )
+    if target_version is not None and target_version <= version:
+        raise StateError("invalid-state-schema", "state cutover target is invalid", 4)
     assignment_sql_row = connection.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='assignments'"
     ).fetchone()
@@ -270,21 +270,56 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
     ):
         raise StateError(
             "invalid-state-schema",
-            "state table assignments constraints do not match schema 2",
+            f"state table assignments constraints do not match schema {version}",
             4,
         )
     if normalized_schema_objects(connection) != expected_schema_objects():
         raise StateError(
             "invalid-state-schema",
-            "state tables, constraints, or indexes do not match schema 2",
+            f"state tables, constraints, or indexes do not match schema {version}",
             4,
         )
-    return False
 
 
-def create_schema(connection: sqlite3.Connection) -> None:
+def read_runtime_metadata(connection: sqlite3.Connection) -> tuple[int, int | None]:
+    try:
+        rows = connection.execute(
+            "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
+        ).fetchall()
+    except sqlite3.Error as error:
+        raise StateError("invalid-state-schema", "runtime metadata is unreadable", 4) from error
+    if len(rows) != 1 or rows[0]["singleton"] != 1:
+        raise StateError(
+            "invalid-state-schema",
+            "runtime_metadata must contain exactly singleton row 1",
+            4,
+        )
+    version = rows[0]["schema_version"]
+    target = rows[0]["target_schema_version"]
+    if (
+        not isinstance(version, int)
+        or version < 1
+        or (target is not None and (not isinstance(target, int) or target <= version))
+    ):
+        raise StateError("invalid-state-schema", "runtime metadata values are invalid", 4)
+    return version, target
+
+
+def create_schema(
+    connection: sqlite3.Connection,
+    *,
+    schema_version: int = STATE_SCHEMA_VERSION,
+) -> None:
     statements = (
-        "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+        """CREATE TABLE runtime_metadata (
+            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+            schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
+            target_schema_version INTEGER,
+            CHECK (
+                target_schema_version IS NULL
+                OR target_schema_version > schema_version
+            )
+        )""",
         """CREATE TABLE runs (
             run_id TEXT PRIMARY KEY,
             root_task_id TEXT NOT NULL,
@@ -385,8 +420,7 @@ def create_schema(connection: sqlite3.Connection) -> None:
             UNIQUE(run_id, operation_key)
         )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
-        f"INSERT INTO metadata(key,value) VALUES ('schema_version','{STATE_SCHEMA_VERSION}')",
-        f"PRAGMA user_version = {STATE_SCHEMA_VERSION}",
+        f"INSERT INTO runtime_metadata(singleton,schema_version,target_schema_version) VALUES (1,{schema_version},NULL)",
     )
     for statement in statements:
         connection.execute(statement)
@@ -508,7 +542,10 @@ def canonical_source_spec_ref(
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     exact_keys(raw, {"schema_version", "run_id", "root_task_id", "repositories", "assignments"}, "manifest")
     if raw["schema_version"] != STATE_SCHEMA_VERSION:
-        raise StateError("unsupported-input-schema", "manifest schema_version must be 2")
+        raise StateError(
+            "unsupported-input-schema",
+            f"manifest schema_version must be {STATE_SCHEMA_VERSION}",
+        )
     run = {"run_id": token(raw["run_id"], "run_id"), "root_task_id": string(raw["root_task_id"], "root_task_id", 256)}
     if not isinstance(raw["repositories"], list) or not raw["repositories"]:
         raise StateError("invalid-input", "repositories must be a nonempty list")
@@ -791,22 +828,232 @@ def insert_run(
     return acquired, waiting
 
 
+def database_schema_version(connection: sqlite3.Connection) -> int:
+    return read_runtime_metadata(connection)[0]
+
+
+def active_owner_runs(connection: sqlite3.Connection) -> int:
+    return int(
+        connection.execute(
+            "SELECT COUNT(*) FROM runs WHERE status IN ('waiting-for-spec','active','blocked')"
+        ).fetchone()[0]
+    )
+
+
+def validate_rebuild_source(connection: sqlite3.Connection, version: int) -> None:
+    if version not in REBUILDABLE_STATE_SCHEMA_VERSIONS:
+        relation = "newer" if version > STATE_SCHEMA_VERSION else "unknown"
+        raise StateError(
+            "unsupported-state-schema",
+            f"schema {version} is {relation} to runtime schema {STATE_SCHEMA_VERSION}; automatic regeneration is forbidden",
+            4,
+        )
+    validate_schema_shape(connection, version)
+
+
+def validate_retained_runtime(path_text: str | None, schema_version: int) -> None:
+    if path_text is None:
+        raise StateError(
+            "retained-runtime-unavailable",
+            f"schema {schema_version} owners require their retained exact runtime",
+            4,
+        )
+    path = Path(path_text)
+    if (
+        not path.is_absolute()
+        or path.is_symlink()
+        or not path.is_file()
+        or not os.access(path, os.X_OK)
+    ):
+        raise StateError(
+            "retained-runtime-unavailable",
+            f"retained runtime is not an executable regular file: {path}",
+            4,
+        )
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise StateError(
+            "retained-runtime-unavailable",
+            f"retained runtime could not be verified: {path}",
+            4,
+        ) from error
+    expected = f"{schema_version}.0.0"
+    if result.returncode != 0 or result.stdout.strip() != expected:
+        raise StateError(
+            "retained-runtime-unavailable",
+            f"retained runtime must report version {expected}",
+            4,
+        )
+
+
+def recreate_schema_in_place(connection: sqlite3.Connection) -> None:
+    for table in (
+        "app_operations",
+        "spec_claims",
+        "assignments",
+        "runs",
+        "runtime_metadata",
+    ):
+        connection.execute(f"DROP TABLE {table}")
+    create_schema(connection)
+
+
+def inspect_state(connection: sqlite3.Connection) -> tuple[int, int | None, int]:
+    tables = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+    }
+    if not tables:
+        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+    if "runtime_metadata" not in tables:
+        raise StateError(
+            "unsupported-state-schema",
+            "unversioned or pre-lineage state cannot be regenerated",
+            4,
+        )
+    version, target = read_runtime_metadata(connection)
+    if version == STATE_SCHEMA_VERSION:
+        validate_schema_shape(connection, version)
+    else:
+        validate_rebuild_source(connection, version)
+    return version, target, active_owner_runs(connection)
+
+
 def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
     path = database_path()
     if not path.exists():
-        return {"ready": True, "state": "uninitialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": 0, "writes_performed": False}
-    connection = connect(write=False)
+        return {"ready": True, "state": "uninitialized", "database_path": str(path), "cutover_target_version": None, "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": 0, "writes_performed": False}
+    validate_database(path)
+    connection = open_database(path, write=False)
     try:
-        active = connection.execute("SELECT COUNT(*) FROM runs WHERE status IN ('waiting-for-spec','active','blocked')").fetchone()[0]
-        return {"ready": True, "state": "initialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
+        version, target, active = inspect_state(connection)
     finally:
         connection.close()
+    if version == STATE_SCHEMA_VERSION:
+        state = "initialized" if target is None else "cutover-in-progress"
+        ready = target is None
+    else:
+        state = "rebuild-ready" if active == 0 else "waiting-for-schema-drain"
+        ready = False
+    return {"ready": ready, "state": state, "database_path": str(path), "database_schema_version": version, "cutover_target_version": target, "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
+
+
+def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
+    path = database_path()
+    if not path.exists():
+        ensure_private_cache_root()
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(descriptor)
+    validate_database(path)
+    connection = open_database(path, write=True)
+    try:
+        connection.execute("BEGIN EXCLUSIVE")
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if not tables:
+            create_schema(connection)
+            connection.commit()
+            return {
+                "ready": True,
+                "state": "initialized",
+                "database_schema_version": STATE_SCHEMA_VERSION,
+                "active_owner_runs": 0,
+                "regenerated": True,
+                "writes_performed": True,
+            }
+        version, target, active = inspect_state(connection)
+        if version == STATE_SCHEMA_VERSION:
+            if target is not None:
+                raise StateError(
+                    "state-cutover-in-progress",
+                    f"runtime schema {STATE_SCHEMA_VERSION} cannot prepare cutover target {target}",
+                    4,
+                )
+            connection.commit()
+            return {
+                "ready": True,
+                "state": "initialized",
+                "database_schema_version": version,
+                "active_owner_runs": active,
+                "regenerated": False,
+                "writes_performed": False,
+            }
+        if target is None:
+            connection.execute(
+                "UPDATE runtime_metadata SET target_schema_version=? WHERE singleton=1",
+                (STATE_SCHEMA_VERSION,),
+            )
+            target = STATE_SCHEMA_VERSION
+        elif target != STATE_SCHEMA_VERSION:
+            raise StateError(
+                "state-cutover-in-progress",
+                f"database is fenced for schema {target}, not {STATE_SCHEMA_VERSION}",
+                4,
+            )
+        if active:
+            connection.commit()
+            validate_retained_runtime(args.retained_runtime, version)
+            return {
+                "ready": False,
+                "state": "waiting-for-schema-drain",
+                "database_schema_version": version,
+                "active_owner_runs": active,
+                "regenerated": False,
+                "writes_performed": True,
+            }
+        if active_owner_runs(connection) != 0:
+            raise StateError("state-busy", "active owners appeared during schema cutover", 4)
+        recreate_schema_in_place(connection)
+        connection.commit()
+        return {
+            "ready": True,
+            "state": "regenerated",
+            "database_schema_version": STATE_SCHEMA_VERSION,
+            "previous_schema_version": version,
+            "active_owner_runs": 0,
+            "regenerated": True,
+            "writes_performed": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def require_new_run_allowed(connection: sqlite3.Connection) -> None:
+    _, target = read_runtime_metadata(connection)
+    if target is not None:
+        raise StateError(
+            "state-cutover-in-progress",
+            f"new runs are fenced while schema {target} cutover is pending",
+            4,
+        )
 
 
 def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
     run, repositories, assignments = validate_manifest(read_json_file(args.manifest, "manifest"))
     connection = connect(write=True)
     try:
+        require_new_run_allowed(connection)
         if connection.execute("SELECT 1 FROM runs WHERE run_id=?", (run["run_id"],)).fetchone():
             raise StateError("run-already-exists", f"run already exists: {run['run_id']}", 4)
         root_owner = connection.execute(
@@ -1066,7 +1313,7 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
             f"ChatGPT operation observation is missing fields: {sorted(common - set(value))}",
         )
     if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] not in {"unknown", "succeeded", "failed"}:
-        raise StateError("invalid-operation-observation", "observation must use schema 2 and a terminal or unknown status")
+        raise StateError("invalid-operation-observation", "observation must use schema 1 and a terminal or unknown status")
     expected_extra = extra_by_action[operation["action"]]
     actual_extra = set(value) - common
     if value["status"] == "succeeded":
@@ -1226,7 +1473,7 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
     if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] != expected_status:
         raise StateError(
             "invalid-ready-observation",
-            "ready observation status must match its schema-2 delivery_type",
+            "ready observation status must match its schema-1 delivery_type",
         )
     run_id = token(args.run_id, "run_id")
     assignment_id = token(value["assignment_id"], "assignment_id")
@@ -1555,7 +1802,10 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
         "claim recovery observation",
     )
     if value["schema_version"] != STATE_SCHEMA_VERSION:
-        raise StateError("unsupported-input-schema", "claim recovery observation schema_version must be 2")
+        raise StateError(
+            "unsupported-input-schema",
+            f"claim recovery observation schema_version must be {STATE_SCHEMA_VERSION}",
+        )
     if not isinstance(value["owner_expected_revision"], int) or value["owner_expected_revision"] < 1:
         raise StateError("invalid-input", "owner_expected_revision must be a positive integer")
     worker_state = string(value["worker_state"], "worker_state", 32)
@@ -2023,12 +2273,24 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="run-state", description="Schema-2 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
+    parser = argparse.ArgumentParser(prog="run-state", description="Schema-1 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
     parser.add_argument("--json", action="store_true", help="emit one machine-readable JSON object")
     parser.add_argument("--version", action="version", version=CLI_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
     doctor = commands.add_parser("doctor", help="inspect shared state readiness without writing")
     doctor.set_defaults(handler=command_doctor, command_name="doctor")
+
+    state = commands.add_parser("state", help="prepare the canonical SQLite claim domain")
+    state_commands = state.add_subparsers(dest="state_command", required=True)
+    prepare = state_commands.add_parser(
+        "prepare",
+        help="fence new starts and destructively regenerate a recognized older schema after drain",
+    )
+    prepare.add_argument(
+        "--retained-runtime",
+        help="absolute executable path for the exact older runtime while owners drain",
+    )
+    prepare.set_defaults(handler=command_state_prepare, command_name="state prepare")
 
     run = commands.add_parser("run", help="start, wait, inspect, list, or finish root runs")
     run_commands = run.add_subparsers(dest="run_command", required=True)

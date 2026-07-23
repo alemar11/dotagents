@@ -1,13 +1,12 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses this shipped artifact. `CLI_VERSION` is exactly `2.0.0`; SQLite, manifest,
-observation, and JSON envelope schemas are integer `2`. This is a hard cut with
-no migrations, aliases, importers, legacy readers, or alternate state files.
-Every v1 DB or payload is rejected without modification. Schema number `2` does
-not authorize another shape: table and column structure must match exactly or
-the CLI returns `invalid-state-schema` without deleting or rewriting the user's
-DB.
+uses this shipped artifact. `CLI_VERSION` is exactly `1.0.0`; SQLite, manifest,
+observation, and JSON envelope schemas are integer `1`. This is a breaking hard
+cut with no migrations, state copies, aliases, importers, or alternate state
+files. Schema number `1` does not authorize another shape: table and column
+structure must match exactly or the CLI returns `invalid-state-schema` without
+deleting or rewriting the DB.
 
 All controllers for the same machine user share:
 
@@ -15,13 +14,31 @@ All controllers for the same machine user share:
 ~/.cache/dotagents/skills/implement-feature/run-state.sqlite3
 ```
 
-The directory and DB are owner-only. There is no lock file. SQLite
-`BEGIN IMMEDIATE` transactions plus the fixed 5000 ms busy timeout are the sole
-writer coordination. Local SQLite does not coordinate different machines.
+The directory and DB are owner-only. SQLite transactions use a fixed 5000 ms
+busy timeout. There is no filesystem lock. The application-owned,
+single-row `runtime_metadata` table is the sole schema and cutover source of
+truth:
+
+```sql
+CREATE TABLE runtime_metadata (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
+    target_schema_version INTEGER,
+    CHECK (
+        target_schema_version IS NULL
+        OR target_schema_version > schema_version
+    )
+);
+```
+
+Exactly one `singleton = 1` row must exist. Normal schema-1 state is
+`(schema_version=1, target_schema_version=NULL)`. `PRAGMA user_version` is not
+application state and is never read or written. Local coordination does not
+span different machines.
 
 ## Stored Data Allowlist
 
-The schema contains only metadata, runs, assignments, canonical Feature Spec
+The schema contains only runtime metadata, runs, assignments, canonical Feature Spec
 claims, and typed ChatGPT task-operation reconciliation facts. It may retain durable
 source refs, tracker backend, delivery type, assignment prerequisites, ChatGPT
 project/thread/worktree identity, exact `receipt_ref`/`readback_ref` machine
@@ -38,6 +55,7 @@ head SHAs remain valid evidence.
 ```bash
 scripts/run-state --version
 scripts/run-state --json doctor
+scripts/run-state --json state prepare
 scripts/run-state --json run start --manifest /absolute/manifest.json
 scripts/run-state --json run wait-sweep \
   --run-id RUN --assignment-id ASSIGNMENT --expected-revision N
@@ -83,9 +101,11 @@ scripts/run-state --json run finish \
   --run-id RUN --expected-revision N --outcome pr-ready
 ```
 
-Read commands and `doctor` never write. Every mutation uses one compare-and-swap
-revision transaction. JSON stdout is one object with `schema_version`, `ok`,
-and `command`; errors add typed `error.code` and `error.message`.
+Read commands and `doctor` never write. `state prepare` is the explicit
+destructive preparation command; every ordinary state mutation uses one
+compare-and-swap revision transaction. JSON stdout is one object with
+`schema_version`, `ok`, and `command`; errors add typed `error.code` and
+`error.message`.
 
 Ready observations always bind assignment/thread/repository/checkout,
 `delivery_type`, named head and base branches, head/base SHAs, clean worktree,
@@ -150,7 +170,7 @@ authoritative evidence.
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 1,
   "owner_run_id": "owner-run",
   "owner_assignment_id": "spec-42",
   "owner_expected_revision": 7,
@@ -192,7 +212,7 @@ Typed ChatGPT operation observations carry only action-specific fields plus `rec
 and cannot be relaunched. Pending or unknown bootstrap delivery forbids worker
 archive until independent task inspection proves it failed.
 
-Every task observation uses `schema_version: 2` and
+Every task observation uses `schema_version: 1` and
 `status: unknown|succeeded|failed`. A succeeded observation requires
 `receipt_ref`, `readback_ref`, and exactly these action fields:
 
@@ -215,44 +235,54 @@ actually observed. Never invent reconciliation references.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `2.0.0` and
-`STATE_SCHEMA_VERSION` remains `2`. Re-run `--help`,
+or build output. `CLI_VERSION` remains `1.0.0` and
+`STATE_SCHEMA_VERSION` remains `1`. Re-run `--help`,
 `--version`, read-only `doctor`, Python compilation, unit/contract tests, and an
 isolated lifecycle fixture after changes.
 
 ## Hard-Cut Operations
 
-Before changing the runtime or canonical DB, suspend new invocations and use
-the installed v1 runtime to reconcile every pending or unknown operation and
-terminalize every v1 controller. Continue only when its read-only `doctor`
-reports `active_owner_runs=0` and the repository changes are frozen in a clean
-commit.
+Changing `STATE_SCHEMA_VERSION`, changing SQLite shape, or expanding the
+recognized rebuild-source set requires explicit user consent before code or
+documentation edits. Every approved change is a breaking hard cut. Never add
+`ALTER` upgrades, data-copy migrations, imports, versioned DB filenames, or
+state carry-forward.
 
-If the canonical DB is already absent, an uninitialized v1 `doctor` is
-equivalent to zero owners even when that older output omits
-`active_owner_runs`. In that case, require an already timestamped owner-only v1
-archive bound to the frozen v1 commit, do not recreate the canonical DB, and
-skip the rename.
+At runtime, call read-only `doctor` first and then `state prepare`.
+For a recognized older DB, `state prepare` validates the old schema and writes
+the new runtime's schema number to `target_schema_version` transactionally
+while the old schema remains intact. A non-NULL target makes old/current
+runtimes reject every new `run start`, while commands needed by already-owned
+runs remain available.
 
-Archive the owner-only canonical v1 DB with a timestamped rename, then install
-the v2 runtime, documentation, and tests together. Do not use a v2 filename:
-the canonical `run-state.sqlite3` path remains the single claim domain. Before
-the first v2 write, `doctor` must report `uninitialized`,
-`active_owner_runs=0`, and `writes_performed=false`; the first `run start`
-creates schema 2.
+If owners remain, invoke preparation with the absolute retained executable:
+`state prepare --retained-runtime /absolute/path/to/old/run-state`. It verifies
+that executable's exact old lineage version and returns
+`waiting-for-schema-drain`. Keep the root turn open and repeat bounded `doctor`
+and `state prepare` sweeps. `waiting-for-spec`, `active`, and `blocked` all
+count as owners. Do not force-finish, abandon, release, or rewrite claims
+merely to complete a cutover. If the retained executable is unavailable or
+does not report the exact old version, fail closed and preserve the fence.
 
-Use the archive shape
-`run-state.sqlite3.v1-YYYYMMDD-HHMMSS.bak`, keep mode `0600`, and record the
-exact frozen v1 commit SHA in the cutover evidence. Any later v1 recovery uses
-a clean checkout of that immutable commit, never the live v2 script.
+When the recognized older DB reports zero owners, `state prepare` begins an
+exclusive SQLite transaction and rechecks zero. Inside that same transaction
+it drops all application tables, indexes, and triggers; recreates the complete
+fresh schema including `runtime_metadata`; inserts the new
+`(schema_version=N, target_schema_version=NULL)` singleton; and commits. No
+row, claim, operation, or historical evidence is copied. Any failure rolls
+back the transaction and restores the complete old logical and file state.
 
-Before any v2 run, rollback may restore the frozen v1 code and archived v1 DB
-directly. After a v2 run exists, first terminalize every v2 controller, archive
-the v2 DB, and only then restore the frozen v1 code and DB. Never run both
-versions against separate state files.
+An older runtime that encounters a newer schema fails closed and never
+regenerates it. Unknown older versions, unversioned tables, corrupt DBs,
+same-number structural drift, unsafe permissions, and symlinks also fail
+closed without reset.
 
-`blocked` runs count as active owners for this gate. Rollback is forbidden
-until the same root recovers each blocked assignment to an ordinary permitted
-terminal outcome. There is no force-finish path that drops post-bootstrap
-claims or bypasses unresolved worker/checkouts merely to make rollback
-possible.
+Schema 1 and CLI 1.0.0 begin a fresh lineage. No pre-lineage DB is a recognized
+rebuild source: verify zero owners with its original runtime, suspend new
+invocations, delete the old DB once, then let schema-1 `state prepare`
+create the fresh claim domain. For every future approved cut, stage the newer
+runtime without replacing the exact old executable needed by active owners.
+The newer `state prepare` may set the fence and wait, but old owners must
+terminalize through that retained old executable. Replace it only after
+`active_owner_runs=0` and successful regeneration. If the old executable is
+unavailable, fail closed instead of promising an unexecutable drain.

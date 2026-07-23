@@ -34,6 +34,7 @@ class RunStateScenarios(unittest.TestCase):
         self.common_a.mkdir(parents=True)
         self.common_b.mkdir(parents=True)
         self.revisions: dict[str, int] = {}
+        self.invoke("state", "prepare")
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -48,8 +49,13 @@ class RunStateScenarios(unittest.TestCase):
         return path
 
     def invoke(self, *args: str, expected: int = 0) -> dict[str, object]:
+        return self.invoke_tool(TOOL, *args, expected=expected)
+
+    def invoke_tool(
+        self, tool: Path, *args: str, expected: int = 0
+    ) -> dict[str, object]:
         result = subprocess.run(
-            [str(TOOL), "--json", *args], env=self.env, text=True,
+            [str(tool), "--json", *args], env=self.env, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
         self.assertEqual(result.returncode, expected, result.stderr + result.stdout)
@@ -57,6 +63,20 @@ class RunStateScenarios(unittest.TestCase):
         if isinstance(payload.get("run_id"), str) and isinstance(payload.get("revision"), int):
             self.revisions[payload["run_id"]] = payload["revision"]
         return payload
+
+    def future_schema_two_tool(self) -> Path:
+        path = self.base / "run-state-schema-2"
+        source = TOOL.read_text(encoding="utf-8")
+        source = source.replace('CLI_VERSION = "1.0.0"', 'CLI_VERSION = "2.0.0"', 1)
+        source = source.replace("STATE_SCHEMA_VERSION = 1", "STATE_SCHEMA_VERSION = 2", 1)
+        source = source.replace(
+            "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()",
+            "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset({1})",
+            1,
+        )
+        path.write_text(source, encoding="utf-8")
+        path.chmod(0o700)
+        return path
 
     def revision(self, run_id: str) -> str:
         return str(self.revisions[run_id])
@@ -110,7 +130,7 @@ class RunStateScenarios(unittest.TestCase):
                 }
             )
         return {
-            "schema_version": 2,
+            "schema_version": 1,
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "repositories": repo_rows,
@@ -118,6 +138,8 @@ class RunStateScenarios(unittest.TestCase):
         }
 
     def start(self, run_id: str, **kwargs: object) -> dict[str, object]:
+        if not self.database.exists():
+            self.invoke("state", "prepare")
         manifest = self.manifest(run_id, **kwargs)
         return self.invoke("run", "start", "--manifest", str(self.write_json(f"{run_id}.json", manifest)))
 
@@ -137,7 +159,7 @@ class RunStateScenarios(unittest.TestCase):
             "--action", action, "--subject-id", subject,
         )
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "status": status,
             "receipt_ref": f"receipt:{key}",
             "readback_ref": f"readback:{key}",
@@ -178,7 +200,7 @@ class RunStateScenarios(unittest.TestCase):
         run_id: str,
         number: int = 1,
         *,
-        schema_version: int = 2,
+        schema_version: int = 1,
         expected: int = 0,
     ) -> dict[str, object]:
         sha = f"{100 + number:040x}"
@@ -227,7 +249,7 @@ class RunStateScenarios(unittest.TestCase):
     ) -> dict[str, object]:
         sha = head_sha or f"{200 + number:040x}"
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
             "repository_identity": repository_identity or self.local_identity(self.common_a),
@@ -268,29 +290,66 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
-        """Given no DB, when doctor runs, then it reports schema 2 without creating cache state."""
+        """Given no DB, when doctor runs, then it reports schema 1 without creating cache state."""
+        self.database.unlink()
         result = self.invoke("doctor")
-        self.assertEqual(result["tool_version"], "2.0.0")
-        self.assertEqual(result["state_schema_version"], 2)
+        self.assertEqual(result["tool_version"], "1.0.0")
+        self.assertEqual(result["state_schema_version"], 1)
         self.assertEqual(result["active_owner_runs"], 0)
         self.assertEqual(result["busy_timeout_ms"], 5000)
         self.assertFalse(self.database.exists())
+        self.assertFalse(self.database.with_name("run-state.lock").exists())
 
-    def test_given_v1_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
-        """Given a retired protocol payload, startup fails closed without creating the database."""
-        manifest = self.manifest("v1-manifest")
-        manifest["schema_version"] = 1
+    def test_given_fresh_user_when_state_prepares_then_schema_and_metadata_are_created(self) -> None:
+        """Given no DB, explicit preparation creates the fresh schema-1 claim domain."""
+        self.database.unlink()
+        prepared = self.invoke("state", "prepare")
+        self.assertEqual(prepared["state"], "initialized")
+        self.assertEqual(prepared["database_schema_version"], 1)
+        self.assertTrue(prepared["regenerated"])
+        self.assertTrue(prepared["writes_performed"])
+        self.assertTrue(self.database.is_file())
+        self.assertFalse(self.database.with_name("run-state.lock").exists())
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchall(),
+                [(1, 1, None)],
+            )
+        started = self.start("prepared-fresh")
+        self.assertEqual(started["status"], "active")
+
+    def test_given_unversioned_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
+        """Given an unversioned protocol payload, startup fails closed without creating the database."""
+        self.database.unlink()
+        manifest = self.manifest("unversioned-manifest")
+        manifest["schema_version"] = 0
         error = self.invoke(
             "run", "start", "--manifest",
-            str(self.write_json("v1-manifest.json", manifest)),
+            str(self.write_json("unversioned-manifest.json", manifest)),
             expected=2,
         )
-        self.assertEqual(error["schema_version"], 2)
+        self.assertEqual(error["schema_version"], 1)
         self.assertEqual(error["error"]["code"], "unsupported-input-schema")
         self.assertFalse(self.database.exists())
 
-    def test_given_v1_task_observation_when_reconciled_then_operation_remains_pending(self) -> None:
-        """Given a retired task payload, reconciliation rejects it without advancing durable state."""
+    def test_given_v2_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
+        """Given the immediately retired protocol payload, startup performs no compatibility conversion."""
+        self.database.unlink()
+        manifest = self.manifest("v2-manifest")
+        manifest["schema_version"] = 2
+        error = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("v2-manifest.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["schema_version"], 1)
+        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        self.assertFalse(self.database.exists())
+
+    def test_given_newer_task_observation_when_reconciled_then_operation_remains_pending(self) -> None:
+        """Given a newer task payload, reconciliation rejects it without advancing durable state."""
         self.start("v1-operation")
         self.invoke(
             "app-operation", "begin", "--run-id", "v1-operation",
@@ -300,7 +359,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         revision = self.revision("v1-operation")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "status": "succeeded",
             "receipt_ref": "receipt:v1-title",
             "readback_ref": "readback:v1-title",
@@ -353,7 +412,7 @@ class RunStateScenarios(unittest.TestCase):
             "--subject-id", "root-wrong-root-title",
         )
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "status": "succeeded",
             "receipt_ref": "receipt:wrong-root-title",
             "readback_ref": "readback:wrong-root-title",
@@ -386,11 +445,11 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "protected-operation-already-started")
 
-    def test_given_v1_ready_observation_when_recorded_then_assignment_and_claim_remain_active(self) -> None:
-        """Given retired delivery evidence, readiness rejects it without releasing ownership."""
+    def test_given_newer_ready_observation_when_recorded_then_assignment_and_claim_remain_active(self) -> None:
+        """Given newer delivery evidence, readiness rejects it without releasing ownership."""
         self.start("v1-ready")
         self.create_worker("v1-ready")
-        error = self.ready_worker("v1-ready", schema_version=1, expected=2)
+        error = self.ready_worker("v1-ready", schema_version=2, expected=2)
         self.assertEqual(error["error"]["code"], "invalid-ready-observation")
         shown = self.invoke("run", "show", "--run-id", "v1-ready")
         self.assertEqual(shown["assignments"][0]["state"], "active")
@@ -447,6 +506,7 @@ class RunStateScenarios(unittest.TestCase):
 
     def test_given_local_only_repository_when_github_pr_is_requested_then_start_rejects_it(self) -> None:
         """Given no GitHub identity, when github-pr delivery is requested, then provider authority fails before state."""
+        self.database.unlink()
         identity = self.local_identity(self.common_a)
         manifest = self.manifest(
             "local-only-pr",
@@ -466,7 +526,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("delivery-mismatch", repositories=[(identity, self.common_a)])
         self.create_worker("delivery-mismatch")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "assignment_id": "spec-01",
             "thread_id": "thread-delivery-mismatch-1",
             "repository_identity": identity,
@@ -643,8 +703,9 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(result["acquired_assignment_ids"], ["spec-01", "spec-02"])
 
-    def test_given_state_writes_when_inspected_then_sqlite_is_the_only_lock(self) -> None:
-        """Given a writer, when state is initialized, then BEGIN IMMEDIATE and no lock file coordinate it."""
+    def test_given_state_writes_when_inspected_then_sqlite_coordinates_them_without_lockfile(self) -> None:
+        """Given a writer, SQLite owns the transaction and no filesystem lock is created."""
+        self.invoke("state", "prepare")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", ResourceWarning)
             namespace = runpy.run_path(str(TOOL), run_name="run_state_test")
@@ -657,7 +718,7 @@ class RunStateScenarios(unittest.TestCase):
                     connection.close()
             del namespace
             gc.collect()
-        self.assertFalse(any(self.database.parent.glob("*.lock")))
+        self.assertFalse(self.database.with_name("run-state.lock").exists())
 
     def test_given_busy_writer_when_timeout_expires_then_error_is_bounded(self) -> None:
         """Given a held transaction, when a second writer exceeds the fixed wait, then it fails state-busy."""
@@ -891,7 +952,7 @@ class RunStateScenarios(unittest.TestCase):
             "--operation-key", "create-ambiguous", "--action", "create-worker",
             "--subject-id", "spec-01",
         )
-        unknown = {"schema_version": 2, "status": "unknown"}
+        unknown = {"schema_version": 1, "status": "unknown"}
         self.invoke(
             "app-operation", "finish", "--run-id", "ambiguous-worker",
             "--expected-revision", self.revision("ambiguous-worker"),
@@ -908,7 +969,7 @@ class RunStateScenarios(unittest.TestCase):
         checkout = self.base / "checkout ambiguous worker"
         checkout.mkdir()
         succeeded = {
-            "schema_version": 2,
+            "schema_version": 1,
             "status": "succeeded",
             "receipt_ref": "receipt:create-ambiguous",
             "readback_ref": "readback:create-ambiguous",
@@ -940,7 +1001,7 @@ class RunStateScenarios(unittest.TestCase):
             "--subject-id", "spec-02",
         )
         stale = {
-            "schema_version": 2, "status": "succeeded",
+            "schema_version": 1, "status": "succeeded",
             "receipt_ref": "receipt:create-alias-2", "readback_ref": "readback:create-alias-2",
             "thread_id": "thread-alias-1", "project_id": "project-1",
             "checkout_path": str(self.base / "checkout alias 1"),
@@ -959,7 +1020,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("wrong-base")
         self.create_worker("wrong-base")
         observation = {
-            "schema_version": 2, "assignment_id": "spec-01",
+            "schema_version": 1, "assignment_id": "spec-01",
             "thread_id": "thread-wrong-base-1",
             "repository_identity": "github:example/project",
             "delivery_type": "github-pr", "head_sha": f"{101:040x}",
@@ -1106,7 +1167,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("missing-owner")
         self.start("missing-waiter")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "missing-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("missing-owner")),
@@ -1125,12 +1186,12 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(result["outcome"], "preimplementation-aborted")
         self.assertTrue(result["claim_acquired"])
 
-    def test_given_v1_recovery_observation_when_claim_reconciles_then_owners_are_unchanged(self) -> None:
-        """Given retired recovery evidence, reconciliation rejects it without transferring the claim."""
+    def test_given_newer_recovery_observation_when_claim_reconciles_then_owners_are_unchanged(self) -> None:
+        """Given newer recovery evidence, reconciliation rejects it without transferring the claim."""
         self.start("v1-recovery-owner")
         self.start("v1-recovery-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "v1-recovery-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("v1-recovery-owner")),
@@ -1160,7 +1221,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("owner-recovery")
         self.create_worker("owner-recovery")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "owner-recovery",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("owner-recovery")),
@@ -1196,7 +1257,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("active-owner-recovery")
         revision = self.revision("active-owner-recovery")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "active-owner-recovery",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(revision),
@@ -1222,7 +1283,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("retry-recovery-owner")
         self.start("retry-recovery-waiter")
         base = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "retry-recovery-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("retry-recovery-owner")),
@@ -1300,7 +1361,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("terminal-owner")
         self.start("terminal-waiter")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "terminal-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("terminal-owner")),
@@ -1329,7 +1390,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("active-owner")
         self.start("active-waiter")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "active-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("active-owner")),
@@ -1354,7 +1415,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("bound-owner")
         self.start("bound-waiter")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "bound-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("bound-owner")),
@@ -1379,7 +1440,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("unknown-owner")
         self.start("unknown-waiter")
         observation = {
-            "schema_version": 2,
+            "schema_version": 1,
             "owner_run_id": "unknown-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("unknown-owner")),
@@ -1421,7 +1482,7 @@ class RunStateScenarios(unittest.TestCase):
             expected=4,
         )
         self.assertEqual(relaunch["error"]["code"], "protected-operation-already-started")
-        observed = {"schema_version": 2, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
+        observed = {"schema_version": 1, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
         result = self.invoke(
             "app-operation", "finish", "--run-id", "recover", "--expected-revision", self.revision("recover"),
             "--operation-key", "bootstrap-recover", "--observation", str(self.write_json("reconciled.json", observed)),
@@ -1467,7 +1528,7 @@ class RunStateScenarios(unittest.TestCase):
             "--operation-key", "root-title-unknown", "--action", "set-root-title",
             "--subject-id", "root-no-receipt",
         )
-        observation = {"schema_version": 2, "status": "unknown"}
+        observation = {"schema_version": 1, "status": "unknown"}
         result = self.invoke(
             "app-operation", "finish", "--run-id", "no-receipt",
             "--expected-revision", self.revision("no-receipt"),
@@ -1494,34 +1555,197 @@ class RunStateScenarios(unittest.TestCase):
         with sqlite3.connect(self.database) as connection:
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
             columns = [row[1] for table in tables for row in connection.execute(f"PRAGMA table_info({table})")]
-            version = connection.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(tables, {"metadata", "runs", "assignments", "spec_claims", "app_operations"})
-        self.assertEqual(version, 2)
+            metadata = connection.execute(
+                "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
+            ).fetchall()
+        self.assertEqual(tables, {"runtime_metadata", "runs", "assignments", "spec_claims", "app_operations"})
+        self.assertEqual(metadata, [(1, 1, None)])
         self.assertNotIn("goal_state", columns)
         self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
-
-    def test_given_schema_one_database_when_read_then_runtime_rejects_it_byte_for_byte(self) -> None:
-        """Given an archived v1 database, when schema 2 inspects it, then rejection preserves every byte."""
-        self.start("schema-one")
+        before = self.database.read_bytes()
+        diagnosis = self.invoke("doctor")
+        self.assertFalse(diagnosis["writes_performed"])
+        self.assertEqual(self.database.read_bytes(), before)
         with sqlite3.connect(self.database) as connection:
-            connection.execute("ALTER TABLE runs ADD COLUMN goal_state TEXT")
-            connection.execute("UPDATE metadata SET value='1' WHERE key='schema_version'")
-            connection.execute("PRAGMA user_version=1")
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO runtime_metadata(singleton,schema_version) VALUES (2,1)"
+                )
+
+    def test_given_future_schema_two_and_drained_schema_one_then_state_is_regenerated_without_carry_forward(self) -> None:
+        """Given a future approved runtime and no old owners, it replaces schema 1 with empty schema 2."""
+        self.start("drained-v1")
+        self.invoke(
+            "run", "finish", "--run-id", "drained-v1",
+            "--expected-revision", self.revision("drained-v1"),
+            "--outcome", "preimplementation-aborted",
+        )
+        future = self.future_schema_two_tool()
+
+        diagnosis = self.invoke_tool(future, "doctor")
+        self.assertEqual(diagnosis["state"], "rebuild-ready")
+        self.assertFalse(diagnosis["ready"])
+        self.assertEqual(diagnosis["database_schema_version"], 1)
+        prepared = self.invoke_tool(future, "state", "prepare")
+        self.assertEqual(prepared["state"], "regenerated")
+        self.assertEqual(prepared["previous_schema_version"], 1)
+        self.assertTrue(prepared["regenerated"])
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (1, 2, None),
+            )
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
+        self.assertFalse(self.database.with_name("run-state.lock").exists())
+
+    def test_given_future_schema_two_and_active_schema_one_then_old_runtime_can_drain_under_fence(self) -> None:
+        """Given a future cut, new starts stop while the retained old runtime terminalizes its owner."""
+        self.start("active-v1")
+        future = self.future_schema_two_tool()
+        diagnosis = self.invoke_tool(future, "doctor")
+        self.assertEqual(diagnosis["state"], "waiting-for-schema-drain")
+        self.assertEqual(diagnosis["active_owner_runs"], 1)
+        unavailable = self.invoke_tool(future, "state", "prepare", expected=4)
+        self.assertEqual(
+            unavailable["error"]["code"],
+            "retained-runtime-unavailable",
+        )
+        prepared = self.invoke_tool(
+            future,
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(TOOL),
+        )
+        self.assertEqual(prepared["state"], "waiting-for-schema-drain")
+        self.assertEqual(prepared["active_owner_runs"], 1)
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (1, 2),
+            )
+        blocked = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("blocked-during-cut.json", self.manifest("blocked-during-cut"))),
+            expected=4,
+        )
+        self.assertEqual(blocked["error"]["code"], "state-cutover-in-progress")
+
+        self.invoke(
+            "run", "finish", "--run-id", "active-v1",
+            "--expected-revision", self.revision("active-v1"),
+            "--outcome", "preimplementation-aborted",
+        )
+        completed = self.invoke_tool(future, "state", "prepare")
+        self.assertEqual(completed["state"], "regenerated")
+        self.assertFalse(self.database.with_name("run-state.lock").exists())
+
+    def test_given_injected_recreate_failure_when_cutover_rolls_back_then_old_state_is_exact(self) -> None:
+        """Given DROP has begun, a creation failure rolls back both schema and rows."""
+        self.start("rollback-v1")
+        self.invoke(
+            "run", "finish", "--run-id", "rollback-v1",
+            "--expected-revision", self.revision("rollback-v1"),
+            "--outcome", "preimplementation-aborted",
+        )
+        future = self.future_schema_two_tool()
+        before_bytes = self.database.read_bytes()
+        with sqlite3.connect(self.database) as connection:
+            before_dump = tuple(connection.iterdump())
+
+        namespace = runpy.run_path(str(future), run_name="future_rollback_test")
+        original_create = namespace["create_schema"]
+
+        def fail_create(*_: object, **__: object) -> None:
+            raise sqlite3.OperationalError("injected schema creation failure")
+
+        namespace["recreate_schema_in_place"].__globals__["create_schema"] = fail_create
+        try:
+            with mock.patch.dict(os.environ, self.env, clear=True):
+                connection = namespace["open_database"](self.database, write=True)
+                try:
+                    connection.execute("BEGIN EXCLUSIVE")
+                    connection.execute(
+                        "UPDATE runtime_metadata SET target_schema_version=2 WHERE singleton=1"
+                    )
+                    with self.assertRaises(sqlite3.OperationalError):
+                        namespace["recreate_schema_in_place"](connection)
+                    connection.rollback()
+                finally:
+                    connection.close()
+        finally:
+            namespace["recreate_schema_in_place"].__globals__["create_schema"] = original_create
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(tuple(connection.iterdump()), before_dump)
+        self.assertEqual(self.database.read_bytes(), before_bytes)
+
+    def test_given_newer_schema_when_old_runtime_prepares_then_it_fails_closed(self) -> None:
+        """Given a newer DB, schema-1 runtime never destroys or downgrades it."""
+        self.start("newer-schema")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE runtime_metadata SET schema_version=2 WHERE singleton=1"
+            )
+        before = self.database.read_bytes()
+        doctor = self.invoke("doctor", expected=4)
+        self.assertEqual(doctor["error"]["code"], "unsupported-state-schema")
+        prepared = self.invoke("state", "prepare", expected=4)
+        self.assertEqual(prepared["error"]["code"], "unsupported-state-schema")
+        self.assertEqual(self.database.read_bytes(), before)
+
+    def test_given_future_cutover_fence_when_new_run_starts_then_existing_state_remains_readable(self) -> None:
+        """Given a later runtime has fenced starts, schema-1 may inspect owners but cannot create another run."""
+        self.start("fenced-owner")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE runtime_metadata SET target_schema_version=2 WHERE singleton=1"
+            )
+        error = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("fenced-new.json", self.manifest("fenced-new"))),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "state-cutover-in-progress")
+        shown = self.invoke("run", "show", "--run-id", "fenced-owner")
+        self.assertEqual(shown["status"], "active")
+        diagnosis = self.invoke("doctor")
+        self.assertEqual(diagnosis["state"], "cutover-in-progress")
+        self.assertFalse(diagnosis["ready"])
+
+    def test_given_unversioned_database_when_read_then_runtime_rejects_it_byte_for_byte(self) -> None:
+        """Given unversioned tables, schema 1 rejects them without destructive preparation."""
+        self.start("unversioned")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP TABLE runtime_metadata")
         before = self.database.read_bytes()
         error = self.invoke("doctor", expected=4)
         self.assertEqual(error["error"]["code"], "unsupported-state-schema")
         self.assertEqual(self.database.read_bytes(), before)
-        manifest = self.manifest("schema-two-write")
+        manifest = self.manifest("unversioned-write")
         write_error = self.invoke(
             "run", "start", "--manifest",
-            str(self.write_json("schema-two-write.json", manifest)),
+            str(self.write_json("unversioned-write.json", manifest)),
             expected=4,
         )
         self.assertEqual(write_error["error"]["code"], "unsupported-state-schema")
         self.assertEqual(self.database.read_bytes(), before)
 
+    def test_given_corrupt_database_when_doctor_runs_then_it_fails_closed_without_rewrite(self) -> None:
+        """Given corrupt bytes, read-only diagnosis reports failure and preserves them."""
+        self.database.write_bytes(b"not a sqlite database")
+        before = self.database.read_bytes()
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "state-database-error")
+        self.assertEqual(self.database.read_bytes(), before)
+
     def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
-        """Given a stale schema-2 DB, when opened, then exact structure fails closed and the file is preserved."""
+        """Given a stale schema-1 DB, when opened, then exact structure fails closed and the file is preserved."""
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
@@ -1529,19 +1753,17 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_two_with_stale_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
+    def test_given_schema_one_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
         """Given protocol metadata drift, doctor fails closed and preserves the database bytes."""
         self.start("stale-metadata")
         with sqlite3.connect(self.database) as connection:
-            connection.execute(
-                "UPDATE metadata SET value='1' WHERE key='schema_version'"
-            )
+            connection.execute("DELETE FROM runtime_metadata")
         before = self.database.read_bytes()
         error = self.invoke("doctor", expected=4)
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertEqual(self.database.read_bytes(), before)
 
-    def test_given_schema_two_without_claim_index_when_read_then_runtime_rejects_it(self) -> None:
+    def test_given_schema_three_without_claim_index_when_read_then_runtime_rejects_it(self) -> None:
         """Given a missing uniqueness constraint, exact schema validation prevents unsafe coordination."""
         self.start("missing-claim-index")
         with sqlite3.connect(self.database) as connection:
@@ -1550,7 +1772,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_two_with_extra_trigger_when_read_then_runtime_rejects_it(self) -> None:
+    def test_given_schema_three_with_extra_trigger_when_read_then_runtime_rejects_it(self) -> None:
         """Given an unexpected state mutation hook, exact schema validation rejects the database."""
         self.start("extra-trigger")
         with sqlite3.connect(self.database) as connection:
@@ -1565,7 +1787,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
 
     def test_given_same_number_schema_with_retired_input_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given the former integration-only state constraint, schema 2 rejects it before a later write."""
+        """Given the former integration-only state constraint, schema 1 rejects it before a later write."""
         self.start("stale-state-constraint")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")
@@ -1578,8 +1800,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_two_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given a stale schema-2 constraint, the runtime rejects it without migration or deletion."""
+    def test_given_schema_three_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
+        """Given a stale schema-1 constraint, the runtime rejects it without migration or deletion."""
         self.start("stale-capability-state")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")

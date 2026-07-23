@@ -41,7 +41,7 @@ Root is a lightweight control plane. Before mutation:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 1,
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "repositories": [
