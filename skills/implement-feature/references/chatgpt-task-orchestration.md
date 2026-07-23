@@ -129,25 +129,33 @@ until authoritative recovery or contract change permits that root to continue.
 
 Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
-durable-source change, an early AutoReview capability reroute, or an
-authoritative final-verification mismatch. An early review-owner follow-up
-contains only the structured doctor result and `review_owner=root`; it occurs
-before implementation and grants root review execution, not implementation
-authority. A new
+durable-source change, an early AutoReview capability reroute, a root-owned
+AutoReview result, or an authoritative final-verification mismatch. An early
+review-owner follow-up contains only the structured doctor result and
+`review_owner=root`; it occurs before implementation and grants root review
+execution, not implementation authority. A new
 peer-identity follow-up carries identity only; it does not introduce technical
 instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider
 refs when applicable.
+
+A root-owned AutoReview result follow-up contains only the structured findings
+and evidence refs returned by AutoReview, bound to the exact reviewed HEAD. It
+may report that the review is clean or identify review findings, but it must not
+add root-authored diagnosis, commands, implementation guidance, or repair
+strategy. The worker owns finding acceptance, repair, validation, and
+replacement evidence.
 
 Allowed example: “Final verification shows PR HEAD `def`, while validation
 evidence is bound to `abc`.”
 
 Forbidden example: “Rerun test X and modify file Y.”
 
-Root provides no diagnosis, commands, implementation guidance, checklist
-judgment, or repair strategy. Diagnosis, repair, validation, and replacement
-evidence remain worker-owned. Durable-contract drift is different: record the
-assignment as blocked instead of suggesting repair.
+Outside the verbatim structured AutoReview result, root provides no diagnosis,
+commands, implementation guidance, checklist judgment, or repair strategy.
+Diagnosis, repair, validation, and replacement evidence remain worker-owned.
+Durable-contract drift is different: record the assignment as blocked instead
+of suggesting repair.
 
 For a root-owned review, require the worker to build the review handoff with:
 

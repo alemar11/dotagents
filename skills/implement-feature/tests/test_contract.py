@@ -108,6 +108,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("review-candidate", worker)
         self.assertIn("--review-phase full", orchestration)
         self.assertIn("--evidence-output", orchestration)
+        self.assertIn("A root-owned AutoReview result follow-up contains only", orchestration)
+        self.assertIn("verbatim structured AutoReview result", orchestration)
 
     def test_given_bootstrap_recovery_when_state_is_ambiguous_then_actual_task_state_prevents_duplicates(self) -> None:
         """Given ambiguous delivery, when recovering, then root inspects the task before repeating and stores no body hash."""
