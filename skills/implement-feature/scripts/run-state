@@ -43,23 +43,18 @@ LOCAL_SPEC_REF_RE = re.compile(
 )
 
 APP_ACTIONS = {
-    "create-goal",
     "create-worker",
     "set-worker-title",
     "send-bootstrap",
     "send-worker-message",
     "set-root-title",
-    "update-goal-progress",
     "archive-worker",
-    "complete-goal",
 }
 SINGLE_USE_ACTIONS = {
-    "create-goal",
     "create-worker",
     "set-worker-title",
     "send-bootstrap",
     "archive-worker",
-    "complete-goal",
 }
 
 
@@ -146,7 +141,7 @@ def connect(*, write: bool) -> sqlite3.Connection:
 EXPECTED_SCHEMA_COLUMNS = {
     "metadata": ("key", "value"),
     "runs": (
-        "run_id", "root_task_id", "status", "goal_state", "implementation_started",
+        "run_id", "root_task_id", "status", "implementation_started",
         "revision", "created_at", "updated_at", "finished_at",
     ),
     "assignments": (
@@ -243,8 +238,6 @@ def create_schema(connection: sqlite3.Connection) -> None:
                 'pr-ready', 'local-branch-ready', 'delivery-ready',
                 'preimplementation-aborted'
             )),
-            goal_state TEXT NOT NULL DEFAULT 'not-created'
-                CHECK(goal_state IN ('not-created', 'active', 'completed')),
             implementation_started INTEGER NOT NULL DEFAULT 0 CHECK(implementation_started IN (0,1)),
             revision INTEGER NOT NULL,
             created_at TEXT NOT NULL,
@@ -784,7 +777,7 @@ def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
             "status": "active" if acquired else "waiting-for-spec",
             "acquired_assignment_ids": acquired,
             "waiting_assignments": waiting,
-            "may_create_goal_or_worker": bool(acquired),
+            "may_create_worker": bool(acquired),
             "max_unchanged_wait_sweeps": MAX_UNCHANGED_WAIT_SWEEPS,
         }
     except Exception:
@@ -911,9 +904,9 @@ def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
 
 def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action: str, subject_id: str) -> str | None:
     if action not in APP_ACTIONS:
-        raise StateError("invalid-app-action", f"unsupported ChatGPT task/Goal action: {action}")
+        raise StateError("invalid-app-action", f"unsupported ChatGPT task action: {action}")
     if run["status"] != "active":
-        raise StateError("run-not-active", f"ChatGPT task/Goal changes require active claimed state, found {run['status']}", 4)
+        raise StateError("run-not-active", f"ChatGPT task changes require active claimed state, found {run['status']}", 4)
     assignment_id: str | None = None
     if action in {"create-worker", "set-worker-title", "send-bootstrap", "send-worker-message", "archive-worker"}:
         assignment = get_assignment(connection, run["run_id"], subject_id)
@@ -923,12 +916,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             raise StateError(
                 "assignment-claim-not-active",
                 "worker task changes require the assignment's active Feature Spec claim",
-                4,
-            )
-        if run["goal_state"] != "active":
-            raise StateError(
-                "goal-not-active",
-                "worker task changes require the active root Goal",
                 4,
             )
         if action == "create-worker":
@@ -964,45 +951,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 )
     elif subject_id != run["root_task_id"]:
         raise StateError("invalid-app-subject", "root ChatGPT action subject must be root_task_id", 4)
-    if action == "create-goal" and run["goal_state"] != "not-created":
-        raise StateError("goal-already-created", "root Goal already exists", 4)
-    if action == "complete-goal":
-        if run["goal_state"] != "active":
-            raise StateError(
-                "goal-not-active",
-                "Goal completion requires this run's successfully created active Goal",
-                4,
-            )
-        unresolved = connection.execute(
-            """SELECT COUNT(*) FROM app_operations
-               WHERE run_id=? AND status IN ('pending','unknown')""",
-            (run["run_id"],),
-        ).fetchone()[0]
-        if unresolved:
-            raise StateError(
-                "unresolved-app-operations",
-                "reconcile every pending or unknown task/Goal change before Goal completion",
-                4,
-            )
-        states = [
-            row[0]
-            for row in connection.execute(
-                "SELECT state FROM assignments WHERE run_id=?", (run["run_id"],)
-            )
-        ]
-        delivery_complete = all(
-            state in {"pr-ready", "local-branch-ready"} for state in states
-        )
-        preimplementation_abort = (
-            not run["implementation_started"]
-            and all(state in {"planned", "preimplementation-aborted"} for state in states)
-        )
-        if not delivery_complete and not preimplementation_abort:
-            raise StateError(
-                "assignments-incomplete",
-                "Goal completion requires delivery-ready assignments or fully reconciled preimplementation abort",
-                4,
-            )
     return assignment_id
 
 
@@ -1047,15 +995,12 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
     common = {"schema_version", "status"}
     reconciliation_refs = {"receipt_ref", "readback_ref"}
     extra_by_action = {
-        "create-goal": {"observed_state"},
         "create-worker": {"thread_id", "project_id", "checkout_path", "git_common_dir", "observed_state"},
         "set-worker-title": {"thread_id", "observed_title"},
         "send-bootstrap": {"thread_id"},
         "send-worker-message": {"thread_id"},
         "set-root-title": {"observed_title"},
-        "update-goal-progress": {"observed_state"},
         "archive-worker": {"thread_id", "observed_state"},
-        "complete-goal": {"observed_state"},
     }
     if not common.issubset(value):
         raise StateError(
@@ -1091,11 +1036,7 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
 def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row, operation: sqlite3.Row, observed: dict[str, Any]) -> None:
     action = operation["action"]
     now = utc_now()
-    if action == "create-goal":
-        if observed["observed_state"] != "active":
-            raise StateError("invalid-app-readback", "created Goal must read back active", 4)
-        connection.execute("UPDATE runs SET goal_state='active' WHERE run_id=?", (run["run_id"],))
-    elif action == "create-worker":
+    if action == "create-worker":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         claim = assignment_claim(connection, run["run_id"], assignment["assignment_id"])
         common = Path(observed["git_common_dir"]).stat()
@@ -1148,10 +1089,6 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         if observed["thread_id"] != assignment["thread_id"] or observed["observed_state"] not in {"archived", "completed"}:
             raise StateError("worker-identity-drift", "archive readback is not terminal for the exact worker", 4)
         connection.execute("UPDATE assignments SET state='preimplementation-aborted',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
-    elif action == "complete-goal":
-        if observed["observed_state"] != "completed":
-            raise StateError("invalid-app-readback", "completed Goal must read back completed", 4)
-        connection.execute("UPDATE runs SET goal_state='completed' WHERE run_id=?", (run["run_id"],))
 
 
 def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
@@ -1721,7 +1658,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("run-not-finishable", f"run is {run['status']}", 4)
         unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND status IN ('pending','unknown')", (run_id,)).fetchone()[0]
         if unresolved:
-            raise StateError("unresolved-app-operations", "finish requires complete task/Goal change reconciliation", 4)
+            raise StateError("unresolved-app-operations", "finish requires complete task change reconciliation", 4)
         states = [row[0] for row in connection.execute("SELECT state FROM assignments WHERE run_id=?", (run_id,))]
         if args.outcome != "preimplementation-aborted":
             delivery_rows = list(
@@ -1734,11 +1671,11 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                 "github-pr": "pr-ready",
                 "local-branch": "local-branch-ready",
             }
-            if run["goal_state"] != "completed" or any(
+            if any(
                 row["state"] != expected_state[row["delivery_type"]]
                 for row in delivery_rows
             ):
-                raise StateError("run-incomplete", "delivery finish requires completed Goal and every assignment ready for its delivery type", 4)
+                raise StateError("run-incomplete", "delivery finish requires every assignment ready for its delivery type", 4)
             delivery_types = {row["delivery_type"] for row in delivery_rows}
             expected_outcome = (
                 "pr-ready" if delivery_types == {"github-pr"}
@@ -1759,12 +1696,10 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
         else:
             if run["implementation_started"]:
                 raise StateError("implementation-already-started", "preimplementation abort cannot release a post-bootstrap claim", 4)
-            if run["goal_state"] == "active" or any(
-                state not in {"planned", "preimplementation-aborted"} for state in states
-            ):
+            if any(state not in {"planned", "preimplementation-aborted"} for state in states):
                 raise StateError(
                     "preimplementation-not-reconciled",
-                    "preimplementation abort requires terminal Goal and worker readback",
+                    "preimplementation abort requires terminal worker readback",
                     4,
                 )
         now = utc_now()
@@ -1811,7 +1746,7 @@ def build_parser() -> argparse.ArgumentParser:
     wait.add_argument("--assignment-id", required=True)
     wait.add_argument("--expected-revision", type=int, required=True)
     wait.set_defaults(handler=command_run_wait_sweep, command_name="run wait-sweep")
-    show = run_commands.add_parser("show", help="read one run, its assignments, claims, and unresolved task/Goal changes")
+    show = run_commands.add_parser("show", help="read one run, its assignments, claims, and unresolved task changes")
     show.add_argument("--run-id", required=True)
     show.set_defaults(handler=command_run_show, command_name="run show")
     listing = run_commands.add_parser("list", help="list root runs")
@@ -1845,9 +1780,9 @@ def build_parser() -> argparse.ArgumentParser:
     abandon.add_argument("--owner-expected-revision", type=int, required=True)
     abandon.set_defaults(handler=command_claim_abandon, command_name="claim abandon")
 
-    operation = commands.add_parser("app-operation", help="record and reconcile one ChatGPT task/Goal change")
+    operation = commands.add_parser("app-operation", help="record and reconcile one ChatGPT task change")
     operation_commands = operation.add_subparsers(dest="operation_command", required=True)
-    begin = operation_commands.add_parser("begin", help="authorize one ChatGPT task/Goal change")
+    begin = operation_commands.add_parser("begin", help="authorize one ChatGPT task change")
     begin.add_argument("--run-id", required=True)
     begin.add_argument("--expected-revision", type=int, required=True)
     begin.add_argument("--operation-key", required=True)

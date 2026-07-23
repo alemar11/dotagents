@@ -28,7 +28,7 @@ authorization interaction:
 > Do you authorize me to create exactly these persistent projects in the
 > ChatGPT desktop app through Computer Use and then start the disclosed
 > implementation? Project creation is distinct from task creation. Otherwise I
-> will stop without creating run state, a Goal, claims, tasks, or worktrees.
+> will stop without creating run state, claims, tasks, or worktrees.
 
 Resolve an affirmative answer to
 `missing_project_action=create-projects` and
@@ -58,4 +58,4 @@ user question. Validation authority,
 recovery choices, operational clarifications, blockers, retries within the
 durable budget, and continuation are worker decisions. A stable contract change
 causes a declarative blocked result, not a question. `denied` stops before run
-state, Goal, task, worktree, claim, project, or provider mutation.
+state, task, worktree, claim, project, or provider mutation.

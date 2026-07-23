@@ -1,19 +1,19 @@
 # ChatGPT Task Orchestration
 
-Root alone creates or changes visible Codex tasks, titles, archives, and the
-lifecycle Goal through the ChatGPT desktop app. Root owns only controller
-bootstrap and the explicitly allowed controller follow-ups below. Workers never
-create tasks or manage the Goal; they send the bounded direct peer messages
-defined below without routing routine collaboration through root.
+Root alone creates or changes visible Codex tasks, titles, and archives through
+the ChatGPT desktop app. Root owns only controller bootstrap and the explicitly
+allowed controller follow-ups below. Workers never create tasks; they send the
+bounded direct peer messages defined below without routing routine
+collaboration through root.
 
 For every such change, root follows one crash-safe sequence:
 
 1. record the intended operation in SQLite before changing the ChatGPT desktop
-   task or Goal;
+   task;
 2. perform the change through the ChatGPT desktop app tools only when
    `app-operation begin` returns `launch_authorized=true`;
 3. use both the immediate tool response and an independent reading of the
-   actual task or Goal to finish the recorded operation;
+   actual task to finish the recorded operation;
 4. after an interruption, inspect the actual object first and record whether
    the change already happened;
 5. repeat the change only when authoritative evidence proves it had no effect.
@@ -23,32 +23,29 @@ stores only identity and reconciliation references, never prompts, message
 bodies, or hashes. `references/run-state.md` owns the exact `app-operation`,
 `receipt_ref`, and `readback_ref` machine fields.
 
-## Goal And Worker Creation
+## Root Title And Worker Creation
 
 This section is reachable only after the saved-project preflight and any
 explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
-1. Create the root lifecycle Goal and independently verify that it is active.
-2. Set and verify the exact root title. For one assignment use
+1. Set and verify the exact root title. For one assignment use
    `👨🏻‍💻 Feature Orchestrator`. For two or more use
    `👨🏻‍💻 Multi-Feature Orchestrator (R/N)`, where `N` is the immutable total
    and `R` counts assignments in `pr-ready` or `local-branch-ready`. Start at
    `0/N`; input-ready, blocked, active, and waiting assignments do not increment
    it. The title is UI evidence, never identity or durable state.
-3. Keep Goal progress coarse: scheduling, worker count, blocked, and final
-   verification. Do not mirror issue phases.
-4. For each claimed, path-disjoint assignment up to three,
+2. For each claimed, path-disjoint assignment up to three,
    create one visible Codex worker task with `environment=worktree` in the
    selected ChatGPT desktop project. The ChatGPT desktop app creates the
    worktree and assigns it to the task; root never runs `git worktree add`.
-5. Independently verify the stable task ID, checkout directory, and Git common
+3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
-6. Send one full bootstrap naming tracker backend, delivery type, source ref,
+4. Send one full bootstrap naming tracker backend, delivery type, source ref,
    repository, branch, allowed paths, issue graph, acceptance and validation
    budgets, safety, worker autonomy, checklist rules, final evidence, and every
    known peer's exact task, repository, branch, role, and checkout identity.
-7. Verify the message was delivered to that exact task. This starts complete
+5. Verify the message was delivered to that exact task. This starts complete
    implementation authority; there is no baseline-only prompt or later GO.
 
 After recovery, read the accepted bootstrap from the task conversation and
@@ -88,9 +85,18 @@ Read visible tasks at bounded intervals for coarse progress. Do not choose
 design, issue order, rewrites, tests, validation, review fixes, or checklist
 judgments for a coherent worker.
 
+While runnable workers remain nonterminal, root keeps the current turn open and
+uses bounded task waits. Worker progress or completion wakes that existing
+wait. Root returns a final response only for a delivery-ready,
+preimplementation-aborted, or declaratively blocked run. After a crash,
+ChatGPT desktop app restart, or premature task completion, continuation is
+manual in the exact same root task; recovery reads the unfinished run and
+authoritative task state before taking action. Never create a replacement root,
+heartbeat, or synthetic lifecycle for an unfinished run.
+
 ## Allowed Follow-Up Messages
 
-Root may send a follow-up only for recovered task/Goal facts, a newly created
+Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
 durable-source change, or an authoritative final-verification mismatch. A new
 peer-identity follow-up carries identity only; it does not introduce technical

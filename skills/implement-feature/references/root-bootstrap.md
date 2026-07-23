@@ -36,7 +36,7 @@ Root is a lightweight control plane. Before mutation:
    each selected path before confirmation, then rerun the complete read-only
    saved-project preflight. With `stop`, denied task permission, unavailable
    Computer Use, a locked host, ambiguous selection, or any mismatched
-   readback, stop before run state, claim, Goal, task, or worktree creation.
+   readback, stop before run state, claim, task, or worktree creation.
 7. Write a private manifest containing only controller identity:
 
 ```json
@@ -76,8 +76,8 @@ not worker recovery and task permission alone never authorizes it. Do not create
 a broader parent project as a diagnostic step. A failed or partial project
 setup is reported exactly and never converted into an active run.
 
-One root task may own only one unfinished run and lifecycle Goal. A second run
-from that task starts only after the first is terminal.
+One root task may own only one unfinished run. A second run from that task
+starts only after the first is terminal.
 
 Call `scripts/run-state --json run start --manifest <absolute-file>`. One
 transaction claims every free canonical Feature Spec and head branch and leaves
@@ -87,11 +87,11 @@ to the same claim identity. With `tracker_backend=local`, the globally
 unambiguous repository-scoped Spec path remains local even when the repository
 identity is `github:owner/repository`.
 
-When at least one assignment acquires its claim, create and read back the one
-root Goal, set title/progress, and schedule up to three disjoint claimed
-assignments. When every assignment waits, create no Goal, worker, worktree,
-branch, or provider mutation. Never use a default PR base such as `main` as a
-head-branch collision: only the implementation head branch is exclusive.
+When at least one assignment acquires its claim, set and verify the root title
+and schedule up to three disjoint claimed assignments. When every assignment
+waits, create no worker, worktree, branch, or provider mutation. Never use a
+default PR base such as `main` as a head-branch collision: only the
+implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
 `environment=worktree`. The ChatGPT desktop app creates the worktree and assigns

@@ -52,12 +52,11 @@ evidence. Record `send-worker-message` before sending, then verify both the
 immediate tool response and the exact visible task conversation before marking
 that send complete.
 
-After every assignment is ready, record the intended Goal completion in SQLite,
-perform it through the ChatGPT desktop app, read the same
-Goal back as completed, finish that recorded operation, and call
-`run finish` with `pr-ready`, `local-branch-ready`, or `delivery-ready` for a
-mixed vector. Run finish verifies assignment-level release already occurred;
-it does not perform a repository-wide release. No terminal result merges.
+After every assignment is ready, call `run finish` with `pr-ready`,
+`local-branch-ready`, or `delivery-ready` for a mixed vector. Run finish
+verifies that task operations are reconciled and assignment-level release
+already occurred; it does not perform a repository-wide release. No terminal
+result merges.
 
 An ordinary worker may first be recorded as `peer-input-ready`; its task and
 claim stay available while its exact HEAD becomes available to dependent peers
@@ -79,7 +78,6 @@ Before one assignment's bootstrap authority, a verified abort may archive its
 exact created worker, reconcile its recorded task changes, and call
 `assignment abort`
 to release only its claim. A whole run that never started implementation may
-then complete any created Goal and call
-`run finish --outcome preimplementation-aborted`. After an assignment's
+then call `run finish --outcome preimplementation-aborted`. After an assignment's
 bootstrap authority, ordinary abort is forbidden; terminal owner recovery
 follows `claim-waits-and-recovery.md`.

@@ -16,21 +16,21 @@ closure.
 The root coordinates; each visible Codex worker task executes one Feature Spec
 end to end in the ChatGPT-created worktree assigned to that task. A worker that remains within the durable
 contract and continues producing coherent progress and evidence must not be
-micromanaged. Root owns scheduling, one lifecycle Goal, canonical Feature Spec
-claims, safely recorded task and Goal changes, coarse status, and read-only final
+micromanaged. Root owns scheduling, canonical Feature Spec claims, safely
+recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, reviews and fixes, tracker proof, and
 its final delivery-ready evidence.
 
-Never set the root lifecycle Goal to `blocked`. When a run, assignment, worker,
-host, or ChatGPT desktop app capability is blocked, keep the root Goal active and represent the
-blocked condition only in Goal progress and run state. Retry recoverable work
-within the same root and complete the Goal only at a terminal run outcome.
-
-An idle or interrupted root task with an active lifecycle Goal remains the sole
-controller for that run. Resume the exact root task and run; task idleness does
-not make the Goal terminal. Never create a replacement root for the same run or
-delivery vector while the original root Goal and run remain active.
+A root task that owns an unfinished run remains the sole controller for that
+run. During executable work, root keeps its current turn open and monitors
+workers with bounded task waits until the run is delivery-ready,
+preimplementation-aborted, or declaratively blocked with no runnable work.
+An unexpected task interruption does not make the run terminal: manually
+resume the exact root task and run, reconstruct current state from authoritative
+sources, and never create a replacement controller while that run is
+unfinished. Do not add a heartbeat, persist the objective, or invent a second
+lifecycle state.
 
 A recoverable pre-bootstrap worker or ChatGPT desktop app failure must not abort the assignment
 or release its claim. Reconcile the failed ChatGPT desktop app operation, keep the assignment
@@ -54,7 +54,7 @@ continuation question during the run.
    delivery type, and exact saved Git-project mapping before state. Resolve the
    one startup authorization interaction only after this read-only preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
-   path or stop before run state, claim, Goal, task, or worktree creation.
+   path or stop before run state, claim, task, or worktree creation.
 2. Start `scripts/run-state`. It uses one per-user schema-1 SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`. SQLite
    transactions and the fixed busy timeout are the only writer lock.
@@ -62,8 +62,8 @@ continuation question during the run.
    Different Specs and head branches may run under different roots in the same
    repository. Keep a conflicting assignment in its bounded Spec wait without
    blocking claims already acquired by sibling assignments.
-4. When at least one assignment owns its claim, create and read back the one
-   root Goal. Schedule up to three path-disjoint Feature Specs; serialize
+4. When at least one assignment owns its claim, set and verify the root title,
+   then schedule up to three path-disjoint Feature Specs; serialize
    overlap inside this root. Dependency-related peers may start before their
    input HEADs stabilize so they can collaborate, but final proof must bind the
    exact prerequisite revisions. Never create a worker for an
@@ -74,7 +74,7 @@ continuation question during the run.
 6. Let the worker follow `references/worker-execution.md` and
    `references/tracker-checklists.md` autonomously. Monitor coarse progress by
    reading the visible tasks. After an interruption, check whether each recorded
-   task or Goal change already happened before deciding whether it is safe to
+   task change already happened before deciding whether it is safe to
    repeat.
    Multi-repository workers communicate directly using the exact peer task and
    checkout identities supplied by root. Each worker operates only in its own
@@ -86,8 +86,8 @@ continuation question during the run.
    judging criteria. For local-branch delivery, use `scripts/verify-ready` for
    the deterministic Git and tracker snapshot instead of composing shell
    probes. Complete each assignment claim when its root-verified
-   evidence reaches `pr-ready` or `local-branch-ready`, then complete the Goal
-   and run only when the whole requested delivery vector is ready.
+   evidence reaches `pr-ready` or `local-branch-ready`, then finish the run only
+   when the whole requested delivery vector is ready.
 
 If a worker observes compatible operational change, it adopts it and continues.
 If a stable durable field changes, it records `assignment block` and stops
@@ -101,7 +101,8 @@ own Feature Spec claim; independent assignments continue.
   startup mutation.
 - Workers load `references/worker-execution.md` and `references/tracker-checklists.md`.
 - Load `references/claim-waits-and-recovery.md` for claim waits, compaction,
-  interrupted task, Goal, title, message, or archive changes, or blocked workers.
+  interrupted root or worker tasks, title, message, or archive changes, or
+  blocked workers.
 - Load `references/final-verification.md` for final verification and closeout.
 - Load `references/run-state.md` for exact CLI shapes, errors, maintenance, or
   state recovery.

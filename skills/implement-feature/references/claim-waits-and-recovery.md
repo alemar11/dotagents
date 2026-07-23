@@ -20,6 +20,15 @@ branches may run under different roots in the same repository.
 
 ## Concrete Interruption Scenarios
 
+### The root task was interrupted
+
+An unfinished run keeps its exact `root_task_id` as the sole controller
+identity. Resume that same visible root task manually, read `run show`, and
+reconcile every pending or unknown task operation against authoritative
+ChatGPT desktop task state before scheduling or repeating work. Never create a
+replacement root, infer completion from task idleness, persist the objective,
+or use a heartbeat as lifecycle state.
+
 ### Worker creation may already have happened
 
 If root was interrupted after requesting a visible worker but before recording

@@ -149,9 +149,6 @@ class RunStateScenarios(unittest.TestCase):
             "--observation", str(self.write_json(f"{key}-{status}.json", observation)),
         )
 
-    def create_goal(self, run_id: str) -> None:
-        self.operation(run_id, f"goal-{run_id}", "create-goal", f"root-{run_id}", {"observed_state": "active"})
-
     def create_worker(self, run_id: str, number: int = 1) -> None:
         assignment = f"spec-{number:02d}"
         thread = f"thread-{run_id}-{number}"
@@ -251,14 +248,12 @@ class RunStateScenarios(unittest.TestCase):
         return self.invoke(*arguments, expected=expected)
 
     def finish_pr_ready(self, run_id: str) -> None:
-        self.operation(run_id, f"complete-{run_id}", "complete-goal", f"root-{run_id}", {"observed_state": "completed"})
         self.invoke(
             "run", "finish", "--run-id", run_id,
             "--expected-revision", self.revision(run_id), "--outcome", "pr-ready",
         )
 
     def finish_local_ready(self, run_id: str) -> None:
-        self.operation(run_id, f"complete-{run_id}", "complete-goal", f"root-{run_id}", {"observed_state": "completed"})
         self.invoke(
             "run", "finish", "--run-id", run_id,
             "--expected-revision", self.revision(run_id), "--outcome", "local-branch-ready",
@@ -278,7 +273,6 @@ class RunStateScenarios(unittest.TestCase):
         manifest = self.manifest("local-only", repositories=[(identity, self.common_a)])
         manifest["assignments"][0]["source_spec_ref"] = "planning/features/feature-1/SPEC.md"
         self.invoke("run", "start", "--manifest", str(self.write_json("local-only.json", manifest)))
-        self.create_goal("local-only")
         self.create_worker("local-only")
         ready = self.ready_local_worker("local-only", repository_identity=identity)
         self.assertEqual(ready["state"], "local-branch-ready")
@@ -315,7 +309,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_local_tracker_when_delivery_is_github_pr_then_provider_closeout_remains_supported(self) -> None:
         """Given local Markdown tracking, when delivery is github-pr, then source and PR transports stay independent."""
         self.start("local-tracker-pr", tracker_backend="local", delivery_type="github-pr")
-        self.create_goal("local-tracker-pr")
         self.create_worker("local-tracker-pr")
         self.ready_worker("local-tracker-pr")
         self.finish_pr_ready("local-tracker-pr")
@@ -342,7 +335,6 @@ class RunStateScenarios(unittest.TestCase):
         """Given local-branch authority, when GitHub-ready evidence is supplied, then the typed mismatch is rejected."""
         identity = self.local_identity(self.common_a)
         self.start("delivery-mismatch", repositories=[(identity, self.common_a)])
-        self.create_goal("delivery-mismatch")
         self.create_worker("delivery-mismatch")
         observation = {
             "schema_version": 1,
@@ -379,7 +371,6 @@ class RunStateScenarios(unittest.TestCase):
         """Given local delivery, when the branch is dirty or detached, then no terminal claim release occurs."""
         identity = self.local_identity(self.common_a)
         self.start("dirty-local", repositories=[(identity, self.common_a)])
-        self.create_goal("dirty-local")
         self.create_worker("dirty-local")
         dirty = self.ready_local_worker(
             "dirty-local", repository_identity=identity,
@@ -390,7 +381,6 @@ class RunStateScenarios(unittest.TestCase):
         self.finish_local_ready("dirty-local")
 
         self.start("detached-local", repositories=[(identity, self.common_a)])
-        self.create_goal("detached-local")
         self.create_worker("detached-local")
         detached = self.ready_local_worker(
             "detached-local", repository_identity=identity,
@@ -409,7 +399,6 @@ class RunStateScenarios(unittest.TestCase):
         manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
         manifest["assignments"][2]["prerequisite_assignment_ids"] = ["spec-02"]
         self.invoke("run", "start", "--manifest", str(self.write_json("integration-vector.json", manifest)))
-        self.create_goal("integration-vector")
         for number in (2, 1, 3):
             self.create_worker("integration-vector", number)
         partial = self.ready_local_worker(
@@ -454,7 +443,6 @@ class RunStateScenarios(unittest.TestCase):
         )
         manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
         self.invoke("run", "start", "--manifest", str(self.write_json("peer-block.json", manifest)))
-        self.create_goal("peer-block")
         self.create_worker("peer-block", 1)
         self.ready_local_worker(
             "peer-block", number=1, repository_identity=identity, peer_input=True,
@@ -470,7 +458,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_runtime_topology_is_unavailable_when_worker_blocks_then_capability_is_distinct(self) -> None:
         """Given post-bootstrap App limitations, capability blocking is not misclassified as contract drift."""
         self.start("capability-block")
-        self.create_goal("capability-block")
         self.create_worker("capability-block")
         blocked = self.invoke(
             "assignment", "capability-block", "--run-id", "capability-block",
@@ -490,7 +477,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(list(self.database.parent.glob("*.sqlite3")), [self.database])
 
     def test_given_one_root_task_when_second_unfinished_run_starts_then_it_is_rejected(self) -> None:
-        """Given a root task owns an active run, when it starts another disjoint run, then one Goal owner is preserved."""
+        """Given a root task owns an active run, when it starts another disjoint run, then one controller is preserved."""
         self.start("first-root", repositories=[("github:example/a", self.common_a)])
         second = self.manifest("second-root", repositories=[("github:example/b", self.common_b)])
         second["root_task_id"] = "root-first-root"
@@ -579,9 +566,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(first["acquired_assignment_ids"], ["spec-01"])
         self.assertEqual(second["acquired_assignment_ids"], ["spec-01"])
-        self.assertTrue(second["may_create_goal_or_worker"])
-        self.create_goal("first-spec")
-        self.create_goal("second-spec")
+        self.assertTrue(second["may_create_worker"])
         self.create_worker("first-spec")
         self.create_worker("second-spec")
         self.assertEqual(self.invoke("run", "show", "--run-id", "first-spec")["assignments"][0]["state"], "active")
@@ -639,14 +624,13 @@ class RunStateScenarios(unittest.TestCase):
         result = self.invoke("run", "start", "--manifest", str(self.write_json("multi.json", manifest)))
         self.assertEqual(result["acquired_assignment_ids"], ["spec-01"])
         self.assertEqual(result["waiting_assignments"][0]["assignment_id"], "spec-02")
-        self.assertTrue(result["may_create_goal_or_worker"])
+        self.assertTrue(result["may_create_worker"])
         shown = self.invoke("run", "show", "--run-id", "multi")
         self.assertEqual([row["active"] for row in shown["spec_claims"]], [1, 0])
 
     def test_given_three_same_repo_specs_when_bootstrapped_then_each_has_its_own_claim(self) -> None:
         """Given three disjoint Specs in one repo, when dispatched, then each worker has one Spec claim."""
         self.start("three", assignment_count=3)
-        self.create_goal("three")
         for number in (1, 2, 3):
             self.create_worker("three", number)
         shown = self.invoke("run", "show", "--run-id", "three")
@@ -657,7 +641,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_three_live_workers_when_fourth_creation_begins_then_capacity_blocks(self) -> None:
         """Given three live workers, when root tries a fourth, then the generic coordinator serializes it."""
         self.start("four", assignment_count=4)
-        self.create_goal("four")
         for number in (1, 2, 3):
             self.create_worker("four", number)
         error = self.invoke(
@@ -677,7 +660,6 @@ class RunStateScenarios(unittest.TestCase):
         )
         manifest["assignments"][3]["prerequisite_assignment_ids"] = ["spec-01"]
         self.invoke("run", "start", "--manifest", str(self.write_json("parked-peer.json", manifest)))
-        self.create_goal("parked-peer")
         for number in (1, 2, 3):
             self.create_worker("parked-peer", number)
         parked = self.ready_local_worker(
@@ -690,32 +672,31 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(states["spec-01"], "peer-input-ready")
         self.assertEqual(states["spec-04"], "active")
 
-    def test_given_no_root_goal_when_worker_creation_begins_then_controller_rejects_it(self) -> None:
-        """Given claimed state but no Goal, when worker creation begins, then bootstrap authority cannot start."""
-        self.start("no-goal")
-        error = self.invoke(
-            "app-operation", "begin", "--run-id", "no-goal",
-            "--expected-revision", self.revision("no-goal"),
+    def test_given_active_run_and_claim_when_worker_creation_begins_then_controller_authorizes_it(self) -> None:
+        """Given claimed state, when worker creation begins, then the unfinished run provides authority."""
+        self.start("worker-ready")
+        result = self.invoke(
+            "app-operation", "begin", "--run-id", "worker-ready",
+            "--expected-revision", self.revision("worker-ready"),
             "--operation-key", "early-worker", "--action", "create-worker",
-            "--subject-id", "spec-01", expected=4,
+            "--subject-id", "spec-01",
         )
-        self.assertEqual(error["error"]["code"], "goal-not-active")
+        self.assertTrue(result["launch_authorized"])
 
-    def test_given_no_root_goal_when_goal_completion_begins_then_controller_rejects_it(self) -> None:
-        """Given planned preimplementation state but no created Goal, when completion begins, then unrelated Goal mutation is blocked."""
-        self.start("no-goal-complete")
-        error = self.invoke(
-            "app-operation", "begin", "--run-id", "no-goal-complete",
-            "--expected-revision", self.revision("no-goal-complete"),
-            "--operation-key", "early-complete", "--action", "complete-goal",
-            "--subject-id", "root-no-goal-complete", expected=4,
+    def test_given_planned_preimplementation_state_when_run_aborts_then_claim_releases_directly(self) -> None:
+        """Given only planned work, when the run aborts, then no artificial lifecycle step is required."""
+        self.start("planned-abort")
+        result = self.invoke(
+            "run", "finish", "--run-id", "planned-abort",
+            "--expected-revision", self.revision("planned-abort"),
+            "--outcome", "preimplementation-aborted",
         )
-        self.assertEqual(error["error"]["code"], "goal-not-active")
+        self.assertEqual(result["outcome"], "preimplementation-aborted")
+        self.assertTrue(result["claims_released"])
 
-    def test_given_unresolved_app_effect_when_goal_completion_begins_then_controller_rejects_it(self) -> None:
-        """Given PR-ready delivery and an unknown App effect, when Goal completion begins, then reconciliation comes first."""
+    def test_given_unresolved_app_effect_when_run_finishes_then_controller_rejects_it(self) -> None:
+        """Given PR-ready delivery and an unknown App effect, when the run finishes, then reconciliation comes first."""
         self.start("unresolved")
-        self.create_goal("unresolved")
         self.create_worker("unresolved")
         self.ready_worker("unresolved")
         self.operation(
@@ -723,17 +704,15 @@ class RunStateScenarios(unittest.TestCase):
             {"observed_title": "Implementing"}, status="unknown",
         )
         error = self.invoke(
-            "app-operation", "begin", "--run-id", "unresolved",
+            "run", "finish", "--run-id", "unresolved",
             "--expected-revision", self.revision("unresolved"),
-            "--operation-key", "complete-too-early", "--action", "complete-goal",
-            "--subject-id", "root-unresolved", expected=4,
+            "--outcome", "pr-ready", expected=4,
         )
         self.assertEqual(error["error"]["code"], "unresolved-app-operations")
 
     def test_given_existing_worker_identity_when_stale_readback_reuses_it_then_binding_fails(self) -> None:
         """Given one worker/worktree binding, when another assignment receives the same readback, then it cannot alias."""
         self.start("alias", assignment_count=2)
-        self.create_goal("alias")
         self.create_worker("alias", 1)
         self.invoke(
             "app-operation", "begin", "--run-id", "alias",
@@ -759,7 +738,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_nondefault_pr_base_when_ready_is_recorded_then_controller_rejects_it(self) -> None:
         """Given provider default main but PR base release, when root records ready, then claims cannot release."""
         self.start("wrong-base")
-        self.create_goal("wrong-base")
         self.create_worker("wrong-base")
         observation = {
             "schema_version": 1, "assignment_id": "spec-01",
@@ -796,14 +774,14 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(result["may_create_worker"])
 
     def test_given_unchanged_owner_when_three_sweeps_pass_then_waiter_blocks_before_app_objects(self) -> None:
-        """Given an active owner, when three unchanged sweeps pass, then waiter terminates before Goal or task."""
+        """Given an active owner, when three unchanged sweeps pass, then waiter terminates before any visible task."""
         self.start("owner")
         self.start("waiter")
         for _ in range(3):
             result = self.invoke("run", "wait-sweep", "--run-id", "waiter", "--assignment-id", "spec-01", "--expected-revision", self.revision("waiter"))
         self.assertEqual(result["state"], "blocked-by-active-spec")
         shown = self.invoke("run", "show", "--run-id", "waiter")
-        self.assertEqual(shown["goal_state"], "not-created")
+        self.assertNotIn("goal_state", shown)
         self.assertTrue(all(row["thread_id"] is None for row in shown["assignments"]))
         self.assertEqual(shown["unresolved_app_operations"], [])
         self.assertEqual(result["conflicting_owner"]["root_task_id"], "root-owner")
@@ -811,7 +789,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_same_owner_adds_worker_when_wait_sweeps_continue_then_bound_does_not_reset(self) -> None:
         """Given one Spec owner, when its worker list changes, then stable owner identity keeps the wait bounded."""
         self.start("churn-owner", assignment_count=2)
-        self.create_goal("churn-owner")
         self.start("churn-waiter")
         first = self.invoke(
             "run", "wait-sweep", "--run-id", "churn-waiter",
@@ -836,7 +813,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_post_bootstrap_durable_block_when_other_root_waits_then_no_takeover_occurs(self) -> None:
         """Given Root A has worker authority and blocks, when Root B waits, then A retains the repository."""
         self.start("owner")
-        self.create_goal("owner")
         self.create_worker("owner")
         result = self.invoke(
             "assignment", "block", "--run-id", "owner", "--expected-revision", self.revision("owner"),
@@ -852,7 +828,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_one_assignment_blocks_when_sibling_is_active_then_run_continues_sibling(self) -> None:
         """Given one durable-contract block, when a sibling is active, then only the blocked Spec retains its claim."""
         self.start("partial-block", assignment_count=2)
-        self.create_goal("partial-block")
         self.create_worker("partial-block", 1)
         self.create_worker("partial-block", 2)
         result = self.invoke(
@@ -864,9 +839,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual([row["state"] for row in shown["assignments"]], ["blocked-durable-contract", "active"])
 
     def test_given_prebootstrap_abort_when_finished_then_claim_releases(self) -> None:
-        """Given a Goal and worker but no bootstrap authority, when both reconcile terminal, then claim releases."""
+        """Given a worker without bootstrap authority, when it reconciles terminal, then the claim releases."""
         self.start("abort")
-        self.create_goal("abort")
         assignment = "spec-01"
         thread = "thread-abort-1"
         checkout = self.base / "abort checkout"
@@ -878,10 +852,6 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             "abort", "archive-abort", "archive-worker", assignment,
             {"thread_id": thread, "observed_state": "archived"},
-        )
-        self.operation(
-            "abort", "complete-abort", "complete-goal", "root-abort",
-            {"observed_state": "completed"},
         )
         result = self.invoke("run", "finish", "--run-id", "abort", "--expected-revision", self.revision("abort"), "--outcome", "preimplementation-aborted")
         self.assertTrue(result["claims_released"])
@@ -925,23 +895,22 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(result["claim_acquired"])
 
     def test_given_confirmed_failed_app_operation_when_retried_then_new_key_is_allowed(self) -> None:
-        """Given readback proves no Goal was created, when root retries, then a new operation key may launch."""
+        """Given readback proves no worker was created, when root retries, then a new operation key may launch."""
         self.start("retry")
         self.operation(
-            "retry", "goal-failed", "create-goal", "root-retry", {}, status="failed"
+            "retry", "worker-failed", "create-worker", "spec-01", {}, status="failed"
         )
         result = self.invoke(
             "app-operation", "begin", "--run-id", "retry",
             "--expected-revision", self.revision("retry"),
-            "--operation-key", "goal-retry", "--action", "create-goal",
-            "--subject-id", "root-retry",
+            "--operation-key", "worker-retry", "--action", "create-worker",
+            "--subject-id", "spec-01",
         )
         self.assertTrue(result["launch_authorized"])
 
     def test_given_pr_ready_release_when_independent_root_starts_then_it_acquires(self) -> None:
         """Given an independent Spec after PR-ready release, when it starts, then merge is not required for ownership."""
         self.start("first")
-        self.create_goal("first")
         self.create_worker("first")
         self.ready_worker("first")
         self.finish_pr_ready("first")
@@ -951,7 +920,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_one_assignment_ready_when_sibling_remains_active_then_only_ready_claim_releases(self) -> None:
         """Given two workers, when one becomes PR-ready, then its Spec claim releases without ending the run."""
         self.start("partial-ready", assignment_count=2)
-        self.create_goal("partial-ready")
         self.create_worker("partial-ready", 1)
         self.create_worker("partial-ready", 2)
         result = self.ready_worker("partial-ready", 1)
@@ -959,12 +927,11 @@ class RunStateScenarios(unittest.TestCase):
         shown = self.invoke("run", "show", "--run-id", "partial-ready")
         self.assertEqual([row["active"] for row in shown["spec_claims"]], [0, 1])
         self.assertEqual(shown["status"], "active")
-        self.assertEqual(shown["goal_state"], "active")
+        self.assertNotIn("goal_state", shown)
 
     def test_given_terminal_postbootstrap_owner_when_waiter_reconciles_then_claim_transfers_atomically(self) -> None:
         """Given authoritative terminal worker proof, when waiter reconciles, then old work is abandoned and the Spec acquires."""
         self.start("terminal-owner")
-        self.create_goal("terminal-owner")
         self.create_worker("terminal-owner")
         self.start("terminal-waiter")
         observation = {
@@ -994,7 +961,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_active_owner_when_waiter_reconciles_then_claim_is_preserved(self) -> None:
         """Given authoritative active worker proof, when waiter reconciles, then no takeover or revision change occurs."""
         self.start("active-owner")
-        self.create_goal("active-owner")
         self.create_worker("active-owner")
         self.start("active-waiter")
         observation = {
@@ -1020,7 +986,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_terminal_worker_with_bound_checkout_when_reconciled_then_claim_is_preserved(self) -> None:
         """Given a completed task still owns its checkout, when reconciled, then a duplicate branch worktree cannot start."""
         self.start("bound-owner")
-        self.create_goal("bound-owner")
         self.create_worker("bound-owner")
         self.start("bound-waiter")
         observation = {
@@ -1046,7 +1011,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_unknown_recovery_when_explicit_abandon_runs_then_exact_claim_transfers(self) -> None:
         """Given irrecoverable App evidence, when explicit abandon is invoked, then only that Spec claim transfers."""
         self.start("unknown-owner")
-        self.create_goal("unknown-owner")
         self.create_worker("unknown-owner")
         self.start("unknown-waiter")
         observation = {
@@ -1079,7 +1043,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_unknown_bootstrap_effect_when_readback_arrives_then_same_key_reconciles(self) -> None:
         """Given ambiguous App delivery, when receipt readback resolves, then the same key succeeds without hashes."""
         self.start("recover")
-        self.create_goal("recover")
         assignment = "spec-01"
         thread = "thread-recover-1"
         checkout = self.base / "recover checkout"
@@ -1106,7 +1069,6 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_unknown_bootstrap_when_archive_begins_then_worker_is_preserved(self) -> None:
         """Given bootstrap may have delivered, when preimplementation archive begins, then reconciliation is mandatory."""
         self.start("archive-unknown")
-        self.create_goal("archive-unknown")
         assignment = "spec-01"
         thread = "thread-archive-unknown-1"
         checkout = self.base / "archive unknown checkout"
@@ -1137,14 +1099,14 @@ class RunStateScenarios(unittest.TestCase):
         self.invoke(
             "app-operation", "begin", "--run-id", "no-receipt",
             "--expected-revision", self.revision("no-receipt"),
-            "--operation-key", "goal-unknown", "--action", "create-goal",
+            "--operation-key", "root-title-unknown", "--action", "set-root-title",
             "--subject-id", "root-no-receipt",
         )
         observation = {"schema_version": 1, "status": "unknown"}
         result = self.invoke(
             "app-operation", "finish", "--run-id", "no-receipt",
             "--expected-revision", self.revision("no-receipt"),
-            "--operation-key", "goal-unknown",
+            "--operation-key", "root-title-unknown",
             "--observation", str(self.write_json("unknown-no-receipt.json", observation)),
         )
         self.assertEqual(result["status"], "unknown")
@@ -1153,9 +1115,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertIsNone(operations["operations"][0]["readback_ref"])
 
     def test_given_post_bootstrap_worker_when_preimplementation_finish_is_attempted_then_release_fails(self) -> None:
-        """Given worker authority has started, when root requests pre-GO release, then the claim remains."""
+        """Given worker authority has started, when root requests preimplementation release, then the claim remains."""
         self.start("started")
-        self.create_goal("started")
         self.create_worker("started")
         error = self.invoke("run", "finish", "--run-id", "started", "--expected-revision", self.revision("started"), "--outcome", "preimplementation-aborted", expected=4)
         self.assertEqual(error["error"]["code"], "implementation-already-started")
@@ -1171,6 +1132,7 @@ class RunStateScenarios(unittest.TestCase):
             version = connection.execute("PRAGMA user_version").fetchone()[0]
         self.assertEqual(tables, {"metadata", "runs", "assignments", "spec_claims", "app_operations"})
         self.assertEqual(version, 1)
+        self.assertNotIn("goal_state", columns)
         self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
 
     def test_given_previous_schema_one_shape_when_read_then_runtime_rejects_without_migration(self) -> None:

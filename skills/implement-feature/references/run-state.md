@@ -107,9 +107,9 @@ constraint.
 
 `run start` acquires free assignment claims independently. Waiting is tracked
 per assignment, so a conflict never prevents sibling claims from starting.
-Worker creation and bootstrap require that assignment's active claim and the
-root's active Goal. A root still owns only one unfinished run and one lifecycle
-Goal, and at most three workers may be live.
+Worker creation and bootstrap require an active run and that assignment's
+active claim. A root owns only one unfinished run, and at most three workers may
+be live.
 
 `assignment ready` validates delivery-specific typed evidence, atomically
 records normal Git facts, and releases that assignment's claim.

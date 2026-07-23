@@ -41,8 +41,8 @@ The successful result must match `delivery_type`. `github-pr` returns
 `local-branch` returns `local-branch-ready` with exact repository and checkout
 identity, named target branch and HEAD, base branch and base SHA ancestry, clean
 worktree, current-head validation and reviews, committed tracker readback, no
-unresolved recorded task/Goal changes, warnings, and changed paths. Coherent progress needs
-no root intervention.
+unresolved recorded task changes, warnings, and changed paths. Coherent progress
+needs no root intervention.
 
 ## Peer Collaboration And Combined Proof
 

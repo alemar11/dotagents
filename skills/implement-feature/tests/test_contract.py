@@ -110,7 +110,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """Given overlap in one repository, when scheduling, then root serializes while disjoint work may reach three."""
         skill = self.text("SKILL.md")
         orchestration = self.text("references/chatgpt-task-orchestration.md")
-        self.assertIn("Schedule up to three path-disjoint", skill)
+        self.assertIn("schedule up to three path-disjoint", skill)
         self.assertIn("overlapping paths or issue dependencies serialize", self.text("references/feature-spec-contract.md"))
         self.assertIn("At most three workers may be executing", orchestration)
         self.assertIn("`peer-input-ready` is parked", orchestration)
@@ -124,6 +124,22 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("`R` counts assignments", orchestration)
         self.assertIn("Start at `0/N`", orchestration)
         self.assertIn("The title is UI evidence, never identity or durable state", orchestration)
+
+    def test_given_goal_free_controller_when_runtime_is_inspected_then_run_and_task_own_lifecycle(self) -> None:
+        """Given the lean controller, runtime state and task liveness replace synthetic lifecycle state."""
+        runtime = self.runtime_text()
+        source = self.text("scripts/run-state")
+        skill = self.normalized(self.text("SKILL.md"))
+        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        self.assertIn("unfinished run remains the sole controller", skill)
+        self.assertIn("root keeps its current turn open", skill)
+        self.assertIn("manual in the exact same root task", orchestration)
+        self.assertIn('"may_create_worker"', source)
+        self.assertNotIn('"goal_state"', source)
+        self.assertIsNone(re.search(r"\bGoal\b", runtime))
+        for retired_action in ("create-goal", "update-goal-progress", "complete-goal"):
+            self.assertNotIn(retired_action, source)
+            self.assertNotIn(retired_action, runtime)
 
     def test_given_two_roots_when_specs_and_head_branches_differ_then_same_repo_is_allowed(self) -> None:
         """Given distinct Specs and worktree branches, when roots coordinate, then repository identity alone does not block."""
