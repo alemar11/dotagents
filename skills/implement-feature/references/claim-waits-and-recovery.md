@@ -25,9 +25,10 @@ branches may run under different roots in the same repository.
 An unfinished run keeps its exact `root_task_id` as the sole controller
 identity. Resume that same visible root task manually, read `run show`, and
 reconcile every pending or unknown task operation against authoritative
-ChatGPT desktop task state before scheduling or repeating work. Never create a
-replacement root, infer completion from task idleness, persist the objective,
-or use a heartbeat as lifecycle state.
+ChatGPT desktop task state before scheduling or considering any authorized
+replay.
+Never create a replacement root, infer completion from task idleness, persist
+the objective, or use a heartbeat as lifecycle state.
 
 ### Worker creation may already have happened
 
@@ -36,17 +37,23 @@ the result, read the ChatGPT desktop task list and the candidate task. Verify
 its stable task ID, selected project, checkout directory, Git common directory,
 and current state. If the exact worker exists, finish the already recorded
 operation and reuse it. If authoritative evidence proves no task was created,
-finish the operation as failed before starting a new keyed attempt. Ambiguous
-evidence stays unknown and forbids a duplicate worker.
+finish that launch as `failed` with its `readback_ref`; the resulting
+`replay_authorized=true` permits `app-operation replay` with the same
+`operation_id` and incremented `launch_count`. Ambiguous evidence stays
+`unknown`, is not replayable for worker creation, and forbids a duplicate
+worker.
 
 ### A message may already have been sent
 
 Read the exact worker conversation and the immediate tool result associated
-with the recorded `send-bootstrap` or `send-worker-message`. When the message is
-present in the correct task, finish the existing operation and do not resend.
-When evidence proves it was not delivered, mark that attempt failed before a
-new keyed send. If delivery cannot be determined, keep the operation unknown;
-never infer delivery from a stored body or hash.
+with the recorded `send-bootstrap` or `send-worker-message`. When the message
+is present in the correct task, finish the existing operation and do not
+resend. When bootstrap delivery is absent or indeterminate, finish that same
+operation as `failed` or `unknown` with the authoritative `readback_ref`; only
+then may `app-operation replay` relaunch it with its original `operation_id`
+and `bootstrap_id` and the newly returned `launch_count`. A follow-up message
+has no replay path; never infer delivery from a stored body or hash and never
+create a replacement identifier.
 
 ### Worker is terminal but its checkout still exists
 

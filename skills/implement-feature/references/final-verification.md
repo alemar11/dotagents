@@ -6,8 +6,9 @@ Root then performs read-only verification; it does not edit code, rerun implemen
 check boxes, uncheck boxes, or judge acceptance criteria.
 
 For `github-pr`, the worker-facing
-`pr-ready-for-merge-but-not-merged` result is also the schema-1 observation
-status. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
+`pr-ready-for-merge-but-not-merged` result is also the
+`implement-feature/delivery-ready-observation` `2.0.0` status
+value. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
 all three names describe the same unmerged delivery boundary.
 
 Collect the terminal reports and immutable current-head evidence for every
@@ -46,9 +47,13 @@ artifacts, completed-issue placement, final checkboxes, and workflow-state
 preservation. Root still verifies worker task, review, validation, peer, and
 no-provider evidence from their authoritative owners.
 
-If authoritative final evidence agrees, record `assignment ready`; that same
-transaction releases only this Feature Spec claim. If it does not, report
-coarse mismatch to the same worker and let the worker own repair.
+If authoritative final evidence agrees, use `assignment ready-observation
+create --readiness-mode terminal` to build the private typed payload from that
+snapshot, then pass the unchanged file and expected revision to plain
+`assignment ready`. The builder is read-only; `ready` derives the terminal
+mutation from the payload, revalidates it in the sole state-mutating
+transaction, and releases only this Feature Spec claim. If evidence does not
+agree, report coarse mismatch to the same worker and let the worker own repair.
 If stable durable contract drift caused the mismatch, record `assignment block`
 and retain claims.
 
@@ -69,6 +74,11 @@ result merges.
 An ordinary worker may first be recorded as `peer-input-ready`; its task and
 claim stay available while its exact HEAD becomes available to dependent peers
 and its execution slot becomes free.
+Build that observation with
+`ready-observation create --readiness-mode peer-input`, then consume it with
+plain `assignment ready`; the consumer derives and revalidates the retained
+claim mutation from the payload. Both stages must use the same authoritative
+snapshot and expected revision.
 Final readiness for a worker that owns combined proof must contain the exact
 current prerequisite HEAD vector. A changed prerequisite HEAD invalidates prior
 proof. The proof owner sends the mismatch directly to the owning peer, that peer

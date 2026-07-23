@@ -38,9 +38,15 @@ replacement controller while that run is unfinished. Do not add a heartbeat,
 worker-to-root wake, persisted objective, or second lifecycle state. The root
 title is UI evidence only and never durable state.
 
-A recoverable pre-bootstrap worker or ChatGPT desktop app failure must not abort the assignment
-or release its claim. Reconcile the failed ChatGPT desktop app operation, keep the assignment
-planned, and retry from the same root with a new recorded operation.
+A recoverable pre-bootstrap worker or ChatGPT desktop app failure must not
+silently duplicate the attempted effect or release its claim. Reconcile the
+recorded ChatGPT desktop app operation before any continuation. Replay only
+when that exact operation reports `replay_authorized=true`, always with the
+same logical `operation_id` and a newly incremented `launch_count`; never begin
+a replacement operation. Bootstrap replay preserves its derived `bootstrap_id`
+and is deduplicated by the worker. A protected non-bootstrap operation may
+replay only after authoritative failed readback proves the prior launch had no
+effect. Controller follow-up messages are not replayable.
 
 Resolve the startup authorization interaction defined in
 `references/options.md` only after the saved-project preflight. When a required
@@ -61,18 +67,20 @@ continuation question during the run.
    one startup authorization interaction only after this read-only preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
-2. Run read-only `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. It uses the permanently
-   unversioned per-user SQLite DB at
-   `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`, with schema
-   version `1` stored only in its singleton `runtime_metadata` row. If a
-   recognized older schema has active
-   owners, keep the root open and repeat bounded doctor/prepare sweeps until
-   they drain through the exact old runtime passed to `state prepare
-   --retained-runtime`; if that executable is unavailable, stop fail-closed.
-   Never start a worker or another run during that wait. Preparation then
-   drops and recreates the complete schema inside one exclusive SQLite
-   transaction without migrating state.
+2. Run read-only `scripts/run-state --json capabilities` and
+   `scripts/run-state --json doctor`, then
+   `scripts/run-state --json state prepare`. CLI `2.0.0` implements runtime
+   contract `2.0.0` over the permanently unversioned per-user SQLite DB at
+   `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
+   schema integer `2` is separate from those SemVer identities. Every run pins
+   its exact runtime contract, CLI, and shipped artifact SHA-256. A database
+   schema-1 state with active owners cannot prove those pins and therefore
+   stops fail-closed; a drained schema-1 state is atomically dropped and
+   recreated as schema 2 without carrying rows forward. For a future
+   recognized older schema that does record exact owner pins, pass every
+   required old executable with repeated `state prepare --retained-runtime`
+   flags and keep the root open for bounded drain sweeps. Never start a worker
+   or another run during a fenced cutover.
    Unknown, newer, corrupt, unversioned, or same-version-invalid state stops
    before claims. SQLite transactions and `target_schema_version` fence
    concurrent CLI work; no filesystem lock is used.
@@ -86,14 +94,17 @@ continuation question during the run.
    input HEADs stabilize so they can collaborate, but final proof must bind the
    exact prerequisite revisions. Never create a worker for an
    assignment whose Spec or head branch claim is waiting.
-5. For each worker, follow `references/chatgpt-task-orchestration.md` and send the full
-   assignment once. A verified bootstrap delivery starts its complete
-   implementation authority; there is no baseline-only phase or later GO.
+5. For each worker, follow `references/chatgpt-task-orchestration.md` and send
+   the full assignment under the generated `bootstrap_id`. A verified,
+   worker-accepted bootstrap starts its complete implementation authority;
+   duplicate delivery of that same logical bootstrap has one effect. There is
+   no baseline-only phase or later GO.
 6. Let the worker follow `references/worker-execution.md` and
    `references/tracker-checklists.md` autonomously. Monitor coarse progress by
    reading the visible tasks. After an interruption, check whether each recorded
-   task change already happened before deciding whether it is safe to
-   repeat.
+   task change already happened before trusting its typed
+   `replay_authorized` result. Never infer no effect from an immediate tool
+   error.
    Multi-repository workers communicate directly using the exact peer task and
    checkout identities supplied by root. Each worker operates only in its own
    worktree and exposes its own component to the peer that owns combined proof,

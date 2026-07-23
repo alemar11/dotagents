@@ -6,25 +6,50 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import sqlite3
 import stat
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "1.1.0"
-STATE_SCHEMA_VERSION = 1
-REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()
-RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = {}
-RETAINED_RUNTIME_VERSION_BY_SCHEMA: dict[int, str] = {1: "1.1.0"}
+CLI_VERSION = "2.0.0"
+RUNTIME_CONTRACT_VERSION = "2.0.0"
+DATABASE_SCHEMA_VERSION = 2
+REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1})
+LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_LIVE_WORKERS = 3
 MAX_UNCHANGED_WAIT_SWEEPS = 3
+
+PROTOCOLS = {
+    "cli_envelope": {
+        "schema": "implement-feature/cli-envelope",
+        "schema_version": "2.0.0",
+    },
+    "run_manifest": {
+        "schema": "implement-feature/run-manifest",
+        "schema_version": "2.0.0",
+    },
+    "app_operation_observation": {
+        "schema": "implement-feature/app-operation-observation",
+        "schema_version": "2.0.0",
+    },
+    "delivery_ready_observation": {
+        "schema": "implement-feature/delivery-ready-observation",
+        "schema_version": "2.0.0",
+    },
+    "recovery_observation": {
+        "schema": "implement-feature/recovery-observation",
+        "schema_version": "2.0.0",
+    },
+}
 
 TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 HEAD_RE = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
@@ -63,6 +88,58 @@ SINGLE_USE_ACTIONS = {
     "archive-worker",
 }
 
+APP_OPERATION_COMMON_FIELDS = {
+    "schema",
+    "schema_version",
+    "operation_id",
+    "launch_count",
+    "status",
+}
+APP_OPERATION_RECONCILIATION_FIELDS = {"receipt_ref", "readback_ref"}
+APP_OPERATION_FIELDS_BY_ACTION = {
+    "create-worker": {
+        "thread_id",
+        "project_id",
+        "checkout_path",
+        "git_common_dir",
+        "observed_state",
+    },
+    "set-worker-title": {"thread_id", "observed_title"},
+    "send-bootstrap": {"thread_id", "bootstrap_id"},
+    "send-worker-message": {"thread_id"},
+    "set-root-title": {"observed_title"},
+    "archive-worker": {"thread_id", "observed_state"},
+}
+READY_COMMON_FIELDS = {
+    "schema",
+    "schema_version",
+    "assignment_id",
+    "thread_id",
+    "repository_identity",
+    "delivery_type",
+    "readiness_mode",
+    "head_sha",
+    "head_branch_name",
+    "base_branch_name",
+    "base_sha",
+    "checkout_path",
+    "worktree_clean",
+    "base_is_ancestor",
+    "validation_head_sha",
+    "autoreview_head_sha",
+    "review_candidate_head_sha",
+    "review_profile",
+    "codex_review_head_sha",
+    "tracker_readback_ref",
+    "prerequisite_heads",
+    "status",
+}
+READY_GITHUB_FIELDS = {
+    "default_branch_name",
+    "pr_url",
+    "provider_observation_ref",
+}
+
 
 class StateError(Exception):
     def __init__(self, code: str, message: str, exit_code: int = 2) -> None:
@@ -70,6 +147,11 @@ class StateError(Exception):
         self.code = code
         self.message = message
         self.exit_code = exit_code
+
+
+class StructuredArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise StateError("invalid-command-line", message)
 
 
 def utc_now() -> str:
@@ -84,6 +166,43 @@ def root_task_title(assignment_count: int) -> str:
 
 def canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def protocol_fields(name: str) -> dict[str, str]:
+    return dict(PROTOCOLS[name])
+
+
+def require_protocol(value: dict[str, Any], name: str, label: str) -> None:
+    expected = PROTOCOLS[name]
+    if (
+        value.get("schema") != expected["schema"]
+        or value.get("schema_version") != expected["schema_version"]
+    ):
+        raise StateError(
+            "unsupported-input-protocol",
+            f"{label} must use {expected['schema']} at {expected['schema_version']}",
+        )
+
+
+def current_runtime_sha256() -> str:
+    try:
+        return hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+    except OSError as error:
+        raise StateError(
+            "runtime-identity-unavailable",
+            "the shipped run-state artifact could not be fingerprinted",
+            4,
+        ) from error
+
+
+def new_operation_id() -> str:
+    return f"op-{secrets.token_hex(16)}"
+
+
+def bootstrap_id_for(operation_id: str) -> str:
+    if not operation_id.startswith("op-"):
+        raise StateError("invalid-operation-id", "operation_id must use the generated op- form")
+    return f"bootstrap-{operation_id[3:]}"
 
 
 def cache_root() -> Path:
@@ -131,7 +250,11 @@ def open_database(path: Path, *, write: bool) -> sqlite3.Connection:
 def connect(*, write: bool) -> sqlite3.Connection:
     path = database_path()
     if not path.exists():
-        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+        raise StateError(
+            "state-uninitialized",
+            f"database schema {DATABASE_SCHEMA_VERSION} has not been initialized",
+            3,
+        )
     try:
         validate_database(path)
         connection = open_database(path, write=write)
@@ -146,7 +269,7 @@ def connect(*, write: bool) -> sqlite3.Connection:
     return connection
 
 
-EXPECTED_SCHEMA_COLUMNS = {
+SCHEMA_ONE_COLUMNS = {
     "runtime_metadata": ("singleton", "schema_version", "target_schema_version"),
     "runs": (
         "run_id", "root_task_id", "status", "implementation_started",
@@ -179,6 +302,59 @@ EXPECTED_SCHEMA_COLUMNS = {
 }
 
 
+CURRENT_SCHEMA_COLUMNS = {
+    **SCHEMA_ONE_COLUMNS,
+    "runs": (
+        "run_id",
+        "root_task_id",
+        "runtime_contract_version",
+        "runtime_cli_version",
+        "runtime_artifact_sha256",
+        "status",
+        "implementation_started",
+        "revision",
+        "created_at",
+        "updated_at",
+        "finished_at",
+    ),
+    "app_operations": (
+        "sequence",
+        "run_id",
+        "operation_id",
+        "action",
+        "subject_id",
+        "assignment_id",
+        "status",
+        "launch_count",
+        "receipt_ref",
+        "readback_ref",
+        "thread_id",
+        "project_id",
+        "checkout_path",
+        "git_common_dir",
+        "observed_title",
+        "provider_observation_ref",
+        "head_sha",
+        "pr_url",
+        "observed_state",
+        "created_at",
+        "updated_at",
+    ),
+}
+
+
+def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
+    if version == 1:
+        return SCHEMA_ONE_COLUMNS
+    if version == DATABASE_SCHEMA_VERSION:
+        return CURRENT_SCHEMA_COLUMNS
+    raise StateError(
+        "unsupported-state-schema",
+        f"database schema {version} has no structural definition in this runtime",
+        4,
+    )
+
+
 def normalized_schema_objects(
     connection: sqlite3.Connection,
 ) -> dict[tuple[str, str], str]:
@@ -193,12 +369,12 @@ def normalized_schema_objects(
     }
 
 
-def expected_schema_objects() -> dict[tuple[str, str], str]:
+def expected_schema_objects(version: int) -> dict[tuple[str, str], str]:
     expected = sqlite3.connect(":memory:", isolation_level=None)
     try:
         expected.row_factory = sqlite3.Row
         expected.execute("PRAGMA foreign_keys = ON")
-        create_schema(expected)
+        create_schema(expected, schema_version=version)
         return normalized_schema_objects(expected)
     finally:
         expected.close()
@@ -215,7 +391,11 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         if allow_create:
             create_schema(connection)
             return True
-        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+        raise StateError(
+            "state-uninitialized",
+            f"database schema {DATABASE_SCHEMA_VERSION} has not been initialized",
+            3,
+        )
     if "runtime_metadata" not in tables:
         raise StateError(
             "unsupported-state-schema",
@@ -223,10 +403,10 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
             4,
         )
     version, _ = read_runtime_metadata(connection)
-    if version != STATE_SCHEMA_VERSION:
+    if version != DATABASE_SCHEMA_VERSION:
         raise StateError(
             "unsupported-state-schema",
-            f"runtime schema {STATE_SCHEMA_VERSION} cannot use database schema {version}",
+            f"runtime database schema {DATABASE_SCHEMA_VERSION} cannot use database schema {version}",
             4,
         )
     validate_schema_shape(connection, version)
@@ -234,7 +414,8 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
 
 
 def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
-    expected = set(EXPECTED_SCHEMA_COLUMNS)
+    columns = expected_schema_columns(version)
+    expected = set(columns)
     actual = {
         row[0]
         for row in connection.execute(
@@ -243,7 +424,7 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
     }
     if actual != expected:
         raise StateError("invalid-state-schema", f"state tables do not match schema {version}", 4)
-    for table, expected_columns in EXPECTED_SCHEMA_COLUMNS.items():
+    for table, expected_columns in columns.items():
         actual_columns = tuple(
             row[1] for row in connection.execute(f"PRAGMA table_info({table})")
         )
@@ -276,7 +457,7 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
             f"state table assignments constraints do not match schema {version}",
             4,
         )
-    if normalized_schema_objects(connection) != expected_schema_objects():
+    if normalized_schema_objects(connection) != expected_schema_objects(version):
         raise StateError(
             "invalid-state-schema",
             f"state tables, constraints, or indexes do not match schema {version}",
@@ -311,8 +492,29 @@ def read_runtime_metadata(connection: sqlite3.Connection) -> tuple[int, int | No
 def create_schema(
     connection: sqlite3.Connection,
     *,
-    schema_version: int = STATE_SCHEMA_VERSION,
+    schema_version: int = DATABASE_SCHEMA_VERSION,
 ) -> None:
+    if schema_version not in {1, DATABASE_SCHEMA_VERSION}:
+        raise StateError(
+            "unsupported-state-schema",
+            f"cannot create database schema {schema_version}",
+            4,
+        )
+    runtime_columns = (
+        ""
+        if schema_version == 1
+        else """
+            runtime_contract_version TEXT NOT NULL,
+            runtime_cli_version TEXT NOT NULL,
+            runtime_artifact_sha256 TEXT NOT NULL,
+        """
+    )
+    operation_id_column = "operation_key" if schema_version == 1 else "operation_id"
+    launch_count_column = (
+        ""
+        if schema_version == 1
+        else "launch_count INTEGER NOT NULL CHECK(launch_count >= 1),"
+    )
     statements = (
         """CREATE TABLE runtime_metadata (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -323,9 +525,10 @@ def create_schema(
                 OR target_schema_version > schema_version
             )
         )""",
-        """CREATE TABLE runs (
+        f"""CREATE TABLE runs (
             run_id TEXT PRIMARY KEY,
             root_task_id TEXT NOT NULL,
+            {runtime_columns}
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
                 'pr-ready', 'local-branch-ready', 'delivery-ready',
@@ -399,14 +602,15 @@ def create_schema(
         )""",
         "CREATE UNIQUE INDEX one_active_spec_owner ON spec_claims(repository_identity,claim_spec_identity) WHERE active=1",
         "CREATE UNIQUE INDEX one_active_head_branch_owner ON spec_claims(repository_identity,target_branch_name) WHERE active=1",
-        """CREATE TABLE app_operations (
+        f"""CREATE TABLE app_operations (
             sequence INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
-            operation_key TEXT NOT NULL,
+            {operation_id_column} TEXT NOT NULL,
             action TEXT NOT NULL,
             subject_id TEXT NOT NULL,
             assignment_id TEXT,
             status TEXT NOT NULL CHECK(status IN ('pending','unknown','succeeded','failed')),
+            {launch_count_column}
             receipt_ref TEXT,
             readback_ref TEXT,
             thread_id TEXT,
@@ -420,7 +624,7 @@ def create_schema(
             observed_state TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            UNIQUE(run_id, operation_key)
+            UNIQUE(run_id, {operation_id_column})
         )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
         f"INSERT INTO runtime_metadata(singleton,schema_version,target_schema_version) VALUES (1,{schema_version},NULL)",
@@ -477,6 +681,13 @@ def directory(value: Any, field: str) -> str:
     if not path.is_absolute() or path.is_symlink() or not path.is_dir():
         raise StateError("invalid-input", f"{field} must be an absolute real directory")
     return str(path.resolve())
+
+
+def absolute_path(value: Any, field: str) -> str:
+    path = Path(string(value, field, 4096))
+    if not path.is_absolute():
+        raise StateError("invalid-input", f"{field} must be an absolute path")
+    return os.path.normpath(str(path))
 
 
 def branch_name(value: Any) -> str:
@@ -543,13 +754,32 @@ def canonical_source_spec_ref(
 
 
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-    exact_keys(raw, {"schema_version", "run_id", "root_task_id", "repositories", "assignments"}, "manifest")
-    if raw["schema_version"] != STATE_SCHEMA_VERSION:
+    exact_keys(
+        raw,
+        {
+            "schema",
+            "schema_version",
+            "runtime_contract_version",
+            "run_id",
+            "root_task_id",
+            "repositories",
+            "assignments",
+        },
+        "manifest",
+    )
+    require_protocol(raw, "run_manifest", "manifest")
+    if raw["runtime_contract_version"] != RUNTIME_CONTRACT_VERSION:
         raise StateError(
-            "unsupported-input-schema",
-            f"manifest schema_version must be {STATE_SCHEMA_VERSION}",
+            "runtime-contract-mismatch",
+            f"manifest runtime_contract_version must be {RUNTIME_CONTRACT_VERSION}",
         )
-    run = {"run_id": token(raw["run_id"], "run_id"), "root_task_id": string(raw["root_task_id"], "root_task_id", 256)}
+    run = {
+        "run_id": token(raw["run_id"], "run_id"),
+        "root_task_id": string(raw["root_task_id"], "root_task_id", 256),
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+        "runtime_cli_version": CLI_VERSION,
+        "runtime_artifact_sha256": current_runtime_sha256(),
+    }
     if not isinstance(raw["repositories"], list) or not raw["repositories"]:
         raise StateError("invalid-input", "repositories must be a nonempty list")
     repositories: list[dict[str, Any]] = []
@@ -668,10 +898,35 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
     return run, repositories, assignments
 
 
-def get_run(connection: sqlite3.Connection, run_id: str) -> sqlite3.Row:
+def get_run(
+    connection: sqlite3.Connection,
+    run_id: str,
+    *,
+    require_runtime_match: bool = True,
+) -> sqlite3.Row:
     row = connection.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
     if row is None:
         raise StateError("run-not-found", f"run does not exist: {run_id}", 3)
+    if require_runtime_match:
+        expected = (
+            RUNTIME_CONTRACT_VERSION,
+            CLI_VERSION,
+            current_runtime_sha256(),
+        )
+        observed = (
+            row["runtime_contract_version"],
+            row["runtime_cli_version"],
+            row["runtime_artifact_sha256"],
+        )
+        if observed != expected:
+            raise StateError(
+                "retained-runtime-required",
+                "this run is pinned to another exact run-state artifact; resume it with "
+                f"runtime_contract_version={row['runtime_contract_version']}, "
+                f"cli_version={row['runtime_cli_version']}, "
+                f"sha256={row['runtime_artifact_sha256']}",
+                4,
+            )
     return row
 
 
@@ -786,9 +1041,20 @@ def insert_run(
     acquired = [item["assignment_id"] for item in assignments if item["assignment_id"] not in conflicts]
     status = "active" if acquired else "waiting-for-spec"
     connection.execute(
-        """INSERT INTO runs(run_id,root_task_id,status,revision,created_at,updated_at)
-           VALUES (?,?,?,1,?,?)""",
-        (run["run_id"], run["root_task_id"], status, now, now),
+        """INSERT INTO runs(
+               run_id,root_task_id,runtime_contract_version,runtime_cli_version,
+               runtime_artifact_sha256,status,revision,created_at,updated_at
+           ) VALUES (?,?,?,?,?,?,1,?,?)""",
+        (
+            run["run_id"],
+            run["root_task_id"],
+            run["runtime_contract_version"],
+            run["runtime_cli_version"],
+            run["runtime_artifact_sha256"],
+            status,
+            now,
+            now,
+        ),
     )
     repositories_by_identity = {item["repository_identity"]: item for item in repositories}
     waiting: list[dict[str, Any]] = []
@@ -844,23 +1110,18 @@ def active_owner_runs(connection: sqlite3.Connection) -> int:
 
 
 def validate_rebuild_source(connection: sqlite3.Connection, version: int) -> None:
-    if version not in REBUILDABLE_STATE_SCHEMA_VERSIONS:
-        relation = "newer" if version > STATE_SCHEMA_VERSION else "unknown"
+    if version not in REBUILDABLE_DATABASE_SCHEMA_VERSIONS:
+        relation = "newer" if version > DATABASE_SCHEMA_VERSION else "unknown"
         raise StateError(
             "unsupported-state-schema",
-            f"schema {version} is {relation} to runtime schema {STATE_SCHEMA_VERSION}; automatic regeneration is forbidden",
+            f"database schema {version} is {relation} to runtime database schema "
+            f"{DATABASE_SCHEMA_VERSION}; automatic regeneration is forbidden",
             4,
         )
     validate_schema_shape(connection, version)
 
 
-def validate_retained_runtime(path_text: str | None, schema_version: int) -> None:
-    if path_text is None:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"schema {schema_version} owners require their retained exact runtime",
-            4,
-        )
+def retained_runtime_identity(path_text: str) -> tuple[str, str, str]:
     path = Path(path_text)
     if (
         not path.is_absolute()
@@ -873,24 +1134,18 @@ def validate_retained_runtime(path_text: str | None, schema_version: int) -> Non
             f"retained runtime is not an executable regular file: {path}",
             4,
         )
-    expected_digest = RETAINED_RUNTIME_SHA256_BY_SCHEMA.get(schema_version)
     try:
-        actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    except OSError as error:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime could not be read: {path}",
-            4,
-        ) from error
-    if expected_digest is None or actual_digest != expected_digest:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime does not match the approved schema {schema_version} executable",
-            4,
-        )
-    try:
-        result = subprocess.run(
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        version = subprocess.run(
             [str(path), "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
+        )
+        capabilities = subprocess.run(
+            [str(path), "--json", "capabilities"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -903,17 +1158,63 @@ def validate_retained_runtime(path_text: str | None, schema_version: int) -> Non
             f"retained runtime could not be verified: {path}",
             4,
         ) from error
-    expected = RETAINED_RUNTIME_VERSION_BY_SCHEMA.get(schema_version)
-    if expected is None:
+    if version.returncode != 0 or capabilities.returncode != 0:
         raise StateError(
             "retained-runtime-unavailable",
-            f"retained runtime version is not approved for schema {schema_version}",
+            f"retained runtime verification failed: {path}",
             4,
         )
-    if result.returncode != 0 or result.stdout.strip() != expected:
+    try:
+        payload = json.loads(capabilities.stdout)
+        contract = string(
+            payload["runtime_contract_version"],
+            "runtime_contract_version",
+            64,
+        )
+    except (KeyError, TypeError, json.JSONDecodeError, StateError) as error:
         raise StateError(
             "retained-runtime-unavailable",
-            f"retained runtime must report version {expected}",
+            f"retained runtime capabilities are invalid: {path}",
+            4,
+        ) from error
+    return contract, version.stdout.strip(), digest
+
+
+def validate_retained_runtimes(
+    connection: sqlite3.Connection,
+    paths: list[str],
+    schema_version: int,
+) -> None:
+    if schema_version in LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS:
+        raise StateError(
+            "legacy-runtime-identity-unknown",
+            f"database schema {schema_version} active owners do not record exact runtime pins; "
+            "drain them before installing this runtime",
+            4,
+        )
+    required = {
+        (
+            row["runtime_contract_version"],
+            row["runtime_cli_version"],
+            row["runtime_artifact_sha256"],
+        )
+        for row in connection.execute(
+            """SELECT DISTINCT runtime_contract_version,runtime_cli_version,
+                              runtime_artifact_sha256
+               FROM runs
+               WHERE status IN ('waiting-for-spec','active','blocked')"""
+        )
+    }
+    provided = {retained_runtime_identity(path) for path in paths}
+    missing = sorted(required - provided)
+    if missing:
+        raise StateError(
+            "retained-runtime-unavailable",
+            "active owners require retained exact runtimes: "
+            + ", ".join(
+                f"contract={contract},cli={cli},sha256={digest}"
+                for contract, cli, digest in missing
+            ),
             4,
         )
 
@@ -938,7 +1239,11 @@ def inspect_state(connection: sqlite3.Connection) -> tuple[int, int | None, int]
         )
     }
     if not tables:
-        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+        raise StateError(
+            "state-uninitialized",
+            f"database schema {DATABASE_SCHEMA_VERSION} has not been initialized",
+            3,
+        )
     if "runtime_metadata" not in tables:
         raise StateError(
             "unsupported-state-schema",
@@ -946,30 +1251,69 @@ def inspect_state(connection: sqlite3.Connection) -> tuple[int, int | None, int]
             4,
         )
     version, target = read_runtime_metadata(connection)
-    if version == STATE_SCHEMA_VERSION:
+    if version == DATABASE_SCHEMA_VERSION:
         validate_schema_shape(connection, version)
     else:
         validate_rebuild_source(connection, version)
     return version, target, active_owner_runs(connection)
 
 
+def version_capabilities() -> dict[str, Any]:
+    return {
+        "cli_version": CLI_VERSION,
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+        "runtime_artifact_sha256": current_runtime_sha256(),
+        "database_schema_version": DATABASE_SCHEMA_VERSION,
+        "protocols": {
+            name: {
+                "schema": protocol["schema"],
+                "version": protocol["schema_version"],
+            }
+            for name, protocol in sorted(PROTOCOLS.items())
+        },
+    }
+
+
+def command_capabilities(_: argparse.Namespace) -> dict[str, Any]:
+    return version_capabilities()
+
+
 def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
     path = database_path()
     if not path.exists():
-        return {"ready": True, "state": "uninitialized", "database_path": str(path), "cutover_target_version": None, "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": 0, "writes_performed": False}
+        return {
+            "ready": True,
+            "state": "uninitialized",
+            "database_path": str(path),
+            "cutover_target_version": None,
+            **version_capabilities(),
+            "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS,
+            "active_owner_runs": 0,
+            "writes_performed": False,
+        }
     validate_database(path)
     connection = open_database(path, write=False)
     try:
         version, target, active = inspect_state(connection)
     finally:
         connection.close()
-    if version == STATE_SCHEMA_VERSION:
+    if version == DATABASE_SCHEMA_VERSION:
         state = "initialized" if target is None else "cutover-in-progress"
         ready = target is None
     else:
         state = "rebuild-ready" if active == 0 else "waiting-for-schema-drain"
         ready = False
-    return {"ready": ready, "state": state, "database_path": str(path), "database_schema_version": version, "cutover_target_version": target, "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
+    return {
+        "ready": ready,
+        "state": state,
+        "database_path": str(path),
+        "observed_database_schema_version": version,
+        "cutover_target_version": target,
+        **version_capabilities(),
+        "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS,
+        "active_owner_runs": active,
+        "writes_performed": False,
+    }
 
 
 def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
@@ -998,17 +1342,17 @@ def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
             return {
                 "ready": True,
                 "state": "initialized",
-                "database_schema_version": STATE_SCHEMA_VERSION,
+                "database_schema_version": DATABASE_SCHEMA_VERSION,
                 "active_owner_runs": 0,
                 "regenerated": True,
                 "writes_performed": True,
             }
         version, target, active = inspect_state(connection)
-        if version == STATE_SCHEMA_VERSION:
+        if version == DATABASE_SCHEMA_VERSION:
             if target is not None:
                 raise StateError(
                     "state-cutover-in-progress",
-                    f"runtime schema {STATE_SCHEMA_VERSION} cannot prepare cutover target {target}",
+                    f"runtime database schema {DATABASE_SCHEMA_VERSION} cannot prepare cutover target {target}",
                     4,
                 )
             connection.commit()
@@ -1020,21 +1364,33 @@ def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
                 "regenerated": False,
                 "writes_performed": False,
             }
+        if active and version in LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS:
+            raise StateError(
+                "legacy-runtime-identity-unknown",
+                f"database schema {version} active owners do not record exact runtime pins; "
+                "drain them before installing this runtime",
+                4,
+            )
+        if active:
+            validate_retained_runtimes(
+                connection,
+                args.retained_runtime,
+                version,
+            )
         if target is None:
             connection.execute(
                 "UPDATE runtime_metadata SET target_schema_version=? WHERE singleton=1",
-                (STATE_SCHEMA_VERSION,),
+                (DATABASE_SCHEMA_VERSION,),
             )
-            target = STATE_SCHEMA_VERSION
-        elif target != STATE_SCHEMA_VERSION:
+            target = DATABASE_SCHEMA_VERSION
+        elif target != DATABASE_SCHEMA_VERSION:
             raise StateError(
                 "state-cutover-in-progress",
-                f"database is fenced for schema {target}, not {STATE_SCHEMA_VERSION}",
+                f"database is fenced for schema {target}, not {DATABASE_SCHEMA_VERSION}",
                 4,
             )
         if active:
             connection.commit()
-            validate_retained_runtime(args.retained_runtime, version)
             return {
                 "ready": False,
                 "state": "waiting-for-schema-drain",
@@ -1050,7 +1406,7 @@ def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
         return {
             "ready": True,
             "state": "regenerated",
-            "database_schema_version": STATE_SCHEMA_VERSION,
+            "database_schema_version": DATABASE_SCHEMA_VERSION,
             "previous_schema_version": version,
             "active_owner_runs": 0,
             "regenerated": True,
@@ -1189,10 +1545,14 @@ def assignment_projection(row: sqlite3.Row) -> dict[str, Any]:
 def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
     connection = connect(write=False)
     try:
-        run = get_run(connection, token(args.run_id, "run_id"))
+        run = get_run(
+            connection,
+            token(args.run_id, "run_id"),
+            require_runtime_match=False,
+        )
         assignments = [assignment_projection(row) for row in connection.execute("SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
         claims = [dict(row) for row in connection.execute("SELECT * FROM spec_claims WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
-        unresolved = [dict(row) for row in connection.execute("SELECT sequence,operation_key,action,subject_id,status FROM app_operations WHERE run_id=? AND status IN ('pending','unknown') ORDER BY sequence", (run["run_id"],))]
+        unresolved = [dict(row) for row in connection.execute("SELECT sequence,operation_id,action,subject_id,status,launch_count FROM app_operations WHERE run_id=? AND status IN ('pending','unknown') ORDER BY sequence", (run["run_id"],))]
         result = dict(run)
         result.update({"assignments": assignments, "spec_claims": claims, "unresolved_app_operations": unresolved})
         return result
@@ -1204,9 +1564,9 @@ def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
     connection = connect(write=False)
     try:
         if args.status == "all":
-            rows = connection.execute("SELECT run_id,root_task_id,status,revision,created_at,updated_at,finished_at FROM runs ORDER BY created_at DESC")
+            rows = connection.execute("SELECT run_id,root_task_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs ORDER BY created_at DESC")
         else:
-            rows = connection.execute("SELECT run_id,root_task_id,status,revision,created_at,updated_at,finished_at FROM runs WHERE status=? ORDER BY created_at DESC", (args.status,))
+            rows = connection.execute("SELECT run_id,root_task_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs WHERE status=? ORDER BY created_at DESC", (args.status,))
         return {"runs": [dict(row) for row in rows]}
     finally:
         connection.close()
@@ -1285,34 +1645,48 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
 
 def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
-    operation_key = token(args.operation_key, "operation_key")
     action = string(args.action, "action", 80)
     subject_id = string(args.subject_id, "subject_id", 256)
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
-        if connection.execute("SELECT 1 FROM app_operations WHERE run_id=? AND operation_key=?", (run_id, operation_key)).fetchone():
-            raise StateError("operation-already-started", "the operation key already exists; reconcile it instead of relaunching", 4)
         assignment_id = validate_app_begin(connection, run, action, subject_id)
         if action in SINGLE_USE_ACTIONS:
             existing = connection.execute(
-                """SELECT operation_key,status FROM app_operations
-                   WHERE run_id=? AND action=? AND subject_id=?
-                     AND status IN ('pending','unknown','succeeded')""",
+                """SELECT operation_id,status FROM app_operations
+                   WHERE run_id=? AND action=? AND subject_id=?""",
                 (run_id, action, subject_id),
             ).fetchone()
             if existing:
-                raise StateError("protected-operation-already-started", f"{action} already uses {existing['operation_key']} ({existing['status']})", 4)
+                raise StateError(
+                    "protected-operation-already-started",
+                    f"{action} already uses {existing['operation_id']} "
+                    f"({existing['status']}); reconcile or replay that exact operation",
+                    4,
+                )
+        operation_id = new_operation_id()
         now = utc_now()
         connection.execute(
-            """INSERT INTO app_operations(run_id,operation_key,action,subject_id,assignment_id,status,created_at,updated_at)
-               VALUES (?,?,?,?,?,'pending',?,?)""",
-            (run_id, operation_key, action, subject_id, assignment_id, now, now),
+            """INSERT INTO app_operations(
+                   run_id,operation_id,action,subject_id,assignment_id,status,
+                   launch_count,created_at,updated_at
+               ) VALUES (?,?,?,?,?,'pending',1,?,?)""",
+            (run_id, operation_id, action, subject_id, assignment_id, now, now),
         )
         revision = advance(connection, run)
         connection.commit()
-        return {"run_id": run_id, "revision": revision, "operation_key": operation_key, "launch_authorized": True}
+        result = {
+            "run_id": run_id,
+            "revision": revision,
+            "operation_id": operation_id,
+            "status": "pending",
+            "launch_count": 1,
+            "launch_authorized": True,
+        }
+        if action == "send-bootstrap":
+            result["bootstrap_id"] = bootstrap_id_for(operation_id)
+        return result
     except Exception:
         connection.rollback()
         raise
@@ -1321,45 +1695,256 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]) -> dict[str, Any]:
-    common = {"schema_version", "status"}
-    reconciliation_refs = {"receipt_ref", "readback_ref"}
-    extra_by_action = {
-        "create-worker": {"thread_id", "project_id", "checkout_path", "git_common_dir", "observed_state"},
-        "set-worker-title": {"thread_id", "observed_title"},
-        "send-bootstrap": {"thread_id"},
-        "send-worker-message": {"thread_id"},
-        "set-root-title": {"observed_title"},
-        "archive-worker": {"thread_id", "observed_state"},
-    }
-    if not common.issubset(value):
+    if not APP_OPERATION_COMMON_FIELDS.issubset(value):
         raise StateError(
             "invalid-input",
-            f"ChatGPT operation observation is missing fields: {sorted(common - set(value))}",
+            "ChatGPT operation observation is missing fields: "
+            f"{sorted(APP_OPERATION_COMMON_FIELDS - set(value))}",
         )
-    if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] not in {"unknown", "succeeded", "failed"}:
-        raise StateError("invalid-operation-observation", "observation must use schema 1 and a terminal or unknown status")
-    expected_extra = extra_by_action[operation["action"]]
-    actual_extra = set(value) - common
+    require_protocol(
+        value,
+        "app_operation_observation",
+        "ChatGPT operation observation",
+    )
+    if value["operation_id"] != operation["operation_id"]:
+        raise StateError(
+            "operation-id-conflict",
+            "observation operation_id differs from the recorded logical operation",
+            4,
+        )
+    if (
+        isinstance(value["launch_count"], bool)
+        or not isinstance(value["launch_count"], int)
+        or value["launch_count"] < 1
+    ):
+        raise StateError(
+            "invalid-operation-observation",
+            "launch_count must be a positive integer",
+        )
+    if value["launch_count"] != operation["launch_count"]:
+        raise StateError(
+            "stale-operation-launch",
+            f"observation launch_count {value['launch_count']} does not match "
+            f"current launch_count {operation['launch_count']}",
+            4,
+        )
+    if value["status"] not in {"unknown", "succeeded", "failed"}:
+        raise StateError(
+            "invalid-operation-observation",
+            "observation status must be unknown, succeeded, or failed",
+        )
+    expected_extra = APP_OPERATION_FIELDS_BY_ACTION[operation["action"]]
+    actual_extra = set(value) - APP_OPERATION_COMMON_FIELDS
     if value["status"] == "succeeded":
         exact_keys(
             value,
-            common | reconciliation_refs | expected_extra,
+            APP_OPERATION_COMMON_FIELDS
+            | APP_OPERATION_RECONCILIATION_FIELDS
+            | expected_extra,
             "ChatGPT operation observation",
         )
-    elif not actual_extra.issubset(reconciliation_refs | expected_extra):
+    elif not actual_extra.issubset(
+        APP_OPERATION_RECONCILIATION_FIELDS | expected_extra
+    ):
         raise StateError(
             "invalid-input",
             "ChatGPT operation observation has unsupported fields: "
-            f"{sorted(actual_extra - reconciliation_refs - expected_extra)}",
+            f"{sorted(actual_extra - APP_OPERATION_RECONCILIATION_FIELDS - expected_extra)}",
+        )
+    if value["status"] == "failed" and "readback_ref" not in value:
+        raise StateError(
+            "invalid-operation-observation",
+            "failed status requires authoritative readback_ref; use unknown until readback exists",
+        )
+    if operation["action"] == "send-bootstrap" and "bootstrap_id" not in value:
+        raise StateError(
+            "invalid-operation-observation",
+            "send-bootstrap observations must carry the recorded bootstrap_id",
         )
     normalized: dict[str, Any] = {
+        "operation_id": operation["operation_id"],
+        "launch_count": operation["launch_count"],
         "status": value["status"],
     }
-    for field in reconciliation_refs & set(value):
+    for field in APP_OPERATION_RECONCILIATION_FIELDS & set(value):
         normalized[field] = string(value[field], field, 2048)
-    for field in actual_extra - reconciliation_refs:
-        normalized[field] = directory(value[field], field) if field in {"checkout_path", "git_common_dir"} else string(value[field], field, 4096)
+    for field in actual_extra - APP_OPERATION_RECONCILIATION_FIELDS:
+        normalized[field] = (
+            absolute_path(value[field], field)
+            if field in {"checkout_path", "git_common_dir"}
+            else string(value[field], field, 4096)
+        )
+    if operation["action"] == "send-bootstrap" and "bootstrap_id" in normalized:
+        if normalized["bootstrap_id"] != bootstrap_id_for(operation["operation_id"]):
+            raise StateError(
+                "bootstrap-id-drift",
+                "bootstrap_id differs from the recorded logical bootstrap",
+                4,
+            )
     return normalized
+
+
+def operation_observation_payload(
+    operation: sqlite3.Row,
+    *,
+    launch_count: int,
+    status: str,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    if operation["action"] == "send-bootstrap":
+        values = {**values, "bootstrap_id": bootstrap_id_for(operation["operation_id"])}
+    payload: dict[str, Any] = {
+        **protocol_fields("app_operation_observation"),
+        "operation_id": operation["operation_id"],
+        "launch_count": launch_count,
+        "status": status,
+    }
+    payload.update({key: value for key, value in values.items() if value is not None})
+    validate_operation_observation(operation, payload)
+    return payload
+
+
+def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]:
+    action = string(action, "action", 80)
+    if action not in APP_ACTIONS:
+        raise StateError("invalid-app-action", f"unsupported ChatGPT task action: {action}")
+    if status not in {"unknown", "succeeded", "failed"}:
+        raise StateError("invalid-input", "status must be unknown, succeeded, or failed")
+    required_fields = {"launch_count"}
+    if status == "succeeded":
+        required_fields.update(APP_OPERATION_RECONCILIATION_FIELDS)
+        required_fields.update(APP_OPERATION_FIELDS_BY_ACTION[action])
+    elif status == "failed":
+        required_fields.add("readback_ref")
+    constants = {
+        **protocol_fields("app_operation_observation"),
+        "operation_id": "generated-by-app-operation-begin",
+        "status": status,
+    }
+    if action == "send-bootstrap":
+        required_fields.discard("bootstrap_id")
+        constants["bootstrap_id"] = "derived-from-operation-id"
+    possible_fields = (
+        APP_OPERATION_RECONCILIATION_FIELDS
+        | APP_OPERATION_FIELDS_BY_ACTION[action]
+    ) - set(constants)
+    required = sorted(required_fields)
+    optional = sorted(possible_fields - required_fields)
+    return {
+        "observation_kind": "app-operation",
+        "action": action,
+        "status": status,
+        "constants": constants,
+        "required_fields": required,
+        "optional_fields": optional,
+        "additional_fields": False,
+    }
+
+
+def command_app_operation_observation_template(args: argparse.Namespace) -> dict[str, Any]:
+    return operation_observation_descriptor(args.action, args.status)
+
+
+def atomic_write_json(path_text: str, value: dict[str, Any]) -> str:
+    path = Path(path_text)
+    if not path.is_absolute() or path.is_symlink() or not path.parent.is_dir():
+        raise StateError(
+            "invalid-output-path",
+            "output must be an absolute new file in an existing directory",
+        )
+    try:
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            text=True,
+        )
+    except OSError as error:
+        raise StateError(
+            "output-write-failed",
+            f"cannot create output beside {path}",
+            4,
+        ) from error
+    try:
+        try:
+            os.fchmod(descriptor, 0o600)
+            handle = os.fdopen(descriptor, "w", encoding="utf-8")
+            descriptor = -1
+            with handle:
+                handle.write(canonical_json(value))
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.link(temporary, path)
+        except FileExistsError as error:
+            raise StateError(
+                "output-already-exists",
+                f"output already exists: {path}",
+                4,
+            ) from error
+        except OSError as error:
+            raise StateError(
+                "output-write-failed",
+                f"cannot write output: {path}",
+                4,
+            ) from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+    return str(path)
+
+
+def operation_observation_values(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        field: getattr(args, field, None)
+        for field in (
+            "receipt_ref",
+            "readback_ref",
+            "thread_id",
+            "project_id",
+            "checkout_path",
+            "git_common_dir",
+            "observed_title",
+            "observed_state",
+        )
+    }
+
+
+def command_app_operation_observation_create(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    operation_id = token(args.operation_id, "operation_id")
+    connection = connect(write=False)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        operation = connection.execute(
+            "SELECT * FROM app_operations WHERE run_id=? AND operation_id=?",
+            (run_id, operation_id),
+        ).fetchone()
+        if operation is None:
+            raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
+        payload = operation_observation_payload(
+            operation,
+            launch_count=args.launch_count,
+            status=args.status,
+            values=operation_observation_values(args),
+        )
+    finally:
+        connection.close()
+    output = atomic_write_json(args.output, payload)
+    return {
+        "observation_kind": "app-operation",
+        "operation_id": operation_id,
+        "action": operation["action"],
+        "status": args.status,
+        "output": output,
+        "artifact_written": True,
+        "state_writes_performed": False,
+    }
 
 
 def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row, operation: sqlite3.Row, observed: dict[str, Any]) -> None:
@@ -1368,7 +1953,9 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
     if action == "create-worker":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         claim = assignment_claim(connection, run["run_id"], assignment["assignment_id"])
-        common = Path(observed["git_common_dir"]).stat()
+        checkout_path = directory(observed["checkout_path"], "checkout_path")
+        git_common_dir = directory(observed["git_common_dir"], "git_common_dir")
+        common = Path(git_common_dir).stat()
         if (common.st_dev, common.st_ino) != (claim["git_common_dir_device"], claim["git_common_dir_inode"]):
             raise StateError("worker-repository-drift", "worker Git common-directory identity differs from the claimed repository", 4)
         if observed["project_id"] != assignment["project_id"] or observed["observed_state"] != "active":
@@ -1381,7 +1968,7 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                  AND NOT (a.run_id=? AND a.assignment_id=?)
                LIMIT 1""",
             (
-                observed["thread_id"], observed["checkout_path"], run["run_id"],
+                observed["thread_id"], checkout_path, run["run_id"],
                 assignment["assignment_id"],
             ),
         ).fetchone()
@@ -1394,7 +1981,14 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         connection.execute(
             """UPDATE assignments SET state='worker-created',thread_id=?,checkout_path=?,git_common_dir=?,updated_at=?
                WHERE run_id=? AND assignment_id=?""",
-            (observed["thread_id"], observed["checkout_path"], observed["git_common_dir"], now, run["run_id"], assignment["assignment_id"]),
+            (
+                observed["thread_id"],
+                checkout_path,
+                git_common_dir,
+                now,
+                run["run_id"],
+                assignment["assignment_id"],
+            ),
         )
     elif action == "set-worker-title":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
@@ -1427,21 +2021,93 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         connection.execute("UPDATE assignments SET state='preimplementation-aborted',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
 
 
+def app_operation_replay_authorized(
+    action: str,
+    status: str,
+    readback_ref: str | None,
+) -> bool:
+    if not readback_ref or action not in SINGLE_USE_ACTIONS:
+        return False
+    if action == "send-bootstrap":
+        return status in {"unknown", "failed"}
+    return status == "failed"
+
+
 def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
-    operation_key = token(args.operation_key, "operation_key")
+    operation_id = token(args.operation_id, "operation_id")
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
-        require_revision(run, args.expected_revision)
-        operation = connection.execute("SELECT * FROM app_operations WHERE run_id=? AND operation_key=?", (run_id, operation_key)).fetchone()
+        operation = connection.execute(
+            "SELECT * FROM app_operations WHERE run_id=? AND operation_id=?",
+            (run_id, operation_id),
+        ).fetchone()
         if operation is None:
-            raise StateError("operation-not-found", f"operation does not exist: {operation_key}", 3)
-        if operation["status"] in {"succeeded", "failed"}:
-            raise StateError("operation-terminal", f"operation is already {operation['status']}", 4)
+            raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
         observed = validate_operation_observation(operation, read_json_file(args.observation, "ChatGPT operation observation"))
-        if operation["status"] == "unknown" and observed["status"] == "unknown":
-            raise StateError("operation-unknown", "reconcile the same unknown operation to succeeded or failed", 4)
+        stored_values = {
+            field: operation[field]
+            for field in (
+                "receipt_ref",
+                "readback_ref",
+                "thread_id",
+                "project_id",
+                "checkout_path",
+                "git_common_dir",
+                "observed_title",
+                "provider_observation_ref",
+                "head_sha",
+                "pr_url",
+                "observed_state",
+            )
+            if operation[field] is not None
+        }
+        if operation["action"] == "send-bootstrap":
+            stored_values["bootstrap_id"] = bootstrap_id_for(operation_id)
+        stored_observation = {
+            "operation_id": operation_id,
+            "launch_count": operation["launch_count"],
+            "status": operation["status"],
+            **stored_values,
+        }
+        terminal_or_reconciled = operation["status"] in {
+            "unknown",
+            "succeeded",
+            "failed",
+        }
+        if terminal_or_reconciled:
+            if observed == stored_observation:
+                connection.rollback()
+                return {
+                    "run_id": run_id,
+                    "revision": run["revision"],
+                    "operation_id": operation_id,
+                    "status": operation["status"],
+                    "launch_count": operation["launch_count"],
+                    "already_applied": True,
+                    "replay_authorized": app_operation_replay_authorized(
+                        operation["action"],
+                        operation["status"],
+                        operation["readback_ref"],
+                    ),
+                }
+        require_revision(run, args.expected_revision)
+        if terminal_or_reconciled:
+            if operation["status"] in {"succeeded", "failed"}:
+                raise StateError(
+                    "operation-observation-conflict",
+                    f"operation is already {operation['status']} with different evidence",
+                    4,
+                )
+            for field, stored_value in stored_values.items():
+                if observed.get(field) != stored_value:
+                    raise StateError(
+                        "operation-observation-conflict",
+                        "reconciliation updates may add evidence but cannot "
+                        f"remove or replace {field}",
+                        4,
+                    )
         if observed["status"] == "succeeded":
             apply_succeeded_app_effect(connection, run, operation, observed)
         values = {field: observed.get(field) for field in (
@@ -1451,17 +2117,114 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         connection.execute(
             """UPDATE app_operations SET status=?,receipt_ref=?,readback_ref=?,thread_id=?,project_id=?,
                checkout_path=?,git_common_dir=?,observed_title=?,provider_observation_ref=?,head_sha=?,pr_url=?,
-               observed_state=?,updated_at=? WHERE run_id=? AND operation_key=?""",
-            (observed["status"], *(values[field] for field in values), utc_now(), run_id, operation_key),
+               observed_state=?,updated_at=? WHERE run_id=? AND operation_id=?""",
+            (observed["status"], *(values[field] for field in values), utc_now(), run_id, operation_id),
         )
         revision = advance(connection, run)
         connection.commit()
-        return {"run_id": run_id, "revision": revision, "operation_key": operation_key, "status": observed["status"], "relaunch_authorized": False}
+        return {
+            "run_id": run_id,
+            "revision": revision,
+            "operation_id": operation_id,
+            "status": observed["status"],
+            "launch_count": operation["launch_count"],
+            "already_applied": False,
+            "replay_authorized": app_operation_replay_authorized(
+                operation["action"],
+                observed["status"],
+                observed.get("readback_ref"),
+            ),
+        }
     except Exception:
         connection.rollback()
         raise
     finally:
         connection.close()
+
+
+def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    operation_id = token(args.operation_id, "operation_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        operation = connection.execute(
+            "SELECT * FROM app_operations WHERE run_id=? AND operation_id=?",
+            (run_id, operation_id),
+        ).fetchone()
+        if operation is None:
+            raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
+        action = operation["action"]
+        if action not in SINGLE_USE_ACTIONS:
+            raise StateError(
+                "operation-replay-unsupported",
+                f"{action} does not support logical-operation replay",
+                4,
+            )
+        if not app_operation_replay_authorized(
+            action,
+            operation["status"],
+            operation["readback_ref"],
+        ):
+            required_status = (
+                "unknown or failed"
+                if action == "send-bootstrap"
+                else "failed"
+            )
+            raise StateError(
+                "operation-reconciliation-required",
+                f"{action} replay requires {required_status} status with "
+                f"authoritative readback_ref, found {operation['status']}",
+                4,
+            )
+        replay_assignment_id = validate_app_begin(
+            connection,
+            run,
+            action,
+            operation["subject_id"],
+        )
+        if replay_assignment_id != operation["assignment_id"]:
+            raise StateError(
+                "invalid-state-schema",
+                "replay subject no longer resolves to the recorded assignment",
+                4,
+            )
+        connection.execute(
+            """UPDATE app_operations
+               SET status='pending',launch_count=launch_count+1,receipt_ref=NULL,
+                   readback_ref=NULL,thread_id=NULL,project_id=NULL,checkout_path=NULL,
+                   git_common_dir=NULL,observed_title=NULL,provider_observation_ref=NULL,
+                   head_sha=NULL,pr_url=NULL,observed_state=NULL,updated_at=?
+               WHERE run_id=? AND operation_id=?""",
+            (utc_now(), run_id, operation_id),
+        )
+        revision = advance(connection, run)
+        connection.commit()
+        result = {
+            "run_id": run_id,
+            "revision": revision,
+            "operation_id": operation_id,
+            "action": action,
+            "status": "pending",
+            "launch_count": operation["launch_count"] + 1,
+            "launch_authorized": True,
+        }
+        if action == "send-bootstrap":
+            result["bootstrap_id"] = bootstrap_id_for(operation_id)
+        return result
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def app_operation_projection(row: sqlite3.Row) -> dict[str, Any]:
+    value = dict(row)
+    if value["action"] == "send-bootstrap":
+        value["bootstrap_id"] = bootstrap_id_for(value["operation_id"])
+    return value
 
 
 def command_app_operation_list(args: argparse.Namespace) -> dict[str, Any]:
@@ -1472,34 +2235,412 @@ def command_app_operation_list(args: argparse.Namespace) -> dict[str, Any]:
         get_run(connection, token(args.run_id, "run_id"))
         rows = list(connection.execute("SELECT * FROM app_operations WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT ?", (args.run_id, args.after_sequence, args.limit + 1)))
         visible = rows[:args.limit]
-        return {"operations": [dict(row) for row in visible], "has_more": len(rows) > args.limit, "next_after_sequence": visible[-1]["sequence"] if visible else args.after_sequence}
+        return {
+            "operations": [app_operation_projection(row) for row in visible],
+            "has_more": len(rows) > args.limit,
+            "next_after_sequence": visible[-1]["sequence"] if visible else args.after_sequence,
+        }
     finally:
         connection.close()
 
 
-def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
-    value = read_json_file(args.observation, "delivery-ready observation")
-    common = {
-        "schema_version", "assignment_id", "thread_id", "repository_identity",
-        "delivery_type", "head_sha", "head_branch_name", "base_branch_name",
-        "base_sha", "checkout_path", "worktree_clean", "base_is_ancestor",
-        "validation_head_sha", "autoreview_head_sha",
-        "review_candidate_head_sha", "review_profile", "codex_review_head_sha",
-        "tracker_readback_ref", "prerequisite_heads", "status",
-    }
-    github_extra = {"default_branch_name", "pr_url", "provider_observation_ref"}
-    delivery_type = value.get("delivery_type")
-    expected_keys = common | github_extra if delivery_type == "github-pr" else common
-    exact_keys(value, expected_keys, "delivery-ready observation")
-    expected_status = {
+def ready_status(delivery_type: str) -> str:
+    status = {
         "github-pr": "pr-ready-for-merge-but-not-merged",
         "local-branch": "local-branch-ready",
     }.get(delivery_type)
-    if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] != expected_status:
+    if status is None:
         raise StateError(
             "invalid-ready-observation",
-            "ready observation status must match its schema-1 delivery_type",
+            "delivery_type must be github-pr or local-branch",
         )
+    return status
+
+
+def validate_ready_observation_shape(value: dict[str, Any]) -> str:
+    delivery_type = value.get("delivery_type")
+    expected_keys = (
+        READY_COMMON_FIELDS | READY_GITHUB_FIELDS
+        if delivery_type == "github-pr"
+        else READY_COMMON_FIELDS
+    )
+    exact_keys(value, expected_keys, "delivery-ready observation")
+    require_protocol(
+        value,
+        "delivery_ready_observation",
+        "delivery-ready observation",
+    )
+    expected_status = ready_status(delivery_type)
+    if value["status"] != expected_status:
+        raise StateError(
+            "invalid-ready-observation",
+            "ready observation status must match delivery_type",
+        )
+    if value["readiness_mode"] not in {"terminal", "peer-input"}:
+        raise StateError(
+            "invalid-ready-observation",
+            "readiness_mode must be terminal or peer-input",
+        )
+    return delivery_type
+
+
+def parse_prerequisite_heads(values: list[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for value in values:
+        assignment_id, separator, sha = value.partition("=")
+        if not separator:
+            raise StateError(
+                "invalid-input",
+                "prerequisite-head must use ASSIGNMENT_ID=GIT_SHA",
+            )
+        assignment_id = token(assignment_id, "prerequisite_head.assignment_id")
+        if assignment_id in result:
+            raise StateError(
+                "invalid-input",
+                f"duplicate prerequisite-head for {assignment_id}",
+            )
+        result[assignment_id] = head(sha, f"prerequisite_heads.{assignment_id}")
+    return result
+
+
+def ready_observation_descriptor(
+    delivery_type: str,
+    review_profile: str,
+    readiness_mode: str,
+) -> dict[str, Any]:
+    status = ready_status(delivery_type)
+    if review_profile not in {"standard", "high-risk"}:
+        raise StateError(
+            "invalid-ready-observation",
+            "review_profile must be standard or high-risk",
+        )
+    if readiness_mode not in {"terminal", "peer-input"}:
+        raise StateError(
+            "invalid-ready-observation",
+            "readiness_mode must be terminal or peer-input",
+        )
+    constants: dict[str, Any] = {
+        **protocol_fields("delivery_ready_observation"),
+        "delivery_type": delivery_type,
+        "status": status,
+        "review_profile": review_profile,
+        "readiness_mode": readiness_mode,
+    }
+    if review_profile == "standard":
+        constants["codex_review_head_sha"] = None
+    required = set(READY_COMMON_FIELDS)
+    if delivery_type == "github-pr":
+        required.update(READY_GITHUB_FIELDS)
+    required -= set(constants)
+    return {
+        "observation_kind": "delivery-ready",
+        "delivery_type": delivery_type,
+        "review_profile": review_profile,
+        "readiness_mode": readiness_mode,
+        "constants": constants,
+        "required_fields": sorted(required),
+        "optional_fields": [],
+        "additional_fields": False,
+    }
+
+
+def command_assignment_ready_observation_template(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    return ready_observation_descriptor(
+        args.delivery_type,
+        args.review_profile,
+        args.readiness_mode,
+    )
+
+
+def ready_observation_payload(
+    args: argparse.Namespace,
+    assignment: sqlite3.Row,
+) -> dict[str, Any]:
+    review_profile = string(args.review_profile, "review_profile", 32)
+    if review_profile not in {"standard", "high-risk"}:
+        raise StateError(
+            "invalid-ready-observation",
+            "review_profile must be standard or high-risk",
+        )
+    if review_profile == "standard":
+        if args.codex_review_head_sha is not None:
+            raise StateError(
+                "invalid-ready-observation",
+                "standard review_profile does not accept codex_review_head_sha",
+            )
+        codex_review_head_sha = None
+    else:
+        codex_review_head_sha = args.codex_review_head_sha
+        if codex_review_head_sha is None:
+            raise StateError(
+                "invalid-ready-observation",
+                "high-risk review_profile requires codex_review_head_sha",
+            )
+    payload: dict[str, Any] = {
+        **protocol_fields("delivery_ready_observation"),
+        "assignment_id": assignment["assignment_id"],
+        "thread_id": args.thread_id,
+        "repository_identity": args.repository_identity,
+        "delivery_type": assignment["delivery_type"],
+        "readiness_mode": args.readiness_mode,
+        "head_sha": args.head_sha,
+        "head_branch_name": args.head_branch_name,
+        "base_branch_name": args.base_branch_name,
+        "base_sha": args.base_sha,
+        "checkout_path": args.checkout_path,
+        "worktree_clean": args.worktree_clean,
+        "base_is_ancestor": args.base_is_ancestor,
+        "validation_head_sha": args.validation_head_sha,
+        "autoreview_head_sha": args.autoreview_head_sha,
+        "review_candidate_head_sha": args.review_candidate_head_sha,
+        "review_profile": review_profile,
+        "codex_review_head_sha": codex_review_head_sha,
+        "tracker_readback_ref": args.tracker_readback_ref,
+        "prerequisite_heads": parse_prerequisite_heads(args.prerequisite_head),
+        "status": ready_status(assignment["delivery_type"]),
+    }
+    github_values = {
+        "default_branch_name": args.default_branch_name,
+        "pr_url": args.pr_url,
+        "provider_observation_ref": args.provider_observation_ref,
+    }
+    if assignment["delivery_type"] == "github-pr":
+        payload.update(github_values)
+    elif any(value is not None for value in github_values.values()):
+        raise StateError(
+            "invalid-ready-observation",
+            "local-branch observations do not accept GitHub provider fields",
+        )
+    validate_ready_observation_shape(payload)
+    return payload
+
+
+def validate_ready_evidence(
+    connection: sqlite3.Connection,
+    run_id: str,
+    assignment: sqlite3.Row,
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    assignment_id = assignment["assignment_id"]
+    delivery_type = validate_ready_observation_shape(value)
+    readiness_mode = value["readiness_mode"]
+    peer_input = readiness_mode == "peer-input"
+    if (
+        assignment["state"] not in {"active", "peer-input-ready"}
+        or value["thread_id"] != assignment["thread_id"]
+    ):
+        raise StateError(
+            "invalid-assignment-transition",
+            "ready evidence must belong to the active worker",
+            4,
+        )
+    if peer_input:
+        dependents = [
+            row["prerequisite_assignment_ids"]
+            for row in connection.execute(
+                """SELECT prerequisite_assignment_ids FROM assignments
+                   WHERE run_id=? AND assignment_id<>?""",
+                (run_id, assignment_id),
+            )
+        ]
+        if not any(assignment_id in json.loads(item) for item in dependents):
+            raise StateError(
+                "not-a-peer-prerequisite",
+                "peer input readiness requires a dependent assignment",
+                4,
+            )
+    if delivery_type != assignment["delivery_type"]:
+        raise StateError(
+            "delivery-type-drift",
+            "ready evidence uses another delivery type",
+            4,
+        )
+    if value["repository_identity"] != assignment["repository_identity"]:
+        raise StateError(
+            "repository-identity-drift",
+            "ready evidence belongs to another repository",
+            4,
+        )
+    if directory(value["checkout_path"], "checkout_path") != assignment["checkout_path"]:
+        raise StateError(
+            "worker-checkout-drift",
+            "ready evidence belongs to another checkout",
+            4,
+        )
+    observed_head = head(value["head_sha"], "head_sha")
+    if value["head_branch_name"] != assignment["target_branch_name"]:
+        raise StateError(
+            "target-branch-drift",
+            "head branch differs from the assignment",
+            4,
+        )
+    base_branch = branch_name(value["base_branch_name"])
+    base_sha = head(value["base_sha"], "base_sha")
+    if value["worktree_clean"] is not True or value["base_is_ancestor"] is not True:
+        raise StateError(
+            "invalid-ready-observation",
+            "delivery readiness requires a clean worktree and proven base ancestry",
+        )
+    for field in ("validation_head_sha", "autoreview_head_sha"):
+        if head(value[field], field) != observed_head:
+            raise StateError(
+                "stale-ready-evidence",
+                f"{field} does not bind current HEAD",
+                4,
+            )
+    review_profile = value["review_profile"]
+    if review_profile not in {"standard", "high-risk"}:
+        raise StateError(
+            "invalid-ready-observation",
+            "review_profile must be standard or high-risk",
+        )
+    codex_review_head = value["codex_review_head_sha"]
+    review_candidate_head = head(
+        value["review_candidate_head_sha"],
+        "review_candidate_head_sha",
+    )
+    if review_profile == "standard":
+        if codex_review_head is not None:
+            raise StateError(
+                "invalid-ready-observation",
+                "standard review_profile requires codex_review_head_sha=null",
+            )
+    elif head(codex_review_head, "codex_review_head_sha") != review_candidate_head:
+        raise StateError(
+            "stale-ready-evidence",
+            "codex_review_head_sha does not bind review_candidate_head_sha",
+            4,
+        )
+    string(value["tracker_readback_ref"], "tracker_readback_ref", 2048)
+    prerequisite_ids = json.loads(assignment["prerequisite_assignment_ids"])
+    prerequisite_heads = value["prerequisite_heads"]
+    if (
+        not isinstance(prerequisite_heads, dict)
+        or set(prerequisite_heads) != set(prerequisite_ids)
+    ):
+        raise StateError(
+            "invalid-ready-observation",
+            "prerequisite_heads must exactly match assignment prerequisites",
+        )
+    current_heads = {
+        row["assignment_id"]: row["head_sha"]
+        for row in connection.execute(
+            "SELECT assignment_id,head_sha FROM assignments WHERE run_id=?",
+            (run_id,),
+        )
+        if row["assignment_id"] in prerequisite_ids
+    }
+    normalized_heads = {
+        prerequisite: head(
+            prerequisite_heads[prerequisite],
+            f"prerequisite_heads.{prerequisite}",
+        )
+        for prerequisite in prerequisite_ids
+    }
+    if normalized_heads != current_heads:
+        raise StateError(
+            "prerequisite-head-drift",
+            "combined proof does not match the current prerequisite HEAD vector",
+            4,
+        )
+    pr_url = None
+    default_branch = None
+    provider_observation_ref = None
+    terminal_state = "local-branch-ready"
+    if delivery_type == "github-pr":
+        default_branch = branch_name(value["default_branch_name"])
+        if base_branch != default_branch:
+            raise StateError(
+                "pull-request-base-drift",
+                "PR base differs from the provider-observed default branch",
+                4,
+            )
+        pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
+        if pull is None:
+            raise StateError(
+                "invalid-ready-observation",
+                "pr_url must be a canonical GitHub pull request URL",
+            )
+        github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
+        if (
+            github_identity is None
+            or (pull.group(1), pull.group(2)) != github_identity.groups()
+        ):
+            raise StateError(
+                "pull-request-repository-drift",
+                "PR belongs to another repository",
+                4,
+            )
+        pr_url = value["pr_url"]
+        provider_observation_ref = string(
+            value["provider_observation_ref"],
+            "provider_observation_ref",
+            2048,
+        )
+        terminal_state = "pr-ready"
+    unresolved = connection.execute(
+        """SELECT COUNT(*) FROM app_operations
+           WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')""",
+        (run_id, assignment_id),
+    ).fetchone()[0]
+    if unresolved:
+        raise StateError(
+            "unresolved-app-operation",
+            "reconcile assignment task changes before ready",
+            4,
+        )
+    return {
+        "delivery_type": delivery_type,
+        "readiness_mode": readiness_mode,
+        "observed_head": observed_head,
+        "base_branch": base_branch,
+        "base_sha": base_sha,
+        "pr_url": pr_url,
+        "default_branch": default_branch,
+        "provider_observation_ref": provider_observation_ref,
+        "terminal_state": terminal_state,
+    }
+
+
+def command_assignment_ready_observation_create(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=False)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        if run["status"] != "active":
+            raise StateError("run-not-active", f"run is {run['status']}", 4)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        payload = ready_observation_payload(args, assignment)
+        validate_ready_evidence(
+            connection,
+            run_id,
+            assignment,
+            payload,
+        )
+    finally:
+        connection.close()
+    output = atomic_write_json(args.output, payload)
+    return {
+        "observation_kind": "delivery-ready",
+        "assignment_id": assignment_id,
+        "delivery_type": assignment["delivery_type"],
+        "readiness_mode": payload["readiness_mode"],
+        "review_profile": args.review_profile,
+        "output": output,
+        "artifact_written": True,
+        "state_writes_performed": False,
+    }
+
+
+def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
+    value = read_json_file(args.observation, "delivery-ready observation")
+    delivery_type = validate_ready_observation_shape(value)
     run_id = token(args.run_id, "run_id")
     assignment_id = token(value["assignment_id"], "assignment_id")
     connection = connect(write=True)
@@ -1509,146 +2650,60 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
         if run["status"] != "active":
             raise StateError("run-not-active", f"run is {run['status']}", 4)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] not in {"active", "peer-input-ready"} or value["thread_id"] != assignment["thread_id"]:
-            raise StateError("invalid-assignment-transition", "ready evidence must belong to the active worker", 4)
-        if args.peer_input:
-            dependents = [
-                row["prerequisite_assignment_ids"]
-                for row in connection.execute(
-                    "SELECT prerequisite_assignment_ids FROM assignments WHERE run_id=? AND assignment_id<>?",
-                    (run_id, assignment_id),
-                )
-            ]
-            if not any(assignment_id in json.loads(value) for value in dependents):
-                raise StateError(
-                    "not-a-peer-prerequisite",
-                    "peer input readiness requires a dependent assignment",
-                    4,
-                )
-        if value["delivery_type"] != assignment["delivery_type"]:
-            raise StateError("delivery-type-drift", "ready evidence uses another delivery type", 4)
-        if value["repository_identity"] != assignment["repository_identity"]:
-            raise StateError("repository-identity-drift", "ready evidence belongs to another repository", 4)
-        if directory(value["checkout_path"], "checkout_path") != assignment["checkout_path"]:
-            raise StateError("worker-checkout-drift", "ready evidence belongs to another checkout", 4)
-        observed_head = head(value["head_sha"], "head_sha")
-        if value["head_branch_name"] != assignment["target_branch_name"]:
-            raise StateError("target-branch-drift", "head branch differs from the assignment", 4)
-        base_branch = branch_name(value["base_branch_name"])
-        base_sha = head(value["base_sha"], "base_sha")
-        if value["worktree_clean"] is not True or value["base_is_ancestor"] is not True:
-            raise StateError(
-                "invalid-ready-observation",
-                "delivery readiness requires a clean worktree and proven base ancestry",
-            )
-        for field in ("validation_head_sha", "autoreview_head_sha"):
-            if head(value[field], field) != observed_head:
-                raise StateError("stale-ready-evidence", f"{field} does not bind current HEAD", 4)
-        review_profile = value["review_profile"]
-        if review_profile not in {"standard", "high-risk"}:
-            raise StateError(
-                "invalid-ready-observation",
-                "review_profile must be standard or high-risk",
-            )
-        codex_review_head = value["codex_review_head_sha"]
-        review_candidate_head = head(
-            value["review_candidate_head_sha"],
-            "review_candidate_head_sha",
+        evidence = validate_ready_evidence(
+            connection,
+            run_id,
+            assignment,
+            value,
         )
-        if review_profile == "standard":
-            if codex_review_head is not None:
-                raise StateError(
-                    "invalid-ready-observation",
-                    "standard review_profile requires codex_review_head_sha=null",
-                )
-        elif head(codex_review_head, "codex_review_head_sha") != review_candidate_head:
-            raise StateError(
-                "stale-ready-evidence",
-                "codex_review_head_sha does not bind review_candidate_head_sha",
-                4,
-            )
-        string(value["tracker_readback_ref"], "tracker_readback_ref", 2048)
-        prerequisite_ids = json.loads(assignment["prerequisite_assignment_ids"])
-        prerequisite_heads = value["prerequisite_heads"]
-        if not isinstance(prerequisite_heads, dict) or set(prerequisite_heads) != set(prerequisite_ids):
-            raise StateError(
-                "invalid-ready-observation",
-                "prerequisite_heads must exactly match assignment prerequisites",
-            )
-        if prerequisite_ids:
-            current_heads = {
-                row["assignment_id"]: row["head_sha"]
-                for row in connection.execute(
-                    "SELECT assignment_id,head_sha FROM assignments WHERE run_id=?",
-                    (run_id,),
-                )
-                if row["assignment_id"] in prerequisite_ids
-            }
-            normalized_heads = {
-                prerequisite: head(prerequisite_heads[prerequisite], f"prerequisite_heads.{prerequisite}")
-                for prerequisite in prerequisite_ids
-            }
-            if normalized_heads != current_heads:
-                raise StateError(
-                    "prerequisite-head-drift",
-                    "combined proof does not match the current prerequisite HEAD vector",
-                    4,
-                )
-        pr_url = None
-        default_branch = None
-        provider_observation_ref = None
-        terminal_state = "local-branch-ready"
-        if delivery_type == "github-pr":
-            default_branch = branch_name(value["default_branch_name"])
-            if base_branch != default_branch:
-                raise StateError(
-                    "pull-request-base-drift",
-                    "PR base differs from the provider-observed default branch",
-                    4,
-                )
-            pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
-            if pull is None:
-                raise StateError("invalid-ready-observation", "pr_url must be a canonical GitHub pull request URL")
-            github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
-            if github_identity is None or (pull.group(1), pull.group(2)) != github_identity.groups():
-                raise StateError("pull-request-repository-drift", "PR belongs to another repository", 4)
-            pr_url = value["pr_url"]
-            provider_observation_ref = string(
-                value["provider_observation_ref"], "provider_observation_ref", 2048
-            )
-            terminal_state = "pr-ready"
-        persisted_state = "peer-input-ready" if args.peer_input else terminal_state
-        unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')", (run_id, assignment_id)).fetchone()[0]
-        if unresolved:
-            raise StateError("unresolved-app-operation", "reconcile assignment task changes before ready", 4)
+        persisted_state = (
+            "peer-input-ready"
+            if evidence["readiness_mode"] == "peer-input"
+            else evidence["terminal_state"]
+        )
         connection.execute(
             """UPDATE assignments SET state=?,head_sha=?,base_branch_name=?,base_sha=?,
                worktree_clean=1,base_is_ancestor=1,pr_url=?,default_branch_name=?,
                provider_observation_ref=?,updated_at=?
                WHERE run_id=? AND assignment_id=?""",
             (
-                persisted_state, observed_head, base_branch, base_sha, pr_url, default_branch,
-                provider_observation_ref,
-                utc_now(), run_id, assignment_id,
+                persisted_state,
+                evidence["observed_head"],
+                evidence["base_branch"],
+                evidence["base_sha"],
+                evidence["pr_url"],
+                evidence["default_branch"],
+                evidence["provider_observation_ref"],
+                utc_now(),
+                run_id,
+                assignment_id,
             ),
         )
         claim_released = False
-        if not args.peer_input:
+        if evidence["readiness_mode"] == "terminal":
             now = utc_now()
             updated = connection.execute(
                 """UPDATE spec_claims SET active=0,released_at=?,release_reason=?
                    WHERE run_id=? AND assignment_id=? AND active=1""",
-                (now, terminal_state, run_id, assignment_id),
+                (now, evidence["terminal_state"], run_id, assignment_id),
             ).rowcount
             if updated != 1:
-                raise StateError("assignment-claim-not-active", "ready assignment has no active claim", 4)
+                raise StateError(
+                    "assignment-claim-not-active",
+                    "ready assignment has no active claim",
+                    4,
+                )
             claim_released = True
         recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
         return {
-            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
-            "state": persisted_state, "delivery_type": delivery_type,
+            "run_id": run_id,
+            "revision": revision,
+            "assignment_id": assignment_id,
+            "state": persisted_state,
+            "delivery_type": delivery_type,
+            "readiness_mode": evidence["readiness_mode"],
             "claim_released": claim_released,
         }
     except Exception:
@@ -1843,17 +2898,25 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
     exact_keys(
         value,
         {
-            "schema_version", "owner_run_id", "owner_assignment_id", "owner_expected_revision",
-            "repository_identity", "tracker_backend", "source_spec_ref", "worker_state",
-            "checkout_state", "readback_ref",
+            "schema",
+            "schema_version",
+            "owner_run_id",
+            "owner_assignment_id",
+            "owner_expected_revision",
+            "repository_identity",
+            "tracker_backend",
+            "source_spec_ref",
+            "worker_state",
+            "checkout_state",
+            "readback_ref",
         },
         "claim recovery observation",
     )
-    if value["schema_version"] != STATE_SCHEMA_VERSION:
-        raise StateError(
-            "unsupported-input-schema",
-            f"claim recovery observation schema_version must be {STATE_SCHEMA_VERSION}",
-        )
+    require_protocol(
+        value,
+        "recovery_observation",
+        "claim recovery observation",
+    )
     if not isinstance(value["owner_expected_revision"], int) or value["owner_expected_revision"] < 1:
         raise StateError("invalid-input", "owner_expected_revision must be a positive integer")
     worker_state = string(value["worker_state"], "worker_state", 32)
@@ -2321,10 +3384,24 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="run-state", description="Schema-1 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
+    parser = StructuredArgumentParser(
+        prog="run-state",
+        description=(
+            "Database-schema-2 SQLite coordination for Implement Feature "
+            "controllers in the ChatGPT desktop app."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="emit one machine-readable JSON object")
     parser.add_argument("--version", action="version", version=CLI_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
+    capabilities = commands.add_parser(
+        "capabilities",
+        help="print independent CLI, runtime, database, and JSON protocol versions",
+    )
+    capabilities.set_defaults(
+        handler=command_capabilities,
+        command_name="capabilities",
+    )
     doctor = commands.add_parser("doctor", help="inspect shared state readiness without writing")
     doctor.set_defaults(handler=command_doctor, command_name="doctor")
 
@@ -2336,6 +3413,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prepare.add_argument(
         "--retained-runtime",
+        action="append",
+        default=[],
         help="absolute executable path for the exact older runtime while owners drain",
     )
     prepare.set_defaults(handler=command_state_prepare, command_name="state prepare")
@@ -2389,16 +3468,81 @@ def build_parser() -> argparse.ArgumentParser:
     begin = operation_commands.add_parser("begin", help="authorize one ChatGPT task change")
     begin.add_argument("--run-id", required=True)
     begin.add_argument("--expected-revision", type=int, required=True)
-    begin.add_argument("--operation-key", required=True)
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
     begin.add_argument("--subject-id", required=True)
     begin.set_defaults(handler=command_app_operation_begin, command_name="app-operation begin")
     op_finish = operation_commands.add_parser("finish", help="record or reconcile the immediate response and independent state inspection")
     op_finish.add_argument("--run-id", required=True)
     op_finish.add_argument("--expected-revision", type=int, required=True)
-    op_finish.add_argument("--operation-key", required=True)
+    op_finish.add_argument("--operation-id", required=True)
     op_finish.add_argument("--observation", required=True)
     op_finish.set_defaults(handler=command_app_operation_finish, command_name="app-operation finish")
+    op_replay = operation_commands.add_parser(
+        "replay",
+        help="authorize another launch of the same reconciled logical operation",
+    )
+    op_replay.add_argument("--run-id", required=True)
+    op_replay.add_argument("--expected-revision", type=int, required=True)
+    op_replay.add_argument("--operation-id", required=True)
+    op_replay.set_defaults(
+        handler=command_app_operation_replay,
+        command_name="app-operation replay",
+    )
+    observation = operation_commands.add_parser(
+        "observation",
+        help="describe or build strict ChatGPT task-operation observations",
+    )
+    observation_commands = observation.add_subparsers(
+        dest="operation_observation_command",
+        required=True,
+    )
+    observation_template = observation_commands.add_parser(
+        "template",
+        help="print a descriptor for one action and observation status",
+    )
+    observation_template.add_argument(
+        "--action",
+        choices=sorted(APP_ACTIONS),
+        required=True,
+    )
+    observation_template.add_argument(
+        "--status",
+        choices=("unknown", "succeeded", "failed"),
+        required=True,
+    )
+    observation_template.set_defaults(
+        handler=command_app_operation_observation_template,
+        command_name="app-operation observation template",
+    )
+    observation_create = observation_commands.add_parser(
+        "create",
+        help="build one strict observation file without mutating run state",
+    )
+    observation_create.add_argument("--run-id", required=True)
+    observation_create.add_argument("--expected-revision", type=int, required=True)
+    observation_create.add_argument("--operation-id", required=True)
+    observation_create.add_argument("--launch-count", type=int, required=True)
+    observation_create.add_argument(
+        "--status",
+        choices=("unknown", "succeeded", "failed"),
+        required=True,
+    )
+    for option in (
+        "receipt-ref",
+        "readback-ref",
+        "thread-id",
+        "project-id",
+        "checkout-path",
+        "git-common-dir",
+        "observed-title",
+        "observed-state",
+    ):
+        observation_create.add_argument(f"--{option}")
+    observation_create.add_argument("--output", required=True)
+    observation_create.set_defaults(
+        handler=command_app_operation_observation_create,
+        command_name="app-operation observation create",
+    )
     op_list = operation_commands.add_parser("list", help="page through typed ChatGPT task-operation facts")
     op_list.add_argument("--run-id", required=True)
     op_list.add_argument("--after-sequence", type=int, default=0)
@@ -2407,11 +3551,86 @@ def build_parser() -> argparse.ArgumentParser:
 
     assignment = commands.add_parser("assignment", help="record worker terminal evidence")
     assignment_commands = assignment.add_subparsers(dest="assignment_command", required=True)
+    ready_observation = assignment_commands.add_parser(
+        "ready-observation",
+        help="describe or build strict delivery-ready observations",
+    )
+    ready_observation_commands = ready_observation.add_subparsers(
+        dest="ready_observation_command",
+        required=True,
+    )
+    ready_template = ready_observation_commands.add_parser(
+        "template",
+        help="print a descriptor for one delivery and review profile",
+    )
+    ready_template.add_argument(
+        "--delivery-type",
+        choices=("github-pr", "local-branch"),
+        required=True,
+    )
+    ready_template.add_argument(
+        "--review-profile",
+        choices=("standard", "high-risk"),
+        required=True,
+    )
+    ready_template.add_argument(
+        "--readiness-mode",
+        choices=("terminal", "peer-input"),
+        required=True,
+    )
+    ready_template.set_defaults(
+        handler=command_assignment_ready_observation_template,
+        command_name="assignment ready-observation template",
+    )
+    ready_create = ready_observation_commands.add_parser(
+        "create",
+        help="build one strict delivery-ready file without mutating run state",
+    )
+    ready_create.add_argument("--run-id", required=True)
+    ready_create.add_argument("--expected-revision", type=int, required=True)
+    ready_create.add_argument("--assignment-id", required=True)
+    ready_create.add_argument("--thread-id", required=True)
+    ready_create.add_argument("--repository-identity", required=True)
+    ready_create.add_argument("--head-sha", required=True)
+    ready_create.add_argument("--head-branch-name", required=True)
+    ready_create.add_argument("--base-branch-name", required=True)
+    ready_create.add_argument("--base-sha", required=True)
+    ready_create.add_argument("--checkout-path", required=True)
+    ready_create.add_argument("--worktree-clean", action="store_true", required=True)
+    ready_create.add_argument("--base-is-ancestor", action="store_true", required=True)
+    ready_create.add_argument("--validation-head-sha", required=True)
+    ready_create.add_argument("--autoreview-head-sha", required=True)
+    ready_create.add_argument("--review-candidate-head-sha", required=True)
+    ready_create.add_argument(
+        "--review-profile",
+        choices=("standard", "high-risk"),
+        required=True,
+    )
+    ready_create.add_argument(
+        "--readiness-mode",
+        choices=("terminal", "peer-input"),
+        required=True,
+    )
+    ready_create.add_argument("--codex-review-head-sha")
+    ready_create.add_argument("--tracker-readback-ref", required=True)
+    ready_create.add_argument(
+        "--prerequisite-head",
+        action="append",
+        default=[],
+        metavar="ASSIGNMENT_ID=GIT_SHA",
+    )
+    ready_create.add_argument("--default-branch-name")
+    ready_create.add_argument("--pr-url")
+    ready_create.add_argument("--provider-observation-ref")
+    ready_create.add_argument("--output", required=True)
+    ready_create.set_defaults(
+        handler=command_assignment_ready_observation_create,
+        command_name="assignment ready-observation create",
+    )
     ready = assignment_commands.add_parser("ready", help="record typed root-verified delivery-ready evidence")
     ready.add_argument("--run-id", required=True)
     ready.add_argument("--expected-revision", type=int, required=True)
     ready.add_argument("--observation", required=True)
-    ready.add_argument("--peer-input", action="store_true", help="retain the worker and claim while exposing an exact HEAD to dependent peers")
     ready.set_defaults(handler=command_assignment_ready, command_name="assignment ready")
     block = assignment_commands.add_parser("block", help="retain claims after a durable contract change")
     block.add_argument("--run-id", required=True)
@@ -2461,19 +3680,45 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def render(payload: dict[str, Any], command: str, as_json: bool) -> None:
-    envelope = {"schema_version": STATE_SCHEMA_VERSION, "ok": True, "command": command, **payload}
+    envelope = {
+        **protocol_fields("cli_envelope"),
+        "ok": True,
+        "command": command,
+        "cli_version": CLI_VERSION,
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+        **payload,
+    }
     print(canonical_json(envelope) if as_json else json.dumps(envelope, indent=2, sort_keys=True, ensure_ascii=False))
+
+
+def failure_payload(command: str, code: str, message: str) -> dict[str, Any]:
+    return {
+        **protocol_fields("cli_envelope"),
+        "ok": False,
+        "command": command,
+        "cli_version": CLI_VERSION,
+        "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+        "error": {"code": code, "message": message},
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_arguments = list(sys.argv[1:] if argv is None else argv)
+    args: argparse.Namespace | None = None
+    as_json = "--json" in raw_arguments
     try:
+        args = parser.parse_args(raw_arguments)
+        as_json = args.json
         render(args.handler(args), args.command_name, args.json)
         return 0
     except StateError as error:
-        payload = {"schema_version": STATE_SCHEMA_VERSION, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": error.code, "message": error.message}}
-        if args.json:
+        payload = failure_payload(
+            getattr(args, "command_name", "unknown"),
+            error.code,
+            error.message,
+        )
+        if as_json:
             print(canonical_json(payload))
         else:
             print(f"{error.code}: {error.message}", file=sys.stderr)
@@ -2483,8 +3728,12 @@ def main(argv: list[str] | None = None) -> int:
         busy = primary in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
         code = "state-busy" if busy else "state-database-error"
         message = f"state database remained busy for {SQLITE_BUSY_TIMEOUT_MS} ms" if busy else str(error)
-        payload = {"schema_version": STATE_SCHEMA_VERSION, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": code, "message": message}}
-        if args.json:
+        payload = failure_payload(
+            getattr(args, "command_name", "unknown"),
+            code,
+            message,
+        )
+        if as_json:
             print(canonical_json(payload))
         else:
             print(f"{code}: {message}", file=sys.stderr)

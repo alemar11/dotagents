@@ -103,8 +103,14 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         normalized = self.normalized(orchestration)
         self.assertIn("record the intended operation in SQLite before changing", normalized)
         self.assertIn("after an interruption, inspect the actual object first", normalized)
-        self.assertIn("repeat the change only when authoritative evidence proves it had no effect", normalized)
-        self.assertIn("never infer delivery from a stored body or hash", recovery)
+        self.assertIn("Bootstrap may replay after `unknown` or `failed` readback", normalized)
+        self.assertIn("actions may replay only from `failed` with readback", normalized)
+        self.assertIn("retain the same `operation_id`", normalized)
+        self.assertIn("retain the same `bootstrap_id`", normalized)
+        self.assertIn(
+            "never infer delivery from a stored body or hash",
+            self.normalized(recovery),
+        )
 
     def test_given_same_repo_assignments_when_paths_overlap_then_root_serializes_them(self) -> None:
         """Given overlap in one repository, when scheduling, then root serializes while disjoint work may reach three."""
@@ -143,12 +149,15 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             self.assertNotIn(retired_action, source)
             self.assertNotIn(retired_action, runtime)
 
-    def test_given_schema_one_lineage_when_runtime_is_inspected_then_one_canonical_claim_domain_remains(self) -> None:
+    def test_given_schema_two_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
         """Given the breaking protocol cut, old state is rebuilt at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "1.1.0"', source)
-        self.assertIn("STATE_SCHEMA_VERSION = 1", source)
+        self.assertIn('CLI_VERSION = "2.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "2.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
+        self.assertIn('"schema": "implement-feature/run-manifest"', source)
+        self.assertIn('"schema_version": "2.0.0"', source)
         self.assertIn("scripts/run-state --json state prepare", state)
         self.assertIn("drops all application tables, indexes, and triggers", state)
         self.assertIn("without carrying any row forward", (REPO / "AGENTS.md").read_text(encoding="utf-8"))
@@ -244,8 +253,11 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "1.1.0"', source)
-        self.assertIn("STATE_SCHEMA_VERSION = 1", source)
+        self.assertIn('CLI_VERSION = "2.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "2.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
+        self.assertIn("command_capabilities", source)
+        self.assertIn("runtime_artifact_sha256", source)
         self.assertIn("BEGIN IMMEDIATE", source)
         self.assertIn("BEGIN EXCLUSIVE", source)
         self.assertIn("runtime_metadata", source)
@@ -257,6 +269,24 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn('CLI_VERSION = "1.0.0"', verifier)
         self.assertNotIn("sqlite3", verifier)
         self.assertNotIn("run-state.sqlite3", verifier)
+
+    def test_given_delivery_ready_protocol_when_mode_is_selected_then_payload_is_the_single_authority(self) -> None:
+        """The builder and consumer share readiness_mode without a divergent ready flag."""
+        source = self.text("scripts/run-state")
+        self.assertIn('"readiness_mode"', source)
+        self.assertIn('"terminal", "peer-input"', source)
+        self.assertIn('"--readiness-mode"', source)
+        self.assertNotIn('ready.add_argument("--peer-input"', source)
+        self.assertIn('"peer-input-ready"', source)
+
+    def test_given_app_operation_replay_when_protocol_is_inspected_then_launch_identity_and_scope_are_explicit(self) -> None:
+        """Each launch is observed exactly, while only failed single-use effects may replay beyond bootstrap."""
+        source = self.text("scripts/run-state")
+        self.assertIn('"launch_count"', source)
+        self.assertIn('"--launch-count"', source)
+        self.assertIn("stale-operation-launch", source)
+        self.assertIn("SINGLE_USE_ACTIONS", source)
+        self.assertIn("send-worker-message", source)
 
     def test_given_runtime_docs_when_references_are_routed_then_every_reference_is_reachable(self) -> None:
         """Given progressive disclosure, when routes are inspected, then every reference is linked by SKILL."""

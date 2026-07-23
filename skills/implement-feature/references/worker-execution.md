@@ -14,6 +14,23 @@ until the worker safely establishes the contract inside its own worktree. Never
 switch the original/main worktree and never treat the managed worktree alone as
 durable delivery.
 
+Before accepting implementation authority, deduplicate the bootstrap envelope
+by its opaque `bootstrap_id`:
+
+- accept the first valid ID and bind it to the exact stable Feature Spec and
+  issue contract received with it;
+- for the same ID and the same stable contract, acknowledge the replay and
+  resume the already accepted work without applying bootstrap initialization a
+  second time;
+- reject the same ID with a different stable contract;
+- after one ID has been accepted, reject every different bootstrap ID.
+
+These checks make the logical bootstrap effect exactly once even though
+delivery itself may be retried. Root may increment its recorded `launch_count`
+for a transport replay, but every generation of that logical bootstrap carries
+the same `bootstrap_id`; the worker deduplicates the stable ID, not the
+controller's launch generation. A missing ID is not an accepted bootstrap.
+
 Before each issue, after recovery, and before final verification:
 
 1. read the current Feature Spec and complete issue graph;

@@ -19,6 +19,31 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
+CLI_VERSION = "2.0.0"
+RUNTIME_CONTRACT_VERSION = "2.0.0"
+DATABASE_SCHEMA_VERSION = 2
+PROTOCOLS = {
+    "cli": {
+        "schema": "implement-feature/cli-envelope",
+        "schema_version": "2.0.0",
+    },
+    "manifest": {
+        "schema": "implement-feature/run-manifest",
+        "schema_version": "2.0.0",
+    },
+    "operation": {
+        "schema": "implement-feature/app-operation-observation",
+        "schema_version": "2.0.0",
+    },
+    "ready": {
+        "schema": "implement-feature/delivery-ready-observation",
+        "schema_version": "2.0.0",
+    },
+    "recovery": {
+        "schema": "implement-feature/recovery-observation",
+        "schema_version": "2.0.0",
+    },
+}
 
 
 class RunStateScenarios(unittest.TestCase):
@@ -65,25 +90,45 @@ class RunStateScenarios(unittest.TestCase):
             self.revisions[payload["run_id"]] = payload["revision"]
         return payload
 
-    def future_schema_two_tool(self) -> Path:
-        path = self.base / "run-state-schema-2"
-        source = TOOL.read_text(encoding="utf-8")
-        source = source.replace('CLI_VERSION = "1.1.0"', 'CLI_VERSION = "2.0.0"', 1)
-        source = source.replace("STATE_SCHEMA_VERSION = 1", "STATE_SCHEMA_VERSION = 2", 1)
-        source = source.replace(
-            "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()",
-            "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset({1})",
-            1,
-        )
-        source = source.replace(
-            "RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = {}",
-            f"RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = "
-            f"{{1: {hashlib.sha256(TOOL.read_bytes()).hexdigest()!r}}}",
-            1,
-        )
-        path.write_text(source, encoding="utf-8")
-        path.chmod(0o700)
-        return path
+    @staticmethod
+    def protocol(name: str) -> dict[str, str]:
+        return dict(PROTOCOLS[name])
+
+    def replace_with_schema_one(self, *, active: bool = False) -> None:
+        """Replace the prepared database with a structurally valid legacy schema."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            namespace = runpy.run_path(str(TOOL), run_name="schema_one_fixture")
+        self.database.unlink()
+        self.database.with_name(f"{self.database.name}-wal").unlink(missing_ok=True)
+        self.database.with_name(f"{self.database.name}-shm").unlink(missing_ok=True)
+        connection = sqlite3.connect(self.database)
+        try:
+            namespace["create_schema"](connection, schema_version=1)
+            if active:
+                connection.execute(
+                    """INSERT INTO runs(
+                           run_id,root_task_id,status,revision,implementation_started,
+                           created_at,updated_at
+                       ) VALUES (?,?,?,?,?,?,?)""",
+                    (
+                        "legacy-active",
+                        "root-legacy-active",
+                        "active",
+                        0,
+                        0,
+                        "2026-01-01T00:00:00Z",
+                        "2026-01-01T00:00:00Z",
+                    ),
+                )
+            connection.commit()
+        finally:
+            connection.close()
+        self.database.chmod(0o600)
+        del namespace
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            gc.collect()
 
     def revision(self, run_id: str) -> str:
         return str(self.revisions[run_id])
@@ -137,7 +182,8 @@ class RunStateScenarios(unittest.TestCase):
                 }
             )
         return {
-            "schema_version": 1,
+            **self.protocol("manifest"),
+            "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "repositories": repo_rows,
@@ -153,30 +199,59 @@ class RunStateScenarios(unittest.TestCase):
     def operation(
         self,
         run_id: str,
-        key: str,
+        label: str,
         action: str,
         subject: str,
         extra: dict[str, object],
         *,
         status: str = "succeeded",
     ) -> dict[str, object]:
-        self.invoke(
-            "app-operation", "begin", "--run-id", run_id,
-            "--expected-revision", self.revision(run_id), "--operation-key", key,
-            "--action", action, "--subject-id", subject,
-        )
-        observation = {
-            "schema_version": 1,
-            "status": status,
-            "receipt_ref": f"receipt:{key}",
-            "readback_ref": f"readback:{key}",
-            **extra,
-        }
+        begun = self.begin_operation(run_id, action, subject)
+        observation = self.operation_observation(begun, status=status, values=extra)
+        if status == "succeeded":
+            observation.setdefault("receipt_ref", f"receipt:{label}")
+            observation.setdefault("readback_ref", f"readback:{label}")
+        elif status == "failed":
+            observation.setdefault("readback_ref", f"readback:{label}")
         return self.invoke(
             "app-operation", "finish", "--run-id", run_id,
-            "--expected-revision", self.revision(run_id), "--operation-key", key,
-            "--observation", str(self.write_json(f"{key}-{status}.json", observation)),
+            "--expected-revision", self.revision(run_id),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(self.write_json(f"{label}-{status}.json", observation)),
         )
+
+    def begin_operation(
+        self,
+        run_id: str,
+        action: str,
+        subject: str,
+        *,
+        expected: int = 0,
+    ) -> dict[str, object]:
+        return self.invoke(
+            "app-operation", "begin", "--run-id", run_id,
+            "--expected-revision", self.revision(run_id),
+            "--action", action, "--subject-id", subject,
+            expected=expected,
+        )
+
+    def operation_observation(
+        self,
+        begun: dict[str, object],
+        *,
+        status: str,
+        values: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        observation: dict[str, object] = {
+            **self.protocol("operation"),
+            "operation_id": begun["operation_id"],
+            "launch_count": begun["launch_count"],
+            "status": status,
+            **(values or {}),
+        }
+        if "bootstrap_id" in begun:
+            observation["bootstrap_id"] = begun["bootstrap_id"]
+        return observation
 
     def create_worker(self, run_id: str, number: int = 1) -> None:
         assignment = f"spec-{number:02d}"
@@ -207,7 +282,8 @@ class RunStateScenarios(unittest.TestCase):
         run_id: str,
         number: int = 1,
         *,
-        schema_version: int = 1,
+        readiness_mode: str = "terminal",
+        protocol_version: str = "2.0.0",
         review_profile: str = "standard",
         review_candidate_head_sha: str | None = None,
         codex_review_head_sha: str | None = None,
@@ -215,11 +291,13 @@ class RunStateScenarios(unittest.TestCase):
     ) -> dict[str, object]:
         sha = f"{100 + number:040x}"
         observation = {
-            "schema_version": schema_version,
+            "schema": PROTOCOLS["ready"]["schema"],
+            "schema_version": protocol_version,
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
             "repository_identity": "github:example/project",
             "delivery_type": "github-pr",
+            "readiness_mode": readiness_mode,
             "head_sha": sha,
             "head_branch_name": f"feature/example-{number}",
             "base_branch_name": "main",
@@ -256,7 +334,7 @@ class RunStateScenarios(unittest.TestCase):
         *,
         number: int = 1,
         repository_identity: str | None = None,
-        peer_input: bool = False,
+        readiness_mode: str = "terminal",
         prerequisite_heads: dict[str, str] | None = None,
         expected: int = 0,
         worktree_clean: bool = True,
@@ -268,11 +346,12 @@ class RunStateScenarios(unittest.TestCase):
     ) -> dict[str, object]:
         sha = head_sha or f"{200 + number:040x}"
         observation = {
-            "schema_version": 1,
+            **self.protocol("ready"),
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
             "repository_identity": repository_identity or self.local_identity(self.common_a),
             "delivery_type": "local-branch",
+            "readiness_mode": readiness_mode,
             "head_sha": sha,
             "head_branch_name": head_branch_name or f"feature/example-{number}",
             "base_branch_name": "main",
@@ -298,8 +377,6 @@ class RunStateScenarios(unittest.TestCase):
             "--expected-revision", self.revision(run_id),
             "--observation", str(self.write_json(f"local-ready-{run_id}-{number}.json", observation)),
         ]
-        if peer_input:
-            arguments.append("--peer-input")
         return self.invoke(*arguments, expected=expected)
 
     def finish_pr_ready(self, run_id: str) -> None:
@@ -315,22 +392,47 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
-        """Given no DB, when doctor runs, then it reports schema 1 without creating cache state."""
+        """Given no DB, when doctor runs, then it reports schema 2 without creating cache state."""
         self.database.unlink()
         result = self.invoke("doctor")
-        self.assertEqual(result["tool_version"], "1.1.0")
-        self.assertEqual(result["state_schema_version"], 1)
+        self.assertEqual(result["cli_version"], CLI_VERSION)
+        self.assertEqual(result["runtime_contract_version"], RUNTIME_CONTRACT_VERSION)
+        self.assertEqual(result["database_schema_version"], DATABASE_SCHEMA_VERSION)
+        self.assertEqual(result["runtime_artifact_sha256"], hashlib.sha256(TOOL.read_bytes()).hexdigest())
         self.assertEqual(result["active_owner_runs"], 0)
         self.assertEqual(result["busy_timeout_ms"], 5000)
         self.assertFalse(self.database.exists())
         self.assertFalse(self.database.with_name("run-state.lock").exists())
 
+    def test_given_json_mode_when_argparse_rejects_retired_ready_flag_then_typed_envelope_is_emitted(self) -> None:
+        """CLI syntax errors remain machine-readable and cannot reintroduce out-of-band readiness mode."""
+        error = self.invoke(
+            "assignment", "ready",
+            "--run-id", "unused",
+            "--expected-revision", "0",
+            "--observation", str(self.inputs / "unused.json"),
+            "--peer-input",
+            expected=2,
+        )
+        self.assertFalse(error["ok"])
+        self.assertEqual(error["schema"], PROTOCOLS["cli"]["schema"])
+        self.assertEqual(
+            error["schema_version"],
+            PROTOCOLS["cli"]["schema_version"],
+        )
+        self.assertEqual(error["cli_version"], CLI_VERSION)
+        self.assertEqual(
+            error["runtime_contract_version"],
+            RUNTIME_CONTRACT_VERSION,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-command-line")
+
     def test_given_fresh_user_when_state_prepares_then_schema_and_metadata_are_created(self) -> None:
-        """Given no DB, explicit preparation creates the fresh schema-1 claim domain."""
+        """Given no DB, explicit preparation creates the fresh schema-2 claim domain."""
         self.database.unlink()
         prepared = self.invoke("state", "prepare")
         self.assertEqual(prepared["state"], "initialized")
-        self.assertEqual(prepared["database_schema_version"], 1)
+        self.assertEqual(prepared["database_schema_version"], DATABASE_SCHEMA_VERSION)
         self.assertTrue(prepared["regenerated"])
         self.assertTrue(prepared["writes_performed"])
         self.assertTrue(self.database.is_file())
@@ -340,7 +442,7 @@ class RunStateScenarios(unittest.TestCase):
                 connection.execute(
                     "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
                 ).fetchall(),
-                [(1, 1, None)],
+                [(1, DATABASE_SCHEMA_VERSION, None)],
             )
         started = self.start("prepared-fresh")
         self.assertEqual(started["status"], "active")
@@ -349,42 +451,46 @@ class RunStateScenarios(unittest.TestCase):
         """Given an unversioned protocol payload, startup fails closed without creating the database."""
         self.database.unlink()
         manifest = self.manifest("unversioned-manifest")
-        manifest["schema_version"] = 0
+        del manifest["schema"]
         error = self.invoke(
             "run", "start", "--manifest",
             str(self.write_json("unversioned-manifest.json", manifest)),
             expected=2,
         )
-        self.assertEqual(error["schema_version"], 1)
-        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        self.assertEqual(error["schema"], PROTOCOLS["cli"]["schema"])
+        self.assertEqual(error["schema_version"], PROTOCOLS["cli"]["schema_version"])
+        self.assertEqual(error["error"]["code"], "invalid-input")
         self.assertFalse(self.database.exists())
 
-    def test_given_v2_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
-        """Given the immediately retired protocol payload, startup performs no compatibility conversion."""
+    def test_given_retired_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
+        """Given the retired integer protocol payload, startup performs no compatibility conversion."""
         self.database.unlink()
-        manifest = self.manifest("v2-manifest")
-        manifest["schema_version"] = 2
+        manifest = self.manifest("retired-manifest")
+        manifest["schema_version"] = 1
         error = self.invoke(
             "run", "start", "--manifest",
-            str(self.write_json("v2-manifest.json", manifest)),
+            str(self.write_json("retired-manifest.json", manifest)),
             expected=2,
         )
-        self.assertEqual(error["schema_version"], 1)
-        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        self.assertEqual(error["schema_version"], PROTOCOLS["cli"]["schema_version"])
+        self.assertEqual(error["error"]["code"], "unsupported-input-protocol")
         self.assertFalse(self.database.exists())
 
     def test_given_newer_task_observation_when_reconciled_then_operation_remains_pending(self) -> None:
         """Given a newer task payload, reconciliation rejects it without advancing durable state."""
         self.start("v1-operation")
-        self.invoke(
+        begun = self.invoke(
             "app-operation", "begin", "--run-id", "v1-operation",
             "--expected-revision", self.revision("v1-operation"),
-            "--operation-key", "root-title", "--action", "set-root-title",
+            "--action", "set-root-title",
             "--subject-id", "root-v1-operation",
         )
         revision = self.revision("v1-operation")
         observation = {
-            "schema_version": 2,
+            "schema": PROTOCOLS["operation"]["schema"],
+            "schema_version": "3.0.0",
+            "operation_id": begun["operation_id"],
+            "launch_count": begun["launch_count"],
             "status": "succeeded",
             "receipt_ref": "receipt:v1-title",
             "readback_ref": "readback:v1-title",
@@ -392,14 +498,567 @@ class RunStateScenarios(unittest.TestCase):
         }
         error = self.invoke(
             "app-operation", "finish", "--run-id", "v1-operation",
-            "--expected-revision", revision, "--operation-key", "root-title",
+            "--expected-revision", revision,
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("v1-operation.json", observation)),
             expected=2,
         )
-        self.assertEqual(error["error"]["code"], "invalid-operation-observation")
+        self.assertEqual(error["error"]["code"], "unsupported-input-protocol")
         shown = self.invoke("run", "show", "--run-id", "v1-operation")
         self.assertEqual(shown["revision"], int(revision))
         self.assertEqual(shown["unresolved_app_operations"][0]["status"], "pending")
+
+    def test_given_app_operation_begin_when_authorized_then_runtime_generates_opaque_identity(self) -> None:
+        """The controller allocates identity before the external effect and never accepts a caller key."""
+        self.start("generated-operation")
+        begun = self.begin_operation(
+            "generated-operation", "set-root-title", "root-generated-operation",
+        )
+        self.assertRegex(str(begun["operation_id"]), r"^op-[0-9a-f]{32}$")
+        self.assertEqual(begun["launch_count"], 1)
+        self.assertTrue(begun["launch_authorized"])
+        operations = self.invoke(
+            "app-operation", "list", "--run-id", "generated-operation",
+        )
+        self.assertEqual(
+            operations["operations"][0]["operation_id"],
+            begun["operation_id"],
+        )
+        self.assertNotIn("operation_key", operations["operations"][0])
+
+    def test_given_unknown_or_failed_bootstrap_with_readback_when_replayed_then_identity_is_stable(self) -> None:
+        """A retry is a new launch of one logical bootstrap, not a second logical operation."""
+        for status in ("unknown", "failed"):
+            with self.subTest(status=status):
+                run_id = f"replay-{status}"
+                self.start(
+                    run_id,
+                    repositories=[
+                        (f"github:example/replay-{status}", self.common_a),
+                    ],
+                )
+                assignment = "spec-01"
+                thread = f"thread-{run_id}-1"
+                checkout = self.base / f"checkout {run_id}"
+                checkout.mkdir()
+                self.operation(
+                    run_id, f"create-{run_id}", "create-worker", assignment,
+                    {
+                        "thread_id": thread,
+                        "project_id": "project-1",
+                        "checkout_path": str(checkout),
+                        "git_common_dir": str(self.common_a),
+                        "observed_state": "active",
+                    },
+                )
+                self.operation(
+                    run_id, f"title-{run_id}", "set-worker-title", assignment,
+                    {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+                )
+                begun = self.begin_operation(
+                    run_id, "send-bootstrap", assignment,
+                )
+                observation = self.operation_observation(
+                    begun,
+                    status=status,
+                    values={
+                        "readback_ref": f"task-read:{run_id}",
+                        "thread_id": thread,
+                    },
+                )
+                finish_revision = self.revision(run_id)
+                observation_path = self.write_json(
+                    f"{run_id}-{status}.json", observation,
+                )
+                finished = self.invoke(
+                    "app-operation", "finish", "--run-id", run_id,
+                    "--expected-revision", finish_revision,
+                    "--operation-id", str(begun["operation_id"]),
+                    "--observation", str(observation_path),
+                )
+                self.assertTrue(finished["replay_authorized"])
+                repeated = self.invoke(
+                    "app-operation", "finish", "--run-id", run_id,
+                    "--expected-revision", finish_revision,
+                    "--operation-id", str(begun["operation_id"]),
+                    "--observation", str(observation_path),
+                )
+                self.assertTrue(repeated["already_applied"])
+                self.assertTrue(repeated["replay_authorized"])
+                self.assertEqual(repeated["revision"], finished["revision"])
+                replayed = self.invoke(
+                    "app-operation", "replay", "--run-id", run_id,
+                    "--expected-revision", self.revision(run_id),
+                    "--operation-id", str(begun["operation_id"]),
+                )
+                self.assertEqual(replayed["operation_id"], begun["operation_id"])
+                self.assertEqual(replayed["bootstrap_id"], begun["bootstrap_id"])
+                self.assertEqual(replayed["launch_count"], 2)
+                self.assertTrue(replayed["launch_authorized"])
+
+    def test_given_replayed_bootstrap_when_first_launch_observation_arrives_late_then_it_is_rejected(self) -> None:
+        """Delayed launch-1 evidence cannot resolve or mutate the pending launch-2 operation."""
+        self.start("delayed-bootstrap")
+        assignment = "spec-01"
+        thread = "thread-delayed-bootstrap-1"
+        checkout = self.base / "checkout delayed bootstrap"
+        checkout.mkdir()
+        self.operation(
+            "delayed-bootstrap", "create-delayed-bootstrap",
+            "create-worker", assignment,
+            {
+                "thread_id": thread,
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        self.operation(
+            "delayed-bootstrap", "title-delayed-bootstrap",
+            "set-worker-title", assignment,
+            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+        )
+        first_launch = self.begin_operation(
+            "delayed-bootstrap", "send-bootstrap", assignment,
+        )
+        first_unknown = self.operation_observation(
+            first_launch,
+            status="unknown",
+            values={
+                "readback_ref": "readback:delayed-bootstrap:first",
+                "thread_id": thread,
+            },
+        )
+        self.invoke(
+            "app-operation", "finish", "--run-id", "delayed-bootstrap",
+            "--expected-revision", self.revision("delayed-bootstrap"),
+            "--operation-id", str(first_launch["operation_id"]),
+            "--observation",
+            str(self.write_json("delayed-bootstrap-first.json", first_unknown)),
+        )
+        second_launch = self.invoke(
+            "app-operation", "replay", "--run-id", "delayed-bootstrap",
+            "--expected-revision", self.revision("delayed-bootstrap"),
+            "--operation-id", str(first_launch["operation_id"]),
+        )
+        self.assertEqual(second_launch["launch_count"], 2)
+
+        stale_output = self.base / "stale-bootstrap-observation.json"
+        stale_builder = self.invoke(
+            "app-operation", "observation", "create",
+            "--run-id", "delayed-bootstrap",
+            "--expected-revision", self.revision("delayed-bootstrap"),
+            "--operation-id", str(first_launch["operation_id"]),
+            "--launch-count", "1",
+            "--status", "unknown",
+            "--readback-ref", "readback:delayed-bootstrap:first",
+            "--thread-id", thread,
+            "--output", str(stale_output),
+            expected=4,
+        )
+        self.assertEqual(
+            stale_builder["error"]["code"], "stale-operation-launch",
+        )
+        self.assertFalse(stale_output.exists())
+
+        stale_unknown = self.invoke(
+            "app-operation", "finish", "--run-id", "delayed-bootstrap",
+            "--expected-revision", self.revision("delayed-bootstrap"),
+            "--operation-id", str(first_launch["operation_id"]),
+            "--observation",
+            str(self.write_json("delayed-bootstrap-late-unknown.json", first_unknown)),
+            expected=4,
+        )
+        self.assertEqual(
+            stale_unknown["error"]["code"], "stale-operation-launch",
+        )
+        delayed_success = self.operation_observation(
+            first_launch,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:delayed-bootstrap:first",
+                "readback_ref": "readback:delayed-bootstrap:first",
+                "thread_id": thread,
+            },
+        )
+        stale_succeeded = self.invoke(
+            "app-operation", "finish", "--run-id", "delayed-bootstrap",
+            "--expected-revision", self.revision("delayed-bootstrap"),
+            "--operation-id", str(first_launch["operation_id"]),
+            "--observation",
+            str(self.write_json(
+                "delayed-bootstrap-late-succeeded.json",
+                delayed_success,
+            )),
+            expected=4,
+        )
+        self.assertEqual(
+            stale_succeeded["error"]["code"], "stale-operation-launch",
+        )
+        operation = next(
+            row
+            for row in self.invoke(
+                "app-operation", "list", "--run-id", "delayed-bootstrap",
+            )["operations"]
+            if row["operation_id"] == first_launch["operation_id"]
+        )
+        self.assertEqual(operation["status"], "pending")
+        self.assertEqual(operation["launch_count"], 2)
+
+    def test_given_bootstrap_without_readback_or_protected_unknown_when_replayed_then_launch_is_rejected(self) -> None:
+        """Replay requires authoritative readback and a status allowed for that action."""
+        self.start("replay-guards")
+        assignment = "spec-01"
+        thread = "thread-replay-guards-1"
+        checkout = self.base / "checkout replay guards"
+        checkout.mkdir()
+        self.operation(
+            "replay-guards", "create-replay-guards", "create-worker", assignment,
+            {
+                "thread_id": thread,
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        self.operation(
+            "replay-guards", "title-replay-guards", "set-worker-title", assignment,
+            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+        )
+        bootstrap = self.begin_operation(
+            "replay-guards", "send-bootstrap", assignment,
+        )
+        no_readback = self.operation_observation(
+            bootstrap, status="unknown", values={"thread_id": thread},
+        )
+        self.invoke(
+            "app-operation", "finish", "--run-id", "replay-guards",
+            "--expected-revision", self.revision("replay-guards"),
+            "--operation-id", str(bootstrap["operation_id"]),
+            "--observation", str(self.write_json("bootstrap-no-readback.json", no_readback)),
+        )
+        blocked = self.invoke(
+            "app-operation", "replay", "--run-id", "replay-guards",
+            "--expected-revision", self.revision("replay-guards"),
+            "--operation-id", str(bootstrap["operation_id"]), expected=4,
+        )
+        self.assertEqual(
+            blocked["error"]["code"], "operation-reconciliation-required",
+        )
+
+        self.start(
+            "nonbootstrap-replay",
+            repositories=[("github:example/nonbootstrap-replay", self.common_a)],
+        )
+        ordinary = self.begin_operation(
+            "nonbootstrap-replay", "set-root-title", "root-nonbootstrap-replay",
+        )
+        ordinary_observation = self.operation_observation(
+            ordinary,
+            status="unknown",
+            values={"readback_ref": "task-read:nonbootstrap-replay"},
+        )
+        self.invoke(
+            "app-operation", "finish", "--run-id", "nonbootstrap-replay",
+            "--expected-revision", self.revision("nonbootstrap-replay"),
+            "--operation-id", str(ordinary["operation_id"]),
+            "--observation",
+            str(self.write_json("nonbootstrap-unknown.json", ordinary_observation)),
+        )
+        blocked_status = self.invoke(
+            "app-operation", "replay", "--run-id", "nonbootstrap-replay",
+            "--expected-revision", self.revision("nonbootstrap-replay"),
+            "--operation-id", str(ordinary["operation_id"]), expected=4,
+        )
+        self.assertEqual(
+            blocked_status["error"]["code"],
+            "operation-reconciliation-required",
+        )
+
+    def test_given_terminal_observation_when_finished_again_then_exact_replay_is_idempotent_and_drift_conflicts(self) -> None:
+        """Repeated identical reconciliation is a no-op; changed terminal evidence never rewrites history."""
+        self.start("idempotent-finish")
+        begun = self.begin_operation(
+            "idempotent-finish", "set-root-title", "root-idempotent-finish",
+        )
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:idempotent-finish",
+                "readback_ref": "readback:idempotent-finish",
+                "observed_title": "🤖 Feature Orchestrator",
+            },
+        )
+        observation_path = self.write_json("idempotent-finish.json", observation)
+        first = self.invoke(
+            "app-operation", "finish", "--run-id", "idempotent-finish",
+            "--expected-revision", self.revision("idempotent-finish"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        repeated = self.invoke(
+            "app-operation", "finish", "--run-id", "idempotent-finish",
+            "--expected-revision", self.revision("idempotent-finish"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        self.assertTrue(repeated["already_applied"])
+        self.assertEqual(repeated["revision"], first["revision"])
+
+        conflicting = {
+            **observation,
+            "readback_ref": "readback:conflicting-terminal-evidence",
+        }
+        error = self.invoke(
+            "app-operation", "finish", "--run-id", "idempotent-finish",
+            "--expected-revision", self.revision("idempotent-finish"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("idempotent-finish-conflict.json", conflicting)),
+            expected=4,
+        )
+        self.assertEqual(
+            error["error"]["code"], "operation-observation-conflict",
+        )
+
+    def test_given_unknown_operation_with_recorded_facts_when_terminalized_then_facts_cannot_be_removed_or_substituted(self) -> None:
+        """Reconciliation is monotonic: a later terminal result must preserve every known fact."""
+        self.start("monotonic-observation")
+        begun = self.begin_operation(
+            "monotonic-observation",
+            "set-root-title",
+            "root-monotonic-observation",
+        )
+        unknown = self.operation_observation(
+            begun,
+            status="unknown",
+            values={
+                "receipt_ref": "receipt:monotonic-observation",
+                "readback_ref": "readback:monotonic-observation",
+                "observed_title": "🤖 Feature Orchestrator",
+            },
+        )
+        self.invoke(
+            "app-operation", "finish", "--run-id", "monotonic-observation",
+            "--expected-revision", self.revision("monotonic-observation"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("monotonic-unknown.json", unknown)),
+        )
+
+        removed = self.operation_observation(
+            begun,
+            status="failed",
+            values={"readback_ref": "readback:monotonic-observation"},
+        )
+        removal_error = self.invoke(
+            "app-operation", "finish", "--run-id", "monotonic-observation",
+            "--expected-revision", self.revision("monotonic-observation"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("monotonic-removed.json", removed)),
+            expected=4,
+        )
+        self.assertEqual(
+            removal_error["error"]["code"],
+            "operation-observation-conflict",
+        )
+
+        substituted = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:monotonic-observation",
+                "readback_ref": "readback:substituted",
+                "observed_title": "🤖 Feature Orchestrator",
+            },
+        )
+        substitution_error = self.invoke(
+            "app-operation", "finish", "--run-id", "monotonic-observation",
+            "--expected-revision", self.revision("monotonic-observation"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("monotonic-substituted.json", substituted)),
+            expected=4,
+        )
+        self.assertEqual(
+            substitution_error["error"]["code"],
+            "operation-observation-conflict",
+        )
+        operation = self.invoke(
+            "app-operation", "list", "--run-id", "monotonic-observation",
+        )["operations"][0]
+        self.assertEqual(operation["status"], "unknown")
+        self.assertEqual(
+            operation["readback_ref"],
+            "readback:monotonic-observation",
+        )
+        self.assertEqual(
+            operation["receipt_ref"],
+            "receipt:monotonic-observation",
+        )
+
+    def test_given_succeeded_create_worker_when_finished_identically_after_paths_disappear_then_it_is_idempotent(self) -> None:
+        """Idempotent finish compares durable evidence before any live path revalidation."""
+        self.start("idempotent-create-worker")
+        checkout = self.base / "idempotent create checkout"
+        checkout.mkdir()
+        begun = self.begin_operation(
+            "idempotent-create-worker", "create-worker", "spec-01",
+        )
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:idempotent-create-worker",
+                "readback_ref": "readback:idempotent-create-worker",
+                "thread_id": "thread-idempotent-create-worker-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        observation_path = self.write_json(
+            "idempotent-create-worker.json", observation,
+        )
+        finish_revision = self.revision("idempotent-create-worker")
+        first = self.invoke(
+            "app-operation", "finish", "--run-id", "idempotent-create-worker",
+            "--expected-revision", finish_revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        checkout.rmdir()
+        self.common_a.rmdir()
+        repeated = self.invoke(
+            "app-operation", "finish", "--run-id", "idempotent-create-worker",
+            "--expected-revision", finish_revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        self.assertTrue(repeated["already_applied"])
+        self.assertEqual(repeated["revision"], first["revision"])
+
+    def test_given_operation_template_and_builder_when_rendered_then_descriptor_is_typed_and_output_never_overwrites(self) -> None:
+        """The template describes fields; the builder emits one private validated payload atomically."""
+        descriptor = self.invoke(
+            "app-operation", "observation", "template",
+            "--action", "set-root-title", "--status", "succeeded",
+        )
+        self.assertEqual(descriptor["observation_kind"], "app-operation")
+        self.assertEqual(
+            descriptor["constants"]["schema"],
+            PROTOCOLS["operation"]["schema"],
+        )
+        self.assertIn("launch_count", descriptor["required_fields"])
+        self.assertIn("observed_title", descriptor["required_fields"])
+        self.assertFalse(descriptor["additional_fields"])
+
+        self.start("operation-builder")
+        begun = self.begin_operation(
+            "operation-builder", "set-root-title", "root-operation-builder",
+        )
+        revision = self.revision("operation-builder")
+        output = self.base / "operation-observation.json"
+        created = self.invoke(
+            "app-operation", "observation", "create",
+            "--run-id", "operation-builder",
+            "--expected-revision", revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--launch-count", str(begun["launch_count"]),
+            "--status", "succeeded",
+            "--receipt-ref", "receipt:operation-builder",
+            "--readback-ref", "readback:operation-builder",
+            "--observed-title", "🤖 Feature Orchestrator",
+            "--output", str(output),
+        )
+        self.assertEqual(created["output"], str(output))
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(payload["operation_id"], begun["operation_id"])
+        self.assertEqual(payload["launch_count"], begun["launch_count"])
+        self.assertEqual(payload["schema_version"], "2.0.0")
+        shown = self.invoke("run", "show", "--run-id", "operation-builder")
+        self.assertEqual(str(shown["revision"]), revision)
+
+        before = output.read_bytes()
+        duplicate = self.invoke(
+            "app-operation", "observation", "create",
+            "--run-id", "operation-builder",
+            "--expected-revision", revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--launch-count", str(begun["launch_count"]),
+            "--status", "succeeded",
+            "--receipt-ref", "receipt:operation-builder",
+            "--readback-ref", "readback:operation-builder",
+            "--observed-title", "🤖 Feature Orchestrator",
+            "--output", str(output),
+            expected=4,
+        )
+        self.assertEqual(duplicate["error"]["code"], "output-already-exists")
+        self.assertEqual(output.read_bytes(), before)
+
+    def test_given_bootstrap_builder_when_created_without_id_flag_then_it_derives_begin_identity(self) -> None:
+        """The bootstrap descriptor and file bind the generated logical ID without caller input."""
+        descriptor = self.invoke(
+            "app-operation", "observation", "template",
+            "--action", "send-bootstrap", "--status", "succeeded",
+        )
+        self.assertEqual(
+            descriptor["constants"]["bootstrap_id"],
+            "derived-from-operation-id",
+        )
+        self.assertNotIn("bootstrap_id", descriptor["required_fields"])
+
+        self.start("bootstrap-builder")
+        assignment = "spec-01"
+        thread = "thread-bootstrap-builder-1"
+        checkout = self.base / "checkout bootstrap builder"
+        checkout.mkdir()
+        self.operation(
+            "bootstrap-builder", "create-bootstrap-builder",
+            "create-worker", assignment,
+            {
+                "thread_id": thread,
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        self.operation(
+            "bootstrap-builder", "title-bootstrap-builder",
+            "set-worker-title", assignment,
+            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+        )
+        begun = self.begin_operation(
+            "bootstrap-builder", "send-bootstrap", assignment,
+        )
+        revision = self.revision("bootstrap-builder")
+        output = self.base / "bootstrap-observation.json"
+        self.invoke(
+            "app-operation", "observation", "create",
+            "--run-id", "bootstrap-builder",
+            "--expected-revision", revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--launch-count", str(begun["launch_count"]),
+            "--status", "succeeded",
+            "--receipt-ref", "receipt:bootstrap-builder",
+            "--readback-ref", "readback:bootstrap-builder",
+            "--thread-id", thread,
+            "--output", str(output),
+        )
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(payload["operation_id"], begun["operation_id"])
+        self.assertEqual(payload["launch_count"], begun["launch_count"])
+        self.assertEqual(payload["bootstrap_id"], begun["bootstrap_id"])
+        self.assertEqual(str(self.invoke(
+            "run", "show", "--run-id", "bootstrap-builder",
+        )["revision"]), revision)
 
     def test_given_one_assignment_when_root_title_is_verified_then_static_title_succeeds(self) -> None:
         """Given one assignment, its root title is the exact static orchestrator title."""
@@ -430,23 +1089,22 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_wrong_root_title_when_read_back_then_operation_remains_pending(self) -> None:
         """Given a wrong emoji or count, exact root-title verification fails closed."""
         self.start("wrong-root-title", assignment_count=2)
-        self.invoke(
-            "app-operation", "begin", "--run-id", "wrong-root-title",
-            "--expected-revision", self.revision("wrong-root-title"),
-            "--operation-key", "wrong-root-title-op", "--action", "set-root-title",
-            "--subject-id", "root-wrong-root-title",
+        begun = self.begin_operation(
+            "wrong-root-title", "set-root-title", "root-wrong-root-title",
         )
-        observation = {
-            "schema_version": 1,
-            "status": "succeeded",
-            "receipt_ref": "receipt:wrong-root-title",
-            "readback_ref": "readback:wrong-root-title",
-            "observed_title": "🤖 Feature Orchestrator · 1 Features",
-        }
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:wrong-root-title",
+                "readback_ref": "readback:wrong-root-title",
+                "observed_title": "🤖 Feature Orchestrator · 1 Features",
+            },
+        )
         error = self.invoke(
             "app-operation", "finish", "--run-id", "wrong-root-title",
             "--expected-revision", self.revision("wrong-root-title"),
-            "--operation-key", "wrong-root-title-op",
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("wrong-root-title.json", observation)),
             expected=4,
         )
@@ -462,11 +1120,9 @@ class RunStateScenarios(unittest.TestCase):
             "root-repeat-root-title",
             {"observed_title": "🤖 Feature Orchestrator"},
         )
-        error = self.invoke(
-            "app-operation", "begin", "--run-id", "repeat-root-title",
-            "--expected-revision", self.revision("repeat-root-title"),
-            "--operation-key", "repeat-root-title-second", "--action", "set-root-title",
-            "--subject-id", "root-repeat-root-title", expected=4,
+        error = self.begin_operation(
+            "repeat-root-title", "set-root-title", "root-repeat-root-title",
+            expected=4,
         )
         self.assertEqual(error["error"]["code"], "protected-operation-already-started")
 
@@ -474,8 +1130,8 @@ class RunStateScenarios(unittest.TestCase):
         """Given newer delivery evidence, readiness rejects it without releasing ownership."""
         self.start("v1-ready")
         self.create_worker("v1-ready")
-        error = self.ready_worker("v1-ready", schema_version=2, expected=2)
-        self.assertEqual(error["error"]["code"], "invalid-ready-observation")
+        error = self.ready_worker("v1-ready", protocol_version="3.0.0", expected=2)
+        self.assertEqual(error["error"]["code"], "unsupported-input-protocol")
         shown = self.invoke("run", "show", "--run-id", "v1-ready")
         self.assertEqual(shown["assignments"][0]["state"], "active")
         self.assertEqual(shown["spec_claims"][0]["active"], 1)
@@ -522,6 +1178,123 @@ class RunStateScenarios(unittest.TestCase):
             expected=2,
         )
         self.assertEqual(error["error"]["code"], "invalid-ready-observation")
+
+    def test_given_ready_template_and_builder_when_used_then_payload_is_derived_without_mutating_assignment(self) -> None:
+        """The builder derives delivery/status from state while preserving independent readback facts."""
+        descriptor = self.invoke(
+            "assignment", "ready-observation", "template",
+            "--delivery-type", "github-pr",
+            "--review-profile", "standard",
+            "--readiness-mode", "terminal",
+        )
+        self.assertEqual(descriptor["observation_kind"], "delivery-ready")
+        self.assertEqual(
+            descriptor["constants"]["schema"],
+            PROTOCOLS["ready"]["schema"],
+        )
+        self.assertEqual(descriptor["constants"]["codex_review_head_sha"], None)
+        self.assertEqual(descriptor["constants"]["readiness_mode"], "terminal")
+        self.assertIn("provider_observation_ref", descriptor["required_fields"])
+
+        self.start("ready-builder")
+        self.create_worker("ready-builder")
+        sha = f"{101:040x}"
+        revision = self.revision("ready-builder")
+        output = self.base / "ready-observation.json"
+        created = self.invoke(
+            "assignment", "ready-observation", "create",
+            "--run-id", "ready-builder",
+            "--expected-revision", revision,
+            "--assignment-id", "spec-01",
+            "--thread-id", "thread-ready-builder-1",
+            "--repository-identity", "github:example/project",
+            "--head-sha", sha,
+            "--head-branch-name", "feature/example-1",
+            "--base-branch-name", "main",
+            "--base-sha", f"{10:040x}",
+            "--checkout-path", str(self.base / "checkout ready-builder 1"),
+            "--worktree-clean",
+            "--base-is-ancestor",
+            "--validation-head-sha", sha,
+            "--autoreview-head-sha", sha,
+            "--review-candidate-head-sha", sha,
+            "--review-profile", "standard",
+            "--readiness-mode", "terminal",
+            "--tracker-readback-ref", "tracker:ready-builder:1",
+            "--default-branch-name", "main",
+            "--pr-url", "https://github.com/example/project/pull/1",
+            "--provider-observation-ref", "provider:ready-builder:1",
+            "--output", str(output),
+        )
+        self.assertEqual(created["output"], str(output))
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(payload["delivery_type"], "github-pr")
+        self.assertEqual(payload["readiness_mode"], "terminal")
+        self.assertEqual(payload["status"], "pr-ready-for-merge-but-not-merged")
+        self.assertIsNone(payload["codex_review_head_sha"])
+        shown = self.invoke("run", "show", "--run-id", "ready-builder")
+        self.assertEqual(str(shown["revision"]), revision)
+        self.assertEqual(shown["assignments"][0]["state"], "active")
+
+        ready = self.invoke(
+            "assignment", "ready", "--run-id", "ready-builder",
+            "--expected-revision", revision,
+            "--observation", str(output),
+        )
+        self.assertEqual(ready["state"], "pr-ready")
+
+    def test_given_peer_input_readiness_payload_when_consumed_then_mode_cannot_diverge_and_claim_is_retained(self) -> None:
+        """The payload is the sole mode authority for both builder validation and ready mutation."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest(
+            "readiness-mode",
+            repositories=[(identity, self.common_a)],
+            assignment_count=2,
+        )
+        manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
+        self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("readiness-mode.json", manifest)),
+        )
+        self.create_worker("readiness-mode", 1)
+        sha = f"{201:040x}"
+        revision = self.revision("readiness-mode")
+        output = self.base / "peer-input-ready-observation.json"
+        self.invoke(
+            "assignment", "ready-observation", "create",
+            "--run-id", "readiness-mode",
+            "--expected-revision", revision,
+            "--assignment-id", "spec-01",
+            "--thread-id", "thread-readiness-mode-1",
+            "--repository-identity", identity,
+            "--head-sha", sha,
+            "--head-branch-name", "feature/example-1",
+            "--base-branch-name", "main",
+            "--base-sha", f"{20:040x}",
+            "--checkout-path", str(self.base / "checkout readiness-mode 1"),
+            "--worktree-clean",
+            "--base-is-ancestor",
+            "--validation-head-sha", sha,
+            "--autoreview-head-sha", sha,
+            "--review-candidate-head-sha", sha,
+            "--review-profile", "standard",
+            "--readiness-mode", "peer-input",
+            "--tracker-readback-ref", "tracker:readiness-mode:1",
+            "--output", str(output),
+        )
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(payload["readiness_mode"], "peer-input")
+
+        ready = self.invoke(
+            "assignment", "ready", "--run-id", "readiness-mode",
+            "--expected-revision", revision,
+            "--observation", str(output),
+        )
+        self.assertEqual(ready["state"], "peer-input-ready")
+        self.assertFalse(ready["claim_released"])
+        shown = self.invoke("run", "show", "--run-id", "readiness-mode")
+        self.assertEqual(shown["assignments"][0]["state"], "peer-input-ready")
+        self.assertEqual(shown["spec_claims"][0]["active"], 1)
 
     def test_given_local_only_repository_when_local_delivery_finishes_then_named_branch_is_durable(self) -> None:
         """Given no remote, when local delivery closes, then exact branch/head evidence reaches local-branch-ready."""
@@ -594,11 +1367,12 @@ class RunStateScenarios(unittest.TestCase):
         self.start("delivery-mismatch", repositories=[(identity, self.common_a)])
         self.create_worker("delivery-mismatch")
         observation = {
-            "schema_version": 1,
+            **self.protocol("ready"),
             "assignment_id": "spec-01",
             "thread_id": "thread-delivery-mismatch-1",
             "repository_identity": identity,
             "delivery_type": "github-pr",
+            "readiness_mode": "terminal",
             "head_sha": f"{101:040x}",
             "head_branch_name": "feature/example-1",
             "base_branch_name": "main",
@@ -662,20 +1436,21 @@ class RunStateScenarios(unittest.TestCase):
             self.create_worker("integration-vector", number)
         partial = self.ready_local_worker(
             "integration-vector", number=1, repository_identity=identity,
-            peer_input=True,
+            readiness_mode="peer-input",
         )
         self.assertEqual(partial["state"], "peer-input-ready")
         exact_head = f"{201:040x}"
         proof_owner = self.ready_local_worker(
             "integration-vector", number=2, repository_identity=identity,
-            prerequisite_heads={"spec-01": exact_head}, peer_input=True,
+            prerequisite_heads={"spec-01": exact_head},
+            readiness_mode="peer-input",
         )
         self.assertEqual(proof_owner["state"], "peer-input-ready")
 
         replacement_head = f"{777:040x}"
         self.ready_local_worker(
             "integration-vector", number=1, repository_identity=identity,
-            peer_input=True, head_sha=replacement_head,
+            readiness_mode="peer-input", head_sha=replacement_head,
         )
         replaced = self.invoke("run", "show", "--run-id", "integration-vector")
         upstream = next(
@@ -704,7 +1479,8 @@ class RunStateScenarios(unittest.TestCase):
         self.invoke("run", "start", "--manifest", str(self.write_json("peer-block.json", manifest)))
         self.create_worker("peer-block", 1)
         self.ready_local_worker(
-            "peer-block", number=1, repository_identity=identity, peer_input=True,
+            "peer-block", number=1, repository_identity=identity,
+            readiness_mode="peer-input",
         )
         blocked = self.invoke(
             "assignment", "block", "--run-id", "peer-block",
@@ -918,9 +1694,8 @@ class RunStateScenarios(unittest.TestCase):
         self.start("four", assignment_count=4)
         for number in (1, 2, 3):
             self.create_worker("four", number)
-        error = self.invoke(
-            "app-operation", "begin", "--run-id", "four", "--expected-revision", self.revision("four"),
-            "--operation-key", "create-fourth", "--action", "create-worker", "--subject-id", "spec-04",
+        error = self.begin_operation(
+            "four", "create-worker", "spec-04",
             expected=4,
         )
         self.assertEqual(error["error"]["code"], "worker-capacity-reached")
@@ -938,7 +1713,8 @@ class RunStateScenarios(unittest.TestCase):
         for number in (1, 2, 3):
             self.create_worker("parked-peer", number)
         parked = self.ready_local_worker(
-            "parked-peer", number=1, repository_identity=identity, peer_input=True,
+            "parked-peer", number=1, repository_identity=identity,
+            readiness_mode="peer-input",
         )
         self.assertEqual(parked["state"], "peer-input-ready")
         self.create_worker("parked-peer", 4)
@@ -950,12 +1726,7 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_active_run_and_claim_when_worker_creation_begins_then_controller_authorizes_it(self) -> None:
         """Given claimed state, when worker creation begins, then the unfinished run provides authority."""
         self.start("worker-ready")
-        result = self.invoke(
-            "app-operation", "begin", "--run-id", "worker-ready",
-            "--expected-revision", self.revision("worker-ready"),
-            "--operation-key", "early-worker", "--action", "create-worker",
-            "--subject-id", "spec-01",
-        )
+        result = self.begin_operation("worker-ready", "create-worker", "spec-01")
         self.assertTrue(result["launch_authorized"])
 
     def test_given_planned_preimplementation_state_when_run_aborts_then_claim_releases_directly(self) -> None:
@@ -1016,71 +1787,73 @@ class RunStateScenarios(unittest.TestCase):
     def test_given_ambiguous_worker_creation_when_reconciled_then_it_is_not_relaunched(self) -> None:
         """Given an unknown create-worker effect, only the same operation may resolve its identity."""
         self.start("ambiguous-worker")
-        self.invoke(
-            "app-operation", "begin", "--run-id", "ambiguous-worker",
-            "--expected-revision", self.revision("ambiguous-worker"),
-            "--operation-key", "create-ambiguous", "--action", "create-worker",
-            "--subject-id", "spec-01",
+        begun = self.begin_operation(
+            "ambiguous-worker", "create-worker", "spec-01",
         )
-        unknown = {"schema_version": 1, "status": "unknown"}
+        unknown = self.operation_observation(begun, status="unknown")
         self.invoke(
             "app-operation", "finish", "--run-id", "ambiguous-worker",
             "--expected-revision", self.revision("ambiguous-worker"),
-            "--operation-key", "create-ambiguous",
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("create-ambiguous-unknown.json", unknown)),
         )
-        blocked = self.invoke(
-            "app-operation", "begin", "--run-id", "ambiguous-worker",
-            "--expected-revision", self.revision("ambiguous-worker"),
-            "--operation-key", "create-duplicate", "--action", "create-worker",
-            "--subject-id", "spec-01", expected=4,
+        blocked = self.begin_operation(
+            "ambiguous-worker", "create-worker", "spec-01", expected=4,
         )
         self.assertEqual(blocked["error"]["code"], "protected-operation-already-started")
         checkout = self.base / "checkout ambiguous worker"
         checkout.mkdir()
-        succeeded = {
-            "schema_version": 1,
-            "status": "succeeded",
-            "receipt_ref": "receipt:create-ambiguous",
-            "readback_ref": "readback:create-ambiguous",
-            "thread_id": "thread-ambiguous-worker-1",
-            "project_id": "project-1",
-            "checkout_path": str(checkout),
-            "git_common_dir": str(self.common_a),
-            "observed_state": "active",
-        }
+        succeeded = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:create-ambiguous",
+                "readback_ref": "readback:create-ambiguous",
+                "thread_id": "thread-ambiguous-worker-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
         self.invoke(
             "app-operation", "finish", "--run-id", "ambiguous-worker",
             "--expected-revision", self.revision("ambiguous-worker"),
-            "--operation-key", "create-ambiguous",
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("create-ambiguous-succeeded.json", succeeded)),
         )
         shown = self.invoke("run", "show", "--run-id", "ambiguous-worker")
         operations = self.invoke("app-operation", "list", "--run-id", "ambiguous-worker")
         self.assertEqual(shown["assignments"][0]["state"], "worker-created")
-        self.assertEqual([row["operation_key"] for row in operations["operations"]], ["create-ambiguous"])
+        self.assertEqual(
+            [row["operation_id"] for row in operations["operations"]],
+            [begun["operation_id"]],
+        )
 
     def test_given_existing_worker_identity_when_stale_readback_reuses_it_then_binding_fails(self) -> None:
         """Given one worker/worktree binding, when another assignment receives the same readback, then it cannot alias."""
         self.start("alias", assignment_count=2)
         self.create_worker("alias", 1)
-        self.invoke(
-            "app-operation", "begin", "--run-id", "alias",
-            "--expected-revision", self.revision("alias"),
-            "--operation-key", "create-alias-2", "--action", "create-worker",
-            "--subject-id", "spec-02",
+        begun = self.begin_operation(
+            "alias", "create-worker", "spec-02",
         )
-        stale = {
-            "schema_version": 1, "status": "succeeded",
-            "receipt_ref": "receipt:create-alias-2", "readback_ref": "readback:create-alias-2",
-            "thread_id": "thread-alias-1", "project_id": "project-1",
-            "checkout_path": str(self.base / "checkout alias 1"),
-            "git_common_dir": str(self.common_a), "observed_state": "active",
-        }
+        stale = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:create-alias-2",
+                "readback_ref": "readback:create-alias-2",
+                "thread_id": "thread-alias-1",
+                "project_id": "project-1",
+                "checkout_path": str(self.base / "checkout alias 1"),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
         error = self.invoke(
             "app-operation", "finish", "--run-id", "alias",
             "--expected-revision", self.revision("alias"),
-            "--operation-key", "create-alias-2",
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("stale-alias.json", stale)), expected=4,
         )
         self.assertEqual(error["error"]["code"], "worker-identity-conflict")
@@ -1090,10 +1863,11 @@ class RunStateScenarios(unittest.TestCase):
         self.start("wrong-base")
         self.create_worker("wrong-base")
         observation = {
-            "schema_version": 1, "assignment_id": "spec-01",
+            **self.protocol("ready"), "assignment_id": "spec-01",
             "thread_id": "thread-wrong-base-1",
             "repository_identity": "github:example/project",
-            "delivery_type": "github-pr", "head_sha": f"{101:040x}",
+            "delivery_type": "github-pr", "readiness_mode": "terminal",
+            "head_sha": f"{101:040x}",
             "head_branch_name": "feature/example-1", "base_branch_name": "release",
             "base_sha": f"{10:040x}",
             "checkout_path": str(self.base / "checkout wrong-base 1"),
@@ -1239,7 +2013,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("missing-owner")
         self.start("missing-waiter")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "missing-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("missing-owner")),
@@ -1263,7 +2037,8 @@ class RunStateScenarios(unittest.TestCase):
         self.start("v1-recovery-owner")
         self.start("v1-recovery-waiter")
         observation = {
-            "schema_version": 2,
+            "schema": PROTOCOLS["recovery"]["schema"],
+            "schema_version": "3.0.0",
             "owner_run_id": "v1-recovery-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("v1-recovery-owner")),
@@ -1281,7 +2056,7 @@ class RunStateScenarios(unittest.TestCase):
             "--observation", str(self.write_json("v1-recovery.json", observation)),
             expected=2,
         )
-        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        self.assertEqual(error["error"]["code"], "unsupported-input-protocol")
         owner = self.invoke(
             "claim", "find", "--repository-identity", "github:example/project",
             "--tracker-backend", "github", "--source-spec-ref", "example/project#1",
@@ -1293,7 +2068,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("owner-recovery")
         self.create_worker("owner-recovery")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "owner-recovery",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("owner-recovery")),
@@ -1329,7 +2104,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("active-owner-recovery")
         revision = self.revision("active-owner-recovery")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "active-owner-recovery",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(revision),
@@ -1355,7 +2130,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("retry-recovery-owner")
         self.start("retry-recovery-waiter")
         base = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "retry-recovery-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("retry-recovery-owner")),
@@ -1392,19 +2167,110 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(second["outcome"], "owner-active")
         self.assertFalse(second["claim_acquired"])
 
-    def test_given_confirmed_failed_app_operation_when_retried_then_new_key_is_allowed(self) -> None:
-        """Given readback proves no worker was created, when root retries, then a new operation key may launch."""
+    def test_given_failed_create_worker_when_replayed_then_same_operation_can_succeed_without_duplicate_identity(self) -> None:
+        """A failed protected effect retries by incrementing its launch, never by allocating another operation."""
         self.start("retry")
-        self.operation(
+        failed = self.operation(
             "retry", "worker-failed", "create-worker", "spec-01", {}, status="failed"
         )
-        result = self.invoke(
-            "app-operation", "begin", "--run-id", "retry",
-            "--expected-revision", self.revision("retry"),
-            "--operation-key", "worker-retry", "--action", "create-worker",
-            "--subject-id", "spec-01",
+        self.assertTrue(failed["replay_authorized"])
+        duplicate = self.begin_operation(
+            "retry", "create-worker", "spec-01", expected=4,
         )
-        self.assertTrue(result["launch_authorized"])
+        self.assertEqual(
+            duplicate["error"]["code"], "protected-operation-already-started",
+        )
+        replayed = self.invoke(
+            "app-operation", "replay", "--run-id", "retry",
+            "--expected-revision", self.revision("retry"),
+            "--operation-id", str(failed["operation_id"]),
+        )
+        self.assertEqual(replayed["operation_id"], failed["operation_id"])
+        self.assertEqual(replayed["launch_count"], 2)
+        checkout = self.base / "checkout retry 1"
+        checkout.mkdir()
+        succeeded = self.operation_observation(
+            replayed,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:worker-retry",
+                "readback_ref": "readback:worker-retry",
+                "thread_id": "thread-retry-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        finished = self.invoke(
+            "app-operation", "finish", "--run-id", "retry",
+            "--expected-revision", self.revision("retry"),
+            "--operation-id", str(failed["operation_id"]),
+            "--observation",
+            str(self.write_json("worker-retry-succeeded.json", succeeded)),
+        )
+        self.assertEqual(finished["status"], "succeeded")
+        self.assertEqual(finished["launch_count"], 2)
+        shown = self.invoke("run", "show", "--run-id", "retry")
+        self.assertEqual(shown["assignments"][0]["state"], "worker-created")
+
+    def test_given_failed_protected_action_or_worker_message_when_replay_is_requested_then_only_protected_action_relaunches(self) -> None:
+        """Failed single-use actions replay in place; repeatable follow-up messages remain non-replayable."""
+        self.start("protected-replay")
+        self.create_worker("protected-replay")
+        failed_title = self.operation(
+            "protected-replay",
+            "root-title-failed",
+            "set-root-title",
+            "root-protected-replay",
+            {},
+            status="failed",
+        )
+        self.assertTrue(failed_title["replay_authorized"])
+        replayed_title = self.invoke(
+            "app-operation", "replay", "--run-id", "protected-replay",
+            "--expected-revision", self.revision("protected-replay"),
+            "--operation-id", str(failed_title["operation_id"]),
+        )
+        self.assertEqual(
+            replayed_title["operation_id"], failed_title["operation_id"],
+        )
+        self.assertEqual(replayed_title["launch_count"], 2)
+        title_succeeded = self.operation_observation(
+            replayed_title,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:root-title-replay",
+                "readback_ref": "readback:root-title-replay",
+                "observed_title": "🤖 Feature Orchestrator",
+            },
+        )
+        self.invoke(
+            "app-operation", "finish", "--run-id", "protected-replay",
+            "--expected-revision", self.revision("protected-replay"),
+            "--operation-id", str(failed_title["operation_id"]),
+            "--observation",
+            str(self.write_json("root-title-replayed.json", title_succeeded)),
+        )
+
+        failed_message = self.operation(
+            "protected-replay",
+            "worker-message-failed",
+            "send-worker-message",
+            "spec-01",
+            {"thread_id": "thread-protected-replay-1"},
+            status="failed",
+        )
+        self.assertFalse(failed_message["replay_authorized"])
+        unsupported = self.invoke(
+            "app-operation", "replay", "--run-id", "protected-replay",
+            "--expected-revision", self.revision("protected-replay"),
+            "--operation-id", str(failed_message["operation_id"]),
+            expected=4,
+        )
+        self.assertEqual(
+            unsupported["error"]["code"], "operation-replay-unsupported",
+        )
 
     def test_given_pr_ready_release_when_independent_root_starts_then_it_acquires(self) -> None:
         """Given an independent Spec after PR-ready release, when it starts, then merge is not required for ownership."""
@@ -1433,7 +2299,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("terminal-owner")
         self.start("terminal-waiter")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "terminal-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("terminal-owner")),
@@ -1462,7 +2328,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("active-owner")
         self.start("active-waiter")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "active-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("active-owner")),
@@ -1487,7 +2353,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("bound-owner")
         self.start("bound-waiter")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "bound-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("bound-owner")),
@@ -1512,7 +2378,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("unknown-owner")
         self.start("unknown-waiter")
         observation = {
-            "schema_version": 1,
+            **self.protocol("recovery"),
             "owner_run_id": "unknown-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("unknown-owner")),
@@ -1538,8 +2404,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(abandoned["outcome"], "manual-abandon")
         self.assertTrue(abandoned["claim_acquired"])
 
-    def test_given_unknown_bootstrap_effect_when_readback_arrives_then_same_key_reconciles(self) -> None:
-        """Given ambiguous App delivery, when receipt readback resolves, then the same key succeeds without hashes."""
+    def test_given_unknown_bootstrap_effect_when_readback_arrives_then_same_id_reconciles(self) -> None:
+        """Given ambiguous App delivery, receipt readback resolves the same operation and bootstrap IDs."""
         self.start("recover")
         assignment = "spec-01"
         thread = "thread-recover-1"
@@ -1547,17 +2413,30 @@ class RunStateScenarios(unittest.TestCase):
         checkout.mkdir()
         self.operation("recover", "create-recover", "create-worker", assignment, {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"})
         self.operation("recover", "title-recover", "set-worker-title", assignment, {"thread_id": thread, "observed_title": "🛠️ Feature 1"})
-        self.operation("recover", "bootstrap-recover", "send-bootstrap", assignment, {"thread_id": thread}, status="unknown")
-        relaunch = self.invoke(
-            "app-operation", "begin", "--run-id", "recover", "--expected-revision", self.revision("recover"),
-            "--operation-key", "bootstrap-recover-2", "--action", "send-bootstrap", "--subject-id", assignment,
-            expected=4,
+        unknown = self.operation(
+            "recover", "bootstrap-recover", "send-bootstrap", assignment,
+            {"thread_id": thread}, status="unknown",
+        )
+        operations = self.invoke("app-operation", "list", "--run-id", "recover")
+        bootstrap = next(row for row in operations["operations"] if row["action"] == "send-bootstrap")
+        relaunch = self.begin_operation(
+            "recover", "send-bootstrap", assignment, expected=4,
         )
         self.assertEqual(relaunch["error"]["code"], "protected-operation-already-started")
-        observed = {"schema_version": 1, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
+        observed = {
+            **self.protocol("operation"),
+            "operation_id": unknown["operation_id"],
+            "launch_count": unknown["launch_count"],
+            "bootstrap_id": bootstrap["bootstrap_id"],
+            "status": "succeeded",
+            "receipt_ref": "receipt:bootstrap-recover",
+            "readback_ref": "thread-read:recover",
+            "thread_id": thread,
+        }
         result = self.invoke(
             "app-operation", "finish", "--run-id", "recover", "--expected-revision", self.revision("recover"),
-            "--operation-key", "bootstrap-recover", "--observation", str(self.write_json("reconciled.json", observed)),
+            "--operation-id", str(unknown["operation_id"]),
+            "--observation", str(self.write_json("reconciled.json", observed)),
         )
         self.assertEqual(result["status"], "succeeded")
         with sqlite3.connect(self.database) as connection:
@@ -1583,28 +2462,22 @@ class RunStateScenarios(unittest.TestCase):
             "archive-unknown", "bootstrap-archive-unknown", "send-bootstrap", assignment,
             {}, status="unknown",
         )
-        error = self.invoke(
-            "app-operation", "begin", "--run-id", "archive-unknown",
-            "--expected-revision", self.revision("archive-unknown"),
-            "--operation-key", "archive-after-unknown", "--action", "archive-worker",
-            "--subject-id", assignment, expected=4,
+        error = self.begin_operation(
+            "archive-unknown", "archive-worker", assignment, expected=4,
         )
         self.assertEqual(error["error"]["code"], "bootstrap-reconciliation-required")
 
     def test_given_unknown_app_effect_before_receipt_when_recorded_then_no_reference_is_fabricated(self) -> None:
         """Given transport ambiguity before any receipt, when unknown is recorded, then nullable typed facts preserve truth."""
         self.start("no-receipt")
-        self.invoke(
-            "app-operation", "begin", "--run-id", "no-receipt",
-            "--expected-revision", self.revision("no-receipt"),
-            "--operation-key", "root-title-unknown", "--action", "set-root-title",
-            "--subject-id", "root-no-receipt",
+        begun = self.begin_operation(
+            "no-receipt", "set-root-title", "root-no-receipt",
         )
-        observation = {"schema_version": 1, "status": "unknown"}
+        observation = self.operation_observation(begun, status="unknown")
         result = self.invoke(
             "app-operation", "finish", "--run-id", "no-receipt",
             "--expected-revision", self.revision("no-receipt"),
-            "--operation-key", "root-title-unknown",
+            "--operation-id", str(begun["operation_id"]),
             "--observation", str(self.write_json("unknown-no-receipt.json", observation)),
         )
         self.assertEqual(result["status"], "unknown")
@@ -1621,8 +2494,8 @@ class RunStateScenarios(unittest.TestCase):
         owner = self.invoke("claim", "find", "--repository-identity", "github:example/project", "--tracker-backend", "github", "--source-spec-ref", "example/project#1")
         self.assertEqual(owner["owner"]["run_id"], "started")
 
-    def test_given_schema_when_inspected_then_only_allowlisted_state_and_no_text_hashes_exist(self) -> None:
-        """Given initialized schema, when tables and columns are inspected, then storage is narrow and hash-free."""
+    def test_given_schema_when_inspected_then_state_is_narrow_and_run_pins_exact_runtime(self) -> None:
+        """Given schema 2, each run stores the exact contract, CLI, and runtime artifact digest."""
         self.start("schema")
         with sqlite3.connect(self.database) as connection:
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
@@ -1631,9 +2504,14 @@ class RunStateScenarios(unittest.TestCase):
                 "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
             ).fetchall()
         self.assertEqual(tables, {"runtime_metadata", "runs", "assignments", "spec_claims", "app_operations"})
-        self.assertEqual(metadata, [(1, 1, None)])
+        self.assertEqual(metadata, [(1, DATABASE_SCHEMA_VERSION, None)])
         self.assertNotIn("goal_state", columns)
-        self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
+        self.assertIn("runtime_artifact_sha256", columns)
+        self.assertFalse(any("body" in column or "checklist" in column or "attempt" in column for column in columns))
+        shown = self.invoke("run", "show", "--run-id", "schema")
+        self.assertEqual(shown["runtime_contract_version"], RUNTIME_CONTRACT_VERSION)
+        self.assertEqual(shown["runtime_cli_version"], CLI_VERSION)
+        self.assertEqual(shown["runtime_artifact_sha256"], hashlib.sha256(TOOL.read_bytes()).hexdigest())
         before = self.database.read_bytes()
         diagnosis = self.invoke("doctor")
         self.assertFalse(diagnosis["writes_performed"])
@@ -1641,24 +2519,42 @@ class RunStateScenarios(unittest.TestCase):
         with sqlite3.connect(self.database) as connection:
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute(
-                    "INSERT INTO runtime_metadata(singleton,schema_version) VALUES (2,1)"
+                    "INSERT INTO runtime_metadata(singleton,schema_version) VALUES (2,2)"
                 )
 
-    def test_given_future_schema_two_and_drained_schema_one_then_state_is_regenerated_without_carry_forward(self) -> None:
-        """Given a future approved runtime and no old owners, it replaces schema 1 with empty schema 2."""
-        self.start("drained-v1")
-        self.invoke(
-            "run", "finish", "--run-id", "drained-v1",
-            "--expected-revision", self.revision("drained-v1"),
-            "--outcome", "preimplementation-aborted",
+    def test_given_run_artifact_pin_drift_when_mutation_is_attempted_then_retained_runtime_is_required(self) -> None:
+        """A same-version but different executable cannot mutate an existing run."""
+        self.start("artifact-pin-drift")
+        revision = self.revision("artifact-pin-drift")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """UPDATE runs
+                   SET runtime_artifact_sha256=?
+                   WHERE run_id='artifact-pin-drift'""",
+                ("0" * 64,),
+            )
+        error = self.invoke(
+            "app-operation", "begin",
+            "--run-id", "artifact-pin-drift",
+            "--expected-revision", revision,
+            "--action", "set-root-title",
+            "--subject-id", "root-artifact-pin-drift",
+            expected=4,
         )
-        future = self.future_schema_two_tool()
+        self.assertEqual(error["error"]["code"], "retained-runtime-required")
+        shown = self.invoke("run", "show", "--run-id", "artifact-pin-drift")
+        self.assertEqual(str(shown["revision"]), revision)
+        self.assertEqual(shown["runtime_artifact_sha256"], "0" * 64)
 
-        diagnosis = self.invoke_tool(future, "doctor")
+    def test_given_drained_schema_one_when_schema_two_prepares_then_state_is_regenerated_without_carry_forward(self) -> None:
+        """Given no legacy owners, schema 2 replaces schema 1 atomically without copying rows."""
+        self.replace_with_schema_one()
+
+        diagnosis = self.invoke("doctor")
         self.assertEqual(diagnosis["state"], "rebuild-ready")
         self.assertFalse(diagnosis["ready"])
-        self.assertEqual(diagnosis["database_schema_version"], 1)
-        prepared = self.invoke_tool(future, "state", "prepare")
+        self.assertEqual(diagnosis["observed_database_schema_version"], 1)
+        prepared = self.invoke("state", "prepare")
         self.assertEqual(prepared["state"], "regenerated")
         self.assertEqual(prepared["previous_schema_version"], 1)
         self.assertTrue(prepared["regenerated"])
@@ -1673,79 +2569,41 @@ class RunStateScenarios(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
         self.assertFalse(self.database.with_name("run-state.lock").exists())
 
-    def test_given_future_schema_two_and_active_schema_one_then_old_runtime_can_drain_under_fence(self) -> None:
-        """Given a future cut, new starts stop while the retained old runtime terminalizes its owner."""
-        self.start("active-v1")
-        future = self.future_schema_two_tool()
-        diagnosis = self.invoke_tool(future, "doctor")
+    def test_given_active_schema_one_when_schema_two_prepares_then_it_fails_closed_without_runtime_identity(self) -> None:
+        """Given legacy active owners lack exact pins, schema 2 cannot guess a retained runtime."""
+        self.replace_with_schema_one(active=True)
+        diagnosis = self.invoke("doctor")
         self.assertEqual(diagnosis["state"], "waiting-for-schema-drain")
         self.assertEqual(diagnosis["active_owner_runs"], 1)
-        unavailable = self.invoke_tool(future, "state", "prepare", expected=4)
+        unavailable = self.invoke("state", "prepare", expected=4)
         self.assertEqual(
             unavailable["error"]["code"],
-            "retained-runtime-unavailable",
+            "legacy-runtime-identity-unknown",
         )
-        counterfeit = self.base / "counterfeit-schema-1"
-        counterfeit.write_text(
-            TOOL.read_text(encoding="utf-8") + "\n# different executable\n",
-            encoding="utf-8",
-        )
-        counterfeit.chmod(0o700)
-        mismatch = self.invoke_tool(
-            future,
-            "state",
-            "prepare",
-            "--retained-runtime",
-            str(counterfeit),
-            expected=4,
-        )
-        self.assertEqual(mismatch["error"]["code"], "retained-runtime-unavailable")
-        prepared = self.invoke_tool(
-            future,
+        with_runtime = self.invoke(
             "state",
             "prepare",
             "--retained-runtime",
             str(TOOL),
+            expected=4,
         )
-        self.assertEqual(prepared["state"], "waiting-for-schema-drain")
-        self.assertEqual(prepared["active_owner_runs"], 1)
+        self.assertEqual(with_runtime["error"]["code"], "legacy-runtime-identity-unknown")
         with sqlite3.connect(self.database) as connection:
             self.assertEqual(
                 connection.execute(
                     "SELECT schema_version,target_schema_version FROM runtime_metadata"
                 ).fetchone(),
-                (1, 2),
+                (1, None),
             )
-        blocked = self.invoke(
-            "run", "start", "--manifest",
-            str(self.write_json("blocked-during-cut.json", self.manifest("blocked-during-cut"))),
-            expected=4,
-        )
-        self.assertEqual(blocked["error"]["code"], "state-cutover-in-progress")
-
-        self.invoke(
-            "run", "finish", "--run-id", "active-v1",
-            "--expected-revision", self.revision("active-v1"),
-            "--outcome", "preimplementation-aborted",
-        )
-        completed = self.invoke_tool(future, "state", "prepare")
-        self.assertEqual(completed["state"], "regenerated")
-        self.assertFalse(self.database.with_name("run-state.lock").exists())
 
     def test_given_injected_recreate_failure_when_cutover_rolls_back_then_old_state_is_exact(self) -> None:
         """Given DROP has begun, a creation failure rolls back both schema and rows."""
-        self.start("rollback-v1")
-        self.invoke(
-            "run", "finish", "--run-id", "rollback-v1",
-            "--expected-revision", self.revision("rollback-v1"),
-            "--outcome", "preimplementation-aborted",
-        )
-        future = self.future_schema_two_tool()
+        self.replace_with_schema_one()
         before_bytes = self.database.read_bytes()
         with sqlite3.connect(self.database) as connection:
             before_dump = tuple(connection.iterdump())
 
-        namespace = runpy.run_path(str(future), run_name="future_rollback_test")
+        namespace = runpy.run_path(str(TOOL), run_name="schema_two_rollback_test")
         original_create = namespace["create_schema"]
 
         def fail_create(*_: object, **__: object) -> None:
@@ -1767,17 +2625,22 @@ class RunStateScenarios(unittest.TestCase):
                     connection.close()
         finally:
             namespace["recreate_schema_in_place"].__globals__["create_schema"] = original_create
+        del original_create
+        del namespace
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            gc.collect()
 
         with sqlite3.connect(self.database) as connection:
             self.assertEqual(tuple(connection.iterdump()), before_dump)
         self.assertEqual(self.database.read_bytes(), before_bytes)
 
     def test_given_newer_schema_when_old_runtime_prepares_then_it_fails_closed(self) -> None:
-        """Given a newer DB, schema-1 runtime never destroys or downgrades it."""
+        """Given a newer DB, schema-2 runtime never destroys or downgrades it."""
         self.start("newer-schema")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET schema_version=2 WHERE singleton=1"
+                "UPDATE runtime_metadata SET schema_version=3 WHERE singleton=1"
             )
         before = self.database.read_bytes()
         doctor = self.invoke("doctor", expected=4)
@@ -1787,11 +2650,11 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_future_cutover_fence_when_new_run_starts_then_existing_state_remains_readable(self) -> None:
-        """Given a later runtime has fenced starts, schema-1 may inspect owners but cannot create another run."""
+        """Given a later runtime has fenced starts, schema 2 may inspect owners but cannot create another run."""
         self.start("fenced-owner")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET target_schema_version=2 WHERE singleton=1"
+                "UPDATE runtime_metadata SET target_schema_version=3 WHERE singleton=1"
             )
         error = self.invoke(
             "run", "start", "--manifest",
@@ -1806,7 +2669,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertFalse(diagnosis["ready"])
 
     def test_given_unversioned_database_when_read_then_runtime_rejects_it_byte_for_byte(self) -> None:
-        """Given unversioned tables, schema 1 rejects them without destructive preparation."""
+        """Given unversioned tables, schema 2 rejects them without destructive preparation."""
         self.start("unversioned")
         with sqlite3.connect(self.database) as connection:
             connection.execute("DROP TABLE runtime_metadata")
@@ -1832,7 +2695,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
-        """Given a stale schema-1 DB, when opened, then exact structure fails closed and the file is preserved."""
+        """Given a stale schema-2 DB, when opened, then exact structure fails closed and the file is preserved."""
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
@@ -1840,7 +2703,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_one_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
+    def test_given_schema_two_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
         """Given protocol metadata drift, doctor fails closed and preserves the database bytes."""
         self.start("stale-metadata")
         with sqlite3.connect(self.database) as connection:
@@ -1874,7 +2737,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
 
     def test_given_same_number_schema_with_retired_input_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given the former integration-only state constraint, schema 1 rejects it before a later write."""
+        """Given the former integration-only state constraint, schema 2 rejects it before a later write."""
         self.start("stale-state-constraint")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")
@@ -1888,7 +2751,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(self.database.exists())
 
     def test_given_schema_three_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given a stale schema-1 constraint, the runtime rejects it without migration or deletion."""
+        """Given a stale schema-2 constraint, the runtime rejects it without migration or deletion."""
         self.start("stale-capability-state")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")

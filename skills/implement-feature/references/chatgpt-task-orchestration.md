@@ -8,20 +8,41 @@ collaboration through root.
 
 For every such change, root follows one crash-safe sequence:
 
-1. record the intended operation in SQLite before changing the ChatGPT desktop
-   task;
+1. call `app-operation begin` to record the intended operation in SQLite before
+   changing the ChatGPT desktop task, then retain its generated opaque
+   `operation_id`; for `send-bootstrap`, also retain the deterministically
+   derived `bootstrap_id`; retain the returned `launch_count` for every action;
 2. perform the change through the ChatGPT desktop app tools only when
    `app-operation begin` returns `launch_authorized=true`;
 3. use both the immediate tool response and an independent reading of the
-   actual task to finish the recorded operation;
+   actual task to build the typed observation for that exact `launch_count` and
+   finish the recorded operation;
 4. after an interruption, inspect the actual object first and record whether
    the change already happened;
-5. repeat the change only when authoritative evidence proves it had no effect.
+5. never begin another logical operation to retry the same effect. Call
+   `app-operation replay` only when `finish` reports
+   `replay_authorized=true`; retain the same `operation_id`, use the incremented
+   `launch_count`, and for bootstrap retain the same `bootstrap_id`.
 
-A pending or unknown change is never launched again under another key. SQLite
-stores only identity and reconciliation references, never prompts, message
-bodies, or hashes. `references/run-state.md` owns the exact `app-operation`,
-`receipt_ref`, and `readback_ref` machine fields.
+Bootstrap may replay after `unknown` or `failed` readback because the worker
+deduplicates its stable `bootstrap_id`; this provides exactly-once bootstrap
+effect, not exactly-once delivery. The protected `create-worker`,
+`set-worker-title`, `set-root-title`, and `archive-worker` actions may replay
+only from `failed` with readback that authoritatively proves that launch had no
+effect. `send-worker-message` has no replay path. A pending operation is never
+replayable, an immediate tool error is not proof of no effect, and no operation
+is relaunched under a new logical identifier. SQLite stores only identity and
+reconciliation references, never prompts, message bodies, or hashes.
+`references/run-state.md` owns the exact operation lifecycle, observation
+protocols, `launch_count`, `receipt_ref`, and `readback_ref` machine fields.
+
+If a terminal or reconciled `finish` response is lost, submit the identical
+observation again with the same `launch_count`. The idempotent readback uses
+the already normalized evidence, even when a previously verified checkout
+directory has since disappeared, and reports the same replay authorization
+implied by that action, status, and launch generation. When refining an
+`unknown` observation, carry every previously recorded fact forward unchanged
+and add only newly authoritative evidence.
 
 ## Root Title And Worker Creation
 
@@ -41,17 +62,21 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    worktree and assigns it to the task; root never runs `git worktree add`.
 3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
-4. Send one full bootstrap naming tracker backend, delivery type, source ref,
-   repository, branch, allowed paths, issue graph, acceptance and validation
-   budgets, safety, worker autonomy, checklist rules, final evidence, and every
-   known peer's exact task, repository, branch, role, and checkout identity.
-5. Verify the message was delivered to that exact task. This starts complete
-   implementation authority; there is no baseline-only prompt or later GO.
+4. Send one full bootstrap envelope carrying the recorded `bootstrap_id` and
+   naming tracker backend, delivery type, source ref, repository, branch,
+   allowed paths, issue graph, acceptance and validation budgets, safety,
+   worker autonomy, checklist rules, final evidence, and every known peer's
+   exact task, repository, branch, role, and checkout identity.
+5. Verify the message was delivered to that exact task and that the worker
+   accepted the same `bootstrap_id`. This starts complete implementation
+   authority; there is no baseline-only prompt or later GO.
 
 After recovery, read the accepted bootstrap from the task conversation and
-compare its stable Spec and issue sections with the current durable sources.
-If the baseline cannot be recovered exactly, fail closed; never replace it with
-a packet or message hash.
+compare its `bootstrap_id` and stable Spec and issue sections with the current
+durable sources. The worker deduplication rules in `worker-execution.md` decide
+whether a replay is the same logical bootstrap. If the accepted baseline cannot
+be recovered exactly, fail closed; never replace it with a packet or message
+hash.
 
 ## Scheduling And Monitoring
 
@@ -121,5 +146,6 @@ assignment as blocked instead of suggesting repair.
 
 Before root sends a controller message, record `send-worker-message` in SQLite. After sending, verify
 the immediate response and independently read the exact task conversation,
-then finish the recorded operation. Store no message body, hash, or worker
-technical state.
+then finish the recorded operation. Controller follow-ups are not replayable;
+an unresolved follow-up remains unresolved rather than being resent under
+another operation. Store no message body, hash, or worker technical state.

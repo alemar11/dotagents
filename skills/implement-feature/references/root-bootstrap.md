@@ -41,7 +41,9 @@ Root is a lightweight control plane. Before mutation:
 
 ```json
 {
-  "schema_version": 1,
+  "schema": "implement-feature/run-manifest",
+  "schema_version": "2.0.0",
+  "runtime_contract_version": "2.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "repositories": [
@@ -69,6 +71,12 @@ Root is a lightweight control plane. Before mutation:
 The manifest deliberately omits raw Spec and issue bodies, checklists, allowed
 path text, validation attempts, worker technical state, provider state, and text
 hashes. Those remain authoritative at their sources.
+
+The manifest protocol and the runtime contract are independent, bare SemVer
+identities; neither is the SQLite database schema integer. `run start` accepts
+only the exact named manifest protocol shown above. It records the current
+runtime contract, CLI version, and SHA-256 of the shipped `run-state` artifact
+on the new run so later mutations can require that exact runtime.
 
 The saved-project preflight and any explicitly authorized project setup finish
 before writing the manifest or calling `scripts/run-state`. Project creation is

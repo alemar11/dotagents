@@ -1,12 +1,36 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses this shipped artifact. `CLI_VERSION` is exactly `1.1.0`; SQLite, manifest,
-observation, and JSON envelope schemas are integer `1`. This is a breaking hard
-cut with no migrations, state copies, aliases, importers, or alternate state
-files. Schema number `1` does not authorize another shape: table and column
-structure must match exactly or the CLI returns `invalid-state-schema` without
-deleting or rewriting the DB.
+uses the shipped artifact. Release `2.0.0` is a breaking hard cut with no
+aliases, legacy payload acceptance, data migration, state copy, importer, or
+alternate state file.
+
+Four version domains are deliberately independent:
+
+| Domain | Current identity | Meaning |
+| --- | --- | --- |
+| CLI | `2.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `2.0.0` | Coordination semantics required by an active run |
+| Database schema | integer `2` | Exact SQLite tables, columns, indexes, and constraints |
+| JSON protocols | named protocol plus `2.0.0` | Exact machine payload or envelope shape |
+
+SemVer identities are bare values without a `v` prefix. Database schema numbers
+are integers, never SemVer. `scripts/run-state --json capabilities` is the
+machine-readable registry for these identities and protocols:
+
+| Protocol | `schema` |
+| --- | --- |
+| CLI envelope | `implement-feature/cli-envelope` |
+| Run manifest | `implement-feature/run-manifest` |
+| ChatGPT task-operation observation | `implement-feature/app-operation-observation` |
+| Delivery-ready observation | `implement-feature/delivery-ready-observation` |
+| Recovery observation | `implement-feature/recovery-observation` |
+
+Every protocol in this release requires the string
+`"schema_version": "2.0.0"` alongside its exact `schema`. An exact-key protocol
+change to a field name, type, required key, or closed enum is breaking and
+requires that protocol's major bump unless a real capability negotiation
+contract is introduced first.
 
 All controllers for the same machine user share:
 
@@ -31,10 +55,19 @@ CREATE TABLE runtime_metadata (
 );
 ```
 
-Exactly one `singleton = 1` row must exist. Normal schema-1 state is
-`(schema_version=1, target_schema_version=NULL)`. `PRAGMA user_version` is not
-application state and is never read or written. Local coordination does not
-span different machines.
+Exactly one `singleton = 1` row must exist. Normal current state is
+`(schema_version=2, target_schema_version=NULL)`. The integer stored here is not
+the CLI, runtime-contract, or JSON protocol version. Schema number `2` does not
+authorize another shape: every table, column, index, and constraint must match
+exactly or the CLI returns `invalid-state-schema` without deleting or rewriting
+the DB. `PRAGMA user_version` is not application state and is never read or
+written. Local coordination does not span different machines.
+
+Every run records `runtime_contract_version`, `runtime_cli_version`, and
+`runtime_artifact_sha256`. Commands that mutate or coordinate that run require
+the exact current executable to match all three pins. `run show` and `run list`
+remain available for diagnosis when it does not. An executable with the same
+SemVer but different bytes is not the retained runtime for that run.
 
 ## Stored Data Allowlist
 
@@ -54,6 +87,7 @@ head SHAs remain valid evidence.
 
 ```bash
 scripts/run-state --version
+scripts/run-state --json capabilities
 scripts/run-state --json doctor
 scripts/run-state --json state prepare
 scripts/run-state --json run start --manifest /absolute/manifest.json
@@ -75,16 +109,37 @@ scripts/run-state --json claim abandon \
   --owner-expected-revision OWNER_N
 
 scripts/run-state --json app-operation begin \
-  --run-id RUN --expected-revision N --operation-key KEY \
+  --run-id RUN --expected-revision N \
   --action create-worker --subject-id ASSIGNMENT
+scripts/run-state --json app-operation observation template \
+  --action send-bootstrap --status unknown
+scripts/run-state --json app-operation observation create \
+  --run-id RUN --expected-revision N --operation-id OPERATION \
+  --launch-count 1 --status unknown --readback-ref READBACK \
+  --output /absolute/new-observation.json
 scripts/run-state --json app-operation finish \
-  --run-id RUN --expected-revision N --operation-key KEY \
+  --run-id RUN --expected-revision N --operation-id OPERATION \
   --observation /absolute/observation.json
+scripts/run-state --json app-operation replay \
+  --run-id RUN --expected-revision N --operation-id OPERATION
 scripts/run-state --json app-operation list --run-id RUN
 
+scripts/run-state --json assignment ready-observation template \
+  --delivery-type local-branch --review-profile standard \
+  --readiness-mode terminal
+scripts/run-state --json assignment ready-observation create \
+  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
+  --readiness-mode terminal \
+  --thread-id THREAD --repository-identity github:owner/repository \
+  --head-sha HEAD --head-branch-name feature/example \
+  --base-branch-name main --base-sha BASE \
+  --checkout-path /absolute/checkout \
+  --worktree-clean --base-is-ancestor \
+  --validation-head-sha HEAD --autoreview-head-sha HEAD \
+  --review-candidate-head-sha CANDIDATE --review-profile standard \
+  --tracker-readback-ref TRACKER \
+  --output /absolute/new-ready-observation.json
 scripts/run-state --json assignment ready \
-  --run-id RUN --expected-revision N --observation /absolute/ready.json
-scripts/run-state --json assignment ready --peer-input \
   --run-id RUN --expected-revision N --observation /absolute/ready.json
 scripts/run-state --json assignment block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
@@ -104,8 +159,138 @@ scripts/run-state --json run finish \
 Read commands and `doctor` never write. `state prepare` is the explicit
 destructive preparation command; every ordinary state mutation uses one
 compare-and-swap revision transaction. JSON stdout is one object with
-`schema_version`, `ok`, and `command`; errors add typed `error.code` and
-`error.message`.
+the `implement-feature/cli-envelope` protocol fields, `ok`, `command`,
+`cli_version`, and `runtime_contract_version`; errors add typed `error.code`
+and `error.message`. With `--json`, argument-parser failures such as missing
+required flags, invalid enum values, and unknown arguments use that same typed
+error envelope instead of unstructured argparse usage output.
+
+The manifest accepted by `run start` has exactly the protocol fields
+`schema="implement-feature/run-manifest"` and
+`schema_version="2.0.0"`, `runtime_contract_version="2.0.0"`, and the
+`run_id`, `root_task_id`, `repositories`, and `assignments` described in
+`root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
+additional top-level keys.
+
+## Observation Builders
+
+`app-operation observation template` and
+`assignment ready-observation template` return descriptors: protocol
+constants, required fields, optional fields, and the closed-key rule. They are
+not payload placeholders and cannot be passed to `finish` or `ready`.
+
+The corresponding `create` commands are pure builders. They read the named run
+and assignment or operation, verify the expected revision and exact runtime
+pin, derive the protocol constants and designated identity fields, validate all
+caller-supplied independent readback facts, and write one bare protocol
+payload. In particular, the ready builder derives assignment, delivery type,
+and status while repository, task, checkout, branch, and evidence facts remain
+caller-supplied observations. They never mutate SQLite.
+The output must be an absolute path to a new file in an existing directory. The
+builder creates it atomically with mode `0600`, follows no output symlink, and
+never overwrites an existing path.
+
+`app-operation finish` remains the sole consumer and state mutator for an
+app-operation observation. `assignment ready` remains the sole consumer and
+state mutator for a delivery-ready observation. Each revalidates the complete
+payload inside its write transaction; successful builder output does not reserve
+or advance state.
+
+The app-operation builder accepts only the action/status fields described by
+its descriptor through `--receipt-ref`, `--readback-ref`, `--thread-id`,
+`--project-id`, `--checkout-path`, `--git-common-dir`, `--observed-title`,
+and `--observed-state`. It also requires `--launch-count` copied from the
+authorizing `begin` or `replay` result; it does not derive the launch
+generation. A stale count is rejected before any observation file is written.
+The builder derives `bootstrap_id`.
+
+Both ready-observation commands require
+`--readiness-mode terminal|peer-input`; the selected value is stored in the
+payload. The ready builder accepts repeated
+`--prerequisite-head ASSIGNMENT_ID=GIT_SHA` flags. `high-risk` requires
+`--codex-review-head-sha`; `standard` rejects it and emits JSON `null`.
+`github-pr` requires `--default-branch-name`, `--pr-url`, and
+`--provider-observation-ref`; `local-branch` rejects all three.
+`peer-input` applies the dependent-assignment validation that the consumer
+later repeats. `assignment ready` has no readiness flag: it derives the
+mutation exclusively from the observation's `readiness_mode`, preventing the
+builder and consumer from selecting different outcomes.
+
+## ChatGPT Task-Operation Identity And Replay
+
+`app-operation begin` generates an opaque `operation_id` in `op-*` form; callers
+never choose or replace one. That ID is the durable logical operation identity.
+The returned positive `launch_count` identifies one authorized execution
+generation: begin creates generation `1`, and every accepted replay increments
+it. For `send-bootstrap`, begin also derives the stable `bootstrap_id` in
+`bootstrap-*` form. Every begin or replay result authorizes only its reported
+generation.
+
+An app-operation observation uses the named app-operation protocol and carries
+exactly its `operation_id`, current `launch_count`, and
+`status: unknown|succeeded|failed` plus permitted evidence. `finish` rejects a
+response from an earlier generation even when its logical `operation_id`
+matches. A succeeded observation requires both `receipt_ref` and independent
+`readback_ref` plus the exact action-specific fields below:
+
+The exact common fields are `schema`, `schema_version`, `operation_id`,
+`launch_count`, and `status`; no observation may omit the launch generation.
+
+| Action | Additional fields |
+| --- | --- |
+| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
+| `set-worker-title` | `thread_id`, `observed_title` |
+| `send-bootstrap` | `thread_id`, `bootstrap_id` |
+| `send-worker-message` | `thread_id` |
+| `set-root-title` | `observed_title` |
+| `archive-worker` | `thread_id`, `observed_state` |
+
+Unknown or failed observations may carry only the authoritative action subset
+actually observed. A bootstrap observation always identifies the derived
+`bootstrap_id`; `failed` requires authoritative `readback_ref`, while `unknown`
+may omit it until readback exists. Never invent reconciliation references or
+classify an immediate tool error alone as proof that an effect did not happen.
+
+Finishing the same observation for the same launch generation again is
+idempotent: it leaves the revision unchanged, reports `already_applied=true`,
+and returns the same logically derived `replay_authorized` value that the
+stored observation permits. The identical-evidence check uses the normalized
+stored facts and does not depend on whether a previously verified
+`checkout_path` or `git_common_dir` still exists. A different `launch_count` or
+conflicting terminal evidence fails closed.
+
+An `unknown` observation may be refined to another terminal status, but every
+fact already recorded by that generation's unknown observation is carried
+forward unchanged; the refinement may add facts and may not erase or replace
+prior receipt, readback, identity, path, provider, Git, or observed-state
+evidence.
+
+`app-operation replay` always preserves the logical `operation_id`, increments
+`launch_count`, returns `launch_authorized=true`, and permits one new
+generation. Its action-specific gates are:
+
+| Action | Replay gate |
+| --- | --- |
+| `send-bootstrap` | Prior generation is `unknown` or `failed` with `readback_ref`; the same `bootstrap_id` is preserved and worker deduplication contains ambiguity |
+| `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
+| `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
+| `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
+| `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
+| `send-worker-message` | Never replayable |
+
+Only bootstrap has exactly-once effect end to end: its transport call may be
+repeated while the worker accepts the stable logical `bootstrap_id` once by the
+rules in `worker-execution.md`. Replayed non-bootstrap operations depend on
+authoritative proof that the preceding generation had no effect; they do not
+claim downstream deduplication.
+
+`set-root-title` has one logical `operation_id` for each run; an authorized
+failed/no-effect replay is another launch generation of that same operation.
+Its expected title is derived from the immutable assignment count:
+`🤖 Feature Orchestrator` for one assignment and
+`🤖 Feature Orchestrator · N Features` for two or more.
+
+## Delivery-Ready Observation
 
 Ready observations always bind assignment/thread/repository/checkout,
 `delivery_type`, named head and base branches, head/base SHAs, clean worktree,
@@ -118,8 +303,9 @@ the provider default branch, canonical PR URL, and provider observation ref;
 `pr-ready-for-merge-but-not-merged` or `local-branch-ready`.
 
 The exact common ready-observation fields are:
-`schema_version`, `assignment_id`, `thread_id`, `repository_identity`,
-`delivery_type`, `head_sha`, `head_branch_name`, `base_branch_name`,
+`schema`, `schema_version`, `assignment_id`, `thread_id`, `repository_identity`,
+`delivery_type`, `readiness_mode`, `head_sha`, `head_branch_name`,
+`base_branch_name`,
 `base_sha`, `checkout_path`, `worktree_clean`, `base_is_ancestor`,
 `validation_head_sha`, `autoreview_head_sha`, `review_candidate_head_sha`,
 `review_profile`, `codex_review_head_sha`,
@@ -135,6 +321,14 @@ Codex review inspected the same initial candidate as its structured full pass.
 After accepted fixes, `validation_head_sha` and `autoreview_head_sha` bind the
 final `head_sha`; `review_candidate_head_sha` remains the immutable initial
 candidate linked through AutoReview's evidence chain.
+
+`readiness_mode` is exactly `terminal` or `peer-input`. `terminal` records the
+delivery-specific terminal assignment state and releases its claim.
+`peer-input` records `peer-input-ready`, retains the worker and claim, and is
+valid only when another assignment depends on that assignment. The builder
+validates the selected mode read-only; `assignment ready` reads it from the
+payload, repeats its validation in the write transaction, and performs the
+corresponding mutation without a caller-side mode flag.
 
 ## Claim Identity And Lifecycle
 
@@ -157,13 +351,13 @@ Worker creation and bootstrap require an active run and that assignment's
 active claim. A root owns only one unfinished run, and at most three workers may
 be live.
 
-`assignment ready` validates delivery-specific typed evidence, atomically
-records normal Git facts, and releases that assignment's claim.
-`--peer-input` instead records the current HEAD for dependent peers, retains
-the task and claim, and parks the worker so another assignment can use the
-execution slot. Combined ready evidence must reproduce the current exact
-prerequisite HEAD vector; drift fails closed. `assignment abort` releases one
-claim only before bootstrap
+`assignment ready` validates delivery-specific typed evidence and atomically
+records normal Git facts. With `readiness_mode=terminal` it releases that
+assignment's claim. With `readiness_mode=peer-input` it instead records the
+current HEAD for dependent peers, retains the task and claim, and parks the
+worker so another assignment can use the execution slot. Combined ready
+evidence must reproduce the current exact prerequisite HEAD vector; drift
+fails closed. `assignment abort` releases one claim only before bootstrap
 authority. A durable-contract block retains only the affected claim. `run
 finish` completes aggregate run state after assignment-level release; claim
 release never proves upstream merge or combined behavior.
@@ -181,7 +375,8 @@ authoritative evidence.
 
 ```json
 {
-  "schema_version": 1,
+  "schema": "implement-feature/recovery-observation",
+  "schema_version": "2.0.0",
   "owner_run_id": "owner-run",
   "owner_assignment_id": "spec-42",
   "owner_expected_revision": 7,
@@ -218,64 +413,77 @@ identities and revisions are mandatory. It preserves artifacts and transfers
 only the exact Feature Spec claim. There is no TTL, lease, heartbeat takeover,
 or repository-wide claim release.
 
-Typed ChatGPT operation observations carry only action-specific fields plus `receipt_ref` and
-`readback_ref` when actually observed. `unknown` preserves ambiguous effects
-and cannot be relaunched. Pending or unknown bootstrap delivery forbids worker
-archive until independent task inspection proves it failed.
-
-Every task observation uses `schema_version: 1` and
-`status: unknown|succeeded|failed`. A succeeded observation requires
-`receipt_ref`, `readback_ref`, and exactly these action fields:
-
-| Action | Additional fields |
-| --- | --- |
-| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
-| `set-worker-title` | `thread_id`, `observed_title` |
-| `send-bootstrap` | `thread_id` |
-| `send-worker-message` | `thread_id` |
-| `set-root-title` | `observed_title` |
-| `archive-worker` | `thread_id`, `observed_state` |
-
-`set-root-title` is single-use for each run. Its exact expected title is derived
-from the immutable assignment count: `🤖 Feature Orchestrator` for one
-assignment and `🤖 Feature Orchestrator · N Features` for two or more.
-
-Unknown or failed observations may include only the authoritative subset
-actually observed. Never invent reconciliation references.
+The same named recovery protocol is used by `assignment recover`; the owner
+fields then name that exact run, assignment, and expected revision. Pending or
+unknown app operations still fail recovery closed. Pending or unknown bootstrap
+delivery also forbids worker archive until independent task inspection provides
+the typed observation required by the operation lifecycle above.
 
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `1.1.0` and
-`STATE_SCHEMA_VERSION` remains `1`. Re-run `--help`,
-`--version`, read-only `doctor`, Python compilation, unit/contract tests, and an
+or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `2.0.0`;
+`DATABASE_SCHEMA_VERSION` remains integer `2`; each protocol entry remains the
+named `2.0.0` identity declared above. Re-run `--help`, `--version`, read-only
+`capabilities` and `doctor`, Python compilation, unit/contract tests, and an
 isolated lifecycle fixture after changes.
+
+Version each domain for its own contract:
+
+- bump the CLI patch for a compatible executable fix, minor for a compatible
+  command/capability addition, and major for a breaking command surface;
+- bump the runtime-contract patch or minor only for semantics that remain
+  compatible with active runs, and major for incompatible coordination or
+  replay semantics;
+- bump one JSON protocol independently, with a major bump for any incompatible
+  exact-key/type/enum change;
+- increment the database schema integer for any SQLite shape change, regardless
+  of which SemVer identity also changes.
+
+Because runs pin the exact CLI version and artifact digest, even a compatible
+new executable does not take over mutation of an already active run. Keep the
+old shipped artifact available until its pinned runs are terminal.
 
 ## Hard-Cut Operations
 
-Changing `STATE_SCHEMA_VERSION`, changing SQLite shape, or expanding the
+Changing `DATABASE_SCHEMA_VERSION`, changing SQLite shape, or expanding the
 recognized rebuild-source set requires explicit user consent before code or
 documentation edits. Every approved change is a breaking hard cut. Never add
 `ALTER` upgrades, data-copy migrations, imports, versioned DB filenames, or
 state carry-forward.
 
-At runtime, call read-only `doctor` first and then `state prepare`.
-For a recognized older DB, `state prepare` validates the old schema and writes
-the new runtime's schema number to `target_schema_version` transactionally
-while the old schema remains intact. A non-NULL target makes old/current
-runtimes reject every new `run start`, while commands needed by already-owned
-runs remain available.
+At runtime, call read-only `capabilities` and `doctor` first and then
+`state prepare`.
 
-If owners remain, invoke preparation with the absolute retained executable:
-`state prepare --retained-runtime /absolute/path/to/old/run-state`. It verifies
-that executable's approved SHA-256 identity and exact old lineage version, then returns
-`waiting-for-schema-drain`. Keep the root turn open and repeat bounded `doctor`
-and `state prepare` sweeps. `waiting-for-spec`, `active`, and `blocked` all
-count as owners. Do not force-finish, abandon, release, or rewrite claims
-merely to complete a cutover. If the retained executable is unavailable or
-does not report the exact old version, fail closed and preserve the fence.
-Approved retained CLI versions are explicit per schema; a CLI minor version is
-not derived from the SQLite schema number.
+Schema 1 is the only recognized rebuild source for release 2.0.0, but its runs
+did not record exact runtime-contract, CLI, and artifact pins. Therefore:
+
+- with any schema-1 owner in `waiting-for-spec`, `active`, or `blocked`,
+  preparation fails closed with the legacy runtime identity unresolved; a
+  caller-supplied executable cannot manufacture the missing per-run proof;
+- with zero schema-1 owners, preparation begins one exclusive transaction,
+  rechecks zero, drops every application object, creates exact schema 2 and its
+  singleton metadata row, and commits with no row carry-forward.
+
+An active schema-1 run can be terminalized only by its already retained
+original artifact. The 2.0.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 2.0.0 preparation only after authoritative schema-1
+state reports zero owners.
+
+For a future recognized older schema that does persist exact run pins,
+`state prepare` first writes the target database-schema integer to
+`target_schema_version` transactionally while preserving the old schema. A
+non-NULL target fences every new run. Pass each distinct required executable
+with a repeated absolute
+`--retained-runtime /absolute/path/to/old/run-state` flag. Preparation verifies
+each executable's `capabilities`, exact CLI/runtime identity, and SHA-256
+against the active-run pins before returning `waiting-for-schema-drain`.
+Missing required, mismatched, or changed artifacts fail closed and preserve
+the state.
+
+Keep the root turn open and repeat bounded `doctor` and `state prepare` sweeps.
+Do not force-finish, abandon, release, or rewrite claims merely to complete a
+cutover. A CLI version is never inferred from a database schema number.
 
 When the recognized older DB reports zero owners, `state prepare` begins an
 exclusive SQLite transaction and rechecks zero. Inside that same transaction
@@ -289,13 +497,3 @@ An older runtime that encounters a newer schema fails closed and never
 regenerates it. Unknown older versions, unversioned tables, corrupt DBs,
 same-number structural drift, unsafe permissions, and symlinks also fail
 closed without reset.
-
-Schema 1 and CLI 1.1.0 begin a fresh lineage. No pre-lineage DB is a recognized
-rebuild source: verify zero owners with its original runtime, suspend new
-invocations, delete the old DB once, then let schema-1 `state prepare`
-create the fresh claim domain. For every future approved cut, stage the newer
-runtime without replacing the exact old executable needed by active owners.
-The newer `state prepare` may set the fence and wait, but old owners must
-terminalize through that retained old executable. Replace it only after
-`active_owner_runs=0` and successful regeneration. If the old executable is
-unavailable, fail closed instead of promising an unexecutable drain.
