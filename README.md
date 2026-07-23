@@ -25,17 +25,16 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 
 | Skill | Purpose |
 | --- | --- |
-| `gitstack:github` | Route mixed GitHub requests to the smallest focused GitStack workflow. |
-| `gitstack:git-commit` | Create intentional regular or targeted fixup commits and optionally push without publishing a PR. |
-| `gitstack:github-triage` | Inspect current-repository issue and PR queues read-only. |
+| `gitstack:github` | Handle general or mixed GitHub requests through the appropriate focused workflows. |
+| `gitstack:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
+| `gitstack:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
 | `gitstack:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
-| `gitstack:github-deep-review` | Trace root cause, provenance, proof, and fix quality for issues and PRs. |
-| `gitstack:github-ci` | Inspect or explicitly fix GitHub Actions failures. |
-| `gitstack:github-review-threads` | Inspect, address, reply to, and resolve PR feedback. |
-| `gitstack:github-portfolio-triage` | Aggregate read-only GitHub state across repositories. |
-| `gitstack:github-releases` | Plan, publish, and validate releases, tags, assets, and packages. |
-| `gitstack:github-stars` | Manage stars and star lists. |
-| `gitstack:yeet` | Validate, commit, push, and open or update a draft PR. |
+| `gitstack:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
+| `gitstack:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
+| `gitstack:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
+| `gitstack:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
+| `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
+| `gitstack:yeet` | Confirm scope, commit, push, and open or update a draft pull request. |
 
 ## Reusable Skills
 

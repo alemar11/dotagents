@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub CI"
-  short_description: "Diagnose and explicitly fix CI failures."
-  brand_color: "#DC2626"
-  default_prompt: "Use $gitstack:github-ci to inspect GitHub Actions with connector-first reads and the shared GitStack CLI for focused evidence. Keep diagnosis read-only unless the user explicitly asks to fix, then implement, validate, and recheck CI."

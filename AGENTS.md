@@ -297,7 +297,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep the plugin-shared runtime artifact at `plugins/gitstack/scripts/gitstack`, its maintenance source at `plugins/gitstack/projects/gitstack/`, and its plugin and CLI semantic versions aligned.
 - Keep GitHub issue lifecycle mechanics in `$gitstack:github-issues`, review-thread mechanics in `$gitstack:github-review-threads`, and stars/list mechanics in `$gitstack:github-stars`.
 - Keep GitStack's shared invocation registry limited to caller inputs. Derived provider states and review judgments belong to their owning result contracts. Omit mutation mode for pure reads; use it only to choose apply versus preview for a write-shaped GitHub operation.
-- Keep `$gitstack:github-triage` read-only and limited to current-repository queue grouping. Route evidence-backed issue disposition to `$gitstack:github-deep-review` and all issue lifecycle mutations to `$gitstack:github-issues`.
+- Keep `$gitstack:github-repository-triage` read-only and responsible for detailed single-repository queue grouping plus comparative scans of multiple explicit repositories. Route evidence-backed issue disposition to `$gitstack:github-investigation` and all issue lifecycle mutations to `$gitstack:github-issues`.
 - Keep `$gitstack:yeet` as publish orchestration over `$gitstack:git-commit` and focused GitStack GitHub workflows rather than duplicating their behavior.
 
 ### Implement Feature Skill

@@ -1,6 +1,6 @@
 ---
 name: github-review-threads
-description: Check or wait for automated PR reviews, inspect feedback, implement selected fixes, validate them, and manage replies or resolution.
+description: Handle GitHub pull request review threads from feedback through verified fixes. Use to check or wait for automated reviews, inspect unresolved feedback, implement selected changes, or explicitly reply and resolve threads.
 ---
 
 # GitHub Review Threads
@@ -44,7 +44,7 @@ It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
-GitStack 6.0.0 is self-contained. The four provider mutation commands
+GitStack 7.0.0 is self-contained. The four provider mutation commands
 (`request`, timeout-warning `comment`, `reply`, and `resolve`) require an exact
 immutable GitStack reservation packet. GitStack atomically consumes that packet
 before transport and owns the durable one-use marker and recovery readback; it

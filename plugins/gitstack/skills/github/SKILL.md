@@ -1,6 +1,6 @@
 ---
 name: github
-description: Route mixed or general GitHub work to the smallest GitStack workflow.
+description: Handle general or mixed GitHub work. Use when a request crosses issues, pull requests, Actions, releases, or local publishing, or when the user is unsure which focused GitStack skill fits.
 ---
 
 # GitHub
@@ -31,12 +31,11 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | --- | --- |
 | Local staging or commit, optionally push without PR | `$gitstack:git-commit` |
 | Publish local work as a branch and draft PR | `$gitstack:yeet` |
-| Current-repository issue and PR queue snapshot | `$gitstack:github-triage` |
+| Issue and PR queue triage for one or more repositories | `$gitstack:github-repository-triage` |
 | GitHub issue lifecycle and relationships | `$gitstack:github-issues` |
-| Root-cause and fix-quality review | `$gitstack:github-deep-review` |
-| Actions inspection or explicit CI repair | `$gitstack:github-ci` |
+| Evidence-backed technical review of an issue, PR, or proposed fix | `$gitstack:github-investigation` |
+| Actions inspection or explicit CI repair | `$gitstack:github-actions` |
 | Automated review check/wait, review feedback, implementation, replies, resolution | `$gitstack:github-review-threads` |
-| Multi-repository queue scan | `$gitstack:github-portfolio-triage` |
 | Tags, releases, notes, assets, packages | `$gitstack:github-releases` |
 | Stars and star lists | `$gitstack:github-stars` |
 

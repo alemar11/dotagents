@@ -1,9 +1,9 @@
 ---
-name: github-deep-review
-description: Review GitHub issues, pull requests, or fixes by tracing root cause, provenance, proof, and fix quality.
+name: github-investigation
+description: Investigate a GitHub issue, pull request, or proposed fix using repository evidence. Use to understand behavior, find the root cause, evaluate whether a fix is sound, and identify remaining risk; use $gitstack:github-review-threads for hosted review feedback.
 ---
 
-# GitHub Deep Review
+# GitHub Investigation
 
 ## Transport
 
@@ -28,8 +28,8 @@ Use this skill for questions like:
 - `did main already fix this?`
 - `should we close this issue?`
 
-Use `$gitstack:github-triage` for current-repo queue summaries, `$gitstack:github-issues` for
-authorized issue lifecycle changes, `$gitstack:github-ci` for Actions failures, and
+Use `$gitstack:github-repository-triage` for current-repo queue summaries, `$gitstack:github-issues` for
+authorized issue lifecycle changes, `$gitstack:github-actions` for Actions failures, and
 `$gitstack:github-review-threads` for listing, drafting, or posting replies to PR review
 threads.
 

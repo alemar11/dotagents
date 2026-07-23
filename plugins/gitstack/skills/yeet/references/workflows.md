@@ -128,7 +128,7 @@ Return:
 - whether the PR is draft or ready
 - validation performed before publishing
 
-If CI fails or review comments need follow-up, route to `$gitstack:github-ci`
+If CI fails or review comments need follow-up, route to `$gitstack:github-actions`
 or `$gitstack:github-review-threads` after the publish step. Supply the exact
 repository and PR plus one `review_operation`; add `mutation_mode=apply` only
 for an authorized reply, request, review submission, or resolution.

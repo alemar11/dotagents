@@ -1,5 +1,5 @@
 interface:
   display_name: "Git Commit"
-  short_description: "Create regular or targeted fixup commits and optionally push."
+  short_description: "Create or push explicit Git commits"
   brand_color: "#64748B"
-  default_prompt: "Use $gitstack:git-commit when the user asks to commit, create a targeted fixup or amend-fixup, commit and push, push existing commits, or stage explicit paths. Resolve commit_operation separately from commit_kind; require an exact target_commit for fixup kinds, never infer fixup from feedback alone, and never autosquash. Never stage or commit during push-only. Use issue-closing trailers only for fully satisfied issues. Route issue-only GitHub comments, labels, type changes, follow-up creation, or manual closure to $gitstack:github-issues."
+  default_prompt: "Use $gitstack:git-commit to inspect the intended scope, stage explicit paths, create the requested regular or targeted commit, and push only when requested; never infer fixup from feedback alone and never autosquash."

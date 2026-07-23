@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Publish local work to GitHub by committing, pushing, and opening or updating a draft PR.
+description: Publish local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, and open or update a draft pull request.
 ---
 
 # Yeet
@@ -15,7 +15,7 @@ skills, direct `git`, the shared CLI, and connector-backed PR operations:
   readiness and `publish open --title-file --body-file` for new PRs. Use the
   connector for supported existing-PR lifecycle operations. Do not put PR
   title or body text in argv or a shell string.
-- Use `$gitstack:github-issues`, `$gitstack:github-triage`, `$gitstack:github-deep-review`, `$gitstack:github-ci`,
+- Use `$gitstack:github-issues`, `$gitstack:github-repository-triage`, `$gitstack:github-investigation`, `$gitstack:github-actions`,
   or `$gitstack:github-review-threads` only for focused follow-up GitHub work.
 
 Resolve `<plugin-root>` as two directories above the directory containing this

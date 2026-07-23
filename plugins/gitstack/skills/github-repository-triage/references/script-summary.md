@@ -1,4 +1,4 @@
-# GitStack Portfolio Scan Contract
+# GitStack Multi-Repository Scan Contract
 
 ## Commands
 

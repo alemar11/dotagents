@@ -28,13 +28,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "6.0.0")
+        self.assertEqual(output.strip(), "7.0.0")
 
     def test_json_doctor_shape(self) -> None:
         code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "6.0.0")
+        self.assertEqual(payload["version"], "7.0.0")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
 
     def test_json_argument_error(self) -> None:

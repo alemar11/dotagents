@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Triage"
-  short_description: "Inspect current-repo GitHub issue and PR queues read-only."
-  brand_color: "#0369A1"
-  default_prompt: "Use $gitstack:github-triage to produce a URL-first current-repo issue and PR queue report, routing disposition judgment to $gitstack:github-deep-review and mutations to $gitstack:github-issues."

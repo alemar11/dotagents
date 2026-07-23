@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub"
-  short_description: "Route mixed GitHub work safely."
+  short_description: "Handle general or mixed GitHub requests"
   brand_color: "#DE4C36"
-  default_prompt: "Use $gitstack:github to route mixed GitHub work to the smallest GitStack workflow, preferring the GitHub connector for supported remote operations, gh for gaps, and direct git for local state."
+  default_prompt: "Use $gitstack:github to handle a general or mixed GitHub request and choose the focused GitStack workflows needed to complete it safely."

@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Manage GitHub issue creation, edits, labels, types, comments, closure, relationships, and dry-runs.
+description: Manage individual GitHub issues and their lifecycle. Use to create, inspect, edit, label, type, comment on, close, relate, or preview changes to specific issues; use $gitstack:github-repository-triage for repository-wide issue and pull request queues.
 ---
 
 # GitHub Issues
@@ -96,12 +96,12 @@ This skill only handles GitHub Issues.
 
 ## Routing
 
-- Use `$gitstack:github-triage` for current-repository queue snapshots, stale/blocker
+- Use `$gitstack:github-repository-triage` for current-repository queue snapshots, stale/blocker
   grouping, and PR triage.
-- Use `$gitstack:github-deep-review` when the question needs root cause, provenance, or
+- Use `$gitstack:github-investigation` when the question needs root cause, provenance, or
   fix-quality judgment before deciding issue disposition.
 - Use `$gitstack:github-review-threads` for PR review-thread context or replies.
-- Use `$gitstack:github-ci` for Actions, checks, and failing PR logs.
+- Use `$gitstack:github-actions` for Actions, checks, and failing PR logs.
 - Use `$gitstack:github-releases` for tags, GitHub Releases, notes, and assets.
 - Use `$gitstack:yeet` for publishing local work as a branch and draft PR.
 

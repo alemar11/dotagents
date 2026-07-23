@@ -1,4 +1,4 @@
-# GitHub Triage Workflows
+# GitHub Repository Triage Workflows
 
 ## Queue Snapshot
 
@@ -21,6 +21,24 @@ gh pr view <number> --json number,title,body,author,isDraft,reviewDecision,merge
 Inspect only enough detail to make the triage recommendation. Avoid broad
 historical reads unless the user asks for a deep queue audit.
 
+## Multiple Repository Scan
+
+Resolve `<plugin-root>` as two directories above the directory containing the
+owning `SKILL.md`; this may be an installed or linked package outside the
+current checkout.
+
+```bash
+<plugin-root>/scripts/gitstack portfolio scan --repo <owner/repo> --repo <owner/repo>
+<plugin-root>/scripts/gitstack portfolio scan --repo-file <repos.txt>
+<plugin-root>/scripts/gitstack --json portfolio scan --repo <owner/repo>
+```
+
+Repo files contain one `owner/repo` per line. Ignore blank lines and `#`
+comments. For each repository, report its URL, open issue and pull request
+counts, recent CI state, latest release state, top queue signals, and
+recommended next action. Preserve per-repository failures and keep the entire
+scan read-only.
+
 ## Focused Follow-Up Routing
 
 Never mutate as a side effect of a read-only triage request. Route GitHub issue
@@ -32,7 +50,7 @@ to preview a specific write-shaped operation. Pure queue reads omit
 `mutation_mode` and an operation field.
 
 Route evidence-backed issue disposition, acceptance, or closure judgment to
-`$gitstack:github-deep-review`. Route PR review-thread replies to
+`$gitstack:github-investigation`. Route PR review-thread replies to
 `$gitstack:github-review-threads` with the exact repository and PR,
 `review_operation=reply`, and `mutation_mode=apply`. For read-only inspection,
 use `review_operation=inspect` and omit mutation authority.

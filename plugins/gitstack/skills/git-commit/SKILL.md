@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Create regular, targeted fixup, or amend-fixup commits and optionally push them with explicit staging and direct git; route PR publishing to $gitstack:yeet.
+description: Create or push Git commits with explicit staging. Use for regular commits, targeted fixups, amend-fixups, push-only requests, or commit-and-push; use $gitstack:yeet when the user also wants a pull request.
 ---
 
 # Git Commit

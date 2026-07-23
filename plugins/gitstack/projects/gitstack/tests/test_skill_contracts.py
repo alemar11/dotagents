@@ -24,6 +24,37 @@ def section(text: str, heading: str) -> str:
 
 
 class GitStackSkillContractTests(unittest.TestCase):
+    def test_public_skill_catalog_names_and_ui_metadata_stay_aligned(self) -> None:
+        expected = {
+            "git-commit",
+            "github-actions",
+            "github",
+            "github-investigation",
+            "github-issues",
+            "github-releases",
+            "github-repository-triage",
+            "github-review-threads",
+            "github-stars",
+            "yeet",
+        }
+        skills_root = PLUGIN_ROOT / "skills"
+        actual = {path.name for path in skills_root.iterdir() if path.is_dir()}
+        self.assertEqual(actual, expected)
+
+        for name in sorted(expected):
+            skill = read(f"skills/{name}/SKILL.md")
+            metadata = read(f"skills/{name}/agents/openai.yaml")
+            short_description = re.search(
+                r'^  short_description: "(.+)"$', metadata, flags=re.MULTILINE
+            )
+            with self.subTest(name=name):
+                self.assertRegex(skill, rf"\A---\nname: {re.escape(name)}\n")
+                self.assertIsNotNone(short_description)
+                assert short_description is not None
+                self.assertGreaterEqual(len(short_description.group(1)), 25)
+                self.assertLessEqual(len(short_description.group(1)), 64)
+                self.assertIn(f"Use $gitstack:{name}", metadata)
+
     def test_executable_fences_do_not_inline_provider_text(self) -> None:
         unsafe = re.compile(
             r"--(?:title|body|description|comment|reply-body)(?:=|\s+)[\"']|"
@@ -59,9 +90,9 @@ class GitStackSkillContractTests(unittest.TestCase):
 
     def test_issue_composers_normalize_provider_boundary(self) -> None:
         paths = (
-            "skills/github-triage/SKILL.md",
-            "skills/github-triage/references/workflows.md",
-            "skills/github-deep-review/SKILL.md",
+            "skills/github-repository-triage/SKILL.md",
+            "skills/github-repository-triage/references/workflows.md",
+            "skills/github-investigation/SKILL.md",
             "skills/yeet/SKILL.md",
             "skills/yeet/references/workflows.md",
         )
@@ -75,8 +106,8 @@ class GitStackSkillContractTests(unittest.TestCase):
 
     def test_review_composers_supply_exact_pr_and_one_operation(self) -> None:
         routes = {
-            "skills/github-triage/references/workflows.md": "review_operation=reply",
-            "skills/github-deep-review/SKILL.md": "review_operation=check|wait",
+            "skills/github-repository-triage/references/workflows.md": "review_operation=reply",
+            "skills/github-investigation/SKILL.md": "review_operation=check|wait",
             "skills/yeet/SKILL.md": "review_operation=request",
             "skills/yeet/references/workflows.md": "`review_operation`",
         }
@@ -129,7 +160,7 @@ class GitStackSkillContractTests(unittest.TestCase):
         )
         self.assertIn(
             "`refactor_disposition` is a judgment returned by",
-            read("skills/github-deep-review/SKILL.md"),
+            read("skills/github-investigation/SKILL.md"),
         )
 
     def test_git_commit_fixups_are_explicit_targeted_and_never_autosquashed(self) -> None:
@@ -255,7 +286,7 @@ class GitStackSkillContractTests(unittest.TestCase):
 
     def test_pure_reads_omit_mutation_mode(self) -> None:
         options = read("references/options.md")
-        triage = read("skills/github-triage/SKILL.md")
+        triage = read("skills/github-repository-triage/SKILL.md")
         releases = read("skills/github-releases/SKILL.md")
 
         self.assertIn("Omit `mutation_mode`", options)
@@ -263,21 +294,26 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("Omit `mutation_mode` for `inspect`", releases)
 
     def test_github_triage_owns_only_queue_grouping(self) -> None:
-        triage = read("skills/github-triage/SKILL.md")
-        metadata = read("skills/github-triage/agents/openai.yaml")
+        triage = read("skills/github-repository-triage/SKILL.md")
+        metadata = read("skills/github-repository-triage/agents/openai.yaml")
 
         self.assertIn("Route evidence-backed issue disposition", triage)
-        self.assertIn("$gitstack:github-deep-review", triage)
+        self.assertIn("$gitstack:github-investigation", triage)
         self.assertIn("routing disposition judgment", metadata)
+        self.assertIn("one or more GitHub repositories", triage)
+        self.assertIn("gitstack portfolio scan", triage)
+        self.assertIn(
+            "per-repository failures",
+            read(
+                "skills/github-repository-triage/references/script-summary.md"
+            ).lower(),
+        )
         self.assertFalse(
-            (PLUGIN_ROOT / "skills/github-triage/references/issue-workflows.md").exists()
+            (PLUGIN_ROOT / "skills/github-repository-triage/references/issue-workflows.md").exists()
         )
 
     def test_triage_transports_are_strictly_read_only(self) -> None:
-        for relative in (
-            "skills/github-triage/SKILL.md",
-            "skills/github-portfolio-triage/SKILL.md",
-        ):
+        for relative in ("skills/github-repository-triage/SKILL.md",):
             transport = section(read(relative), "Transport")
             normalized = " ".join(transport.split())
             with self.subTest(relative=relative):
@@ -293,7 +329,7 @@ class GitStackSkillContractTests(unittest.TestCase):
                 )
 
     def test_github_triage_links_canonical_handoff_registry(self) -> None:
-        triage = read("skills/github-triage/SKILL.md")
+        triage = read("skills/github-repository-triage/SKILL.md")
 
         self.assertIn("`../../references/options.md`", triage)
         self.assertIn("canonical GitStack invocation fields", triage)

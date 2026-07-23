@@ -1,6 +1,6 @@
 ---
 name: github-stars
-description: Use when listing, adding, removing, or organizing the authenticated GitHub user's stars and star lists.
+description: Manage the authenticated GitHub user's stars and star lists. Use to list, add, remove, or organize starred repositories.
 ---
 
 # GitHub Stars

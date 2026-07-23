@@ -1,5 +1,5 @@
 interface:
   display_name: "Yeet"
-  short_description: "Publish local work as a branch and draft PR, or hand off issue-only hygiene."
+  short_description: "Commit, push, and open or update a draft PR"
   brand_color: "#EA580C"
-  default_prompt: "Use $gitstack:yeet to publish local work by inspecting scope, composing a commit through $gitstack:git-commit, pushing safely, and opening or reusing a draft PR with the GitHub connector or same-target gh fallback. Route issue-only work to $gitstack:github-issues."
+  default_prompt: "Use $gitstack:yeet to confirm the intended local changes, commit them, push the branch, and open or update a draft pull request."

@@ -1,9 +1,9 @@
 ---
-name: github-ci
-description: Inspect or explicitly fix failing GitHub Actions checks with focused evidence and verification.
+name: github-actions
+description: Inspect failing GitHub Actions checks and logs, diagnose the root cause, or implement an explicitly requested fix with local validation and a remote recheck.
 ---
 
-# GitHub CI
+# GitHub Actions
 
 ## Role
 
