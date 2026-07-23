@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import gc
+import hashlib
 import io
 import json
 import os
@@ -72,6 +73,12 @@ class RunStateScenarios(unittest.TestCase):
         source = source.replace(
             "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()",
             "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset({1})",
+            1,
+        )
+        source = source.replace(
+            "RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = {}",
+            f"RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = "
+            f"{{1: {hashlib.sha256(TOOL.read_bytes()).hexdigest()!r}}}",
             1,
         )
         path.write_text(source, encoding="utf-8")
@@ -1613,6 +1620,21 @@ class RunStateScenarios(unittest.TestCase):
             unavailable["error"]["code"],
             "retained-runtime-unavailable",
         )
+        counterfeit = self.base / "counterfeit-schema-1"
+        counterfeit.write_text(
+            TOOL.read_text(encoding="utf-8") + "\n# different executable\n",
+            encoding="utf-8",
+        )
+        counterfeit.chmod(0o700)
+        mismatch = self.invoke_tool(
+            future,
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(counterfeit),
+            expected=4,
+        )
+        self.assertEqual(mismatch["error"]["code"], "retained-runtime-unavailable")
         prepared = self.invoke_tool(
             future,
             "state",

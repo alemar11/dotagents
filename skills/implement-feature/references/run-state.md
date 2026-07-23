@@ -257,7 +257,7 @@ runs remain available.
 
 If owners remain, invoke preparation with the absolute retained executable:
 `state prepare --retained-runtime /absolute/path/to/old/run-state`. It verifies
-that executable's exact old lineage version and returns
+that executable's approved SHA-256 identity and exact old lineage version, then returns
 `waiting-for-schema-drain`. Keep the root turn open and repeat bounded `doctor`
 and `state prepare` sweeps. `waiting-for-spec`, `active`, and `blocked` all
 count as owners. Do not force-finish, abandon, release, or rewrite claims
