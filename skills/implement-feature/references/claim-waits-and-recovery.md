@@ -63,6 +63,16 @@ recorded change is still pending/unknown, mark the waiter
 without asking. Never use elapsed time, titles, heartbeat absence, or a stale
 task list as proof of abandonment.
 
+When the original root has no waiter, reconcile every recorded task operation
+and use `assignment recover` with exact owner revision, worker, checkout, claim,
+and readback evidence. Active worker or present checkout retains ownership.
+Terminal/missing worker plus released/absent checkout marks the assignment
+`abandoned` and releases only its claim; after every sibling is terminal, the
+same root may use `run finish --outcome abandoned`. Unknown evidence fails
+closed. Use `assignment capability-block` only while the ChatGPT desktop app
+capability remains unavailable; after authoritative recovery, the same root
+uses `assignment resume`.
+
 ## Terminal Owner Reconciliation
 
 Before blocking a waiting Spec after recovery, read the exact owner root and

@@ -88,11 +88,16 @@ judgments for a coherent worker.
 While runnable workers remain nonterminal, root keeps the current turn open and
 uses bounded task waits. Worker progress or completion wakes that existing
 wait. Root returns a final response only for a delivery-ready,
-preimplementation-aborted, or declaratively blocked run. After a crash,
+preimplementation-aborted, owner-abandoned, or declaratively blocked run. After a crash,
 ChatGPT desktop app restart, or premature task completion, continuation is
 manual in the exact same root task; recovery reads the unfinished run and
-authoritative task state before taking action. Never create a replacement root,
-heartbeat, or synthetic lifecycle for an unfinished run.
+authoritative SQLite, task, tracker, and repository state before taking action.
+Never create a replacement root, heartbeat, worker-to-root wake, or synthetic
+lifecycle for an unfinished run.
+
+A declaratively blocked response does not call `run finish`. The blocked run
+and its claims remain unfinished and exclusively bound to the same root task
+until authoritative recovery or contract change permits that root to continue.
 
 ## Allowed Follow-Up Messages
 

@@ -25,12 +25,18 @@ its final delivery-ready evidence.
 A root task that owns an unfinished run remains the sole controller for that
 run. During executable work, root keeps its current turn open and monitors
 workers with bounded task waits until the run is delivery-ready,
-preimplementation-aborted, or declaratively blocked with no runnable work.
+preimplementation-aborted, owner-abandoned, or declaratively blocked with no
+runnable work.
+Never return a final response while runnable work remains.
+`blocked` is terminal only for the current response: the run intentionally
+remains unfinished with its claims retained, so only the same root may resume
+after authoritative recovery or contract change.
 An unexpected task interruption does not make the run terminal: manually
-resume the exact root task and run, reconstruct current state from authoritative
-sources, and never create a replacement controller while that run is
-unfinished. Do not add a heartbeat, persist the objective, or invent a second
-lifecycle state.
+resume the exact root task and run, reconstruct current state from SQLite,
+visible ChatGPT tasks, trackers, and repositories, and never create a
+replacement controller while that run is unfinished. Do not add a heartbeat,
+worker-to-root wake, persisted objective, or second lifecycle state. The root
+title is UI evidence only and never durable state.
 
 A recoverable pre-bootstrap worker or ChatGPT desktop app failure must not abort the assignment
 or release its claim. Reconcile the failed ChatGPT desktop app operation, keep the assignment
@@ -55,7 +61,7 @@ continuation question during the run.
    one startup authorization interaction only after this read-only preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
-2. Start `scripts/run-state`. It uses one per-user schema-1 SQLite DB at
+2. Start `scripts/run-state`. It uses one per-user schema-2 SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`. SQLite
    transactions and the fixed busy timeout are the only writer lock.
 3. Atomically claim each free `(repository_identity, source_spec_ref)` pair.

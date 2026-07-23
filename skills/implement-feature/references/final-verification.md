@@ -5,6 +5,11 @@ The worker first reports the terminal observation required by its stable
 Root then performs read-only verification; it does not edit code, rerun implementation,
 check boxes, uncheck boxes, or judge acceptance criteria.
 
+For `github-pr`, the worker-facing
+`pr-ready-for-merge-but-not-merged` result is also the schema-2 observation
+status. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
+all three names describe the same unmerged delivery boundary.
+
 Collect the terminal reports and immutable current-head evidence for every
 ready candidate before mutating assignment state or visible titles. Reuse that
 snapshot while its tracker, task, checkout, branch, and HEAD identities remain
@@ -81,3 +86,9 @@ to release only its claim. A whole run that never started implementation may
 then call `run finish --outcome preimplementation-aborted`. After an assignment's
 bootstrap authority, ordinary abort is forbidden; terminal owner recovery
 follows `claim-waits-and-recovery.md`.
+
+If post-bootstrap owner recovery proves a worker terminal or missing and its
+checkout released or absent, `assignment recover` may mark that assignment
+`abandoned` and release only its claim. After every sibling is terminal and all
+task operations are reconciled, `run finish --outcome abandoned` terminalizes
+the owning run without claiming delivery success.

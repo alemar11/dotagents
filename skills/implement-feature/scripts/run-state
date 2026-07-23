@@ -14,8 +14,8 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "1.0.0"
-STATE_SCHEMA_VERSION = 1
+CLI_VERSION = "2.0.0"
+STATE_SCHEMA_VERSION = 2
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_LIVE_WORKERS = 3
@@ -111,17 +111,21 @@ def connect(*, write: bool) -> sqlite3.Connection:
         else:
             os.close(descriptor)
     elif not path.exists():
-        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+        raise StateError("state-uninitialized", "schema-2 state has not been initialized", 3)
     validate_database(path)
+    target = path if write else f"{path.resolve().as_uri()}?mode=ro"
     connection = sqlite3.connect(
-        path,
+        target,
         timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
         isolation_level=None,
+        uri=not write,
     )
     try:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        if not write:
+            connection.execute("PRAGMA query_only = ON")
         if write:
             connection.execute("BEGIN IMMEDIATE")
             created = ensure_schema(connection, allow_create=True)
@@ -148,6 +152,7 @@ EXPECTED_SCHEMA_COLUMNS = {
         "run_id", "assignment_id", "source_spec_ref", "claim_spec_identity",
         "repository_identity", "tracker_backend", "delivery_type", "project_id",
         "title", "target_branch_name", "prerequisite_assignment_ids", "state",
+        "blocked_from_state",
         "unchanged_wait_sweeps", "waiting_owner_run_id", "waiting_owner_assignment_id",
         "waiting_owner_root_task_id", "thread_id", "checkout_path", "git_common_dir",
         "head_sha", "base_branch_name", "base_sha", "worktree_clean",
@@ -170,6 +175,31 @@ EXPECTED_SCHEMA_COLUMNS = {
 }
 
 
+def normalized_schema_objects(
+    connection: sqlite3.Connection,
+) -> dict[tuple[str, str], str]:
+    return {
+        (row["type"], row["name"]): " ".join(row["sql"].split())
+        for row in connection.execute(
+            """SELECT type,name,sql FROM sqlite_master
+               WHERE type IN ('table','index','view','trigger')
+                 AND name NOT LIKE 'sqlite_%'
+                 AND sql IS NOT NULL"""
+        )
+    }
+
+
+def expected_schema_objects() -> dict[tuple[str, str], str]:
+    expected = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        expected.row_factory = sqlite3.Row
+        expected.execute("PRAGMA foreign_keys = ON")
+        create_schema(expected)
+        return normalized_schema_objects(expected)
+    finally:
+        expected.close()
+
+
 def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool:
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
     if version == 0:
@@ -184,11 +214,11 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         if allow_create:
             create_schema(connection)
             return True
-        raise StateError("state-uninitialized", "schema-1 state has not been initialized", 3)
+        raise StateError("state-uninitialized", "schema-2 state has not been initialized", 3)
     if version != STATE_SCHEMA_VERSION:
         raise StateError(
             "unsupported-state-schema",
-            f"expected schema 1, found {version}; migrations are not supported",
+            f"expected schema {STATE_SCHEMA_VERSION}, found {version}; migrations are not supported",
             4,
         )
     expected = set(EXPECTED_SCHEMA_COLUMNS)
@@ -199,7 +229,7 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         )
     }
     if actual != expected:
-        raise StateError("invalid-state-schema", "state tables do not match schema 1", 4)
+        raise StateError("invalid-state-schema", "state tables do not match schema 2", 4)
     for table, expected_columns in EXPECTED_SCHEMA_COLUMNS.items():
         actual_columns = tuple(
             row[1] for row in connection.execute(f"PRAGMA table_info({table})")
@@ -207,9 +237,21 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
         if actual_columns != expected_columns:
             raise StateError(
                 "invalid-state-schema",
-                f"state table {table} columns do not match schema 1",
+                f"state table {table} columns do not match schema 2",
                 4,
             )
+    metadata_version = connection.execute(
+        "SELECT value FROM metadata WHERE key='schema_version'"
+    ).fetchone()
+    if (
+        metadata_version is None
+        or metadata_version["value"] != str(STATE_SCHEMA_VERSION)
+    ):
+        raise StateError(
+            "invalid-state-schema",
+            "state metadata does not match schema 2",
+            4,
+        )
     assignment_sql_row = connection.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='assignments'"
     ).fetchone()
@@ -221,7 +263,13 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
     ):
         raise StateError(
             "invalid-state-schema",
-            "state table assignments constraints do not match schema 1",
+            "state table assignments constraints do not match schema 2",
+            4,
+        )
+    if normalized_schema_objects(connection) != expected_schema_objects():
+        raise StateError(
+            "invalid-state-schema",
+            "state tables, constraints, or indexes do not match schema 2",
             4,
         )
     return False
@@ -236,7 +284,7 @@ def create_schema(connection: sqlite3.Connection) -> None:
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
                 'pr-ready', 'local-branch-ready', 'delivery-ready',
-                'preimplementation-aborted'
+                'preimplementation-aborted', 'abandoned'
             )),
             implementation_started INTEGER NOT NULL DEFAULT 0 CHECK(implementation_started IN (0,1)),
             revision INTEGER NOT NULL,
@@ -262,6 +310,9 @@ def create_schema(connection: sqlite3.Connection) -> None:
                 'blocked-durable-contract', 'blocked-app-capability',
                 'blocked-by-active-spec', 'preimplementation-aborted',
                 'abandoned', 'abandoned-recovery-required'
+            )),
+            blocked_from_state TEXT CHECK(blocked_from_state IN (
+                'active', 'peer-input-ready'
             )),
             unchanged_wait_sweeps INTEGER NOT NULL DEFAULT 0,
             waiting_owner_run_id TEXT,
@@ -327,8 +378,8 @@ def create_schema(connection: sqlite3.Connection) -> None:
             UNIQUE(run_id, operation_key)
         )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
-        "INSERT INTO metadata(key,value) VALUES ('schema_version','1')",
-        "PRAGMA user_version = 1",
+        f"INSERT INTO metadata(key,value) VALUES ('schema_version','{STATE_SCHEMA_VERSION}')",
+        f"PRAGMA user_version = {STATE_SCHEMA_VERSION}",
     )
     for statement in statements:
         connection.execute(statement)
@@ -449,8 +500,8 @@ def canonical_source_spec_ref(
 
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     exact_keys(raw, {"schema_version", "run_id", "root_task_id", "repositories", "assignments"}, "manifest")
-    if raw["schema_version"] != 1:
-        raise StateError("unsupported-input-schema", "manifest schema_version must be 1")
+    if raw["schema_version"] != STATE_SCHEMA_VERSION:
+        raise StateError("unsupported-input-schema", "manifest schema_version must be 2")
     run = {"run_id": token(raw["run_id"], "run_id"), "root_task_id": string(raw["root_task_id"], "root_task_id", 256)}
     if not isinstance(raw["repositories"], list) or not raw["repositories"]:
         raise StateError("invalid-input", "repositories must be a nonempty list")
@@ -736,11 +787,11 @@ def insert_run(
 def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
     path = database_path()
     if not path.exists():
-        return {"ready": True, "state": "uninitialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": 1, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "writes_performed": False}
+        return {"ready": True, "state": "uninitialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": 0, "writes_performed": False}
     connection = connect(write=False)
     try:
         active = connection.execute("SELECT COUNT(*) FROM runs WHERE status IN ('waiting-for-spec','active','blocked')").fetchone()[0]
-        return {"ready": True, "state": "initialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": 1, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
+        return {"ready": True, "state": "initialized", "database_path": str(path), "tool_version": CLI_VERSION, "state_schema_version": STATE_SCHEMA_VERSION, "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS, "active_owner_runs": active, "writes_performed": False}
     finally:
         connection.close()
 
@@ -795,7 +846,7 @@ def command_run_wait_sweep(args: argparse.Namespace) -> dict[str, Any]:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] != "waiting-for-spec":
+        if assignment["state"] not in {"waiting-for-spec", "blocked-by-active-spec"}:
             raise StateError("assignment-not-waiting", f"assignment is {assignment['state']}", 4)
         conflict = active_assignment_conflict(
             connection, assignment["repository_identity"], assignment["claim_spec_identity"],
@@ -1007,8 +1058,8 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
             "invalid-input",
             f"ChatGPT operation observation is missing fields: {sorted(common - set(value))}",
         )
-    if value["schema_version"] != 1 or value["status"] not in {"unknown", "succeeded", "failed"}:
-        raise StateError("invalid-operation-observation", "observation must use schema 1 and a terminal or unknown status")
+    if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] not in {"unknown", "succeeded", "failed"}:
+        raise StateError("invalid-operation-observation", "observation must use schema 2 and a terminal or unknown status")
     expected_extra = extra_by_action[operation["action"]]
     actual_extra = set(value) - common
     if value["status"] == "succeeded":
@@ -1155,13 +1206,13 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
     expected_keys = common | github_extra if delivery_type == "github-pr" else common
     exact_keys(value, expected_keys, "delivery-ready observation")
     expected_status = {
-        "github-pr": "pr-ready-for-merge",
+        "github-pr": "pr-ready-for-merge-but-not-merged",
         "local-branch": "local-branch-ready",
     }.get(delivery_type)
-    if value["schema_version"] != 1 or value["status"] != expected_status:
+    if value["schema_version"] != STATE_SCHEMA_VERSION or value["status"] != expected_status:
         raise StateError(
             "invalid-ready-observation",
-            "ready observation status must match its schema-1 delivery_type",
+            "ready observation status must match its schema-2 delivery_type",
         )
     run_id = token(args.run_id, "run_id")
     assignment_id = token(value["assignment_id"], "assignment_id")
@@ -1312,7 +1363,12 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
                 "durable-contract blocking requires an active or peer-input-ready post-bootstrap worker",
                 4,
             )
-        connection.execute("UPDATE assignments SET state='blocked-durable-contract',updated_at=? WHERE run_id=? AND assignment_id=?", (utc_now(), run_id, assignment_id))
+        connection.execute(
+            """UPDATE assignments
+               SET state='blocked-durable-contract',blocked_from_state=?,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (assignment["state"], utc_now(), run_id, assignment_id),
+        )
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
@@ -1339,13 +1395,14 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
         if assignment["state"] not in {"active", "peer-input-ready"}:
             raise StateError(
                 "invalid-assignment-transition",
-                "App capability blocking requires an active or peer-input-ready post-bootstrap worker",
+                "ChatGPT desktop app capability blocking requires an active or peer-input-ready post-bootstrap worker",
                 4,
             )
         connection.execute(
-            "UPDATE assignments SET state='blocked-app-capability',updated_at=? "
-            "WHERE run_id=? AND assignment_id=?",
-            (utc_now(), run_id, assignment_id),
+            """UPDATE assignments
+               SET state='blocked-app-capability',blocked_from_state=?,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (assignment["state"], utc_now(), run_id, assignment_id),
         )
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
@@ -1354,6 +1411,56 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
             "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
             "state": "blocked-app-capability", "run_status": run_status,
             "claim_retained": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] not in {
+            "blocked-durable-contract", "blocked-app-capability"
+        }:
+            raise StateError(
+                "invalid-assignment-transition",
+                "resume requires a recoverable blocked assignment",
+                4,
+            )
+        restored = assignment["blocked_from_state"]
+        if restored not in {"active", "peer-input-ready"}:
+            raise StateError(
+                "invalid-state-schema",
+                "blocked assignment has no valid resume state",
+                4,
+            )
+        claim = assignment_claim(connection, run_id, assignment_id)
+        if not claim["active"]:
+            raise StateError(
+                "assignment-claim-not-active",
+                "blocked assignment resume requires its retained claim",
+                4,
+            )
+        connection.execute(
+            """UPDATE assignments SET state=?,blocked_from_state=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (restored, utc_now(), run_id, assignment_id),
+        )
+        run_status = recompute_run_status(connection, run_id)
+        revision = advance(connection, run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision,
+            "assignment_id": assignment_id, "state": restored,
+            "run_status": run_status, "claim_retained": True,
         }
     except Exception:
         connection.rollback()
@@ -1433,8 +1540,8 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
         },
         "claim recovery observation",
     )
-    if value["schema_version"] != 1:
-        raise StateError("unsupported-input-schema", "claim recovery observation schema_version must be 1")
+    if value["schema_version"] != STATE_SCHEMA_VERSION:
+        raise StateError("unsupported-input-schema", "claim recovery observation schema_version must be 2")
     if not isinstance(value["owner_expected_revision"], int) or value["owner_expected_revision"] < 1:
         raise StateError("invalid-input", "owner_expected_revision must be a positive integer")
     worker_state = string(value["worker_state"], "worker_state", 32)
@@ -1462,6 +1569,122 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def command_assignment_recover(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    observed = validate_claim_recovery_observation(
+        read_json_file(args.observation, "owner recovery observation")
+    )
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if (
+            observed["owner_run_id"] != run_id
+            or observed["owner_assignment_id"] != assignment_id
+            or observed["owner_expected_revision"] != run["revision"]
+        ):
+            raise StateError(
+                "recovery-owner-drift",
+                "owner recovery evidence must name this exact run, assignment, and revision",
+                4,
+            )
+        if (
+            assignment["repository_identity"] != observed["repository_identity"]
+            or assignment["tracker_backend"] != observed["tracker_backend"]
+            or assignment["claim_spec_identity"] != observed["claim_spec_identity"]
+        ):
+            raise StateError(
+                "claim-identity-drift",
+                "owner recovery evidence belongs to another Feature Spec",
+                4,
+            )
+        if assignment["state"] not in {
+            "active", "peer-input-ready",
+            "blocked-durable-contract", "blocked-app-capability",
+        }:
+            raise StateError(
+                "invalid-assignment-transition",
+                "owner recovery requires a post-bootstrap nonterminal assignment",
+                4,
+            )
+        claim = assignment_claim(connection, run_id, assignment_id)
+        if not claim["active"]:
+            raise StateError(
+                "assignment-claim-not-active",
+                "owner recovery requires the assignment's retained claim",
+                4,
+            )
+        if observed["worker_state"] == "active" or observed["checkout_state"] == "present":
+            connection.rollback()
+            return {
+                "run_id": run_id, "revision": run["revision"],
+                "assignment_id": assignment_id, "state": assignment["state"],
+                "outcome": (
+                    "owner-active"
+                    if observed["worker_state"] == "active"
+                    else "checkout-still-bound"
+                ),
+                "claim_released": False,
+            }
+        unresolved = connection.execute(
+            """SELECT COUNT(*) FROM app_operations
+               WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')""",
+            (run_id, assignment_id),
+        ).fetchone()[0]
+        if (
+            observed["worker_state"] == "unknown"
+            or observed["checkout_state"] == "unknown"
+            or unresolved
+        ):
+            raise StateError(
+                "owner-recovery-insufficient",
+                "owner recovery requires terminal worker, released checkout, and reconciled task operations",
+                4,
+            )
+        if observed["worker_state"] not in {"archived", "completed", "not-found"}:
+            raise StateError(
+                "owner-recovery-insufficient",
+                "owner recovery worker state is not terminal",
+                4,
+            )
+        if observed["checkout_state"] not in {"released", "not-found"}:
+            raise StateError(
+                "owner-recovery-insufficient",
+                "owner recovery checkout remains bound",
+                4,
+            )
+        now = utc_now()
+        connection.execute(
+            """UPDATE assignments
+               SET state='abandoned',blocked_from_state=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (now, run_id, assignment_id),
+        )
+        connection.execute(
+            """UPDATE spec_claims
+               SET active=0,released_at=?,release_reason='abandoned',
+                   recovery_readback_ref=?
+               WHERE run_id=? AND assignment_id=?""",
+            (now, observed["readback_ref"], run_id, assignment_id),
+        )
+        run_status = recompute_run_status(connection, run_id)
+        revision = advance(connection, run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision,
+            "assignment_id": assignment_id, "state": "abandoned",
+            "run_status": run_status, "outcome": "owner-abandoned",
+            "claim_released": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     assignment_id = token(args.assignment_id, "assignment_id")
@@ -1473,7 +1696,10 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
         waiter_run = get_run(connection, run_id)
         require_revision(waiter_run, args.expected_revision)
         waiter = get_assignment(connection, run_id, assignment_id)
-        if waiter["state"] not in {"waiting-for-spec", "blocked-by-active-spec"}:
+        if waiter["state"] not in {
+            "waiting-for-spec", "blocked-by-active-spec",
+            "abandoned-recovery-required",
+        }:
             raise StateError("assignment-not-waiting", f"assignment is {waiter['state']}", 4)
         if (
             waiter["repository_identity"] != observed["repository_identity"]
@@ -1495,6 +1721,34 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
         require_revision(owner_run, observed["owner_expected_revision"])
 
         if observed["worker_state"] == "active" or observed["checkout_state"] == "present":
+            if waiter["state"] == "abandoned-recovery-required":
+                now = utc_now()
+                connection.execute(
+                    """UPDATE assignments
+                       SET state='blocked-by-active-spec',updated_at=?
+                       WHERE run_id=? AND assignment_id=?""",
+                    (now, run_id, assignment_id),
+                )
+                connection.execute(
+                    """UPDATE spec_claims SET recovery_readback_ref=?
+                       WHERE run_id=? AND assignment_id=?""",
+                    (observed["readback_ref"], run_id, assignment_id),
+                )
+                status = recompute_run_status(connection, run_id)
+                revision = advance(connection, waiter_run)
+                connection.commit()
+                return {
+                    "run_id": run_id, "revision": revision,
+                    "assignment_id": assignment_id,
+                    "state": "blocked-by-active-spec",
+                    "run_status": status,
+                    "outcome": (
+                        "owner-active"
+                        if observed["worker_state"] == "active"
+                        else "checkout-still-bound"
+                    ),
+                    "claim_acquired": False,
+                }
             connection.rollback()
             return {
                 "run_id": run_id, "revision": waiter_run["revision"],
@@ -1654,13 +1908,14 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
     try:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
-        if run["status"] not in {"active"}:
+        finishable_statuses = {"active", "blocked"} if args.outcome == "abandoned" else {"active"}
+        if run["status"] not in finishable_statuses:
             raise StateError("run-not-finishable", f"run is {run['status']}", 4)
         unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND status IN ('pending','unknown')", (run_id,)).fetchone()[0]
         if unresolved:
             raise StateError("unresolved-app-operations", "finish requires complete task change reconciliation", 4)
         states = [row[0] for row in connection.execute("SELECT state FROM assignments WHERE run_id=?", (run_id,))]
-        if args.outcome != "preimplementation-aborted":
+        if args.outcome in {"pr-ready", "local-branch-ready", "delivery-ready"}:
             delivery_rows = list(
                 connection.execute(
                     "SELECT delivery_type,state FROM assignments WHERE run_id=?",
@@ -1693,13 +1948,36 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
             ).fetchone()[0]
             if active_claims:
                 raise StateError("claims-not-released", "every delivery-ready assignment must release its claim before run finish", 4)
-        else:
+        elif args.outcome == "preimplementation-aborted":
             if run["implementation_started"]:
                 raise StateError("implementation-already-started", "preimplementation abort cannot release a post-bootstrap claim", 4)
             if any(state not in {"planned", "preimplementation-aborted"} for state in states):
                 raise StateError(
                     "preimplementation-not-reconciled",
                     "preimplementation abort requires terminal worker readback",
+                    4,
+                )
+        else:
+            terminal_states = {
+                "pr-ready", "local-branch-ready",
+                "preimplementation-aborted", "abandoned",
+            }
+            if "abandoned" not in states or any(
+                state not in terminal_states for state in states
+            ):
+                raise StateError(
+                    "run-incomplete",
+                    "abandoned finish requires every assignment terminal and at least one abandoned",
+                    4,
+                )
+            active_claims = connection.execute(
+                "SELECT COUNT(*) FROM spec_claims WHERE run_id=? AND active=1",
+                (run_id,),
+            ).fetchone()[0]
+            if active_claims:
+                raise StateError(
+                    "claims-not-released",
+                    "abandoned finish requires every assignment claim released",
                     4,
                 )
         now = utc_now()
@@ -1719,7 +1997,9 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
         connection.commit()
         return {
             "run_id": run_id, "revision": run["revision"] + 1, "outcome": terminal,
-            "claims_released": args.outcome == "preimplementation-aborted",
+            "claims_released": args.outcome in {
+                "preimplementation-aborted", "abandoned",
+            },
         }
     except Exception:
         connection.rollback()
@@ -1729,7 +2009,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="run-state", description="Schema-1 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
+    parser = argparse.ArgumentParser(prog="run-state", description="Schema-2 SQLite coordination for Implement Feature controllers in the ChatGPT desktop app.")
     parser.add_argument("--json", action="store_true", help="emit one machine-readable JSON object")
     parser.add_argument("--version", action="version", version=CLI_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -1750,12 +2030,12 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--run-id", required=True)
     show.set_defaults(handler=command_run_show, command_name="run show")
     listing = run_commands.add_parser("list", help="list root runs")
-    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "all"), default="active")
+    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "abandoned", "all"), default="active")
     listing.set_defaults(handler=command_run_list, command_name="run list")
-    finish = run_commands.add_parser("finish", help="close a delivery-ready run or verified preimplementation abort")
+    finish = run_commands.add_parser("finish", help="close a delivery-ready, preimplementation-aborted, or owner-abandoned run")
     finish.add_argument("--run-id", required=True)
     finish.add_argument("--expected-revision", type=int, required=True)
-    finish.add_argument("--outcome", choices=("pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted"), required=True)
+    finish.add_argument("--outcome", choices=("pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "abandoned"), required=True)
     finish.set_defaults(handler=command_run_finish, command_name="run finish")
 
     claim = commands.add_parser("claim", help="inspect or reconcile canonical Feature Spec ownership")
@@ -1816,7 +2096,7 @@ def build_parser() -> argparse.ArgumentParser:
     block.set_defaults(handler=command_assignment_block, command_name="assignment block")
     capability_block = assignment_commands.add_parser(
         "capability-block",
-        help="retain claims when the declared App execution topology is unavailable",
+        help="retain claims when the declared ChatGPT desktop app execution topology is unavailable",
     )
     capability_block.add_argument("--run-id", required=True)
     capability_block.add_argument("--expected-revision", type=int, required=True)
@@ -1824,6 +2104,29 @@ def build_parser() -> argparse.ArgumentParser:
     capability_block.set_defaults(
         handler=command_assignment_capability_block,
         command_name="assignment capability-block",
+    )
+    resume = assignment_commands.add_parser(
+        "resume",
+        help="resume one recovered blocked assignment in the same root run",
+    )
+    resume.add_argument("--run-id", required=True)
+    resume.add_argument("--expected-revision", type=int, required=True)
+    resume.add_argument("--assignment-id", required=True)
+    resume.set_defaults(
+        handler=command_assignment_resume,
+        command_name="assignment resume",
+    )
+    recover = assignment_commands.add_parser(
+        "recover",
+        help="record terminal owner-side recovery for a missing post-bootstrap worker",
+    )
+    recover.add_argument("--run-id", required=True)
+    recover.add_argument("--expected-revision", type=int, required=True)
+    recover.add_argument("--assignment-id", required=True)
+    recover.add_argument("--observation", required=True)
+    recover.set_defaults(
+        handler=command_assignment_recover,
+        command_name="assignment recover",
     )
     abort = assignment_commands.add_parser("abort", help="release one verified pre-bootstrap Feature Spec claim")
     abort.add_argument("--run-id", required=True)
@@ -1834,7 +2137,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def render(payload: dict[str, Any], command: str, as_json: bool) -> None:
-    envelope = {"schema_version": 1, "ok": True, "command": command, **payload}
+    envelope = {"schema_version": STATE_SCHEMA_VERSION, "ok": True, "command": command, **payload}
     print(canonical_json(envelope) if as_json else json.dumps(envelope, indent=2, sort_keys=True, ensure_ascii=False))
 
 
@@ -1845,7 +2148,7 @@ def main(argv: list[str] | None = None) -> int:
         render(args.handler(args), args.command_name, args.json)
         return 0
     except StateError as error:
-        payload = {"schema_version": 1, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": error.code, "message": error.message}}
+        payload = {"schema_version": STATE_SCHEMA_VERSION, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": error.code, "message": error.message}}
         if args.json:
             print(canonical_json(payload))
         else:
@@ -1856,7 +2159,7 @@ def main(argv: list[str] | None = None) -> int:
         busy = primary in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
         code = "state-busy" if busy else "state-database-error"
         message = f"state database remained busy for {SQLITE_BUSY_TIMEOUT_MS} ms" if busy else str(error)
-        payload = {"schema_version": 1, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": code, "message": message}}
+        payload = {"schema_version": STATE_SCHEMA_VERSION, "ok": False, "command": getattr(args, "command_name", "unknown"), "error": {"code": code, "message": message}}
         if args.json:
             print(canonical_json(payload))
         else:

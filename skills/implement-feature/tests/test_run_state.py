@@ -110,7 +110,7 @@ class RunStateScenarios(unittest.TestCase):
                 }
             )
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "repositories": repo_rows,
@@ -137,7 +137,7 @@ class RunStateScenarios(unittest.TestCase):
             "--action", action, "--subject-id", subject,
         )
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "status": status,
             "receipt_ref": f"receipt:{key}",
             "readback_ref": f"readback:{key}",
@@ -173,10 +173,17 @@ class RunStateScenarios(unittest.TestCase):
             {"thread_id": thread},
         )
 
-    def ready_worker(self, run_id: str, number: int = 1) -> dict[str, object]:
+    def ready_worker(
+        self,
+        run_id: str,
+        number: int = 1,
+        *,
+        schema_version: int = 2,
+        expected: int = 0,
+    ) -> dict[str, object]:
         sha = f"{100 + number:040x}"
         observation = {
-            "schema_version": 1,
+            "schema_version": schema_version,
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
             "repository_identity": "github:example/project",
@@ -196,12 +203,13 @@ class RunStateScenarios(unittest.TestCase):
             "default_branch_name": "main",
             "pr_url": f"https://github.com/example/project/pull/{number}",
             "provider_observation_ref": f"provider:pr:{number}:head:{100 + number}",
-            "status": "pr-ready-for-merge",
+            "status": "pr-ready-for-merge-but-not-merged",
         }
         return self.invoke(
             "assignment", "ready", "--run-id", run_id,
             "--expected-revision", self.revision(run_id),
             "--observation", str(self.write_json(f"ready-{run_id}-{number}.json", observation)),
+            expected=expected,
         )
 
     def ready_local_worker(
@@ -219,7 +227,7 @@ class RunStateScenarios(unittest.TestCase):
     ) -> dict[str, object]:
         sha = head_sha or f"{200 + number:040x}"
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "assignment_id": f"spec-{number:02d}",
             "thread_id": f"thread-{run_id}-{number}",
             "repository_identity": repository_identity or self.local_identity(self.common_a),
@@ -260,12 +268,64 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
-        """Given no DB, when doctor runs, then it reports schema 1 without creating cache state."""
+        """Given no DB, when doctor runs, then it reports schema 2 without creating cache state."""
         result = self.invoke("doctor")
-        self.assertEqual(result["tool_version"], "1.0.0")
-        self.assertEqual(result["state_schema_version"], 1)
+        self.assertEqual(result["tool_version"], "2.0.0")
+        self.assertEqual(result["state_schema_version"], 2)
+        self.assertEqual(result["active_owner_runs"], 0)
         self.assertEqual(result["busy_timeout_ms"], 5000)
         self.assertFalse(self.database.exists())
+
+    def test_given_v1_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
+        """Given a retired protocol payload, startup fails closed without creating the database."""
+        manifest = self.manifest("v1-manifest")
+        manifest["schema_version"] = 1
+        error = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("v1-manifest.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["schema_version"], 2)
+        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        self.assertFalse(self.database.exists())
+
+    def test_given_v1_task_observation_when_reconciled_then_operation_remains_pending(self) -> None:
+        """Given a retired task payload, reconciliation rejects it without advancing durable state."""
+        self.start("v1-operation")
+        self.invoke(
+            "app-operation", "begin", "--run-id", "v1-operation",
+            "--expected-revision", self.revision("v1-operation"),
+            "--operation-key", "root-title", "--action", "set-root-title",
+            "--subject-id", "root-v1-operation",
+        )
+        revision = self.revision("v1-operation")
+        observation = {
+            "schema_version": 1,
+            "status": "succeeded",
+            "receipt_ref": "receipt:v1-title",
+            "readback_ref": "readback:v1-title",
+            "observed_title": "Feature Orchestrator",
+        }
+        error = self.invoke(
+            "app-operation", "finish", "--run-id", "v1-operation",
+            "--expected-revision", revision, "--operation-key", "root-title",
+            "--observation", str(self.write_json("v1-operation.json", observation)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-operation-observation")
+        shown = self.invoke("run", "show", "--run-id", "v1-operation")
+        self.assertEqual(shown["revision"], int(revision))
+        self.assertEqual(shown["unresolved_app_operations"][0]["status"], "pending")
+
+    def test_given_v1_ready_observation_when_recorded_then_assignment_and_claim_remain_active(self) -> None:
+        """Given retired delivery evidence, readiness rejects it without releasing ownership."""
+        self.start("v1-ready")
+        self.create_worker("v1-ready")
+        error = self.ready_worker("v1-ready", schema_version=1, expected=2)
+        self.assertEqual(error["error"]["code"], "invalid-ready-observation")
+        shown = self.invoke("run", "show", "--run-id", "v1-ready")
+        self.assertEqual(shown["assignments"][0]["state"], "active")
+        self.assertEqual(shown["spec_claims"][0]["active"], 1)
 
     def test_given_local_only_repository_when_local_delivery_finishes_then_named_branch_is_durable(self) -> None:
         """Given no remote, when local delivery closes, then exact branch/head evidence reaches local-branch-ready."""
@@ -337,7 +397,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("delivery-mismatch", repositories=[(identity, self.common_a)])
         self.create_worker("delivery-mismatch")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "assignment_id": "spec-01",
             "thread_id": "thread-delivery-mismatch-1",
             "repository_identity": identity,
@@ -357,7 +417,7 @@ class RunStateScenarios(unittest.TestCase):
             "default_branch_name": "main",
             "pr_url": "https://github.com/example/project/pull/1",
             "provider_observation_ref": "provider:mismatch",
-            "status": "pr-ready-for-merge",
+            "status": "pr-ready-for-merge-but-not-merged",
         }
         error = self.invoke(
             "assignment", "ready", "--run-id", "delivery-mismatch",
@@ -454,6 +514,14 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(blocked["state"], "blocked-durable-contract")
         self.assertTrue(blocked["claim_retained"])
+        resumed = self.invoke(
+            "assignment", "resume", "--run-id", "peer-block",
+            "--expected-revision", self.revision("peer-block"),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(resumed["state"], "peer-input-ready")
+        self.assertEqual(resumed["run_status"], "active")
+        self.assertTrue(resumed["claim_retained"])
 
     def test_given_runtime_topology_is_unavailable_when_worker_blocks_then_capability_is_distinct(self) -> None:
         """Given post-bootstrap App limitations, capability blocking is not misclassified as contract drift."""
@@ -467,6 +535,13 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(blocked["state"], "blocked-app-capability")
         self.assertEqual(blocked["run_status"], "blocked")
         self.assertTrue(blocked["claim_retained"])
+        resumed = self.invoke(
+            "assignment", "resume", "--run-id", "capability-block",
+            "--expected-revision", self.revision("capability-block"),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(resumed["state"], "active")
+        self.assertEqual(resumed["run_status"], "active")
 
     def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
         """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
@@ -710,6 +785,81 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "unresolved-app-operations")
 
+    def test_given_incomplete_assignment_when_run_finishes_then_controller_rejects_it(self) -> None:
+        """Given a claimed planned assignment, delivery finish cannot bypass worker readiness."""
+        self.start("incomplete-finish")
+        error = self.invoke(
+            "run", "finish", "--run-id", "incomplete-finish",
+            "--expected-revision", self.revision("incomplete-finish"),
+            "--outcome", "pr-ready", expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "run-incomplete")
+
+    def test_given_delivery_ready_assignment_with_active_claim_when_run_finishes_then_controller_rejects_it(self) -> None:
+        """Given terminal evidence but an unreleased claim, aggregate closeout remains blocked."""
+        self.start("active-claim-finish")
+        self.create_worker("active-claim-finish")
+        self.ready_worker("active-claim-finish")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """UPDATE spec_claims
+                   SET active=1,released_at=NULL,release_reason=NULL
+                   WHERE run_id='active-claim-finish' AND assignment_id='spec-01'"""
+            )
+        error = self.invoke(
+            "run", "finish", "--run-id", "active-claim-finish",
+            "--expected-revision", self.revision("active-claim-finish"),
+            "--outcome", "pr-ready", expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "claims-not-released")
+
+    def test_given_ambiguous_worker_creation_when_reconciled_then_it_is_not_relaunched(self) -> None:
+        """Given an unknown create-worker effect, only the same operation may resolve its identity."""
+        self.start("ambiguous-worker")
+        self.invoke(
+            "app-operation", "begin", "--run-id", "ambiguous-worker",
+            "--expected-revision", self.revision("ambiguous-worker"),
+            "--operation-key", "create-ambiguous", "--action", "create-worker",
+            "--subject-id", "spec-01",
+        )
+        unknown = {"schema_version": 2, "status": "unknown"}
+        self.invoke(
+            "app-operation", "finish", "--run-id", "ambiguous-worker",
+            "--expected-revision", self.revision("ambiguous-worker"),
+            "--operation-key", "create-ambiguous",
+            "--observation", str(self.write_json("create-ambiguous-unknown.json", unknown)),
+        )
+        blocked = self.invoke(
+            "app-operation", "begin", "--run-id", "ambiguous-worker",
+            "--expected-revision", self.revision("ambiguous-worker"),
+            "--operation-key", "create-duplicate", "--action", "create-worker",
+            "--subject-id", "spec-01", expected=4,
+        )
+        self.assertEqual(blocked["error"]["code"], "protected-operation-already-started")
+        checkout = self.base / "checkout ambiguous worker"
+        checkout.mkdir()
+        succeeded = {
+            "schema_version": 2,
+            "status": "succeeded",
+            "receipt_ref": "receipt:create-ambiguous",
+            "readback_ref": "readback:create-ambiguous",
+            "thread_id": "thread-ambiguous-worker-1",
+            "project_id": "project-1",
+            "checkout_path": str(checkout),
+            "git_common_dir": str(self.common_a),
+            "observed_state": "active",
+        }
+        self.invoke(
+            "app-operation", "finish", "--run-id", "ambiguous-worker",
+            "--expected-revision", self.revision("ambiguous-worker"),
+            "--operation-key", "create-ambiguous",
+            "--observation", str(self.write_json("create-ambiguous-succeeded.json", succeeded)),
+        )
+        shown = self.invoke("run", "show", "--run-id", "ambiguous-worker")
+        operations = self.invoke("app-operation", "list", "--run-id", "ambiguous-worker")
+        self.assertEqual(shown["assignments"][0]["state"], "worker-created")
+        self.assertEqual([row["operation_key"] for row in operations["operations"]], ["create-ambiguous"])
+
     def test_given_existing_worker_identity_when_stale_readback_reuses_it_then_binding_fails(self) -> None:
         """Given one worker/worktree binding, when another assignment receives the same readback, then it cannot alias."""
         self.start("alias", assignment_count=2)
@@ -721,7 +871,7 @@ class RunStateScenarios(unittest.TestCase):
             "--subject-id", "spec-02",
         )
         stale = {
-            "schema_version": 1, "status": "succeeded",
+            "schema_version": 2, "status": "succeeded",
             "receipt_ref": "receipt:create-alias-2", "readback_ref": "readback:create-alias-2",
             "thread_id": "thread-alias-1", "project_id": "project-1",
             "checkout_path": str(self.base / "checkout alias 1"),
@@ -740,7 +890,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("wrong-base")
         self.create_worker("wrong-base")
         observation = {
-            "schema_version": 1, "assignment_id": "spec-01",
+            "schema_version": 2, "assignment_id": "spec-01",
             "thread_id": "thread-wrong-base-1",
             "repository_identity": "github:example/project",
             "delivery_type": "github-pr", "head_sha": f"{101:040x}",
@@ -755,7 +905,7 @@ class RunStateScenarios(unittest.TestCase):
             "prerequisite_heads": {},
             "default_branch_name": "main",
             "pr_url": "https://github.com/example/project/pull/1",
-            "provider_observation_ref": "provider:wrong-base", "status": "pr-ready-for-merge",
+            "provider_observation_ref": "provider:wrong-base", "status": "pr-ready-for-merge-but-not-merged",
         }
         error = self.invoke(
             "assignment", "ready", "--run-id", "wrong-base",
@@ -785,6 +935,18 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(all(row["thread_id"] is None for row in shown["assignments"]))
         self.assertEqual(shown["unresolved_app_operations"], [])
         self.assertEqual(result["conflicting_owner"]["root_task_id"], "root-owner")
+        self.invoke(
+            "run", "finish", "--run-id", "owner",
+            "--expected-revision", self.revision("owner"),
+            "--outcome", "preimplementation-aborted",
+        )
+        resumed = self.invoke(
+            "run", "wait-sweep", "--run-id", "waiter",
+            "--assignment-id", "spec-01",
+            "--expected-revision", self.revision("waiter"),
+        )
+        self.assertEqual(resumed["state"], "planned")
+        self.assertTrue(resumed["claim_acquired"])
 
     def test_given_same_owner_adds_worker_when_wait_sweeps_continue_then_bound_does_not_reset(self) -> None:
         """Given one Spec owner, when its worker list changes, then stable owner identity keeps the wait bounded."""
@@ -875,7 +1037,7 @@ class RunStateScenarios(unittest.TestCase):
         self.start("missing-owner")
         self.start("missing-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "missing-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("missing-owner")),
@@ -893,6 +1055,140 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(result["outcome"], "preimplementation-aborted")
         self.assertTrue(result["claim_acquired"])
+
+    def test_given_v1_recovery_observation_when_claim_reconciles_then_owners_are_unchanged(self) -> None:
+        """Given retired recovery evidence, reconciliation rejects it without transferring the claim."""
+        self.start("v1-recovery-owner")
+        self.start("v1-recovery-waiter")
+        observation = {
+            "schema_version": 1,
+            "owner_run_id": "v1-recovery-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("v1-recovery-owner")),
+            "repository_identity": "github:example/project",
+            "tracker_backend": "github",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "not-found",
+            "checkout_state": "not-found",
+            "readback_ref": "app-read:v1-recovery",
+        }
+        error = self.invoke(
+            "claim", "reconcile", "--run-id", "v1-recovery-waiter",
+            "--assignment-id", "spec-01",
+            "--expected-revision", self.revision("v1-recovery-waiter"),
+            "--observation", str(self.write_json("v1-recovery.json", observation)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "unsupported-input-schema")
+        owner = self.invoke(
+            "claim", "find", "--repository-identity", "github:example/project",
+            "--tracker-backend", "github", "--source-spec-ref", "example/project#1",
+        )
+        self.assertEqual(owner["owner"]["run_id"], "v1-recovery-owner")
+
+    def test_given_terminal_missing_owner_without_waiter_when_recovered_then_same_root_can_finish_abandoned(self) -> None:
+        """Given a lost post-bootstrap worker, typed owner recovery releases its claim and terminalizes the run."""
+        self.start("owner-recovery")
+        self.create_worker("owner-recovery")
+        observation = {
+            "schema_version": 2,
+            "owner_run_id": "owner-recovery",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("owner-recovery")),
+            "repository_identity": "github:example/project",
+            "tracker_backend": "github",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "completed",
+            "checkout_state": "released",
+            "readback_ref": "app-read:owner-recovery-terminal",
+        }
+        recovered = self.invoke(
+            "assignment", "recover", "--run-id", "owner-recovery",
+            "--expected-revision", self.revision("owner-recovery"),
+            "--assignment-id", "spec-01",
+            "--observation", str(self.write_json("owner-recovery.json", observation)),
+        )
+        self.assertEqual(recovered["state"], "abandoned")
+        self.assertTrue(recovered["claim_released"])
+        finished = self.invoke(
+            "run", "finish", "--run-id", "owner-recovery",
+            "--expected-revision", self.revision("owner-recovery"),
+            "--outcome", "abandoned",
+        )
+        self.assertEqual(finished["outcome"], "abandoned")
+        self.assertTrue(finished["claims_released"])
+        shown = self.invoke("run", "show", "--run-id", "owner-recovery")
+        self.assertEqual(shown["status"], "abandoned")
+        self.assertEqual(shown["spec_claims"][0]["active"], 0)
+
+    def test_given_active_owner_without_waiter_when_recovered_then_claim_is_preserved(self) -> None:
+        """Given an authoritative live owner, owner-side recovery performs no terminal mutation."""
+        self.start("active-owner-recovery")
+        self.create_worker("active-owner-recovery")
+        revision = self.revision("active-owner-recovery")
+        observation = {
+            "schema_version": 2,
+            "owner_run_id": "active-owner-recovery",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(revision),
+            "repository_identity": "github:example/project",
+            "tracker_backend": "github",
+            "source_spec_ref": "example/project#1",
+            "worker_state": "active",
+            "checkout_state": "present",
+            "readback_ref": "app-read:active-owner-recovery",
+        }
+        recovered = self.invoke(
+            "assignment", "recover", "--run-id", "active-owner-recovery",
+            "--expected-revision", revision, "--assignment-id", "spec-01",
+            "--observation", str(self.write_json("active-owner-recovery.json", observation)),
+        )
+        self.assertEqual(recovered["outcome"], "owner-active")
+        self.assertFalse(recovered["claim_released"])
+        self.assertEqual(recovered["revision"], int(revision))
+
+    def test_given_recovery_required_waiter_when_owner_is_later_active_then_bounded_wait_can_resume(self) -> None:
+        """Given newer authoritative evidence, a failed recovery returns to the ordinary blocked wait."""
+        self.start("retry-recovery-owner")
+        self.create_worker("retry-recovery-owner")
+        self.start("retry-recovery-waiter")
+        base = {
+            "schema_version": 2,
+            "owner_run_id": "retry-recovery-owner",
+            "owner_assignment_id": "spec-01",
+            "owner_expected_revision": int(self.revision("retry-recovery-owner")),
+            "repository_identity": "github:example/project",
+            "tracker_backend": "github",
+            "source_spec_ref": "example/project#1",
+        }
+        unknown = {
+            **base,
+            "worker_state": "unknown",
+            "checkout_state": "unknown",
+            "readback_ref": "app-read:retry-recovery-unknown",
+        }
+        first = self.invoke(
+            "claim", "reconcile", "--run-id", "retry-recovery-waiter",
+            "--assignment-id", "spec-01",
+            "--expected-revision", self.revision("retry-recovery-waiter"),
+            "--observation", str(self.write_json("retry-recovery-unknown.json", unknown)),
+        )
+        self.assertEqual(first["state"], "abandoned-recovery-required")
+        active = {
+            **base,
+            "worker_state": "active",
+            "checkout_state": "present",
+            "readback_ref": "app-read:retry-recovery-active",
+        }
+        second = self.invoke(
+            "claim", "reconcile", "--run-id", "retry-recovery-waiter",
+            "--assignment-id", "spec-01",
+            "--expected-revision", self.revision("retry-recovery-waiter"),
+            "--observation", str(self.write_json("retry-recovery-active.json", active)),
+        )
+        self.assertEqual(second["state"], "blocked-by-active-spec")
+        self.assertEqual(second["outcome"], "owner-active")
+        self.assertFalse(second["claim_acquired"])
 
     def test_given_confirmed_failed_app_operation_when_retried_then_new_key_is_allowed(self) -> None:
         """Given readback proves no worker was created, when root retries, then a new operation key may launch."""
@@ -935,7 +1231,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("terminal-owner")
         self.start("terminal-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "terminal-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("terminal-owner")),
@@ -964,7 +1260,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("active-owner")
         self.start("active-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "active-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("active-owner")),
@@ -989,7 +1285,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("bound-owner")
         self.start("bound-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "bound-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("bound-owner")),
@@ -1014,7 +1310,7 @@ class RunStateScenarios(unittest.TestCase):
         self.create_worker("unknown-owner")
         self.start("unknown-waiter")
         observation = {
-            "schema_version": 1,
+            "schema_version": 2,
             "owner_run_id": "unknown-owner",
             "owner_assignment_id": "spec-01",
             "owner_expected_revision": int(self.revision("unknown-owner")),
@@ -1056,7 +1352,7 @@ class RunStateScenarios(unittest.TestCase):
             expected=4,
         )
         self.assertEqual(relaunch["error"]["code"], "protected-operation-already-started")
-        observed = {"schema_version": 1, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
+        observed = {"schema_version": 2, "status": "succeeded", "receipt_ref": "receipt:bootstrap-recover", "readback_ref": "thread-read:recover", "thread_id": thread}
         result = self.invoke(
             "app-operation", "finish", "--run-id", "recover", "--expected-revision", self.revision("recover"),
             "--operation-key", "bootstrap-recover", "--observation", str(self.write_json("reconciled.json", observed)),
@@ -1102,7 +1398,7 @@ class RunStateScenarios(unittest.TestCase):
             "--operation-key", "root-title-unknown", "--action", "set-root-title",
             "--subject-id", "root-no-receipt",
         )
-        observation = {"schema_version": 1, "status": "unknown"}
+        observation = {"schema_version": 2, "status": "unknown"}
         result = self.invoke(
             "app-operation", "finish", "--run-id", "no-receipt",
             "--expected-revision", self.revision("no-receipt"),
@@ -1131,20 +1427,32 @@ class RunStateScenarios(unittest.TestCase):
             columns = [row[1] for table in tables for row in connection.execute(f"PRAGMA table_info({table})")]
             version = connection.execute("PRAGMA user_version").fetchone()[0]
         self.assertEqual(tables, {"metadata", "runs", "assignments", "spec_claims", "app_operations"})
-        self.assertEqual(version, 1)
+        self.assertEqual(version, 2)
         self.assertNotIn("goal_state", columns)
         self.assertFalse(any("sha256" in column or "body" in column or "checklist" in column or "attempt" in column for column in columns))
 
-    def test_given_previous_schema_one_shape_when_read_then_runtime_rejects_without_migration(self) -> None:
-        """Given the retired repository-claim shape, when schema 1 opens, then the fresh runtime fails closed."""
-        self.start("retired-shape")
+    def test_given_schema_one_database_when_read_then_runtime_rejects_it_byte_for_byte(self) -> None:
+        """Given an archived v1 database, when schema 2 inspects it, then rejection preserves every byte."""
+        self.start("schema-one")
         with sqlite3.connect(self.database) as connection:
-            connection.execute("ALTER TABLE spec_claims RENAME TO repository_claims")
+            connection.execute("ALTER TABLE runs ADD COLUMN goal_state TEXT")
+            connection.execute("UPDATE metadata SET value='1' WHERE key='schema_version'")
+            connection.execute("PRAGMA user_version=1")
+        before = self.database.read_bytes()
         error = self.invoke("doctor", expected=4)
-        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertEqual(error["error"]["code"], "unsupported-state-schema")
+        self.assertEqual(self.database.read_bytes(), before)
+        manifest = self.manifest("schema-two-write")
+        write_error = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("schema-two-write.json", manifest)),
+            expected=4,
+        )
+        self.assertEqual(write_error["error"]["code"], "unsupported-state-schema")
+        self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
-        """Given a stale schema-1 DB, when opened, then exact structure fails closed and the file is preserved."""
+        """Given a stale schema-2 DB, when opened, then exact structure fails closed and the file is preserved."""
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
@@ -1152,8 +1460,43 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
+    def test_given_schema_two_with_stale_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
+        """Given protocol metadata drift, doctor fails closed and preserves the database bytes."""
+        self.start("stale-metadata")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE metadata SET value='1' WHERE key='schema_version'"
+            )
+        before = self.database.read_bytes()
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertEqual(self.database.read_bytes(), before)
+
+    def test_given_schema_two_without_claim_index_when_read_then_runtime_rejects_it(self) -> None:
+        """Given a missing uniqueness constraint, exact schema validation prevents unsafe coordination."""
+        self.start("missing-claim-index")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP INDEX one_active_spec_owner")
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertTrue(self.database.exists())
+
+    def test_given_schema_two_with_extra_trigger_when_read_then_runtime_rejects_it(self) -> None:
+        """Given an unexpected state mutation hook, exact schema validation rejects the database."""
+        self.start("extra-trigger")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """CREATE TRIGGER unexpected_claim_release
+                   AFTER UPDATE ON spec_claims
+                   BEGIN
+                     UPDATE runs SET updated_at=updated_at WHERE run_id=NEW.run_id;
+                   END"""
+            )
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+
     def test_given_same_number_schema_with_retired_input_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given the former integration-only state constraint, schema 1 rejects it instead of failing on a later write."""
+        """Given the former integration-only state constraint, schema 2 rejects it before a later write."""
         self.start("stale-state-constraint")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")
@@ -1166,8 +1509,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_one_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given the earlier schema-1 constraint, the new runtime rejects it without migration or deletion."""
+    def test_given_schema_two_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
+        """Given a stale schema-2 constraint, the runtime rejects it without migration or deletion."""
         self.start("stale-capability-state")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")

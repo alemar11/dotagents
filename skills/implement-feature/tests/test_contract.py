@@ -141,6 +141,23 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             self.assertNotIn(retired_action, source)
             self.assertNotIn(retired_action, runtime)
 
+    def test_given_v2_hard_cut_when_runtime_is_inspected_then_one_canonical_claim_domain_remains(self) -> None:
+        """Given the breaking protocol cut, v1 is rejected and no alternate state filename can split ownership."""
+        source = self.text("scripts/run-state")
+        state = self.normalized(self.text("references/run-state.md"))
+        self.assertIn('CLI_VERSION = "2.0.0"', source)
+        self.assertIn("STATE_SCHEMA_VERSION = 2", source)
+        self.assertIn("Every v1 DB or payload is rejected without modification", state)
+        self.assertIn("active_owner_runs=0", state)
+        self.assertIn("the canonical `run-state.sqlite3` path remains the single claim domain", state)
+        self.assertIn("assignment resume", state)
+        self.assertIn("assignment recover", state)
+        self.assertIn("run finish --outcome abandoned", state)
+        self.assertIn("?mode=ro", source)
+        self.assertIn("PRAGMA query_only = ON", source)
+        self.assertIn("normalized_schema_objects", source)
+        self.assertNotIn("run-state-v2.sqlite3", source + state)
+
     def test_given_two_roots_when_specs_and_head_branches_differ_then_same_repo_is_allowed(self) -> None:
         """Given distinct Specs and worktree branches, when roots coordinate, then repository identity alone does not block."""
         spec = self.text("references/feature-spec-contract.md")
@@ -218,8 +235,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "1.0.0"', source)
-        self.assertIn("STATE_SCHEMA_VERSION = 1", source)
+        self.assertIn('CLI_VERSION = "2.0.0"', source)
+        self.assertIn("STATE_SCHEMA_VERSION = 2", source)
         self.assertIn("BEGIN IMMEDIATE", source)
         self.assertNotIn(".lock", source)
         self.assertNotIn("migrate", source.lower())
