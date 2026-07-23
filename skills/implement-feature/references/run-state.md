@@ -205,6 +205,10 @@ Every task observation uses `schema_version: 2` and
 | `set-root-title` | `observed_title` |
 | `archive-worker` | `thread_id`, `observed_state` |
 
+`set-root-title` is single-use for each run. Its exact expected title is derived
+from the immutable assignment count: `🤖 Feature Orchestrator` for one
+assignment and `🤖 Feature Orchestrator · N Features` for two or more.
+
 Unknown or failed observations may include only the authoritative subset
 actually observed. Never invent reconciliation references.
 

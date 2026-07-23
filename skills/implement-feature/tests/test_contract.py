@@ -115,15 +115,17 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("At most three workers may be executing", orchestration)
         self.assertIn("`peer-input-ready` is parked", orchestration)
 
-    def test_given_root_assignments_when_title_is_set_then_it_uses_exact_coarse_progress(self) -> None:
-        """Given one or many Specs, when root title changes, then exact ready/total UI evidence is used."""
+    def test_given_root_assignments_when_title_is_set_then_it_is_exact_and_immutable(self) -> None:
+        """Given one or many Specs, when root is titled, then its static total is exact UI evidence."""
         orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
-        self.assertIn("`👨🏻‍💻 Feature Orchestrator`", orchestration)
-        self.assertIn("`👨🏻‍💻 Multi-Feature Orchestrator (R/N)`", orchestration)
-        self.assertIn("`N` is the immutable total", orchestration)
-        self.assertIn("`R` counts assignments", orchestration)
-        self.assertIn("Start at `0/N`", orchestration)
+        self.assertIn("`🤖 Feature Orchestrator`", orchestration)
+        self.assertIn("`🤖 Feature Orchestrator · N Features`", orchestration)
+        self.assertIn("including waiting or blocked assignments", orchestration)
+        self.assertIn("Never update the root title as assignments progress", orchestration)
         self.assertIn("The title is UI evidence, never identity or durable state", orchestration)
+        self.assertNotIn("👨🏻‍💻", orchestration)
+        self.assertNotIn("Multi-Feature Orchestrator", orchestration)
+        self.assertNotIn("R/N", orchestration)
 
     def test_given_goal_free_controller_when_runtime_is_inspected_then_run_and_task_own_lifecycle(self) -> None:
         """Given the lean controller, runtime state and task liveness replace synthetic lifecycle state."""

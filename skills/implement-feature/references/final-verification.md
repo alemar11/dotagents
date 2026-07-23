@@ -11,9 +11,8 @@ status. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
 all three names describe the same unmerged delivery boundary.
 
 Collect the terminal reports and immutable current-head evidence for every
-ready candidate before mutating assignment state or visible titles. Reuse that
-snapshot while its tracker, task, checkout, branch, and HEAD identities remain
-unchanged; do not rerun equivalent reads between `R/N` title updates. If any
+ready candidate before mutating assignment state. Reuse that snapshot while its
+tracker, task, checkout, branch, and HEAD identities remain unchanged. If any
 identity or authoritative artifact changes, discard the affected snapshot and
 verify that assignment again.
 

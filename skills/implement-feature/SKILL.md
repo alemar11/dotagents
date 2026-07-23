@@ -68,8 +68,8 @@ continuation question during the run.
    Different Specs and head branches may run under different roots in the same
    repository. Keep a conflicting assignment in its bounded Spec wait without
    blocking claims already acquired by sibling assignments.
-4. When at least one assignment owns its claim, set and verify the root title,
-   then schedule up to three path-disjoint Feature Specs; serialize
+4. When at least one assignment owns its claim, set and verify the immutable
+   root title once, then schedule up to three path-disjoint Feature Specs; serialize
    overlap inside this root. Dependency-related peers may start before their
    input HEADs stabilize so they can collaborate, but final proof must bind the
    exact prerequisite revisions. Never create a worker for an

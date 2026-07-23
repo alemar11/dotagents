@@ -29,12 +29,12 @@ This section is reachable only after the saved-project preflight and any
 explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
-1. Set and verify the exact root title. For one assignment use
-   `👨🏻‍💻 Feature Orchestrator`. For two or more use
-   `👨🏻‍💻 Multi-Feature Orchestrator (R/N)`, where `N` is the immutable total
-   and `R` counts assignments in `pr-ready` or `local-branch-ready`. Start at
-   `0/N`; input-ready, blocked, active, and waiting assignments do not increment
-   it. The title is UI evidence, never identity or durable state.
+1. Set and verify the exact immutable root title once. For one assignment use
+   `🤖 Feature Orchestrator`. For two or more use
+   `🤖 Feature Orchestrator · N Features`, where `N` is the immutable total
+   assignment count, including waiting or blocked assignments. Never update the
+   root title as assignments progress. The title is UI evidence, never identity
+   or durable state.
 2. For each claimed, path-disjoint assignment up to three,
    create one visible Codex worker task with `environment=worktree` in the
    selected ChatGPT desktop project. The ChatGPT desktop app creates the

@@ -317,6 +317,75 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(shown["revision"], int(revision))
         self.assertEqual(shown["unresolved_app_operations"][0]["status"], "pending")
 
+    def test_given_one_assignment_when_root_title_is_verified_then_static_title_succeeds(self) -> None:
+        """Given one assignment, its root title is the exact static orchestrator title."""
+        self.start("single-root-title")
+        result = self.operation(
+            "single-root-title", "single-root-title-op", "set-root-title",
+            "root-single-root-title",
+            {"observed_title": "🤖 Feature Orchestrator"},
+        )
+        self.assertEqual(result["status"], "succeeded")
+
+    def test_given_multiple_assignments_when_root_title_is_verified_then_total_is_static(self) -> None:
+        """Given one waiting sibling, the immutable total still includes every assignment."""
+        self.start("multi-root-title-owner")
+        self.start("multi-root-title", assignment_count=2)
+        shown = self.invoke("run", "show", "--run-id", "multi-root-title")
+        self.assertEqual(
+            [row["state"] for row in shown["assignments"]],
+            ["waiting-for-spec", "planned"],
+        )
+        result = self.operation(
+            "multi-root-title", "multi-root-title-op", "set-root-title",
+            "root-multi-root-title",
+            {"observed_title": "🤖 Feature Orchestrator · 2 Features"},
+        )
+        self.assertEqual(result["status"], "succeeded")
+
+    def test_given_wrong_root_title_when_read_back_then_operation_remains_pending(self) -> None:
+        """Given a wrong emoji or count, exact root-title verification fails closed."""
+        self.start("wrong-root-title", assignment_count=2)
+        self.invoke(
+            "app-operation", "begin", "--run-id", "wrong-root-title",
+            "--expected-revision", self.revision("wrong-root-title"),
+            "--operation-key", "wrong-root-title-op", "--action", "set-root-title",
+            "--subject-id", "root-wrong-root-title",
+        )
+        observation = {
+            "schema_version": 2,
+            "status": "succeeded",
+            "receipt_ref": "receipt:wrong-root-title",
+            "readback_ref": "readback:wrong-root-title",
+            "observed_title": "🤖 Feature Orchestrator · 1 Features",
+        }
+        error = self.invoke(
+            "app-operation", "finish", "--run-id", "wrong-root-title",
+            "--expected-revision", self.revision("wrong-root-title"),
+            "--operation-key", "wrong-root-title-op",
+            "--observation", str(self.write_json("wrong-root-title.json", observation)),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "root-title-drift")
+        operations = self.invoke("app-operation", "list", "--run-id", "wrong-root-title")
+        self.assertEqual(operations["operations"][0]["status"], "pending")
+
+    def test_given_verified_root_title_when_second_title_begins_then_it_is_rejected(self) -> None:
+        """Given an immutable root title, another root-title mutation cannot launch."""
+        self.start("repeat-root-title")
+        self.operation(
+            "repeat-root-title", "repeat-root-title-first", "set-root-title",
+            "root-repeat-root-title",
+            {"observed_title": "🤖 Feature Orchestrator"},
+        )
+        error = self.invoke(
+            "app-operation", "begin", "--run-id", "repeat-root-title",
+            "--expected-revision", self.revision("repeat-root-title"),
+            "--operation-key", "repeat-root-title-second", "--action", "set-root-title",
+            "--subject-id", "root-repeat-root-title", expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "protected-operation-already-started")
+
     def test_given_v1_ready_observation_when_recorded_then_assignment_and_claim_remain_active(self) -> None:
         """Given retired delivery evidence, readiness rejects it without releasing ownership."""
         self.start("v1-ready")

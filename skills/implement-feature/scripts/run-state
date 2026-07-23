@@ -54,6 +54,7 @@ SINGLE_USE_ACTIONS = {
     "create-worker",
     "set-worker-title",
     "send-bootstrap",
+    "set-root-title",
     "archive-worker",
 }
 
@@ -68,6 +69,12 @@ class StateError(Exception):
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def root_task_title(assignment_count: int) -> str:
+    if assignment_count == 1:
+        return "🤖 Feature Orchestrator"
+    return f"🤖 Feature Orchestrator · {assignment_count} Features"
 
 
 def canonical_json(value: Any) -> str:
@@ -1122,6 +1129,13 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"] or observed["observed_title"] != assignment["title"]:
             raise StateError("worker-title-drift", "worker title readback differs from the assignment", 4)
+    elif action == "set-root-title":
+        assignment_count = connection.execute(
+            "SELECT COUNT(*) FROM assignments WHERE run_id=?",
+            (run["run_id"],),
+        ).fetchone()[0]
+        if observed["observed_title"] != root_task_title(assignment_count):
+            raise StateError("root-title-drift", "root title readback differs from the immutable run title", 4)
     elif action == "send-bootstrap":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:

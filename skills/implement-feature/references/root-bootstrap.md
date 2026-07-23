@@ -87,11 +87,11 @@ to the same claim identity. With `tracker_backend=local`, the globally
 unambiguous repository-scoped Spec path remains local even when the repository
 identity is `github:owner/repository`.
 
-When at least one assignment acquires its claim, set and verify the root title
-and schedule up to three disjoint claimed assignments. When every assignment
-waits, create no worker, worktree, branch, or provider mutation. Never use a
-default PR base such as `main` as a head-branch collision: only the
-implementation head branch is exclusive.
+When at least one assignment acquires its claim, set and verify the immutable
+root title once and schedule up to three disjoint claimed assignments. When
+every assignment waits, create no worker, worktree, branch, or provider
+mutation. Never use a default PR base such as `main` as a head-branch collision:
+only the implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
 `environment=worktree`. The ChatGPT desktop app creates the worktree and assigns
