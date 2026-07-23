@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-CLI_VERSION = "1.0.0"
+CLI_VERSION = "1.1.0"
 
 
 class VerifyError(Exception):
@@ -113,6 +113,42 @@ def issue_expectation(raw: str) -> tuple[str, str]:
     return path, expected_state
 
 
+def review_candidate(args: argparse.Namespace) -> dict[str, Any]:
+    checkout = canonical_checkout(args.checkout, "managed checkout")
+    branch = run_git(checkout, "branch", "--show-current").stdout.strip()
+    if branch != args.branch:
+        raise VerifyError(
+            "review-branch-mismatch",
+            f"expected {args.branch}, observed {branch or 'detached HEAD'}",
+        )
+
+    require_clean(checkout, "managed checkout")
+    base_sha = exact_sha(checkout, args.base_sha, "base SHA")
+    head_sha = exact_sha(checkout, "HEAD", "candidate HEAD")
+    ancestry = run_git(
+        checkout,
+        "merge-base",
+        "--is-ancestor",
+        base_sha,
+        head_sha,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        raise VerifyError(
+            "invalid-ancestry",
+            "declared base SHA is not an ancestor of the candidate HEAD",
+        )
+
+    return {
+        "checkout": str(checkout),
+        "branch": branch,
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "clean": True,
+        "ancestry_verified": True,
+    }
+
+
 def local_branch(args: argparse.Namespace) -> dict[str, Any]:
     checkout = canonical_checkout(args.checkout, "managed checkout")
     original = canonical_checkout(args.original_checkout, "original checkout")
@@ -201,6 +237,13 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--json", action="store_true", help="emit a stable JSON result")
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("doctor", help="check local runtime dependencies")
+    candidate = commands.add_parser(
+        "review-candidate",
+        help="read one authoritative clean branch candidate for review handoff",
+    )
+    candidate.add_argument("--checkout", required=True)
+    candidate.add_argument("--branch", required=True)
+    candidate.add_argument("--base-sha", required=True)
     local = commands.add_parser("local-branch", help="verify a local-branch delivery snapshot")
     local.add_argument("--checkout", required=True)
     local.add_argument("--original-checkout", required=True)
@@ -236,6 +279,8 @@ def main() -> int:
             if git is None:
                 raise VerifyError("missing-git", "git is not available on PATH")
             data: dict[str, Any] = {"git": git, "python": sys.executable}
+        elif args.command == "review-candidate":
+            data = review_candidate(args)
         else:
             data = local_branch(args)
         emit({"ok": True, "version": CLI_VERSION, "command": args.command, "data": data}, args.json)

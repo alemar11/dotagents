@@ -96,6 +96,19 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("does not edit code", gates)
         self.assertIn("must not edit, check, uncheck, reinterpret, or adjudicate", tracker)
 
+    def test_given_review_handoff_when_capability_is_resolved_then_identity_and_owner_are_explicit(self) -> None:
+        """The bootstrap field and review command are literal machine-facing contracts."""
+        skill = self.text("SKILL.md")
+        bootstrap = self.text("references/root-bootstrap.md")
+        orchestration = self.text("references/chatgpt-task-orchestration.md")
+        worker = self.text("references/worker-execution.md")
+        for source in (skill, bootstrap, orchestration, worker):
+            self.assertIn("review_owner=worker|root", source)
+        self.assertIn("review-candidate", orchestration)
+        self.assertIn("review-candidate", worker)
+        self.assertIn("--review-phase full", orchestration)
+        self.assertIn("--evidence-output", orchestration)
+
     def test_given_bootstrap_recovery_when_state_is_ambiguous_then_actual_task_state_prevents_duplicates(self) -> None:
         """Given ambiguous delivery, when recovering, then root inspects the task before repeating and stores no body hash."""
         orchestration = self.text("references/chatgpt-task-orchestration.md")
@@ -266,7 +279,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertNotIn("PRAGMA user_version", source)
         self.assertIn("command_state_prepare", source)
         self.assertNotIn("migrate", source.lower())
-        self.assertIn('CLI_VERSION = "1.0.0"', verifier)
+        self.assertIn('CLI_VERSION = "1.1.0"', verifier)
         self.assertNotIn("sqlite3", verifier)
         self.assertNotIn("run-state.sqlite3", verifier)
 

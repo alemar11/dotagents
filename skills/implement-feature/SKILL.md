@@ -95,7 +95,9 @@ continuation question during the run.
    exact prerequisite revisions. Never create a worker for an
    assignment whose Spec or head branch claim is waiting.
 5. For each worker, follow `references/chatgpt-task-orchestration.md` and send
-   the full assignment under the generated `bootstrap_id`. A verified,
+   the full assignment under the generated `bootstrap_id`, including canonical
+   `review_owner=worker|root`. Resolve that owner through the early AutoReview
+   doctor path before implementation begins. A verified,
    worker-accepted bootstrap starts its complete implementation authority;
    duplicate delivery of that same logical bootstrap has one effect. There is
    no baseline-only phase or later GO.

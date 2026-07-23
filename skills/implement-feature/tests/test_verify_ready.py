@@ -117,13 +117,60 @@ class VerifyReadyScenarios(unittest.TestCase):
             check=False,
         )
 
+    def invoke_review_candidate(
+        self,
+        fixture: dict[str, str],
+        *,
+        branch: str = "feature/health",
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                str(TOOL),
+                "--json",
+                "review-candidate",
+                "--checkout",
+                fixture["managed"],
+                "--branch",
+                branch,
+                "--base-sha",
+                fixture["base_sha"],
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
     def test_cli_surface(self) -> None:
         version = subprocess.run([str(TOOL), "--version"], capture_output=True, text=True, check=True)
         doctor = subprocess.run([str(TOOL), "--json", "doctor"], capture_output=True, text=True, check=True)
         help_result = subprocess.run([str(TOOL), "--help"], capture_output=True, text=True, check=True)
-        self.assertEqual(version.stdout.strip(), "1.0.0")
+        self.assertEqual(version.stdout.strip(), "1.1.0")
         self.assertTrue(json.loads(doctor.stdout)["ok"])
+        self.assertIn("review-candidate", help_result.stdout)
         self.assertIn("local-branch", help_result.stdout)
+
+    def test_review_candidate_returns_git_resolved_full_shas(self) -> None:
+        fixture = self.fixture()
+        result = self.invoke_review_candidate(fixture)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["data"]["head_sha"], fixture["head_sha"])
+        self.assertEqual(payload["data"]["base_sha"], fixture["base_sha"])
+        self.assertEqual(payload["data"]["branch"], "feature/health")
+        self.assertTrue(payload["data"]["clean"])
+        self.assertTrue(payload["data"]["ancestry_verified"])
+
+    def test_review_candidate_rejects_branch_mismatch(self) -> None:
+        result = self.invoke_review_candidate(self.fixture(), branch="feature/other")
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)["error"]["code"], "review-branch-mismatch")
+
+    def test_review_candidate_rejects_dirty_worktree(self) -> None:
+        fixture = self.fixture()
+        Path(fixture["managed"], "untracked.txt").write_text("dirty\n", encoding="utf-8")
+        result = self.invoke_review_candidate(fixture)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)["error"]["code"], "dirty-worktree")
 
     def test_local_branch_returns_one_terminal_snapshot(self) -> None:
         result = self.invoke(self.fixture())

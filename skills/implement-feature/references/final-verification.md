@@ -17,6 +17,12 @@ tracker, task, checkout, branch, and HEAD identities remain unchanged. If any
 identity or authoritative artifact changes, discard the affected snapshot and
 verify that assignment again.
 
+The review candidate identity must originate from `scripts/verify-ready --json
+review-candidate`, not from a manually expanded short SHA. Worker and root
+repeat that read-only command against the managed checkout before a root-owned
+review and require identical full `base_sha`, `head_sha`, branch, cleanliness,
+and ancestry fields.
+
 For each assignment, root rereads:
 
 - the current Feature Spec and issue graph, including final checkbox state;
@@ -105,3 +111,12 @@ checkout released or absent, `assignment recover` may mark that assignment
 `abandoned` and release only its claim. After every sibling is terminal and all
 task operations are reconciled, `run finish --outcome abandoned` terminalizes
 the owning run without claiming delivery success.
+
+## Verification CLI Maintenance
+
+Normal runtime execution stays on `scripts/verify-ready`, whose
+`CLI_VERSION = "1.1.0"` is its SemVer source of truth. It is read-only: neither
+`doctor`, `review-candidate`, nor `local-branch` writes repository or run state.
+Use a minor bump for a compatible new verification command and a patch bump for
+a compatible correction. Re-run `--help`, `--version`, `--json doctor`, the
+review-candidate fixture, and local-branch fixtures after changes.

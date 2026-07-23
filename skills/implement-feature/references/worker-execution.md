@@ -14,6 +14,17 @@ until the worker safely establishes the contract inside its own worktree. Never
 switch the original/main worktree and never treat the managed worktree alone as
 durable delivery.
 
+Resolve the bootstrap's `review_owner=worker|root` before editing
+implementation files. With worker ownership, run
+`<autoreview-skill-root>/scripts/autoreview --json doctor` immediately after
+read-only checkout identity preflight and before branch selection. Continue
+only when it succeeds. On
+`recovery=reroute-to-capable-root`, send the structured result to root and wait
+for its evidence-only owner readback; do not retry with escalation or copy
+credentials. Root ownership changes only the later review executor. The worker
+retains design, implementation, finding verification, fixes, validation,
+tracker, and delivery authority.
+
 Before accepting implementation authority, deduplicate the bootstrap envelope
 by its opaque `bootstrap_id`:
 
@@ -52,6 +63,21 @@ current-head Codex review. Verify and aggregate findings before fixing them,
 then revalidate changed evidence and use AutoReview fix verification. Never
 force-push published history, merge, enqueue, deploy, release, or perform
 post-merge closure.
+
+Before a worker-owned review or a root reroute, run:
+
+```bash
+<implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
+  --checkout <managed-checkout> \
+  --branch <target-branch> \
+  --base-sha <startup-base-sha>
+```
+
+Use its exact `head_sha` and `base_sha` fields verbatim. Never expand a short
+SHA manually. The review executor repeats this readback immediately before
+launch. A root reroute always starts structured AutoReview in branch mode with
+the exact base, `review_phase=full`, and an evidence output so accepted fixes
+can continue in one evidence chain; it never substitutes commit mode.
 
 Follow `tracker-checklists.md` for every issue and parent checkbox. If later work
 invalidates proof, uncheck it and read back the correction. Restore and commit

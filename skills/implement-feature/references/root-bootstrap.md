@@ -107,6 +107,21 @@ it to that task. Root verifies the task, checkout directory, and Git common
 directory; it never runs `git worktree add`. SQLite keeps only checkout identity
 needed for coordination, not the worker's technical contents.
 
+Each full bootstrap carries the canonical operational field
+`review_owner=worker|root`. Resolve it before implementation begins. Root may
+select itself only after its own AutoReview doctor succeeds. Prefer the worker
+when its capability is already proven. When capability is unknown, bootstrap
+with `review_owner=worker`; after read-only checkout identity preflight and
+before branch or implementation mutation, the worker runs
+`<autoreview-skill-root>/scripts/autoreview --json doctor`. A successful doctor
+confirms the worker owner. `recovery=reroute-to-capable-root` is a hard handoff:
+the worker sends the structured doctor result, root runs the same doctor
+immediately, and either records `review_owner=root` in one evidence-only
+follow-up or blocks as `blocked-app-capability` before implementation. Never
+copy credentials or try
+an escalated worker launch after the reroute result. Review ownership is
+operational bootstrap data and is not added to the run manifest or SQLite.
+
 After the required ordinary workers and worktrees exist, forward-test the
 declared distributed execution topology before combined validation. Every
 worker must remain isolated to its own worktree. Each component owner proves its

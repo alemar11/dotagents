@@ -62,8 +62,9 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    worktree and assigns it to the task; root never runs `git worktree add`.
 3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
-4. Send one full bootstrap envelope carrying the recorded `bootstrap_id` and
-   naming tracker backend, delivery type, source ref, repository, branch,
+4. Send one full bootstrap envelope carrying the recorded `bootstrap_id`,
+   canonical `review_owner=worker|root`, and naming tracker backend, delivery
+   type, source ref, repository, branch,
    allowed paths, issue graph, acceptance and validation budgets, safety,
    worker autonomy, checklist rules, final evidence, and every known peer's
    exact task, repository, branch, role, and checkout identity.
@@ -128,7 +129,11 @@ until authoritative recovery or contract change permits that root to continue.
 
 Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
-durable-source change, or an authoritative final-verification mismatch. A new
+durable-source change, an early AutoReview capability reroute, or an
+authoritative final-verification mismatch. An early review-owner follow-up
+contains only the structured doctor result and `review_owner=root`; it occurs
+before implementation and grants root review execution, not implementation
+authority. A new
 peer-identity follow-up carries identity only; it does not introduce technical
 instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider
@@ -143,6 +148,23 @@ Root provides no diagnosis, commands, implementation guidance, checklist
 judgment, or repair strategy. Diagnosis, repair, validation, and replacement
 evidence remain worker-owned. Durable-contract drift is different: record the
 assignment as blocked instead of suggesting repair.
+
+For a root-owned review, require the worker to build the review handoff with:
+
+```bash
+<implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
+  --checkout <managed-checkout> \
+  --branch <target-branch> \
+  --base-sha <startup-base-sha>
+```
+
+The worker forwards the returned `base_sha` and `head_sha` without shortening,
+expanding, or reconstructing either value. Root reruns the same command against
+the same checkout and requires exact JSON identity before review. It then uses
+AutoReview branch mode with that exact base, `--review-phase full`, and
+`--evidence-output`; commit mode is not a reroute substitute because it cannot
+open the branch evidence chain needed after accepted fixes. Root returns only
+findings and evidence to the worker and never edits the candidate.
 
 Before root sends a controller message, record `send-worker-message` in SQLite. After sending, verify
 the immediate response and independently read the exact task conversation,
