@@ -44,14 +44,34 @@ worktree, current-head validation and reviews, committed tracker readback, no
 unresolved recorded task/Goal changes, warnings, and changed paths. Coherent progress needs
 no root intervention.
 
-## Dedicated Integration Worker
+## Peer Collaboration And Combined Proof
 
-This is another visible Codex task only when Plan Feature produced a dedicated
-integration Feature Spec. Its bootstrap supplies every prerequisite repository,
-branch, HEAD, and authoritative managed-worktree path plus the complete start,
-wiring, port, health, E2E, budget, evidence, cleanup, and terminal contract. The
-worker launches and cleans up components itself, rereads every input HEAD before
-and after validation, and proves the exact complete SHA vector. Any drift makes
-all prior integration proof stale. It returns an upstream-owned defect as
-evidence to root for routing; root never selects or implements the fix. After a
-partial worker produces a new HEAD, rerun the complete integration proof.
+There is no dedicated integration worker. For a multi-repository bundle, the
+ordinary repository workers communicate directly using the exact peer task,
+repository, branch, HEAD, and checkout identities supplied by root. Workers may
+exchange interface clarifications, exact revisions, test endpoints, and factual
+mismatch evidence while the durable contract remains unchanged. They do not
+delegate their repository implementation or expand another worker's scope.
+
+Each combined boundary has an existing worker as its proof owner. For example,
+the web worker may prove web-to-backend behavior while the mobile worker proves
+mobile-to-backend behavior against the same backend HEAD. A bundle-wide scenario
+must likewise name one existing worker capable of executing it within that
+worker's accepted scope. If no ordinary worker can own the required proof, the
+bundle is not execution-ready; do not synthesize another task as a fallback.
+
+Before combined validation, the ordinary workers test the distributed execution
+topology described by the Spec. Every worker remains isolated to its own
+worktree. Each peer starts and cleans up its own component, sends the proof
+owner its exact pre-start HEAD plus endpoint and health evidence, and sends its
+post-cleanup HEAD readback afterward. The proof owner runs the combined scenario
+through those exposed component boundaries and records the exact SHA vector.
+
+The proof owner must not infer a peer HEAD from an earlier message, read or
+execute inside a peer worktree, or take ownership of a peer component. Any peer
+HEAD change makes prior proof stale. A worker sends an upstream-owned mismatch
+directly to the owning peer as evidence only; that peer owns diagnosis, repair,
+validation, and a replacement HEAD. The proof owner then reruns the affected
+complete proof. If the distributed topology cannot execute, report
+`blocked-app-capability` without asking the user or falling back to root
+execution.

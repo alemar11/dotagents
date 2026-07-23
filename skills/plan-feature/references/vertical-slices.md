@@ -68,13 +68,13 @@ Each issue must identify:
 Potential delivery artifacts are planning context, not completion proof. The
 executor records real delivery evidence during implementation.
 
-Every multi-repository bundle has exactly one distinct repo-owned integration
-partial downstream of all implementation partials and at least one integration
-issue that owns a bounded repo/path change and proves the cross-repository result
-after those upstream merges. A validation-only or no-op issue cannot satisfy the
-required integrated outcome; withhold the bundle if no concrete integration
-vehicle exists. This structure does not depend on a knowledge
-delta.
+Assign every cross-repository boundary to an existing implementation partial
+whose accepted repository, paths, tools, and validation budget can execute the
+combined proof. Record the exact peer Feature Specs as Feature Dependencies and
+put the executable integration contract on that proof-owning partial. Different
+consumers may own different boundaries against the same producer HEAD. Withhold
+the bundle when no existing partial can own a required proof; never synthesize
+an integration partial, issue subtree, branch, or worker.
 
 ## Dependency Graph
 
@@ -100,12 +100,14 @@ Rules:
   Feature Spec refs;
 - reverse edges are derived by scanning all lists and are never stored.
 
-An agent-ready issue may list unfinished dependencies: it is ready for the
-queue, but execution waits until those dependencies finish.
+An agent-ready issue may list unfinished intra-Spec dependencies: it is ready
+for the queue, but its worker executes it only after those issues finish.
 
 Cross-Feature-Spec dependencies stay in the Feature Spec's dependency table.
-They gate the complete downstream Feature Spec and always wait for upstream
-merge plus integration proof.
+Peer workers may start before those upstream Specs finish so they can collaborate.
+Final dependent or combined proof must bind the exact prerequisite delivery
+evidence and requires merge only when the durable dependency contract explicitly
+says merged input is necessary.
 
 ## Scope Overlap Gate
 
@@ -153,8 +155,8 @@ conflict and require separately authorized replacement.
 
 Never compress across Feature Specs. Run the gate independently for each
 implementation-eligible Spec and exclude coordination-only parent artifacts.
-Preserve every required repo-owned integration partial, its real integration
-issue, and the unique final domain-closeout owner. A repair must stay inside the
+Preserve every required combined-proof owner and the unique final
+domain-closeout owner. A repair must stay inside the
 accepted Feature Spec scope; otherwise return a planning blocker instead of
 widening the source.
 
@@ -179,17 +181,16 @@ rewrite a durable seed.
 ## Domain Knowledge Closeout
 
 When the issue phase receives a knowledge delta, exactly one final
-implementation/integration issue persists it. No Feature Spec body carries the
+implementation closeout issue persists it. No Feature Spec body carries the
 payload. Exclude the selected owner and its outgoing `dependency_ids`, derive
 the nodes with no dependents in the remaining graph, then make the owner depend
 directly on every such node and reject any issue that depends on the owner.
 
-For a multi-repository bundle, persist the delta only on the final issue of its
-dedicated repo-owned integration partial. That partial exists regardless of the
-delta, and its Feature Dependencies point to every implementation partial so all
-cross-Spec edges wait for upstream merge. Apply the owner-excluded terminal rule
-only inside that integration partial; never copy sibling-partial issue IDs
-across Specs.
+For a multi-repository bundle, persist the delta only on the final issue of an
+existing implementation partial whose accepted paths contain every target. Its
+Feature Dependencies name the exact peer inputs required for final proof. Apply
+the owner-excluded terminal rule only inside that partial; never copy
+sibling-partial issue IDs across Specs.
 
 The final issue must:
 

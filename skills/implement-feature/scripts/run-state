@@ -39,7 +39,7 @@ GITHUB_SPEC_URL_RE = re.compile(
 )
 LOCAL_SPEC_REF_RE = re.compile(
     r"^(?:[a-z0-9][a-z0-9._-]{0,100}/)?planning/features/"
-    r"[a-z0-9][a-z0-9._/-]*/(?:integration/)?SPEC\.md$"
+    r"[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?/SPEC\.md$"
 )
 
 APP_ACTIONS = {
@@ -215,6 +215,20 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
                 f"state table {table} columns do not match schema 1",
                 4,
             )
+    assignment_sql_row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='assignments'"
+    ).fetchone()
+    assignment_sql = assignment_sql_row[0] if assignment_sql_row else ""
+    if (
+        "'peer-input-ready'" not in assignment_sql
+        or "'blocked-app-capability'" not in assignment_sql
+        or "'integration-input-ready'" in assignment_sql
+    ):
+        raise StateError(
+            "invalid-state-schema",
+            "state table assignments constraints do not match schema 1",
+            4,
+        )
     return False
 
 
@@ -251,8 +265,8 @@ def create_schema(connection: sqlite3.Connection) -> None:
             prerequisite_assignment_ids TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN (
                 'waiting-for-spec', 'planned', 'worker-created', 'active',
-                'integration-input-ready', 'pr-ready', 'local-branch-ready',
-                'blocked-durable-contract',
+                'peer-input-ready', 'pr-ready', 'local-branch-ready',
+                'blocked-durable-contract', 'blocked-app-capability',
                 'blocked-by-active-spec', 'preimplementation-aborted',
                 'abandoned', 'abandoned-recovery-required'
             )),
@@ -649,8 +663,11 @@ def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
             "SELECT state FROM assignments WHERE run_id=? ORDER BY assignment_id", (run_id,)
         )
     ]
-    runnable = {"planned", "worker-created", "active", "integration-input-ready"}
-    blockers = {"blocked-durable-contract", "blocked-by-active-spec", "abandoned-recovery-required", "abandoned"}
+    runnable = {"planned", "worker-created", "active", "peer-input-ready"}
+    blockers = {
+        "blocked-durable-contract", "blocked-app-capability",
+        "blocked-by-active-spec", "abandoned-recovery-required", "abandoned",
+    }
     if any(state in runnable for state in states):
         status = "active"
     elif any(state == "waiting-for-spec" for state in states):
@@ -917,25 +934,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if action == "create-worker":
             if assignment["state"] != "planned":
                 raise StateError("invalid-assignment-transition", "worker creation requires a planned assignment", 4)
-            prerequisites = json.loads(assignment["prerequisite_assignment_ids"])
-            if prerequisites:
-                rows = connection.execute(
-                    "SELECT assignment_id,state FROM assignments WHERE run_id=?",
-                    (run["run_id"],),
-                )
-                states = {row["assignment_id"]: row["state"] for row in rows}
-                if any(
-                    states.get(prerequisite) not in {
-                        "integration-input-ready", "pr-ready", "local-branch-ready"
-                    }
-                    for prerequisite in prerequisites
-                ):
-                    raise StateError(
-                        "prerequisites-not-ready",
-                        "worker creation requires stable terminal branch/head evidence for every prerequisite",
-                        4,
-                    )
-            live = connection.execute("SELECT COUNT(*) FROM assignments WHERE run_id=? AND state IN ('worker-created','active','integration-input-ready')", (run["run_id"],)).fetchone()[0]
+            live = connection.execute("SELECT COUNT(*) FROM assignments WHERE run_id=? AND state IN ('worker-created','active')", (run["run_id"],)).fetchone()[0]
             pending = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND action='create-worker' AND status IN ('pending','unknown')", (run["run_id"],)).fetchone()[0]
             if live + pending >= MAX_LIVE_WORKERS:
                 raise StateError("worker-capacity-reached", "at most three live workers are allowed", 4)
@@ -944,7 +943,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         elif action == "send-bootstrap" and assignment["state"] != "worker-created":
             raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
         elif action == "send-worker-message" and assignment["state"] not in {
-            "active", "integration-input-ready"
+            "active", "peer-input-ready"
         }:
             raise StateError("invalid-assignment-transition", "worker messages require an active worker", 4)
         elif action == "archive-worker" and assignment["state"] != "worker-created":
@@ -1236,9 +1235,9 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
         if run["status"] != "active":
             raise StateError("run-not-active", f"run is {run['status']}", 4)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] not in {"active", "integration-input-ready"} or value["thread_id"] != assignment["thread_id"]:
+        if assignment["state"] not in {"active", "peer-input-ready"} or value["thread_id"] != assignment["thread_id"]:
             raise StateError("invalid-assignment-transition", "ready evidence must belong to the active worker", 4)
-        if args.integration_input:
+        if args.peer_input:
             dependents = [
                 row["prerequisite_assignment_ids"]
                 for row in connection.execute(
@@ -1248,8 +1247,8 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
             ]
             if not any(assignment_id in json.loads(value) for value in dependents):
                 raise StateError(
-                    "not-an-integration-prerequisite",
-                    "integration input readiness requires a dependent assignment",
+                    "not-a-peer-prerequisite",
+                    "peer input readiness requires a dependent assignment",
                     4,
                 )
         if value["delivery_type"] != assignment["delivery_type"]:
@@ -1294,8 +1293,8 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
             }
             if normalized_heads != current_heads:
                 raise StateError(
-                    "integration-head-drift",
-                    "integration proof does not match the current prerequisite HEAD vector",
+                    "prerequisite-head-drift",
+                    "combined proof does not match the current prerequisite HEAD vector",
                     4,
                 )
         pr_url = None
@@ -1321,7 +1320,7 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
                 value["provider_observation_ref"], "provider_observation_ref", 2048
             )
             terminal_state = "pr-ready"
-        persisted_state = "integration-input-ready" if args.integration_input else terminal_state
+        persisted_state = "peer-input-ready" if args.peer_input else terminal_state
         unresolved = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')", (run_id, assignment_id)).fetchone()[0]
         if unresolved:
             raise StateError("unresolved-app-operation", "reconcile assignment task changes before ready", 4)
@@ -1337,7 +1336,7 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
             ),
         )
         claim_released = False
-        if not args.integration_input:
+        if not args.peer_input:
             now = utc_now()
             updated = connection.execute(
                 """UPDATE spec_claims SET active=0,released_at=?,release_reason=?
@@ -1370,8 +1369,12 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
         assignment = get_assignment(connection, run_id, assignment_id)
-        if assignment["state"] != "active":
-            raise StateError("invalid-assignment-transition", "durable-contract blocking requires an active post-bootstrap worker", 4)
+        if assignment["state"] not in {"active", "peer-input-ready"}:
+            raise StateError(
+                "invalid-assignment-transition",
+                "durable-contract blocking requires an active or peer-input-ready post-bootstrap worker",
+                4,
+            )
         connection.execute("UPDATE assignments SET state='blocked-durable-contract',updated_at=? WHERE run_id=? AND assignment_id=?", (utc_now(), run_id, assignment_id))
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
@@ -1379,6 +1382,40 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
         return {
             "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
             "state": "blocked-durable-contract", "run_status": run_status,
+            "claim_retained": True,
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] not in {"active", "peer-input-ready"}:
+            raise StateError(
+                "invalid-assignment-transition",
+                "App capability blocking requires an active or peer-input-ready post-bootstrap worker",
+                4,
+            )
+        connection.execute(
+            "UPDATE assignments SET state='blocked-app-capability',updated_at=? "
+            "WHERE run_id=? AND assignment_id=?",
+            (utc_now(), run_id, assignment_id),
+        )
+        run_status = recompute_run_status(connection, run_id)
+        revision = advance(connection, run)
+        connection.commit()
+        return {
+            "run_id": run_id, "revision": revision, "assignment_id": assignment_id,
+            "state": "blocked-app-capability", "run_status": run_status,
             "claim_retained": True,
         }
     except Exception:
@@ -1835,13 +1872,24 @@ def build_parser() -> argparse.ArgumentParser:
     ready.add_argument("--run-id", required=True)
     ready.add_argument("--expected-revision", type=int, required=True)
     ready.add_argument("--observation", required=True)
-    ready.add_argument("--integration-input", action="store_true", help="retain the worker and claim while exposing an exact prerequisite HEAD")
+    ready.add_argument("--peer-input", action="store_true", help="retain the worker and claim while exposing an exact HEAD to dependent peers")
     ready.set_defaults(handler=command_assignment_ready, command_name="assignment ready")
     block = assignment_commands.add_parser("block", help="retain claims after a durable contract change")
     block.add_argument("--run-id", required=True)
     block.add_argument("--expected-revision", type=int, required=True)
     block.add_argument("--assignment-id", required=True)
     block.set_defaults(handler=command_assignment_block, command_name="assignment block")
+    capability_block = assignment_commands.add_parser(
+        "capability-block",
+        help="retain claims when the declared App execution topology is unavailable",
+    )
+    capability_block.add_argument("--run-id", required=True)
+    capability_block.add_argument("--expected-revision", type=int, required=True)
+    capability_block.add_argument("--assignment-id", required=True)
+    capability_block.set_defaults(
+        handler=command_assignment_capability_block,
+        command_name="assignment capability-block",
+    )
     abort = assignment_commands.add_parser("abort", help="release one verified pre-bootstrap Feature Spec claim")
     abort.add_argument("--run-id", required=True)
     abort.add_argument("--expected-revision", type=int, required=True)

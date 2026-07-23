@@ -21,8 +21,6 @@ local artifact, otherwise omit this line]
 ## Planning Identity
 
 - Feature slug: [accepted lowercase kebab-case slug].
-- Partial role: integration. [Include only for the dedicated multi-repository
-  integration partial; omit it from the parent and implementation partials.]
 - Product or project slug: [include only for monorepos or orchestrator workspaces].
 - Workspace path: [include only for monorepos or multi-repository workspaces].
 - Context files: [include every applicable available current/coordination root,
@@ -58,8 +56,7 @@ local artifact, otherwise omit this line]
 
 - Affected repositories: [canonical repo slugs or current repository].
 - Allowed paths: [repo-relative or repo-qualified scope].
-- Spec target branch: [valid branch shared by this Spec's generated issues; use
-  the distinct derived integration branch for an integration partial].
+- Spec target branch: [valid branch shared by this Spec's generated issues].
 - [For monorepos, include the selected workspace and optional scoped contexts.]
 - [For multi-repository work, state each repository's role and cross-repo
   contract.]
@@ -77,13 +74,17 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
 
 ## Integration Execution Contract
 
-[Include only for a dedicated multi-repository integration Feature Spec. In
-concise executable prose, name every repository role and component start
-command; endpoint and environment wiring; collision-safe port allocation;
-health checks; the integration/E2E command or scenario; timeout, retry, and any
-material validation budget; evidence to retain; cleanup behavior; and the
-required terminal outcome. Bind proof to the exact repository/branch/HEAD
-vector and require every HEAD to be reread before and after validation.]
+[Include in an existing implementation partial that owns combined proof for a
+multi-repository boundary. In concise executable prose, name every repository
+role and component start command; endpoint and environment wiring;
+collision-safe port allocation; health checks; the integration/E2E command or
+scenario; timeout, retry, and any material validation budget; evidence to
+retain; cleanup behavior; and the required terminal outcome. Bind proof to the
+exact repository/branch/HEAD vector. Assign each component either to the proof
+owner or to its owning peer. Require every worker to stay inside its own
+worktree, start and clean up its own component, and read its own HEAD before
+startup and after cleanup. The proof owner must validate through peer-exposed
+component boundaries, never through cross-worktree access.]
 
 ## Acceptance Criteria
 
@@ -152,19 +153,17 @@ Idea after the complete applied planning result is durable and verified.
 
 No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
 section. The optional delta remains run/phase data
-until the issue phase places its exact payload on the sole final
-implementation/integration issue in the same complete bundle. On the
+until the issue phase places its exact payload on the sole final closeout issue
+in the same complete bundle. On the
 existing-source route, explicit accepted delta data remains separate from the
 immutable source and every target must already fit that source's repository and
 path scope.
 
-Every multi-repository bundle has exactly one repo-owned integration partial
-with its distinct backend-owned title or
-path, retain `Partial role: integration` in its body, and include one
-Feature Dependency edge to every implementation partial. Require merged input
-when the durable contract says so; otherwise require an exact branch/HEAD
-dependency. This integration
-partial exists independently of a knowledge delta and never carries the delta
-in its Feature Spec body. A monorepo normally keeps FE, BE, app, and integration
-inside one Feature Spec worker and one App-managed worktree; do not add a
-dedicated integration partial merely because packages differ.
+In a multi-repository bundle, assign each combined boundary to an existing
+implementation partial that can execute the proof within its scope. Record its
+peer inputs as Feature Dependencies and include an executable `## Integration
+Execution Contract` in that partial. Different consumers may own different
+proofs against the same producer HEAD. Withhold the bundle when no existing
+partial can own a required proof; never create a dedicated integration partial.
+A monorepo normally keeps FE, BE, app, and integration inside one Feature Spec
+worker and one ChatGPT-created worktree.

@@ -153,51 +153,32 @@ For multi-repository work:
    partial; never reuse the parent ref for a child.
    In apply mode, make every multi-repository ref globally unambiguous: use
    `owner/repository#<number>` or a canonical hosted URL for GitHub and
-   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
-   `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` for
+   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` for
    local Markdown. Use those same refs in the repo-to-child mapping, sibling
    links, and Feature Dependencies; bare `#<number>` and bare repo-relative
    paths are invalid in a multi-repository bundle.
-3. Choose the one repository that owns cross-repository integration
-   proof from accepted scope and evidence;
-   stop if that owner is ambiguous. Create a dedicated integration partial with proposed ref
-   `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`.
-   Its mandatory Feature Dependencies table contains one edge to every
-   implementation partial, so it cannot execute until every upstream partial
-   exposes stable delivery evidence. Its generated visible App integration task
-   owns the cross-repository proof over the exact repository/branch/HEAD set.
-   The integration owner is an affected child repository selected from evidence;
-   this does not require or create a coordination repository. Create this
-   partial independently of `knowledge_delta`, and never render the delta in its
-   Feature Spec body. Require a bounded repo-owned integration vehicle that can
-   produce a concrete path change in addition to validation proof; withhold the
-   bundle if no such vehicle exists. Derive its
-   target branch as `<ordinary_target_branch_name>-integration` from the
-   resolved ordinary branch in the same repository; the default result is
-   `feature/<feature_slug>-integration`.
-4. Give the integration partial a durable identity distinct from the ordinary
-   implementation partial in the same repository. On GitHub, title it
-   `Feature Spec: <Feature Name> - Integration`, include
-   `Partial role: integration` in its Planning Identity, and use its own
-   `owner/repository#<number>` ref or canonical hosted URL as the applied
-   `source_spec_ref`. With the local backend, write it to
-   `planning/features/<feature-slug>/integration/SPEC.md` in the owning
-   repository, expose its applied source ref with the owning repository slug,
-   and keep its issues under the matching `integration/issues/` subtree.
-5. Validate every implementation-eligible partial as one bundle: each
+3. Assign each cross-repository boundary to one existing implementation partial
+   that can execute the combined proof within its accepted repository, paths,
+   tools, and validation budget. Multiple boundaries may have different owners:
+   for example, web owns web-to-backend proof and mobile owns mobile-to-backend
+   proof against the same backend revision. Name the required peer Specs in the
+   owner's Feature Dependencies and include the executable Integration Execution
+   Contract in that existing partial. If no existing partial can own a required
+   bundle-wide proof, withhold the bundle; never create a dedicated integration
+   Spec or future worker as a fallback.
+4. Validate every implementation-eligible partial as one bundle: each
    `(affected_repository, target_branch_name)` pair must have exactly one
    Feature Spec owner. The same branch string may appear in different
    repositories, but two partials in the same repository must not share it,
    even when paths are disjoint or dependencies serialize them. Resolve collisions
    before new publication; for an immutable existing source, stop rather than
    rename it.
-6. Add the complete repo-to-child-ref mapping and sibling links to every child
-   and integration partial.
-7. Start issue generation only after the complete linked artifact set exists.
+5. Add the complete repo-to-child-ref mapping and sibling links to every child.
+6. Start issue generation only after the complete linked artifact set exists.
 
 Mixed child tracker backends are valid because routing is an owning-repository
 fact, not one run-wide choice. Preserve one publication plan ordered by parent,
-implementation partials, the integration partial, cross-link updates, then
+implementation partials, cross-link updates, then
 generated issues. Proposed refs are inspection-only and never agent-executable.
 In apply mode, place every role, including an all-local bundle, in one
 recoverable publication transaction. Hosted roles use staging when their refs
@@ -235,8 +216,8 @@ source or a future issue to accommodate it.
 
 When the intake source is any member of a multi-repository bundle, traverse its
 canonical parent, repo-to-child, sibling, and Feature Dependency links to load
-the complete connected coordination, implementation, and dedicated integration
-Spec set. Validate every body's stable fields and ref through the same gates,
+the complete connected coordination and implementation Spec set. Validate every
+body's stable fields and ref through the same gates,
 preserving current acceptance checkbox markers. The
 coordination parent owns no generated implementation issues; pass only
 implementation-eligible partials to issue generation. A missing, ambiguous,
@@ -314,8 +295,7 @@ For every edge:
   `write_mode=propose`;
 - in a multi-repository applied bundle, require every upstream ref to identify
   its owning repository through `owner/repository#<number>`, a canonical hosted
-  URL, `<repository-slug>/planning/features/<feature-slug>/SPEC.md`, or
-  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`;
+  URL, or `<repository-slug>/planning/features/<feature-slug>/SPEC.md`;
 - reject self, duplicate, missing, and ambiguous refs;
 - require a concrete portable reason;
 - normalize upstream-to-downstream edges and validate the reachable Feature
@@ -369,15 +349,17 @@ Then verify:
 - every knowledge target has one unambiguous repository owner and lies inside
   the accepted Feature Spec repository/path scope, so the final issue can cover
   it without a later scope expansion;
-- every multi-repository bundle has exactly one dedicated integration partial
-  with Feature Dependencies covering every implementation
-  partial, and its title or path plus `Partial role: integration` distinguish it
-  from the implementation partial in the same repository;
-- every dedicated integration partial contains an executable
+- every cross-repository acceptance boundary names one or more existing
+  implementation partials as combined-proof owners and the exact peer Feature
+  Dependencies required by each owner;
+- every implementation partial that owns combined proof contains an executable
   `## Integration Execution Contract` covering component roles and start
   commands, endpoint/environment wiring, collision-safe ports, health checks,
   integration/E2E proof, timeout/retry/material budget, retained evidence,
-  cleanup, exact input SHA vector, HEAD reread, and required terminal outcome;
+  cleanup, exact input SHA vector, pre/post HEAD rereads by each owning worker,
+  required terminal outcome, and an explicit assignment of each component to
+  the proof-owner task or its peer task; each worker must stay inside its own
+  worktree and the proof owner must use peer-exposed component boundaries;
 - the body contains no workflow status field such as `Status: Draft`;
 - an applied local body contains exactly one `issue_type: <configured feature
   value>` header after the H1 and before `## Source`; GitHub and proposed
@@ -447,8 +429,8 @@ Hosted roles require staging because final issue numbers are unavailable before
 creation; deterministic local refs are resolved before mutation:
 
 1. Before any mutation, validate every role-keyed parameterized final-body
-   template and predeclare the complete parent, implementation, integration,
-   sibling, and Feature Dependency ref slots plus the exact optional configured
+   template and predeclare the complete parent, implementation, sibling, and
+   Feature Dependency ref slots plus the exact optional configured
    body-metadata slot and value. Generate one transaction identity and record
    each role, exact target, title, complete reconstructable template, allowed
    ref slots, and allowed body-metadata insertion. Materialize final bodies only
@@ -497,10 +479,8 @@ member and traverses the whole connected set.
 
 - `write_mode=apply`, GitHub: for a single Spec, publish the final sanitized
   body directly as `Feature Spec: <Feature Name>`. For a multi-repository
-  bundle, publish each hosted role through the transaction above: create every
-  predeclared hosted staging role, including exactly one
-  `Feature Spec: <Feature Name> - Integration` when GitHub owns it, then
-  finalize each hosted body through the authorized `edit`. Translate each write to
+  bundle, publish each parent or implementation role through the transaction
+  above, then finalize each hosted body through the authorized `edit`. Translate each write to
   GitStack-owned `mutation_mode=apply`, its exact target, and one canonical
   `issue_operation`; apply the configured feature metadata transport only after
   the final body verifies, and retain the hosted issue number or URL as
@@ -513,13 +493,8 @@ member and traverses the whole connected set.
   `issue_type: <configured tracker value>` after the H1 and before `## Source`.
   Do not add a workflow-state header to a Feature Spec. In a multi-repository bundle, use
   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` as the qualified
-  ref and create the file only as its predeclared transaction operation. Write
-  a dedicated integration partial to
-  `planning/features/<feature-slug>/integration/SPEC.md` inside its owning
-  repository, keep its issues under
-  `planning/features/<feature-slug>/integration/issues/`, and use
-  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` as
-  its qualified multi-repository ref. On exact continuation, create only missing
+  ref and create the file only as its predeclared transaction operation. On
+  exact continuation, create only missing
   predeclared local files whose targets and final bodies still match; never
   overwrite or repair a conflicting file.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
@@ -527,8 +502,7 @@ member and traverses the whole connected set.
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,
   or `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for a
-  repo-scoped implementation partial. A dedicated integration partial uses
-  `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`.
+  repo-scoped implementation partial.
   Return publication order and state that every proposed source and the
   complete proposed issue bundle are non-executable until applied.
 

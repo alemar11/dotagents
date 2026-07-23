@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+
+CLI_VERSION = "1.0.0"
+
+
+class VerifyError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def run_git(checkout: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", "-C", str(checkout), *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "git command failed"
+        raise VerifyError("git-command-failed", detail)
+    return result
+
+
+def canonical_checkout(raw: str, label: str) -> Path:
+    checkout = Path(raw).expanduser().resolve()
+    if not checkout.is_dir():
+        raise VerifyError("invalid-checkout", f"{label} is not a directory: {checkout}")
+    if run_git(checkout, "rev-parse", "--is-inside-work-tree").stdout.strip() != "true":
+        raise VerifyError("invalid-checkout", f"{label} is not a Git worktree: {checkout}")
+    return checkout
+
+
+def repo_path(checkout: Path, raw: str, label: str) -> tuple[PurePosixPath, Path]:
+    relative = PurePosixPath(raw)
+    if not raw or relative.is_absolute() or ".." in relative.parts:
+        raise VerifyError("invalid-repo-path", f"{label} must be a repository-relative path")
+    resolved = (checkout / Path(*relative.parts)).resolve()
+    try:
+        resolved.relative_to(checkout)
+    except ValueError as error:
+        raise VerifyError("invalid-repo-path", f"{label} escapes the checkout") from error
+    return relative, resolved
+
+
+def exact_sha(checkout: Path, revision: str, label: str) -> str:
+    result = run_git(checkout, "rev-parse", "--verify", f"{revision}^{{commit}}")
+    sha = result.stdout.strip()
+    if len(sha) not in {40, 64}:
+        raise VerifyError("invalid-git-head", f"{label} did not resolve to a full commit SHA")
+    return sha
+
+
+def require_clean(checkout: Path, label: str) -> None:
+    status = run_git(checkout, "status", "--porcelain", "--untracked-files=all").stdout
+    if status:
+        raise VerifyError("dirty-worktree", f"{label} is not clean")
+
+
+def markdown_checkboxes(path: Path, label: str) -> int:
+    if not path.is_file() or path.is_symlink():
+        raise VerifyError("missing-tracker-artifact", f"{label} is missing or not a regular file: {path}")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    in_acceptance = False
+    boxes: list[str] = []
+    for line in lines:
+        if line == "## Acceptance Criteria":
+            in_acceptance = True
+            continue
+        if in_acceptance and line.startswith("## "):
+            break
+        if in_acceptance and line.startswith("- [") and len(line) >= 5 and line[4:5] == "]":
+            boxes.append(line[3:4])
+    if not boxes:
+        raise VerifyError("missing-acceptance-criteria", f"{label} has no Acceptance Criteria checkboxes")
+    if any(marker not in {"x", "X"} for marker in boxes):
+        raise VerifyError("unchecked-acceptance-criteria", f"{label} has unchecked Acceptance Criteria")
+    return len(boxes)
+
+
+def workflow_state(path: Path) -> str:
+    values = [
+        line.split(":", 1)[1].strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("workflow_state:")
+    ]
+    if len(values) != 1 or not values[0]:
+        raise VerifyError("invalid-workflow-state", "issue must contain exactly one nonempty workflow_state")
+    return values[0]
+
+
+def verify_tracked(checkout: Path, relative: PurePosixPath, label: str) -> None:
+    result = run_git(checkout, "ls-files", "--error-unmatch", str(relative), check=False)
+    if result.returncode != 0:
+        raise VerifyError("untracked-tracker-artifact", f"{label} is not tracked at the declared HEAD")
+
+
+def issue_expectation(raw: str) -> tuple[str, str]:
+    path, separator, expected_state = raw.rpartition("=")
+    if not separator or not path or not expected_state:
+        raise VerifyError("invalid-issue-expectation", "--issue must use repository/path.md=expected-state")
+    return path, expected_state
+
+
+def local_branch(args: argparse.Namespace) -> dict[str, Any]:
+    checkout = canonical_checkout(args.checkout, "managed checkout")
+    original = canonical_checkout(args.original_checkout, "original checkout")
+    if checkout == original:
+        raise VerifyError("checkout-identity-mismatch", "managed and original checkout must differ")
+
+    expected_base = exact_sha(original, args.base_sha, "base SHA")
+    expected_head = exact_sha(checkout, args.head_sha, "head SHA")
+    observed_base = exact_sha(original, "HEAD", "original checkout HEAD")
+    observed_head = exact_sha(checkout, "HEAD", "managed checkout HEAD")
+    if observed_base != expected_base:
+        raise VerifyError("base-head-mismatch", "original checkout HEAD differs from the declared base SHA")
+    if observed_head != expected_head:
+        raise VerifyError("delivery-head-mismatch", "managed checkout HEAD differs from the declared head SHA")
+
+    base_branch = run_git(original, "branch", "--show-current").stdout.strip()
+    delivery_branch = run_git(checkout, "branch", "--show-current").stdout.strip()
+    if base_branch != args.base_branch:
+        raise VerifyError("base-branch-mismatch", f"expected {args.base_branch}, observed {base_branch or 'detached HEAD'}")
+    if delivery_branch != args.branch:
+        raise VerifyError("delivery-branch-mismatch", f"expected {args.branch}, observed {delivery_branch or 'detached HEAD'}")
+
+    require_clean(original, "original checkout")
+    require_clean(checkout, "managed checkout")
+    ancestry = run_git(checkout, "merge-base", "--is-ancestor", expected_base, expected_head, check=False)
+    if ancestry.returncode != 0:
+        raise VerifyError("invalid-ancestry", "declared base SHA is not an ancestor of the delivery HEAD")
+    diff_check = run_git(checkout, "diff", "--check", f"{expected_base}..{expected_head}", check=False)
+    if diff_check.returncode != 0:
+        raise VerifyError("invalid-diff", diff_check.stdout.strip() or diff_check.stderr.strip())
+
+    spec_relative, spec = repo_path(checkout, args.spec_path, "Feature Spec path")
+    verify_tracked(checkout, spec_relative, "Feature Spec")
+    spec_criteria = markdown_checkboxes(spec, "Feature Spec")
+    issues: list[dict[str, Any]] = []
+    for raw_issue in args.issue:
+        raw_path, expected_state = issue_expectation(raw_issue)
+        issue_relative, issue = repo_path(checkout, raw_path, "issue path")
+        parts = issue_relative.parts
+        done_index = next(
+            (index for index in range(len(parts) - 1) if parts[index : index + 2] == ("issues", "done")),
+            None,
+        )
+        if done_index is None:
+            raise VerifyError("issue-not-complete", "local completed issue must be under an issues/done directory")
+        active_relative = PurePosixPath(*(parts[: done_index + 1] + parts[done_index + 2 :]))
+        _, active_issue = repo_path(checkout, str(active_relative), "active issue path")
+        tracked_active = run_git(
+            checkout, "ls-tree", "-r", "--name-only", expected_head, "--", str(active_relative)
+        ).stdout.strip()
+        if active_issue.exists() or tracked_active:
+            raise VerifyError("duplicate-active-issue", "completed issue still exists at its active path")
+        verify_tracked(checkout, issue_relative, "completed issue")
+        issue_criteria = markdown_checkboxes(issue, "completed issue")
+        observed_state = workflow_state(issue)
+        if observed_state != expected_state:
+            raise VerifyError(
+                "workflow-state-mismatch",
+                f"expected workflow_state {expected_state}, observed {observed_state} in {issue_relative}",
+            )
+        issues.append(
+            {
+                "path": str(issue_relative),
+                "criteria_checked": issue_criteria,
+                "workflow_state": observed_state,
+            }
+        )
+
+    return {
+        "base_branch": base_branch,
+        "base_sha": observed_base,
+        "branch": delivery_branch,
+        "head_sha": observed_head,
+        "spec_path": str(spec_relative),
+        "spec_criteria_checked": spec_criteria,
+        "issues": issues,
+        "clean": True,
+        "ancestry_verified": True,
+        "diff_check": "passed",
+    }
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(description="Read-only terminal verification for implement-feature deliveries.")
+    root.add_argument("--version", action="version", version=CLI_VERSION)
+    root.add_argument("--json", action="store_true", help="emit a stable JSON result")
+    commands = root.add_subparsers(dest="command", required=True)
+    commands.add_parser("doctor", help="check local runtime dependencies")
+    local = commands.add_parser("local-branch", help="verify a local-branch delivery snapshot")
+    local.add_argument("--checkout", required=True)
+    local.add_argument("--original-checkout", required=True)
+    local.add_argument("--base-branch", required=True)
+    local.add_argument("--base-sha", required=True)
+    local.add_argument("--branch", required=True)
+    local.add_argument("--head-sha", required=True)
+    local.add_argument("--spec-path", required=True)
+    local.add_argument(
+        "--issue",
+        action="append",
+        required=True,
+        metavar="PATH=EXPECTED_STATE",
+        help="repeat for every completed issue in the Feature Spec graph",
+    )
+    return root
+
+
+def emit(payload: dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+    elif payload["ok"]:
+        print(f"{payload['command']}: ok")
+    else:
+        print(f"{payload['error']['code']}: {payload['error']['message']}", file=sys.stderr)
+
+
+def main() -> int:
+    args = parser().parse_args()
+    try:
+        if args.command == "doctor":
+            git = shutil.which("git")
+            if git is None:
+                raise VerifyError("missing-git", "git is not available on PATH")
+            data: dict[str, Any] = {"git": git, "python": sys.executable}
+        else:
+            data = local_branch(args)
+        emit({"ok": True, "version": CLI_VERSION, "command": args.command, "data": data}, args.json)
+        return 0
+    except (OSError, UnicodeError, VerifyError) as error:
+        failure = error if isinstance(error, VerifyError) else VerifyError("verification-io-error", str(error))
+        emit(
+            {
+                "ok": False,
+                "version": CLI_VERSION,
+                "command": args.command,
+                "error": {"code": failure.code, "message": failure.message},
+            },
+            args.json,
+        )
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

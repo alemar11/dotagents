@@ -99,13 +99,13 @@ completion.]
 
 ## Domain Knowledge Closeout
 
-[Include only on the final implementation/integration issue when the issue
+[Include only on the final closeout issue when the issue
 phase receives a knowledge delta as run data. In a single Spec, this issue must
 prove integrated feature behavior and satisfy the owner-excluded terminal rule
 from `issue-phase.md`. In
-a multi-repository bundle, it belongs to the dedicated integration partial,
-whose Feature Dependencies already wait for every implementation partial to
-merge; its issue dependencies remain local to that integration partial. Every
+a multi-repository bundle, it belongs to an existing implementation partial
+whose Feature Dependencies supply the exact peer inputs required for proof;
+its issue dependencies remain local to that partial. Every
 target surface below must resolve to a repository named in this issue's
 `affected_repositories` and a path equal to or contained by one of this issue's
 `allowed_paths`.]
@@ -138,15 +138,13 @@ knowledge_delta:
   not choose that delivery mechanism.
 - Local tracker: after implementation, integration proof, and any domain
   closeout succeed, move this file to the `done/` directory of its owning issue
-  subtree. An ordinary issue moves to
-  `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`; an integration
-  issue moves to
-  `planning/features/<feature-slug>/integration/issues/done/<NN>-<slug>.md`.
-  Create only the selected `done/` directory on demand. For multi-repository
+  subtree:
+  `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
+  Create the `done/` directory on demand. For multi-repository
   work, require cross-repo integration proof first. The Execution Contract must
   include the tracker-owning repository plus both the exact active and exact
   destination paths, and both paths must resolve inside that affected Git
-  repository. Rerun every final gate that the resulting head invalidates. The
+  repository. Rerun every final gate that the resulting head invalidates.
   Commit that move on the declared delivery branch. With `local-branch`, it
   remains local; with `github-pr`, it is included in the published branch and
   pull request.

@@ -138,7 +138,7 @@ For orchestrator workspace mode, preserve these points in the draft:
 - selected local or GitHub tracker backend;
 - accepted parent Feature Specs, linked repo-scoped partial Feature Specs,
   repo-owned local planning subtrees, vertical issues, sibling mappings, and
-  integration partials or gates are durable planning artifacts only when
+  combined-proof gates are durable planning artifacts only when
   `$plan-feature` handles them during real feature planning;
 - setup is config-only and must not create Feature Spec or issue subtrees;
 - setup must not create Idea issues, Idea files, or `planning/ideas/`

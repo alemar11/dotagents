@@ -97,14 +97,15 @@ Resolve `write_mode` once:
   checkout, review, publication, and merge authority out of planning artifacts.
 - Each implementation-eligible Spec owns a unique
   `(affected_repository, target_branch_name)` pair. Multi-repository bundles
-  use one distinct repo-owned integration Spec whose Feature Dependencies wait
-  for every implementation partial's required stable delivery evidence and
-  whose visible App worker owns real integration work over the exact SHA set.
-  A monorepo normally uses one worker/worktree across its packages.
+  assign every combined boundary to an existing repo-owned implementation Spec;
+  its Feature Dependencies name the peer inputs whose exact revisions the proof
+  requires. Ordinary workers collaborate directly, and no dedicated integration
+  Spec or worker is generated. A monorepo normally uses one worker/worktree
+  across its packages.
   `references/spec-phase.md` owns recoverable multi-repository publication.
 - Carry accepted durable planning decisions only as optional
   `knowledge_delta` phase data. Never persist it in a Feature Spec; put it only
-  on the final integration/closeout issue whose repository and allowed paths
+  on a final closeout issue whose repository and allowed paths
   contain every target. `references/issue-phase.md` owns terminal dependency
   derivation and continuation evidence.
 - Compress the candidate graph before freezing new IDs or invoking
@@ -293,15 +294,13 @@ Existing issues must match the stable graph and body contract; conflicts stop
 the run, while a complete matching applied bundle returns a verified no-op.
 
 If `knowledge_delta` is present in a single Spec, reuse or add a final
-integration issue, exclude it and its own `dependency_ids` while deriving the
+closeout issue, exclude it and its own `dependency_ids` while deriving the
 remaining graph's no-dependent terminals, then make it depend directly on all
 of them and reject any dependent of the owner. In a
-multi-repository bundle, generate at least one issue from the dedicated
-integration partial after its
-merge-wait Feature Dependencies cover every implementation partial; keep its
-issue dependencies local. Attach the delta only to the final integration issue
-when present. Harden and validate the selected final issue like every other
-issue.
+multi-repository bundle, select an existing implementation partial whose scope
+contains every knowledge target and whose dependencies cover the inputs needed
+for final proof. Attach the delta only to that partial's final closeout issue.
+Harden and validate the selected final issue like every other issue.
 
 ### 5. Reconcile Idea Sources
 

@@ -69,7 +69,7 @@ planning_blockers: []
 - App compatibility: compatible after publication replaces the proposed source
   ref with a durable hosted ref
 - Domain capture: the non-persisted run delta is deferred to the final
-  integration issue; the Feature Spec body carries no payload
+  closeout issue; the Feature Spec body carries no payload
 - Proposed issue ref: `proposed-issue:account-settings-export/01`
 - Final proposed issue ref: `proposed-issue:account-settings-export/02`
 - Intended tracker metadata after apply: canonical `task` through `native-type`
@@ -294,7 +294,7 @@ Root coordination never edits or judges individual criteria.
   implementation PR; closure occurs after merge.
 ```
 
-## Final Proposed Integration Issue
+## Final Proposed Closeout Issue
 
 Proposed issue ref: `proposed-issue:account-settings-export/02`
 
@@ -413,30 +413,23 @@ implementation_target_branches:
 The parent is coordination-only. Each generated implementation issue belongs
 to one repo-scoped partial and uses that partial's source ref.
 
-Every multi-repository bundle adds exactly one dedicated integration partial
-owned by the repository where a concrete integration change and integrated
-validation run:
+The existing web partial owns web-to-API combined proof. It names the API as a
+Feature Dependency and carries the executable Integration Execution Contract:
 
 ```text
-integration_source_spec_ref: proposed-spec:account-platform/account-settings-export/web/integration
-integration_feature_dependencies:
+combined_proof_owner: proposed-spec:account-platform/account-settings-export/web
+web_feature_dependencies:
   - upstream_feature_spec_ref: proposed-spec:account-platform/account-settings-export/api
-    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
-  - upstream_feature_spec_ref: proposed-spec:account-platform/account-settings-export/web
-    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
-integration_issue_ref: proposed-issue:account-platform/account-settings-export/web/integration/01
-integration_issue_dependency_ids: none
-integration_target_branch: feature/account-settings-export-integration
-knowledge_delta_owner: integration_issue_ref
+    dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
+combined_proof_issue_ref: proposed-issue:account-platform/account-settings-export/web/01
+combined_proof_target_branch: feature/account-settings-export
+knowledge_delta_owner: combined_proof_issue_ref
 ```
 
-The integration partial is downstream of both implementation partials, so its
-whole issue graph waits for their merges. Its issue IDs remain local to the
-integration partial; no sibling-partial issue ID is copied into
-`dependency_ids`. The integration issue owns a bounded change in the `web`
-repository plus the integrated proof, so it can produce a real integration change. The
-`knowledge_delta_owner` line is present only when a delta exists; the same
-integration partial and issue remain mandatory without one.
+The web and API workers may start together and communicate directly. Final web
+proof binds the exact API HEAD; no sibling-partial issue ID is copied into
+`dependency_ids`. The `knowledge_delta_owner` line is present only when a delta
+exists. No additional Spec, issue subtree, branch, or worker is created.
 
 ### Expected Applied Multi-Repository Identity Projection
 
@@ -448,37 +441,25 @@ are replaced:
 github_child_source_spec_refs:
   api: acme/account-api#241
   web: acme/account-web#118
-github_integration_source_spec_ref: acme/account-web#119
-github_integration_issue_source_spec_ref: acme/account-web#119
-github_integration_target_branch: feature/account-settings-export-integration
-github_integration_feature_dependencies:
+github_combined_proof_owner: acme/account-web#118
+github_web_feature_dependencies:
   - upstream_feature_spec_ref: acme/account-api#241
-    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
-  - upstream_feature_spec_ref: acme/account-web#118
-    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
+    dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
 local_child_source_spec_refs:
   api: api/planning/features/account-settings-export/SPEC.md
   web: web/planning/features/account-settings-export/SPEC.md
-local_integration_source_spec_ref: web/planning/features/account-settings-export/integration/SPEC.md
-local_integration_issue_source_spec_ref: web/planning/features/account-settings-export/integration/SPEC.md
-local_integration_target_branch: feature/account-settings-export-integration
-local_integration_issue_affected_repositories: web
-local_integration_issue_allowed_paths:
-  - web/src/account-settings/export-integration/**
-  - web/planning/features/account-settings-export/integration/issues/01-prove-integrated-export.md
-  - web/planning/features/account-settings-export/integration/issues/done/01-prove-integrated-export.md
-local_integration_feature_dependencies:
+local_combined_proof_owner: web/planning/features/account-settings-export/SPEC.md
+local_web_feature_dependencies:
   - upstream_feature_spec_ref: api/planning/features/account-settings-export/SPEC.md
-    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
-  - upstream_feature_spec_ref: web/planning/features/account-settings-export/SPEC.md
-    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
-local_integration_completion_path: web/planning/features/account-settings-export/integration/issues/done/01-prove-integrated-export.md
+    dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
+local_combined_proof_issue: web/planning/features/account-settings-export/issues/01-prove-integrated-export.md
+local_combined_proof_done: web/planning/features/account-settings-export/issues/done/01-prove-integrated-export.md
 ```
 
 Bare `#<number>` and bare repo-relative paths are not valid sibling identities.
-The applied integration Feature Spec and its generated issue are executable
-only after these durable refs replace every proposed ref; this projection does
-not publish or enqueue them.
+The applied implementation Specs and their issues are executable only after
+these durable refs replace every proposed ref; this projection does not publish
+or enqueue them.
 
 ### Multi-Repository Apply Transaction Projection
 
@@ -491,7 +472,6 @@ roles:
   - parent: hosted
   - implementation/api: hosted
   - implementation/web: local
-  - integration/web: local
 staging_contract:
   applies_to: hosted roles with unknown refs only
   marker: unique transaction and role
@@ -585,7 +565,6 @@ required_connected_set:
   - coordination-parent
   - implementation/api
   - implementation/web
-  - integration/web
 completion_scope: every implementation-eligible partial in the connected set
 ```
 
@@ -598,7 +577,7 @@ for only the intake partial is invalid.
 ## Knowledge Delta Single-Run Probe
 
 Any accepted `knowledge_delta` is carried directly through the same complete
-bundle run and persisted only on the final integration issue. The proposed
+bundle run and persisted only on the final closeout issue. The proposed
 Feature Spec remains payload-free, while the final proposed issue above carries
 the exact delta and its implementation-closeout contract. There is no
 successful partial planning result that can strand the delta between
@@ -621,7 +600,7 @@ handoff to match current state and must not reinterpret omission as
    evidence leave a material blocker; defer domain capture.
 3. Produce the complete Feature Spec body and deterministic proposed source
    ref without writing.
-4. Split candidate vertical issues, assign scope plus integration and closeout
+4. Split candidate vertical issues, assign scope plus combined proof and closeout
    ownership, run structural graph compression, then freeze final IDs.
 5. Run one or more `$plan-harder` passes per missing final issue; in this
    new-source proposal every final issue is missing. Persist only each final
@@ -657,7 +636,7 @@ handoff to match current state and must not reinterpret omission as
 5. Publish ordinary implementation issues in topological order; after each
    final body verifies, apply mapped `Task` through native type and
    `ready-for-agent` through its exact label.
-6. Publish the final integration/domain-closeout issue last.
+6. Publish the final combined-proof/domain-closeout issue last.
 7. Attach every generated issue to its owning Feature Spec when supported.
 
 This sequence is descriptive output only; it contains no executable command.
@@ -687,8 +666,8 @@ This sequence is descriptive output only; it contains no executable command.
   owner's terminal dependencies are not recomputed.
 - A Feature Spec body persists `knowledge_delta` or a
   `## Domain Knowledge Handoff` section.
-- A multi-repository bundle omits its distinct integration partial or emits a
-  validation-only integration issue that cannot produce a real integration change.
+- A cross-repository acceptance boundary has no existing implementation partial
+  capable of owning its exact-revision combined proof.
 - Domain knowledge is captured during planning or assigned to a docs-only
   issue.
 - A `knowledge_delta.target_surfaces` entry falls outside the final closeout

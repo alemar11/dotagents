@@ -64,11 +64,11 @@ class CompleteBundleFixtureTests(unittest.TestCase):
         cls.issue_01 = section(
             cls.fixture,
             "## Proposed Implementation Issue 01",
-            "## Final Proposed Integration Issue",
+            "## Final Proposed Closeout Issue",
         )
         cls.issue_02 = section(
             cls.fixture,
-            "## Final Proposed Integration Issue",
+            "## Final Proposed Closeout Issue",
             "## Expected Publication Order",
         )
 
@@ -201,7 +201,7 @@ class CompleteBundleFixtureTests(unittest.TestCase):
     def test_local_issue_paths_include_matching_done_destinations(self) -> None:
         done_paths = set(
             re.findall(
-                r"[a-z0-9-]+/planning/features/[a-z0-9-]+/(?:integration/)?issues/done/[a-z0-9-]+\.md",
+                r"[a-z0-9-]+/planning/features/[a-z0-9-]+/issues/done/[a-z0-9-]+\.md",
                 self.fixture,
             )
         )
@@ -221,12 +221,29 @@ class CompleteBundleFixtureTests(unittest.TestCase):
                 "proposed-spec:account-platform/account-settings-export",
                 "proposed-spec:account-platform/account-settings-export/api",
                 "proposed-spec:account-platform/account-settings-export/web",
-                "proposed-spec:account-platform/account-settings-export/web/integration",
             },
             proposed_refs,
         )
         self.assertIn("feature/account-settings-export", probe)
-        self.assertIn("feature/account-settings-export-integration", probe)
+        self.assertNotIn("feature/account-settings-export-integration", probe)
+
+    def test_multi_repository_runtime_has_no_dedicated_integration_artifact(self) -> None:
+        """Combined proof stays on ordinary implementation Specs and retired identities cannot reappear."""
+        runtime = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in [
+                SKILL_ROOT / "SKILL.md",
+                *sorted((SKILL_ROOT / "references").glob("*.md")),
+            ]
+        )
+        for retired in (
+            "Feature Spec: <Feature Name> - Integration",
+            "planning/features/<feature-slug>/integration/SPEC.md",
+            "Partial role: integration",
+            "proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration",
+            "exactly one distinct repo-owned integration partial",
+        ):
+            self.assertNotIn(retired, runtime)
 
     def test_docs_and_fixture_are_portable(self) -> None:
         contents = "\n".join(

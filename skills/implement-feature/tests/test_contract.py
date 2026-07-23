@@ -24,19 +24,48 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def normalized(contents: str) -> str:
         return " ".join(contents.split())
 
-    def test_given_startup_when_permission_is_resolved_then_it_is_the_only_user_question(self) -> None:
-        """Given startup, when permission is granted, then no later authority question is allowed."""
-        options = self.text("references/options.md")
+    def test_given_startup_when_authorization_is_resolved_then_it_is_the_only_user_interaction(self) -> None:
+        """Given startup, when required fields are granted, then no later authority question is allowed."""
+        options_raw = self.text("references/options.md")
+        options = self.normalized(options_raw)
         skill = self.text("SKILL.md")
-        self.assertIn("Ask once", options)
+        self.assertIn("same startup authorization interaction", options)
         self.assertIn("do not ask another user question", options)
         self.assertIn("Never ask another authority, recovery", skill)
-        self.assertEqual(re.findall(r"`visible_app_task_permission`", options).count("`visible_app_task_permission`"), 1)
+        self.assertEqual(
+            len(re.findall(r"^\| `visible_app_task_permission` \|", options_raw, re.MULTILINE)),
+            1,
+        )
+        self.assertIn("`missing_project_action`", options)
+        self.assertIn("`create-projects`, `stop`", options)
+
+    def test_given_missing_saved_projects_when_preflight_runs_then_setup_is_explicit_and_pre_state(self) -> None:
+        """Given a missing project mapping, preflight asks once or stops before operational state."""
+        skill = self.normalized(self.text("SKILL.md"))
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        options = self.normalized(self.text("references/options.md"))
+        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        self.assertIn("exact saved Git-project mapping before state", skill)
+        self.assertIn("whose path is exactly that repository root", bootstrap)
+        self.assertIn("A non-Git coordination workspace is not a substitute", bootstrap)
+        self.assertIn("before writing the manifest or calling `scripts/run-state`", bootstrap)
+        self.assertIn("Project creation is distinct from task creation", options)
+        self.assertIn("never treat task permission as project-creation permission", options)
+        self.assertIn("saved-project preflight", orchestration)
+
+    def test_given_authorized_project_setup_when_computer_use_selects_then_exact_paths_are_required(self) -> None:
+        """Given create-projects authority, Computer Use may create only exact verified Git roots."""
+        options = self.normalized(self.text("references/options.md"))
+        self.assertIn("authorizes only the exact paths listed in the question", options)
+        self.assertIn("require exact equality with the expected Git root", options)
+        self.assertIn("read `list_projects` again", options)
+        self.assertIn("Never create a broader substitute", options)
+        self.assertIn("the workspace root or `/private/tmp`", options)
 
     def test_given_compatible_operational_edits_when_worker_rereads_then_it_continues(self) -> None:
         """Given compatible design or test edits, when reread occurs, then worker accepts them autonomously."""
         spec = self.text("references/feature-spec-contract.md")
-        worker = self.text("references/worker-execution.md")
+        worker = self.normalized(self.text("references/worker-execution.md"))
         self.assertIn("implementation approach or internal technical design", spec)
         self.assertIn("additional or equivalent tests", spec)
         self.assertIn("accept compatible operational changes and continue autonomously", worker)
@@ -56,6 +85,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("only after that current-head proof exists", tracker)
         self.assertIn("uncheck it immediately", tracker)
         self.assertIn("Read the authoritative issue again", tracker)
+        self.assertIn("moving an issue into `issues/done/` is the completion", tracker)
+        self.assertIn("never write\n`workflow_state: done`", tracker)
 
     def test_given_worker_handoff_when_root_closes_then_root_is_read_only(self) -> None:
         """Given PR-ready worker evidence, when root verifies, then it never judges or edits criteria."""
@@ -81,7 +112,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         orchestration = self.text("references/chatgpt-task-orchestration.md")
         self.assertIn("Schedule up to three path-disjoint", skill)
         self.assertIn("overlapping paths or issue dependencies serialize", self.text("references/feature-spec-contract.md"))
-        self.assertIn("At most three workers may be live", orchestration)
+        self.assertIn("At most three workers may be executing", orchestration)
+        self.assertIn("`peer-input-ready` is parked", orchestration)
 
     def test_given_root_assignments_when_title_is_set_then_it_uses_exact_coarse_progress(self) -> None:
         """Given one or many Specs, when root title changes, then exact ready/total UI evidence is used."""
@@ -129,16 +161,24 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("performs none of those\nprovider operations", worker)
         self.assertIn("for `local-branch`: absence of push/PR/provider operations", gates)
 
-    def test_given_multi_repo_integration_when_scheduled_then_it_is_a_visible_worker_with_exact_inputs(self) -> None:
-        """Given a dedicated Integration Spec, when prerequisites stabilize, then another visible App task owns proof."""
+    def test_given_multi_repo_boundaries_when_scheduled_then_existing_workers_collaborate(self) -> None:
+        """Given cross-repo behavior, ordinary workers communicate and own exact-revision combined proof."""
         orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
-        worker = self.text("references/worker-execution.md")
+        worker = self.normalized(self.text("references/worker-execution.md"))
         spec = self.text("references/feature-spec-contract.md")
-        self.assertIn("dedicated integration Spec counts as another visible Codex worker task", orchestration)
-        self.assertIn("exact vector", orchestration)
-        self.assertIn("Dedicated Integration Worker", worker)
+        self.assertIn("There is no dedicated integration worker or reserved integration slot", orchestration)
+        self.assertIn("Workers communicate directly with their named peers", orchestration)
+        self.assertIn("a newly created peer's exact task/repository/branch/role/checkout identity", orchestration)
+        self.assertIn("A new peer-identity follow-up carries identity only", orchestration)
+        self.assertIn("Peer Collaboration And Combined Proof", worker)
+        self.assertIn("Each combined boundary has an existing worker as its proof owner", worker)
         self.assertIn("ChatGPT-created worktree evidence", spec)
-        self.assertIn("blocks the whole local cross-repository bundle", spec)
+        self.assertIn("Every worker remains isolated to its own worktree", worker)
+        self.assertIn("must not infer a peer HEAD", worker)
+        final_verification = self.normalized(self.text("references/final-verification.md"))
+        self.assertIn("must not access a peer worktree", final_verification)
+        self.assertNotIn("direct-worktree execution", worker)
+        self.assertIn("`blocked-app-capability`", spec)
 
     def test_given_final_gate_mismatch_when_root_follows_up_then_message_is_evidence_only(self) -> None:
         """Given repairable final evidence mismatch, when root messages, then worker autonomy and App reconciliation remain intact."""
@@ -154,17 +194,22 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("worker owns diagnosis, repair, validation", verification)
         self.assertIn("Final verification shows PR HEAD `def`", verification)
 
-    def test_given_cli_when_structurally_inspected_then_it_is_one_executable_schema_one_artifact(self) -> None:
-        """Given the package, when CLI structure is inspected, then one executable owns fresh schema 1."""
+    def test_given_clis_when_structurally_inspected_then_state_and_verification_stay_separate(self) -> None:
+        """Given the package, when CLIs are inspected, then one helper owns state and one stays read-only."""
         scripts = sorted(path.name for path in (ROOT / "scripts").iterdir() if path.is_file())
         source = self.text("scripts/run-state")
-        self.assertEqual(scripts, ["run-state"])
+        verifier = self.text("scripts/verify-ready")
+        self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
+        self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
         self.assertIn('CLI_VERSION = "1.0.0"', source)
         self.assertIn("STATE_SCHEMA_VERSION = 1", source)
         self.assertIn("BEGIN IMMEDIATE", source)
         self.assertNotIn(".lock", source)
         self.assertNotIn("migrate", source.lower())
+        self.assertIn('CLI_VERSION = "1.0.0"', verifier)
+        self.assertNotIn("sqlite3", verifier)
+        self.assertNotIn("run-state.sqlite3", verifier)
 
     def test_given_runtime_docs_when_references_are_routed_then_every_reference_is_reachable(self) -> None:
         """Given progressive disclosure, when routes are inspected, then every reference is linked by SKILL."""
@@ -179,7 +224,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         readme = (REPO / "README.md").read_text(encoding="utf-8")
         self.assertIn("The root coordinates", agents)
         self.assertIn("run-state.sqlite3", readme)
-        self.assertIn("One startup permission", readme)
+        self.assertIn("the one startup interaction", readme)
 
     def test_given_runtime_contract_when_state_boundary_is_read_then_text_content_stays_authoritative_elsewhere(self) -> None:
         """Given generic coordinator docs, when state ownership is read, then raw delivery content is excluded structurally."""

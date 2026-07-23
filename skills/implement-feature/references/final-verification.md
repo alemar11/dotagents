@@ -5,6 +5,13 @@ The worker first reports the terminal observation required by its stable
 Root then performs read-only verification; it does not edit code, rerun implementation,
 check boxes, uncheck boxes, or judge acceptance criteria.
 
+Collect the terminal reports and immutable current-head evidence for every
+ready candidate before mutating assignment state or visible titles. Reuse that
+snapshot while its tracker, task, checkout, branch, and HEAD identities remain
+unchanged; do not rerun equivalent reads between `R/N` title updates. If any
+identity or authoritative artifact changes, discard the affected snapshot and
+verify that assignment again.
+
 For each assignment, root rereads:
 
 - the current Feature Spec and issue graph, including final checkbox state;
@@ -19,6 +26,17 @@ For each assignment, root rereads:
   base, configured CI, mergeability, conflicts, rules, and approvals;
 - for `local-branch`: absence of push/PR/provider operations and an exact named
   local branch plus HEAD.
+
+For each `local-branch` candidate, run `scripts/verify-ready --json
+local-branch` once with the managed and original checkout identities, declared
+base and delivery branch/SHAs, repository-relative Feature Spec and completed
+issue paths, and each issue's canonical startup `workflow_state`, passing one
+`--issue path=state` argument for every issue in the graph. Its passing
+snapshot replaces ad hoc shell composition for branch identity, original
+checkout preservation, ancestry, cleanliness, `git diff --check`, tracked
+artifacts, completed-issue placement, final checkboxes, and workflow-state
+preservation. Root still verifies worker task, review, validation, peer, and
+no-provider evidence from their authoritative owners.
 
 If authoritative final evidence agrees, record `assignment ready`; that same
 transaction releases only this Feature Spec claim. If it does not, report
@@ -41,13 +59,21 @@ Goal back as completed, finish that recorded operation, and call
 mixed vector. Run finish verifies assignment-level release already occurred;
 it does not perform a repository-wide release. No terminal result merges.
 
-For a dedicated integration assignment, root may first record each prerequisite
-as `integration-input-ready`; its task and claim stay active and its exact HEAD
-is available to the integration bootstrap. Dispatch the visible integration
-task only after every prerequisite is in that state and a worker slot is free.
-Final integration readiness must contain the exact current prerequisite HEAD
-vector. A changed prerequisite HEAD invalidates prior proof; root routes the
-coarse failure or rerun request while workers retain technical ownership.
+An ordinary worker may first be recorded as `peer-input-ready`; its task and
+claim stay available while its exact HEAD becomes available to dependent peers
+and its execution slot becomes free.
+Final readiness for a worker that owns combined proof must contain the exact
+current prerequisite HEAD vector. A changed prerequisite HEAD invalidates prior
+proof. The proof owner sends the mismatch directly to the owning peer, that peer
+repairs its own repository, and the proof owner reruns the affected validation.
+Root observes and reconciles the resulting coarse evidence but does not relay
+routine technical messages or choose the fix.
+
+Verify each owning peer's task contains matching pre-start and post-cleanup HEAD
+reads plus endpoint, health, and cleanup evidence, and that the proof owner's
+combined result names the same SHA vector. The proof owner must not access a
+peer worktree; it validates only through the component boundary exposed by that
+peer.
 
 Before one assignment's bootstrap authority, a verified abort may archive its
 exact created worker, reconcile its recorded task changes, and call

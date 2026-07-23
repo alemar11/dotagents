@@ -32,8 +32,7 @@ When proposed output precedes the hosted Feature Spec, use
 `source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
 `proposed-spec:<project-slug>/<feature-slug>` for a multi-repository parent, or
 `proposed-spec:<project-slug>/<feature-slug>/<repository-slug>` for each
-repo-scoped implementation partial. A dedicated integration partial uses
-`proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration`.
+repo-scoped implementation partial.
 Order the proposal so each owning Feature Spec is created before its issues.
 Before hosted child creation, replace that proposed ref in the child's canonical
 `## Execution Contract` `source_spec_ref` row with the owning
@@ -43,15 +42,6 @@ multi-repository partial. Use the same globally qualified identity in
 repo-to-child mappings, sibling links, and cross-repository Feature Dependency
 rows. Never treat a proposed ref as an executable source, use a bare issue
 number across repositories, or add a duplicate header field.
-
-On apply, a dedicated integration partial is a second hosted Feature Spec in
-its evidence-derived owner repository. Give it the distinct title
-`Feature Spec: <Feature Name> - Integration`, retain
-`Partial role: integration` in its Planning Identity, and use its own hosted
-issue number, expressed as an `owner/repository#<number>` ref or canonical
-hosted URL, as the durable `source_spec_ref`. It must not reuse the ordinary
-implementation partial's title, body identity, or issue number. Selecting an
-integration owner does not require a coordination repository.
 
 ## Conventions
 
@@ -79,7 +69,6 @@ consumption; Feature Spec and implementation-issue workflows remain valid.
 ## Title Format
 
 - Feature Spec issue: `Feature Spec: <Feature Name>`
-- Integration Feature Spec issue: `Feature Spec: <Feature Name> - Integration`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 - Idea issue: `Idea: <Name>`
 
@@ -111,9 +100,6 @@ Idea issues.
   reference.
 - Publish the Feature Spec as a GitHub issue titled
   `Feature Spec: <Feature Name>`.
-- Publish a dedicated integration partial, when present, as a separate GitHub
-  issue titled `Feature Spec: <Feature Name> - Integration`, with
-  `Partial role: integration` in its body.
 - Treat generated implementation issues as the execution graph. Do not create
   a separate execution-plan issue.
 - Publish implementation issues as sub-issues of the Feature Spec with titles

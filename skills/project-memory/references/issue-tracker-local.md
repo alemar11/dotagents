@@ -26,9 +26,7 @@ Feature Spec,
 `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>` for a
 multi-repository parent, or
 `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>`
-for a repo-scoped implementation partial, or
-`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration`
-for a dedicated integration partial until that Feature Spec is written. A
+for a repo-scoped implementation partial. A
 proposed ref and any `planning/tmp/` artifact are non-executable and must never
 be used as a durable `ready-for-agent` source.
 
@@ -36,8 +34,7 @@ Applied single-repository refs use the repo-relative durable path. Applied
 multi-repository partials prefix that path with the owning repository slug,
 using the canonical
 `<repository-slug>/planning/features/<feature-slug>/SPEC.md` shape. For example,
-`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
-`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`.
+`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md`.
 Use the same qualified refs in repo-to-child mappings, sibling links, and
 Feature Dependencies. A bare repo-relative path is invalid across sibling
 repositories because identical tracker paths can exist in more than one child.
@@ -46,12 +43,6 @@ repositories because identical tracker paths can exist in more than one child.
 
 - One feature per directory: `planning/features/<feature-slug>/`
 - The Feature Spec is `planning/features/<feature-slug>/SPEC.md`
-- A dedicated integration partial in the same repository is
-  `planning/features/<feature-slug>/integration/SPEC.md`; its issues are
-  `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` and its
-  completed issues move under the matching `integration/issues/done/`
-  subtree. It never reuses the implementation partial's `SPEC.md` or
-  `issues/` paths.
 - Implementation issues are
   `planning/features/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
 - Implementation issue headings use:
@@ -116,12 +107,6 @@ delivery branch from
 `planning/features/<feature-slug>/issues/<NN>-<slug>.md` to
 `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
-For a dedicated integration partial, move the issue from
-`planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` to
-`planning/features/<feature-slug>/integration/issues/done/<NN>-<slug>.md`.
-Derive the completion target from the owning issue subtree; never move an
-integration issue into the ordinary feature's `issues/done/` directory.
-
 Do not delete completed issue files or add a `done` status. The `done/` folder
 is the completion signal; `workflow_state:` remains the lifecycle state for
 active issues. Create the folder on demand when completing the first issue.
@@ -139,9 +124,7 @@ implementation stopping point or prescribe its delivery proof.
 For `write_mode=apply`, create or update the durable artifact under
 `planning/features/<feature-slug>/`, creating directories as needed. For
 `write_mode=propose`, return the would-be durable path and body without writing
-it. A dedicated integration partial uses the distinct `integration/` subtree
-in the evidence-derived owner repository; it does not require a coordination
-repository.
+it.
 
 For an authorized Idea-capture `write_mode=apply`, create the durable artifact
 at `planning/ideas/<idea-slug>.md`; Project Memory setup alone never authorizes

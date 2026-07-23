@@ -22,6 +22,10 @@ the current GitStack issue workflow; local Markdown changes stay inside the
 worker's assigned worktree, are committed with the implementation, and receive
 the same post-change validation and review.
 
+For local Markdown, moving an issue into `issues/done/` is the completion
+signal. Preserve its existing canonical `workflow_state`; never write
+`workflow_state: done` or invent another completion state.
+
 Recovery repeats the same read-before-write and read-after-write sequence.
 Never infer success from an earlier response, stale checkbox, worker summary,
 or root opinion. Root must not edit, check, uncheck, reinterpret, or adjudicate

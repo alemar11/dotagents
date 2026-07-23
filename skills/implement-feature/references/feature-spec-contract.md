@@ -17,12 +17,13 @@ Each selected Spec must establish stable fields for:
 - literal validation commands plus material retry or attempt budget and required
   terminal result.
 
-An ordinary external dependency must satisfy its stable dependency contract
-before startup. A dedicated integration Spec in the selected bundle is the
-exception: its visible Codex worker waits for every prerequisite assignment's
-exact repository, branch, HEAD, and ChatGPT-created worktree evidence. GitHub input
-must be merged only when the durable dependency explicitly requires it. Never
-use claim release alone as dependency or integration proof.
+An external dependency must satisfy its stable dependency contract before the
+dependent proof can become final. Ordinary peer tasks may start earlier and
+collaborate while the prerequisite implementation is still converging. Final
+combined proof binds every prerequisite assignment's exact repository, branch,
+HEAD, and ChatGPT-created worktree evidence. GitHub input must be merged only
+when the durable dependency explicitly requires it. Never use claim release alone
+as dependency or combined proof.
 
 One selected implementation Spec owns one repository, head branch, visible task,
 worktree, worker, delivery result, and claim. `github-pr` additionally owns one
@@ -41,12 +42,17 @@ identified as `github:owner/repository` may validly use a local Markdown
 `tracker_backend` fact while terminal validation keys from `delivery_type`.
 
 In a monorepo, one coherent Spec worker normally owns FE, BE, app, and their
-integration in one worktree. In a multi-repository bundle, the dedicated
-integration Spec is another implementation-eligible visible Codex task. Before
-the one startup permission or state creation, require authoritative ChatGPT
-desktop project evidence that its task can access every exact sibling
-ChatGPT-created worktree. Absence or ambiguity blocks the whole local cross-repository bundle;
-root execution and future manual testing are forbidden fallbacks.
+integration in one worktree. In a multi-repository bundle, existing repository
+workers own the combined boundaries named by the plan and communicate directly.
+Planning must assign component startup, HEAD readback, endpoint wiring, health,
+validation, and cleanup to those ordinary workers without assuming a shared
+filesystem. Before state, verify only that every repository can receive its
+ordinary task/worktree and that the topology is complete. After those worktrees
+exist, every worker stays inside its own checkout and proves distributed
+peer-owned component execution. If the tasks cannot communicate or expose the
+required components, the affected bundle is `blocked-app-capability`;
+cross-worktree access, a dedicated integration task, root execution, raw
+worktrees, copied sources, and future manual testing are forbidden fallbacks.
 
 ## Drift Classification
 

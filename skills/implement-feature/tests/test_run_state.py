@@ -213,13 +213,14 @@ class RunStateScenarios(unittest.TestCase):
         *,
         number: int = 1,
         repository_identity: str | None = None,
-        integration_input: bool = False,
+        peer_input: bool = False,
         prerequisite_heads: dict[str, str] | None = None,
         expected: int = 0,
         worktree_clean: bool = True,
         head_branch_name: str | None = None,
+        head_sha: str | None = None,
     ) -> dict[str, object]:
-        sha = f"{200 + number:040x}"
+        sha = head_sha or f"{200 + number:040x}"
         observation = {
             "schema_version": 1,
             "assignment_id": f"spec-{number:02d}",
@@ -245,8 +246,8 @@ class RunStateScenarios(unittest.TestCase):
             "--expected-revision", self.revision(run_id),
             "--observation", str(self.write_json(f"local-ready-{run_id}-{number}.json", observation)),
         ]
-        if integration_input:
-            arguments.append("--integration-input")
+        if peer_input:
+            arguments.append("--peer-input")
         return self.invoke(*arguments, expected=expected)
 
     def finish_pr_ready(self, run_id: str) -> None:
@@ -297,6 +298,19 @@ class RunStateScenarios(unittest.TestCase):
         assignment = shown["assignments"][0]
         self.assertEqual(assignment["source_spec_ref"], "project/planning/features/feature-1/SPEC.md")
         self.assertEqual(assignment["delivery_type"], "local-branch")
+
+    def test_given_retired_integration_source_ref_when_run_starts_then_it_is_rejected(self) -> None:
+        """Given the removed dedicated-integration path, startup rejects it instead of treating it as a Spec."""
+        manifest = self.manifest("retired-integration-ref", tracker_backend="local")
+        manifest["assignments"][0]["source_spec_ref"] = (
+            "project/planning/features/feature-1/integration/SPEC.md"
+        )
+        error = self.invoke(
+            "run", "start", "--manifest",
+            str(self.write_json("retired-integration-ref.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-input")
 
     def test_given_local_tracker_when_delivery_is_github_pr_then_provider_closeout_remains_supported(self) -> None:
         """Given local Markdown tracking, when delivery is github-pr, then source and PR transports stay independent."""
@@ -384,37 +398,88 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(detached["error"]["code"], "target-branch-drift")
 
-    def test_given_integration_assignment_when_inputs_stabilize_then_dispatch_and_sha_vector_are_enforced(self) -> None:
-        """Given two local partials, when integration runs, then exact prerequisite HEADs gate dispatch and proof."""
+    def test_given_peer_assignments_when_inputs_stabilize_then_early_dispatch_and_sha_vector_are_enforced(self) -> None:
+        """Given dependent peers, both may start early while combined proof binds the exact prerequisite HEADs."""
         identity = self.local_identity(self.common_a)
         manifest = self.manifest(
             "integration-vector",
             repositories=[(identity, self.common_a)],
-            assignment_count=2,
+            assignment_count=3,
         )
         manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
+        manifest["assignments"][2]["prerequisite_assignment_ids"] = ["spec-02"]
         self.invoke("run", "start", "--manifest", str(self.write_json("integration-vector.json", manifest)))
         self.create_goal("integration-vector")
-        early = self.invoke(
-            "app-operation", "begin", "--run-id", "integration-vector",
-            "--expected-revision", self.revision("integration-vector"),
-            "--operation-key", "early-integration", "--action", "create-worker",
-            "--subject-id", "spec-02", expected=4,
-        )
-        self.assertEqual(early["error"]["code"], "prerequisites-not-ready")
-        self.create_worker("integration-vector", 1)
+        for number in (2, 1, 3):
+            self.create_worker("integration-vector", number)
         partial = self.ready_local_worker(
             "integration-vector", number=1, repository_identity=identity,
-            integration_input=True,
+            peer_input=True,
         )
-        self.assertEqual(partial["state"], "integration-input-ready")
-        self.create_worker("integration-vector", 2)
+        self.assertEqual(partial["state"], "peer-input-ready")
+        exact_head = f"{201:040x}"
+        proof_owner = self.ready_local_worker(
+            "integration-vector", number=2, repository_identity=identity,
+            prerequisite_heads={"spec-01": exact_head}, peer_input=True,
+        )
+        self.assertEqual(proof_owner["state"], "peer-input-ready")
+
+        replacement_head = f"{777:040x}"
+        self.ready_local_worker(
+            "integration-vector", number=1, repository_identity=identity,
+            peer_input=True, head_sha=replacement_head,
+        )
+        replaced = self.invoke("run", "show", "--run-id", "integration-vector")
+        upstream = next(
+            row for row in replaced["assignments"] if row["assignment_id"] == "spec-01"
+        )
+        self.assertEqual(upstream["head_sha"], replacement_head)
         stale = self.ready_local_worker(
             "integration-vector", number=2, repository_identity=identity,
-            prerequisite_heads={"spec-01": f"{999:040x}"},
+            prerequisite_heads={"spec-01": exact_head},
             expected=4,
         )
-        self.assertEqual(stale["error"]["code"], "integration-head-drift")
+        self.assertEqual(stale["error"]["code"], "prerequisite-head-drift")
+        ready = self.ready_local_worker(
+            "integration-vector", number=2, repository_identity=identity,
+            prerequisite_heads={"spec-01": replacement_head},
+        )
+        self.assertEqual(ready["state"], "local-branch-ready")
+
+    def test_given_peer_input_ready_worker_when_contract_drifts_then_it_can_block(self) -> None:
+        """Given a parked peer, durable drift still records a terminal block and retains its claim."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest(
+            "peer-block", repositories=[(identity, self.common_a)], assignment_count=2,
+        )
+        manifest["assignments"][1]["prerequisite_assignment_ids"] = ["spec-01"]
+        self.invoke("run", "start", "--manifest", str(self.write_json("peer-block.json", manifest)))
+        self.create_goal("peer-block")
+        self.create_worker("peer-block", 1)
+        self.ready_local_worker(
+            "peer-block", number=1, repository_identity=identity, peer_input=True,
+        )
+        blocked = self.invoke(
+            "assignment", "block", "--run-id", "peer-block",
+            "--expected-revision", self.revision("peer-block"),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(blocked["state"], "blocked-durable-contract")
+        self.assertTrue(blocked["claim_retained"])
+
+    def test_given_runtime_topology_is_unavailable_when_worker_blocks_then_capability_is_distinct(self) -> None:
+        """Given post-bootstrap App limitations, capability blocking is not misclassified as contract drift."""
+        self.start("capability-block")
+        self.create_goal("capability-block")
+        self.create_worker("capability-block")
+        blocked = self.invoke(
+            "assignment", "capability-block", "--run-id", "capability-block",
+            "--expected-revision", self.revision("capability-block"),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(blocked["state"], "blocked-app-capability")
+        self.assertEqual(blocked["run_status"], "blocked")
+        self.assertTrue(blocked["claim_retained"])
 
     def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
         """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
@@ -601,6 +666,29 @@ class RunStateScenarios(unittest.TestCase):
             expected=4,
         )
         self.assertEqual(error["error"]["code"], "worker-capacity-reached")
+
+    def test_given_one_worker_is_parked_for_peers_when_fourth_creation_begins_then_slot_is_reused(self) -> None:
+        """Given three created peers, input-ready parking preserves repair access without blocking the next assignment."""
+        identity = self.local_identity(self.common_a)
+        manifest = self.manifest(
+            "parked-peer",
+            repositories=[(identity, self.common_a)],
+            assignment_count=4,
+        )
+        manifest["assignments"][3]["prerequisite_assignment_ids"] = ["spec-01"]
+        self.invoke("run", "start", "--manifest", str(self.write_json("parked-peer.json", manifest)))
+        self.create_goal("parked-peer")
+        for number in (1, 2, 3):
+            self.create_worker("parked-peer", number)
+        parked = self.ready_local_worker(
+            "parked-peer", number=1, repository_identity=identity, peer_input=True,
+        )
+        self.assertEqual(parked["state"], "peer-input-ready")
+        self.create_worker("parked-peer", 4)
+        shown = self.invoke("run", "show", "--run-id", "parked-peer")
+        states = {row["assignment_id"]: row["state"] for row in shown["assignments"]}
+        self.assertEqual(states["spec-01"], "peer-input-ready")
+        self.assertEqual(states["spec-04"], "active")
 
     def test_given_no_root_goal_when_worker_creation_begins_then_controller_rejects_it(self) -> None:
         """Given claimed state but no Goal, when worker creation begins, then bootstrap authority cannot start."""
@@ -1098,6 +1186,34 @@ class RunStateScenarios(unittest.TestCase):
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertTrue(self.database.exists())
+
+    def test_given_same_number_schema_with_retired_input_state_when_read_then_runtime_fails_closed(self) -> None:
+        """Given the former integration-only state constraint, schema 1 rejects it instead of failing on a later write."""
+        self.start("stale-state-constraint")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA writable_schema=ON")
+            connection.execute(
+                "UPDATE sqlite_master SET sql=replace(sql, 'peer-input-ready', 'integration-input-ready') "
+                "WHERE type='table' AND name='assignments'"
+            )
+            connection.execute("PRAGMA writable_schema=OFF")
+        error = self.invoke("doctor", expected=4)
+        self.assertEqual(error["error"]["code"], "invalid-state-schema")
+        self.assertTrue(self.database.exists())
+
+    def test_given_schema_one_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
+        """Given the earlier schema-1 constraint, the new runtime rejects it without migration or deletion."""
+        self.start("stale-capability-state")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA writable_schema=ON")
+            connection.execute(
+                "UPDATE sqlite_master SET sql=replace(sql, 'blocked-app-capability', 'retired-app-capability') "
+                "WHERE type='table' AND name='assignments'"
+            )
+            connection.execute("PRAGMA writable_schema=OFF")
         error = self.invoke("doctor", expected=4)
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())

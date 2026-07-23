@@ -23,7 +23,7 @@ class GraphCompressionReplayTests(unittest.TestCase):
                 "closeout-terminal-recompute",
                 "overlapping-lifecycle-fragments",
                 "same-size-independent-outcomes",
-                "cross-spec-integration-owner",
+                "cross-spec-combined-proof-owner",
                 "fragmented-many-candidates",
                 "many-independent-outcomes",
             },
@@ -111,19 +111,16 @@ class GraphCompressionReplayTests(unittest.TestCase):
         self.assertTrue(all(len(issue["from"]) == 1 for issue in replay["final_issues"]))
 
     def test_cross_spec_ordering_stays_out_of_issue_dependency_ids(self) -> None:
-        replay = self.cases["cross-spec-integration-owner"]
-        integration_issue = next(
-            issue for issue in replay["final_issues"] if issue["role"] == "integration"
+        replay = self.cases["cross-spec-combined-proof-owner"]
+        proof_issue = next(
+            issue for issue in replay["final_issues"] if issue["role"] == "combined-proof"
         )
 
-        self.assertEqual([], integration_issue["depends_on"])
-        self.assertEqual("integration", integration_issue["spec"])
-        self.assertEqual(
-            {"api", "web"},
-            {edge["upstream_spec"] for edge in replay["feature_dependencies"]},
-        )
+        self.assertEqual([], proof_issue["depends_on"])
+        self.assertEqual("web", proof_issue["spec"])
+        self.assertEqual({"api"}, {edge["upstream_spec"] for edge in replay["feature_dependencies"]})
         self.assertTrue(
-            all(edge["spec"] == "integration" for edge in replay["feature_dependencies"])
+            all(edge["spec"] == "web" for edge in replay["feature_dependencies"])
         )
 
     def test_domain_closeout_owner_survives_as_the_terminal_issue(self) -> None:

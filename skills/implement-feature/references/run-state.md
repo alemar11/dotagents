@@ -66,9 +66,11 @@ scripts/run-state --json app-operation list --run-id RUN
 
 scripts/run-state --json assignment ready \
   --run-id RUN --expected-revision N --observation /absolute/ready.json
-scripts/run-state --json assignment ready --integration-input \
+scripts/run-state --json assignment ready --peer-input \
   --run-id RUN --expected-revision N --observation /absolute/ready.json
 scripts/run-state --json assignment block \
+  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
+scripts/run-state --json assignment capability-block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json assignment abort \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
@@ -111,13 +113,14 @@ Goal, and at most three workers may be live.
 
 `assignment ready` validates delivery-specific typed evidence, atomically
 records normal Git facts, and releases that assignment's claim.
-`--integration-input` instead records the current prerequisite HEAD and retains
-the task and claim. Integration ready evidence must reproduce the current exact
+`--peer-input` instead records the current HEAD for dependent peers, retains
+the task and claim, and parks the worker so another assignment can use the
+execution slot. Combined ready evidence must reproduce the current exact
 prerequisite HEAD vector; drift fails closed. `assignment abort` releases one
 claim only before bootstrap
 authority. A durable-contract block retains only the affected claim. `run
 finish` completes aggregate run state after assignment-level release; claim
-release never proves upstream merge or integration.
+release never proves upstream merge or combined behavior.
 
 ## Recovery Observation
 

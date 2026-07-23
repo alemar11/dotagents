@@ -86,14 +86,11 @@ Read the Feature Spec and verify:
   retained evidence, and required terminal outcome;
 - affected repositories and allowed paths resolve to real planning scope;
 - the target branch is valid and shared across all affected repositories;
-- a dedicated integration partial uses a target branch distinct from the
-  ordinary partial branch in the same owner repository;
 - every Feature Spec dependency ref resolves and the cross-Spec graph is
   acyclic;
 - every applied multi-repository source and dependency ref is globally
   unambiguous: `owner/repository#<number>` or a canonical hosted URL for GitHub,
-  and `<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
-  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` for
+  and `<repository-slug>/planning/features/<feature-slug>/SPEC.md` for
   local Markdown;
 - the complete parent/child Feature Spec mapping exists for multi-repository
   work;
@@ -170,8 +167,10 @@ Require every ref to exist, reject self-dependencies, and validate the graph is
 acyclic. Derive which issues an issue blocks by scanning all dependency lists;
 do not store a second reverse-edge field.
 
-Feature Spec dependencies affect when the whole Feature Spec may start. Do not
-copy upstream Feature Spec refs into an issue's dependency list.
+Feature Spec dependencies identify peer inputs required for final proof; they do
+not by themselves forbid an ordinary peer worker from starting early and
+collaborating. Do not copy upstream Feature Spec refs into an issue's dependency
+list.
 
 ### 3. Assign Repository Scope
 
@@ -198,21 +197,18 @@ All issues use the Feature Spec's shared `target_branch_name`. Repository
 topology stays a Project Memory fact and is not copied into a selectable issue
 field.
 
-### 4. Assign Integration And Domain Closeout
+### 4. Assign Combined Proof And Domain Closeout
 
-Every multi-repository bundle has exactly one dedicated repo-owned integration
-partial whose Feature Dependencies cover every implementation partial.
-Generate at least one real integration issue from that partial after the
-upstream merge waits; this issue owns the cross-repository proof whether or not
-`knowledge_delta` exists. It must own a bounded repository/path change plus the
-proof, not a no-op or validation-only task, so an executor can produce a real
-integration change. If no such integration vehicle exists, withhold the bundle
-as blocked. Keep its `dependency_ids` local to the integration partial.
-
-All integration issues use the integration partial's distinct branch derived as
-`<ordinary_target_branch_name>-integration`; with the default ordinary branch
-this is `feature/<feature_slug>-integration`. Never reuse the ordinary partial's
-branch in the same owner repository.
+For every cross-repository boundary, choose an existing implementation partial
+whose worker can execute the proof within its accepted paths and tools. Record
+the required producer partials in Feature Dependencies and describe the exact
+revision vector, startup, wiring, health, validation, evidence, and cleanup in
+that partial's Integration Execution Contract. Assign each component process to
+the proof owner or its owning peer and require that worker's pre/post HEAD
+readback; never assume the proof owner can access sibling filesystems. Multiple consumer partials may
+own separate proofs against one producer. A bundle-wide criterion must name one
+existing partial as owner. If no existing partial can own it, withhold the
+bundle instead of creating another Spec, issue subtree, branch, or worker.
 
 If `knowledge_delta` is absent, generate no domain closeout section.
 
@@ -226,12 +222,11 @@ If `knowledge_delta` is present:
    it can remain topologically last after these dependencies; reuse a durable
    seed only when its existing closeout payload and dependencies are already
    exact. Otherwise append a new owner without modifying the retained issue.
-2. For a multi-repository bundle, accept the delta as phase data only while
-   generating the dedicated integration partial's issues. Require that
-   partial's Feature Dependencies to cover every implementation partial and
-   therefore wait for all upstream merges. Reject delta assignment to the
-   coordination parent or an ordinary implementation partial. Within the
-   integration partial, reuse or append the closeout owner and apply the same
+2. For a multi-repository bundle, assign the delta to one existing
+   implementation partial whose accepted repository and paths contain every
+   target. Reject assignment to the coordination parent and reject the bundle
+   when no existing partial can own all targets without scope expansion. Within
+   the selected partial, reuse or append the closeout owner and apply the same
    owner-excluded terminal algorithm only to that partial. Reject a dependent
    of the owner and never copy sibling-partial issue IDs. Reuse an unpublished
    candidate only when it can remain topologically last inside that partial;
@@ -473,9 +468,9 @@ mutation. Under `write_mode=propose`, report each missing label creation as an
 intended operation and perform no mutation. Preserve verified label creations
 in partial-failure recovery and retry only a still-missing operation.
 
-Order output topologically, with the final integration issue last for a
-multi-repository bundle and its domain closeout attached only when a delta
-exists.
+Order output topologically, with the final combined-proof or closeout issue last
+inside its owning implementation partial and its domain closeout attached only
+when a delta exists.
 
 - `write_mode=apply`, GitHub: retain exact existing issues and publish only
   missing issues through
@@ -492,14 +487,10 @@ exists.
   native type mutation when GitHub Issue Types are disabled.
 - `write_mode=apply`, local: retain exact existing files and write only missing
   `planning/features/<feature-slug>/issues/<NN>-<slug>.md` in the owning
-  repository. Issues owned by a dedicated integration partial use
-  `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` in that
   repository. Insert canonical `issue_type: task` and
   `workflow_state: ready-for-agent` header lines. Preserve generated IDs in
   filenames and dependency data. Render completion into the matching subtree:
-  ordinary issues move to `planning/features/<feature-slug>/issues/done/`,
-  while integration issues move to
-  `planning/features/<feature-slug>/integration/issues/done/`. Before output,
+  issues move to `planning/features/<feature-slug>/issues/done/`. Before output,
   include the tracker-owning repository and both exact source and destination
   paths in each issue's Execution Contract.
   For a contract-equivalent existing active file with only missing canonical
@@ -513,9 +504,7 @@ exists.
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
   `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/<NN>` for an
-  issue owned by a multi-repository implementation partial. An issue owned by
-  the dedicated integration partial uses
-  `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/integration/<NN>`.
+  issue owned by a multi-repository implementation partial.
   On the new-source route, state that neither proposed source nor proposed
   issues are executable until applied. On the existing-source route, preserve
   the supplied source as durable and state that only the proposed issue or

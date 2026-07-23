@@ -29,7 +29,7 @@
           "from": ["c08"],
           "title": "Let account owners download their export",
           "depends_on": ["01"],
-          "role": "integration-closeout",
+          "role": "domain-closeout",
           "why": "The user download path is independently observable and owns final integrated proof."
         }
       ],
@@ -47,7 +47,7 @@
       "final_issues": [
         {"id": "01", "spec": "main", "from": ["c01"], "title": "Deliver the export API", "depends_on": [], "role": "vertical", "why": "The API is independently valuable and has distinct contract proof."},
         {"id": "02", "spec": "main", "from": ["c02"], "title": "Deliver the export audit query", "depends_on": [], "role": "vertical", "why": "The audit query is independently valuable; its candidate ordering behind the API was artificial."},
-        {"id": "03", "spec": "main", "from": ["c03"], "title": "Prove the integrated export and capture accepted knowledge", "depends_on": ["01", "02"], "role": "integration-closeout", "why": "The closeout owner remains final and must wait for every terminal after graph repair."}
+        {"id": "03", "spec": "main", "from": ["c03"], "title": "Prove the integrated export and capture accepted knowledge", "depends_on": ["01", "02"], "role": "domain-closeout", "why": "The closeout owner remains final and must wait for every terminal after graph repair."}
       ],
       "removed_dependency_edges": [["c02", "c01"]],
       "domain_closeout_owner": "03",
@@ -107,24 +107,22 @@
       "expected": {"candidate_count": 5, "final_count": 5, "minimum_hardening_calls": 5, "avoided_initial_hardening_calls": 0}
     },
     {
-      "id": "cross-spec-integration-owner",
+      "id": "cross-spec-combined-proof-owner",
       "candidates": [
         {"id": "api-c01", "spec": "api", "title": "Expose account export status", "depends_on": []},
         {"id": "web-c01", "spec": "web", "title": "Show account export status", "depends_on": []},
-        {"id": "integration-c01", "spec": "integration", "title": "Prove the web and API export flow together", "depends_on": []}
+        {"id": "web-c02", "spec": "web", "title": "Prove the web and API export flow together", "depends_on": []}
       ],
       "final_issues": [
         {"id": "api-01", "spec": "api", "from": ["api-c01"], "title": "Expose account export status", "depends_on": [], "role": "vertical", "why": "The API partial owns one independently verifiable repository outcome."},
-        {"id": "web-01", "spec": "web", "from": ["web-c01"], "title": "Show account export status", "depends_on": [], "role": "vertical", "why": "The web partial owns one independently verifiable repository outcome."},
-        {"id": "integration-01", "spec": "integration", "from": ["integration-c01"], "title": "Prove the integrated account export flow", "depends_on": [], "role": "integration", "why": "The dedicated integration partial owns a bounded change and cross-repository proof after upstream Specs merge."}
+        {"id": "web-01", "spec": "web", "from": ["web-c01", "web-c02"], "title": "Show and prove account export status against the API", "depends_on": [], "role": "combined-proof", "why": "The existing web partial owns its consumer behavior and exact-revision web-to-API proof."}
       ],
       "feature_dependencies": [
-        {"spec": "integration", "upstream_spec": "api", "reason": "Wait for the API partial to merge and pass integration proof."},
-        {"spec": "integration", "upstream_spec": "web", "reason": "Wait for the web partial to merge and pass integration proof."}
+        {"spec": "web", "upstream_spec": "api", "reason": "Supply the exact API branch and HEAD for web-to-API proof."}
       ],
       "removed_dependency_edges": [],
       "domain_closeout_owner": null,
-      "expected": {"candidate_count": 3, "final_count": 3, "minimum_hardening_calls": 3, "avoided_initial_hardening_calls": 0}
+      "expected": {"candidate_count": 3, "final_count": 2, "minimum_hardening_calls": 2, "avoided_initial_hardening_calls": 1}
     },
     {
       "id": "fragmented-many-candidates",

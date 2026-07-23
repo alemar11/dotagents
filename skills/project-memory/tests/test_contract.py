@@ -113,12 +113,9 @@ class ProjectMemoryContractTests(unittest.TestCase):
             "proposed-spec:<project-slug>/<feature-slug>/<repository-slug>",
             publishing,
         )
-        self.assertIn(
-            "proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration",
-            publishing,
-        )
+        self.assertNotIn("/<repository-slug>/integration", publishing)
 
-    def test_integration_partial_has_distinct_applied_backend_identity(self) -> None:
+    def test_combined_proof_reuses_ordinary_feature_spec_identity(self) -> None:
         github = (
             SKILL_ROOT / "references" / "issue-tracker-github.md"
         ).read_text(encoding="utf-8")
@@ -128,27 +125,12 @@ class ProjectMemoryContractTests(unittest.TestCase):
         publishing = (
             SKILL_ROOT / "references" / "tracker-publishing.md"
         ).read_text(encoding="utf-8")
-        github_normalized = " ".join(github.split())
-        local_normalized = " ".join(local.split())
-
-        self.assertIn("Feature Spec: <Feature Name> - Integration", github)
-        self.assertIn("Partial role: integration", github)
-        self.assertIn("its own hosted issue number", github_normalized)
-        self.assertIn(
-            "planning/features/<feature-slug>/integration/SPEC.md",
-            local,
-        )
-        self.assertIn(
-            "planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md",
-            local,
-        )
-        self.assertIn("does not require a coordination", local_normalized)
-        self.assertIn("#<integration-spec-number>", publishing)
-        self.assertIn("owner/repository#<integration-spec-number>", publishing)
-        self.assertIn(
-            "<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md",
-            publishing,
-        )
+        combined = "\n".join((github, local, publishing))
+        self.assertIn("Feature Spec: <Feature Name>", github)
+        self.assertIn("planning/features/<feature-slug>/SPEC.md", local)
+        self.assertNotIn("Feature Spec: <Feature Name> - Integration", combined)
+        self.assertNotIn("Partial role: integration", combined)
+        self.assertNotIn("planning/features/<feature-slug>/integration/", combined)
 
     def test_applied_multi_repo_refs_are_globally_unambiguous(self) -> None:
         github = (
@@ -260,11 +242,9 @@ class ProjectMemoryContractTests(unittest.TestCase):
         for path in (
             "planning/features/<feature-slug>/SPEC.md",
             "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
-            "planning/features/<feature-slug>/integration/SPEC.md",
-            "<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md",
-            "planning/features/<feature-slug>/integration/issues/",
         ):
             self.assertIn(path, local_apply)
+        self.assertNotIn("/integration/", local_apply)
 
     def test_retired_tracker_policy_is_absent_from_project_memory_docs(self) -> None:
         markdown = "\n".join(
@@ -718,22 +698,16 @@ class ProjectMemoryContractTests(unittest.TestCase):
             options, r"(?m)^\| `artifact_marker` \|"
         )
 
-    def test_local_integration_completion_uses_matching_subtree(self) -> None:
+    def test_local_completion_uses_the_owning_feature_subtree(self) -> None:
         local = (SKILL_ROOT / "references" / "issue-tracker-local.md").read_text(
             encoding="utf-8"
         )
 
         self.assertIn(
-            "planning/features/<feature-slug>/integration/issues/done/"
-            "<NN>-<slug>.md",
+            "planning/features/<feature-slug>/issues/done/<NN>-<slug>.md",
             local,
         )
-        self.assertIn("Derive the completion target from the owning issue subtree", local)
-        self.assertIn(
-            "never move an\nintegration issue into the ordinary feature's "
-            "`issues/done/` directory",
-            local,
-        )
+        self.assertNotIn("planning/features/<feature-slug>/integration/", local)
         normalized = " ".join(local.split())
         self.assertIn("tracker file in `affected_repositories`", normalized)
         self.assertIn("exact active issue path", normalized)
