@@ -22,6 +22,14 @@ the current GitStack issue workflow; local Markdown changes stay inside the
 worker's assigned worktree, are committed with the implementation, and receive
 the same post-change validation and review.
 
+Complete and read back all tracker mutations before opening AutoReview's first
+full review on the committed candidate. If a review fix invalidates acceptance
+proof, uncheck or repair the tracker state, read it back, and include the
+restored tracker state in the same coherent fix HEAD before AutoReview
+fix-verification. A tracker-only HEAD after clean review is sequencing drift:
+it does not justify another model review and must not be used as terminal
+evidence.
+
 For local Markdown, moving an issue into `issues/done/` is the completion
 signal. Preserve its existing canonical `workflow_state`; never write
 `workflow_state: done` or invent another completion state.

@@ -23,7 +23,11 @@ For each assignment, root rereads:
 - exact target branch and head SHA;
 - base branch, base SHA, and proven ancestry;
 - current-head validation evidence;
-- terminal AutoReview and current-head Codex review evidence;
+- current-head AutoReview evidence with its derived
+  `review_profile=standard|high-risk`; `standard` requires no native Codex
+  review, while `high-risk` requires the single native Codex review on that
+  same initial `review_candidate_head_sha` and an AutoReview evidence chain
+  that closes its findings on the current HEAD;
 - actionable feedback resolution;
 - committed tracker readback and a clean managed worktree;
 - for `github-pr` only: open non-draft PR identity, provider default-branch

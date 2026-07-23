@@ -3,9 +3,9 @@
 The worker executes one assigned Feature Spec end to end in the
 ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
-repairs, tests, validation, commits, AutoReview, Codex review, tracker progress,
-and final evidence. With `github-pr` it also owns push, PR creation and updates,
-CI, and provider review fixes. With `local-branch` it performs none of those
+repairs, tests, validation, commits, the AutoReview-owned review gate, tracker
+progress, and final evidence. With `github-pr` it also owns push, PR creation
+and updates, CI, and provider review fixes. With `local-branch` it performs none of those
 provider operations.
 
 Before implementation, verify or create/select the declared named branch in the
@@ -27,14 +27,19 @@ in-contract work. Choose safe, maintainable approaches and coherent rewrites.
 Respect the accepted material attempt budget and required validation result.
 
 Use target-repository instructions for commits and validation. Use current
-GitStack workflows only for required GitHub operations. Run `$autoreview`
-after focused validation, verify every finding in the real code, fix accepted
-findings, and revalidate changed evidence. Run the required current-head Codex
-review and resolve actionable feedback. Never force-push published history,
-merge, enqueue, deploy, release, or perform post-merge closure.
+GitStack workflows only for required GitHub operations. Finish implementation,
+focused validation, tracker checkbox/readback work, and the coherent committed
+candidate HEAD before invoking `$autoreview`. AutoReview owns
+`review_profile=standard|high-risk`; only its `high-risk` path adds one native
+current-head Codex review. Verify and aggregate findings before fixing them,
+then revalidate changed evidence and use AutoReview fix verification. Never
+force-push published history, merge, enqueue, deploy, release, or perform
+post-merge closure.
 
 Follow `tracker-checklists.md` for every issue and parent checkbox. If later work
-invalidates proof, uncheck it and read back the correction.
+invalidates proof, uncheck it and read back the correction. Restore and commit
+that proof before the next AutoReview fix verification; do not create a
+tracker-only post-review HEAD.
 
 The successful result must match `delivery_type`. `github-pr` returns
 `pr-ready-for-merge-but-not-merged` with PR/provider/CI and mergeability proof.

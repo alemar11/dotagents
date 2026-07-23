@@ -11,15 +11,19 @@ Use canonical `review_phase` values:
   terminal; findings start a lineage with one full review consumed.
 - `fix-verification`: verify dispositioned findings and regressions on the
   committed delta from the prior head. It never performs another broad review.
+  A clean result is sufficient closeout evidence when `review-policy.md`
+  classifies the lineage as complete.
 - `disposition`: close an unchanged head after every open finding was
   consciously rejected. It makes no Codex call and accepts no fix.
-- `terminal-full`: the second and final broad review in a lineage. It requires
-  `verification-clean` evidence produced after fixes to the first full review.
+- `terminal-full`: an optional second and final broad review in a lineage. It
+  requires `verification-clean` evidence produced after fixes to the first
+  full review and an explicit escalation reason under `review-policy.md`.
 
-The helper permits any number of progressing fix verifications. It does not
-permit a third full review in one lineage. Findings from the terminal full, or
-later Codex PR review findings, close through fix verification and produce
-`terminal-composite-clean` evidence.
+The helper permits any number of progressing fix verifications, but callers
+must not invoke another one without a substantive changed committed HEAD. It
+does not permit a third full review in one lineage. Findings from an escalated
+terminal full, or later Codex PR review findings, close through fix verification
+and produce `terminal-composite-clean` evidence.
 
 ## Finding Intake
 
@@ -101,15 +105,16 @@ Process interruption after either launch also cannot relaunch.
 Terminal states are:
 
 - `terminal-clean`: a full review is clean on the exact current patch.
-- `verification-clean`: fixes to the first full are delta-clean but still need
-  `terminal-full`.
+- `verification-clean`: fixes to the first full are delta-clean. This is
+  terminal when the review policy requires no explicit broad escalation.
 - `terminal-composite-clean`: accepted findings after the second full or a
   later PR review are resolved by a clean delta chain.
 - `fix-required`: accepted or newly surfaced delta findings remain.
 
-Use only `terminal-clean` or `terminal-composite-clean` as closeout evidence.
-If the same finding recurs without a substantive head change, stop with
-`review-no-progress`; do not retry indefinitely.
+Use `terminal-clean`, policy-qualified `verification-clean`, or
+`terminal-composite-clean` as closeout evidence. If the same finding recurs
+without a substantive head change, stop with `review-no-progress`; do not retry
+indefinitely.
 
 ## Commands
 

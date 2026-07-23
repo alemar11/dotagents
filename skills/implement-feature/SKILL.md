@@ -100,7 +100,7 @@ continuation question during the run.
    with exact pre/post HEAD evidence. Never create a dedicated integration
    worker or grant cross-worktree access.
 7. Apply `references/final-verification.md`. Root rereads authoritative tracker,
-   ChatGPT task, Git, delivery-specific provider, CI, and review evidence without editing or
+ChatGPT task, Git, delivery-specific provider, CI, and AutoReview-owned review evidence without editing or
    judging criteria. For local-branch delivery, use `scripts/verify-ready` for
    the deterministic Git and tracker snapshot instead of composing shell
    probes. Complete each assignment claim when its root-verified

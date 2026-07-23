@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Run Codex-only structured closeout review by sending the selected change bundle to a separate read-only Codex execution, reusing verified clean evidence for an unchanged target, and verifying committed review fixes incrementally before final, commit, PR, or ship.
+description: Run a bounded Codex-only closeout review, adding one native Codex review only for high-risk changes, reusing clean evidence, and verifying committed fixes incrementally.
 ---
 
 # Auto Review
@@ -68,7 +68,10 @@ unstaged diffs, and every non-ignored untracked file. For untracked files, a NUL
 byte replaces the contents with an omission marker; all other bytes are decoded
 as text with replacement characters. Branch and commit modes send the selected
 diff and stat. Any `--prompt`, `--prompt-file`, or `--dataset` content is also
-sent.
+sent. Under `review_profile=high-risk`, the one native `codex review` sends the
+same selected repository target through the Codex engine. It is covered by the
+same disclosed review authorization and does not create a second permission
+question.
 
 After the user explicitly invokes Auto Review or authorizes a calling workflow
 that includes it, run without a separate authorization question, acknowledgement
@@ -80,23 +83,28 @@ web search, not the Codex engine transfer.
 
 ## Canonical Closeout Sequence
 
-1. Apply `Review Evidence Freshness`. If clean evidence is reusable, return it
+1. Read [references/review-policy.md](references/review-policy.md), derive
+   `review_profile=standard|high-risk`, and finish the coherent candidate HEAD
+   before opening a review lineage.
+2. Apply `Review Evidence Freshness`. If clean evidence is reusable, return it
    to the caller and skip the helper invocation.
-2. Run the focused local tests or proof first.
-3. Run `scripts/autoreview` on the correct target mode.
-4. Verify each finding in the real code before accepting it.
-5. Fix only the accepted findings.
-6. Rerun focused tests or proof if code changed.
-7. For committed branch work, read
+3. Run the focused local tests or proof first.
+4. Run `scripts/autoreview` on the correct target mode. For `high-risk`, also
+   run the single native Codex review selected by the review policy on the same
+   unchanged HEAD.
+5. Verify and aggregate findings from both lenses before accepting fixes.
+6. Fix only the accepted findings in one coherent batch when possible.
+7. Rerun focused tests or proof if code changed.
+8. For committed branch work, read
    [references/evidence-chain.md](references/evidence-chain.md), disposition
-   every finding, and use `review_phase=fix-verification` after accepted fixes.
-   Local or exact-commit targets without chain evidence rerun a full review.
-8. After fixes to the first full review are delta-clean, run the one allowed
-   `terminal-full`. Resolve findings from that pass through further progressing
-   fix verifications; do not run a third full review in the same lineage.
-9. Stop on `terminal-clean`, `terminal-composite-clean`, or consciously rejected
-   remaining findings. Repeated feedback without a substantive changed head is
-   `review-no-progress`, not permission for an unbounded retry loop.
+   every finding, import native findings with `finding_source=codex-review`, and
+   use `review_phase=fix-verification` after accepted fixes. Local or
+   exact-commit targets without chain evidence rerun a full review.
+9. Stop on `terminal-clean`, policy-qualified `verification-clean`,
+   `terminal-composite-clean`, or consciously rejected remaining findings.
+   Do not run `terminal-full` automatically. Repeated feedback without a
+   substantive changed head is `review-no-progress`, not permission for an
+   unbounded retry loop.
 
 ## Runtime Surface
 
@@ -142,8 +150,9 @@ or "patch is incorrect", but callers must branch on `review_outcome`.
 For committed branch fix loops, the evidence-chain contract additionally uses
 `review_phase=full|fix-verification|disposition|terminal-full` and terminal state
 `fix-required|verification-clean|terminal-clean|terminal-composite-clean`.
-Read [references/evidence-chain.md](references/evidence-chain.md) before using
-those values or their strict finding-intake file.
+Read [references/review-policy.md](references/review-policy.md) and
+[references/evidence-chain.md](references/evidence-chain.md) before using those
+values or their strict finding-intake file.
 
 ## Closeout Entry Modes
 
@@ -174,7 +183,8 @@ those values or their strict finding-intake file.
    Fix verification examines only accepted findings and regressions on changed
    delta lines. A base, merge-base, repository, or path-set expansion starts a
    new full-review lineage.
-8. Stop once terminal evidence has no accepted/actionable findings. Do
+8. Stop once the review policy accepts the clean evidence and no
+   accepted/actionable findings remain. Do
    not rerun it only for a later lifecycle boundary or nicer closeout wording.
 
 ## Helper Commands
@@ -227,7 +237,10 @@ Under `--json`, environment failures preserve the human `error` and add stable
 
 Include:
 
+- the derived `review_profile` and the evidence-backed risk boundary;
 - the review command used, or the prior command and result reused;
+- for `high-risk`, the one native Codex review selector and confirmation that
+  it inspected the same candidate HEAD;
 - when reusing evidence, proof that the effective patch and scope are unchanged;
 - tests or proof run after any accepted finding was fixed;
 - findings accepted or rejected, with a brief reason;

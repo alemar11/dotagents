@@ -68,7 +68,7 @@ class RunStateScenarios(unittest.TestCase):
     def future_schema_two_tool(self) -> Path:
         path = self.base / "run-state-schema-2"
         source = TOOL.read_text(encoding="utf-8")
-        source = source.replace('CLI_VERSION = "1.0.0"', 'CLI_VERSION = "2.0.0"', 1)
+        source = source.replace('CLI_VERSION = "1.1.0"', 'CLI_VERSION = "2.0.0"', 1)
         source = source.replace("STATE_SCHEMA_VERSION = 1", "STATE_SCHEMA_VERSION = 2", 1)
         source = source.replace(
             "REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()",
@@ -208,6 +208,9 @@ class RunStateScenarios(unittest.TestCase):
         number: int = 1,
         *,
         schema_version: int = 1,
+        review_profile: str = "standard",
+        review_candidate_head_sha: str | None = None,
+        codex_review_head_sha: str | None = None,
         expected: int = 0,
     ) -> dict[str, object]:
         sha = f"{100 + number:040x}"
@@ -226,7 +229,13 @@ class RunStateScenarios(unittest.TestCase):
             "base_is_ancestor": True,
             "validation_head_sha": sha,
             "autoreview_head_sha": sha,
-            "codex_review_head_sha": sha,
+            "review_candidate_head_sha": review_candidate_head_sha or sha,
+            "review_profile": review_profile,
+            "codex_review_head_sha": (
+                (review_candidate_head_sha or sha)
+                if review_profile == "high-risk" and codex_review_head_sha is None
+                else codex_review_head_sha
+            ),
             "tracker_readback_ref": f"tracker:{run_id}:{number}",
             "prerequisite_heads": {},
             "default_branch_name": "main",
@@ -253,6 +262,9 @@ class RunStateScenarios(unittest.TestCase):
         worktree_clean: bool = True,
         head_branch_name: str | None = None,
         head_sha: str | None = None,
+        review_profile: str = "standard",
+        review_candidate_head_sha: str | None = None,
+        codex_review_head_sha: str | None = None,
     ) -> dict[str, object]:
         sha = head_sha or f"{200 + number:040x}"
         observation = {
@@ -270,7 +282,13 @@ class RunStateScenarios(unittest.TestCase):
             "base_is_ancestor": True,
             "validation_head_sha": sha,
             "autoreview_head_sha": sha,
-            "codex_review_head_sha": sha,
+            "review_candidate_head_sha": review_candidate_head_sha or sha,
+            "review_profile": review_profile,
+            "codex_review_head_sha": (
+                (review_candidate_head_sha or sha)
+                if review_profile == "high-risk" and codex_review_head_sha is None
+                else codex_review_head_sha
+            ),
             "tracker_readback_ref": f"tracker:{run_id}:{number}",
             "prerequisite_heads": prerequisite_heads or {},
             "status": "local-branch-ready",
@@ -300,7 +318,7 @@ class RunStateScenarios(unittest.TestCase):
         """Given no DB, when doctor runs, then it reports schema 1 without creating cache state."""
         self.database.unlink()
         result = self.invoke("doctor")
-        self.assertEqual(result["tool_version"], "1.0.0")
+        self.assertEqual(result["tool_version"], "1.1.0")
         self.assertEqual(result["state_schema_version"], 1)
         self.assertEqual(result["active_owner_runs"], 0)
         self.assertEqual(result["busy_timeout_ms"], 5000)
@@ -462,6 +480,49 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(shown["assignments"][0]["state"], "active")
         self.assertEqual(shown["spec_claims"][0]["active"], 1)
 
+    def test_given_standard_review_profile_when_ready_is_recorded_then_native_review_must_be_absent(self) -> None:
+        """Given standard AutoReview, native Codex review evidence is rejected rather than treated as another gate."""
+        self.start("standard-review")
+        self.create_worker("standard-review")
+        error = self.ready_worker(
+            "standard-review",
+            review_profile="standard",
+            codex_review_head_sha=f"{101:040x}",
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-ready-observation")
+        ready = self.ready_worker("standard-review", review_profile="standard")
+        self.assertEqual(ready["state"], "pr-ready")
+
+    def test_given_high_risk_review_profile_when_ready_is_recorded_then_native_review_must_bind_head(self) -> None:
+        """Given high-risk AutoReview, the one native Codex review must bind the exact candidate HEAD."""
+        self.start("high-risk-review")
+        self.create_worker("high-risk-review")
+        error = self.ready_worker(
+            "high-risk-review",
+            review_profile="high-risk",
+            codex_review_head_sha=f"{999:040x}",
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "stale-ready-evidence")
+        ready = self.ready_worker(
+            "high-risk-review",
+            review_profile="high-risk",
+            review_candidate_head_sha=f"{777:040x}",
+        )
+        self.assertEqual(ready["state"], "pr-ready")
+
+    def test_given_unknown_review_profile_when_ready_is_recorded_then_it_fails_closed(self) -> None:
+        """Given a noncanonical profile, readiness rejects it before releasing the claim."""
+        self.start("unknown-review")
+        self.create_worker("unknown-review")
+        error = self.ready_worker(
+            "unknown-review",
+            review_profile="critical",
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-ready-observation")
+
     def test_given_local_only_repository_when_local_delivery_finishes_then_named_branch_is_durable(self) -> None:
         """Given no remote, when local delivery closes, then exact branch/head evidence reaches local-branch-ready."""
         identity = self.local_identity(self.common_a)
@@ -547,6 +608,8 @@ class RunStateScenarios(unittest.TestCase):
             "base_is_ancestor": True,
             "validation_head_sha": f"{101:040x}",
             "autoreview_head_sha": f"{101:040x}",
+            "review_candidate_head_sha": f"{101:040x}",
+            "review_profile": "high-risk",
             "codex_review_head_sha": f"{101:040x}",
             "tracker_readback_ref": "tracker:mismatch",
             "prerequisite_heads": {},
@@ -1037,6 +1100,8 @@ class RunStateScenarios(unittest.TestCase):
             "worktree_clean": True, "base_is_ancestor": True,
             "validation_head_sha": f"{101:040x}",
             "autoreview_head_sha": f"{101:040x}",
+            "review_candidate_head_sha": f"{101:040x}",
+            "review_profile": "high-risk",
             "codex_review_head_sha": f"{101:040x}",
             "tracker_readback_ref": "tracker:wrong-base",
             "prerequisite_heads": {},

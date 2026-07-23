@@ -16,10 +16,11 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "1.0.0"
+CLI_VERSION = "1.1.0"
 STATE_SCHEMA_VERSION = 1
 REBUILDABLE_STATE_SCHEMA_VERSIONS = frozenset()
 RETAINED_RUNTIME_SHA256_BY_SCHEMA: dict[int, str] = {}
+RETAINED_RUNTIME_VERSION_BY_SCHEMA: dict[int, str] = {1: "1.1.0"}
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_LIVE_WORKERS = 3
@@ -902,7 +903,13 @@ def validate_retained_runtime(path_text: str | None, schema_version: int) -> Non
             f"retained runtime could not be verified: {path}",
             4,
         ) from error
-    expected = f"{schema_version}.0.0"
+    expected = RETAINED_RUNTIME_VERSION_BY_SCHEMA.get(schema_version)
+    if expected is None:
+        raise StateError(
+            "retained-runtime-unavailable",
+            f"retained runtime version is not approved for schema {schema_version}",
+            4,
+        )
     if result.returncode != 0 or result.stdout.strip() != expected:
         raise StateError(
             "retained-runtime-unavailable",
@@ -1476,7 +1483,8 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version", "assignment_id", "thread_id", "repository_identity",
         "delivery_type", "head_sha", "head_branch_name", "base_branch_name",
         "base_sha", "checkout_path", "worktree_clean", "base_is_ancestor",
-        "validation_head_sha", "autoreview_head_sha", "codex_review_head_sha",
+        "validation_head_sha", "autoreview_head_sha",
+        "review_candidate_head_sha", "review_profile", "codex_review_head_sha",
         "tracker_readback_ref", "prerequisite_heads", "status",
     }
     github_extra = {"default_branch_name", "pr_url", "provider_observation_ref"}
@@ -1533,9 +1541,32 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
                 "invalid-ready-observation",
                 "delivery readiness requires a clean worktree and proven base ancestry",
             )
-        for field in ("validation_head_sha", "autoreview_head_sha", "codex_review_head_sha"):
+        for field in ("validation_head_sha", "autoreview_head_sha"):
             if head(value[field], field) != observed_head:
                 raise StateError("stale-ready-evidence", f"{field} does not bind current HEAD", 4)
+        review_profile = value["review_profile"]
+        if review_profile not in {"standard", "high-risk"}:
+            raise StateError(
+                "invalid-ready-observation",
+                "review_profile must be standard or high-risk",
+            )
+        codex_review_head = value["codex_review_head_sha"]
+        review_candidate_head = head(
+            value["review_candidate_head_sha"],
+            "review_candidate_head_sha",
+        )
+        if review_profile == "standard":
+            if codex_review_head is not None:
+                raise StateError(
+                    "invalid-ready-observation",
+                    "standard review_profile requires codex_review_head_sha=null",
+                )
+        elif head(codex_review_head, "codex_review_head_sha") != review_candidate_head:
+            raise StateError(
+                "stale-ready-evidence",
+                "codex_review_head_sha does not bind review_candidate_head_sha",
+                4,
+            )
         string(value["tracker_readback_ref"], "tracker_readback_ref", 2048)
         prerequisite_ids = json.loads(assignment["prerequisite_assignment_ids"])
         prerequisite_heads = value["prerequisite_heads"]

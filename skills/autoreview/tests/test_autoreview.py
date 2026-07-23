@@ -18,6 +18,7 @@ from unittest import mock
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "autoreview"
 SKILL_PATH = Path(__file__).resolve().parents[1] / "SKILL.md"
 OPENAI_YAML_PATH = Path(__file__).resolve().parents[1] / "agents" / "openai.yaml"
+REVIEW_POLICY_PATH = Path(__file__).resolve().parents[1] / "references" / "review-policy.md"
 loader = importlib.machinery.SourceFileLoader("autoreview_script", str(SCRIPT_PATH))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -54,19 +55,37 @@ class AutoreviewContractTests(unittest.TestCase):
         ):
             self.assertIn(invalidation, normalized_skill)
 
-    def test_discovery_metadata_promotes_review_evidence_reuse(self) -> None:
+    def test_discovery_metadata_promotes_bounded_risk_based_review(self) -> None:
         skill = SKILL_PATH.read_text(encoding="utf-8")
         metadata = OPENAI_YAML_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("reusing verified clean evidence for an unchanged target", skill)
-        self.assertIn("separate read-only Codex execution", skill)
-        self.assertIn("separate read-only Codex execution", metadata)
-        self.assertIn("reuse verified clean evidence", metadata)
-        self.assertIn("unchanged", metadata)
+        self.assertIn("review_profile=standard|high-risk", skill)
+        self.assertIn("only for high-risk changes", metadata)
+        self.assertIn("without redundant reruns", metadata)
         self.assertNotIn(
             'short_description: "Run structured closeout review before final, commit, PR, or ship."',
             metadata,
         )
+
+    def test_review_policy_maps_native_codex_review_to_high_risk_only(self) -> None:
+        policy = " ".join(REVIEW_POLICY_PATH.read_text(encoding="utf-8").split())
+
+        self.assertIn("AutoReview owns the derived `review_profile` result", policy)
+        self.assertIn("`standard`: run the structured AutoReview path only", policy)
+        self.assertIn(
+            "`high-risk`: run structured AutoReview plus one native `codex review`",
+            policy,
+        )
+        self.assertIn("Run native `codex review` at most once per lineage", policy)
+        self.assertIn(
+            "Current Codex CLI rejects a positional prompt combined with `--base`, `--commit`, or `--uncommitted`",
+            policy,
+        )
+        self.assertIn(
+            "A clean `verification-clean` result is sufficient terminal evidence",
+            policy,
+        )
+        self.assertIn("`terminal-full` is not an automatic closeout phase", policy)
 
     def test_codex_transfer_is_intrinsic_without_a_second_authorization(self) -> None:
         skill = SKILL_PATH.read_text(encoding="utf-8")

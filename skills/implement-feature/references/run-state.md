@@ -1,7 +1,7 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses this shipped artifact. `CLI_VERSION` is exactly `1.0.0`; SQLite, manifest,
+uses this shipped artifact. `CLI_VERSION` is exactly `1.1.0`; SQLite, manifest,
 observation, and JSON envelope schemas are integer `1`. This is a breaking hard
 cut with no migrations, state copies, aliases, importers, or alternate state
 files. Schema number `1` does not authorize another shape: table and column
@@ -109,8 +109,10 @@ compare-and-swap revision transaction. JSON stdout is one object with
 
 Ready observations always bind assignment/thread/repository/checkout,
 `delivery_type`, named head and base branches, head/base SHAs, clean worktree,
-base ancestry, current-head validation/AutoReview/Codex-review SHAs, tracker
-readback, and the exact prerequisite HEAD map. `github-pr` additionally requires
+base ancestry, current-head validation and AutoReview SHAs, the first coherent
+review-candidate SHA, the derived review profile, its conditional native
+Codex-review SHA, tracker readback, and the exact prerequisite HEAD map.
+`github-pr` additionally requires
 the provider default branch, canonical PR URL, and provider observation ref;
 `local-branch` rejects those fields. Status must be respectively
 `pr-ready-for-merge-but-not-merged` or `local-branch-ready`.
@@ -119,11 +121,20 @@ The exact common ready-observation fields are:
 `schema_version`, `assignment_id`, `thread_id`, `repository_identity`,
 `delivery_type`, `head_sha`, `head_branch_name`, `base_branch_name`,
 `base_sha`, `checkout_path`, `worktree_clean`, `base_is_ancestor`,
-`validation_head_sha`, `autoreview_head_sha`, `codex_review_head_sha`,
+`validation_head_sha`, `autoreview_head_sha`, `review_candidate_head_sha`,
+`review_profile`, `codex_review_head_sha`,
 `tracker_readback_ref`, `prerequisite_heads`, and `status`. `github-pr`
 requires exactly three more fields: `default_branch_name`, `pr_url`, and
 `provider_observation_ref`. `local-branch` forbids those three. No other keys
 are accepted.
+
+`review_profile` is exactly `standard` or `high-risk`, derived by AutoReview.
+For `standard`, `codex_review_head_sha` must be JSON `null`. For `high-risk`,
+it must equal `review_candidate_head_sha`, proving that AutoReview's one native
+Codex review inspected the same initial candidate as its structured full pass.
+After accepted fixes, `validation_head_sha` and `autoreview_head_sha` bind the
+final `head_sha`; `review_candidate_head_sha` remains the immutable initial
+candidate linked through AutoReview's evidence chain.
 
 ## Claim Identity And Lifecycle
 
@@ -235,7 +246,7 @@ actually observed. Never invent reconciliation references.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `1.0.0` and
+or build output. `CLI_VERSION` remains `1.1.0` and
 `STATE_SCHEMA_VERSION` remains `1`. Re-run `--help`,
 `--version`, read-only `doctor`, Python compilation, unit/contract tests, and an
 isolated lifecycle fixture after changes.
@@ -263,6 +274,8 @@ and `state prepare` sweeps. `waiting-for-spec`, `active`, and `blocked` all
 count as owners. Do not force-finish, abandon, release, or rewrite claims
 merely to complete a cutover. If the retained executable is unavailable or
 does not report the exact old version, fail closed and preserve the fence.
+Approved retained CLI versions are explicit per schema; a CLI minor version is
+not derived from the SQLite schema number.
 
 When the recognized older DB reports zero owners, `state prepare` begins an
 exclusive SQLite transaction and rechecks zero. Inside that same transaction
@@ -277,7 +290,7 @@ regenerates it. Unknown older versions, unversioned tables, corrupt DBs,
 same-number structural drift, unsafe permissions, and symlinks also fail
 closed without reset.
 
-Schema 1 and CLI 1.0.0 begin a fresh lineage. No pre-lineage DB is a recognized
+Schema 1 and CLI 1.1.0 begin a fresh lineage. No pre-lineage DB is a recognized
 rebuild source: verify zero owners with its original runtime, suspend new
 invocations, delete the old DB once, then let schema-1 `state prepare`
 create the fresh claim domain. For every future approved cut, stage the newer

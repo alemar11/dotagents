@@ -147,7 +147,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """Given the breaking protocol cut, old state is rebuilt at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "1.0.0"', source)
+        self.assertIn('CLI_VERSION = "1.1.0"', source)
         self.assertIn("STATE_SCHEMA_VERSION = 1", source)
         self.assertIn("scripts/run-state --json state prepare", state)
         self.assertIn("drops all application tables, indexes, and triggers", state)
@@ -244,7 +244,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "1.0.0"', source)
+        self.assertIn('CLI_VERSION = "1.1.0"', source)
         self.assertIn("STATE_SCHEMA_VERSION = 1", source)
         self.assertIn("BEGIN IMMEDIATE", source)
         self.assertIn("BEGIN EXCLUSIVE", source)
