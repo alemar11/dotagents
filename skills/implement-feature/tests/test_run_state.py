@@ -19,8 +19,8 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
-CLI_VERSION = "2.0.0"
-RUNTIME_CONTRACT_VERSION = "2.0.0"
+CLI_VERSION = "3.0.0"
+RUNTIME_CONTRACT_VERSION = "3.0.0"
 DATABASE_SCHEMA_VERSION = 2
 PROTOCOLS = {
     "cli": {
@@ -41,6 +41,10 @@ PROTOCOLS = {
     },
     "recovery": {
         "schema": "implement-feature/recovery-observation",
+        "schema_version": "2.0.0",
+    },
+    "resume": {
+        "schema": "implement-feature/assignment-resume-observation",
         "schema_version": "2.0.0",
     },
 }
@@ -205,8 +209,18 @@ class RunStateScenarios(unittest.TestCase):
         extra: dict[str, object],
         *,
         status: str = "succeeded",
+        review_owner: str | None = None,
     ) -> dict[str, object]:
-        begun = self.begin_operation(run_id, action, subject)
+        begun = self.begin_operation(
+            run_id,
+            action,
+            subject,
+            review_owner=(
+                review_owner
+                if review_owner is not None
+                else ("worker" if action == "send-bootstrap" else None)
+            ),
+        )
         observation = self.operation_observation(begun, status=status, values=extra)
         if status == "succeeded":
             observation.setdefault("receipt_ref", f"receipt:{label}")
@@ -227,13 +241,16 @@ class RunStateScenarios(unittest.TestCase):
         subject: str,
         *,
         expected: int = 0,
+        review_owner: str | None = None,
     ) -> dict[str, object]:
-        return self.invoke(
+        args = [
             "app-operation", "begin", "--run-id", run_id,
             "--expected-revision", self.revision(run_id),
             "--action", action, "--subject-id", subject,
-            expected=expected,
-        )
+        ]
+        if review_owner is not None:
+            args.extend(("--review-owner", review_owner))
+        return self.invoke(*args, expected=expected)
 
     def operation_observation(
         self,
@@ -253,7 +270,42 @@ class RunStateScenarios(unittest.TestCase):
             observation["bootstrap_id"] = begun["bootstrap_id"]
         return observation
 
-    def create_worker(self, run_id: str, number: int = 1) -> None:
+    def resume_observation(
+        self,
+        run_id: str,
+        assignment_id: str,
+        blocked_state: str,
+        recovered_state: str,
+        readback_ref: str,
+        *,
+        observed_run_id: str | None = None,
+        run_revision: int | None = None,
+    ) -> Path:
+        return self.write_json(
+            f"{run_id}-{assignment_id}-resume.json",
+            {
+                **self.protocol("resume"),
+                "run_id": observed_run_id or run_id,
+                "assignment_id": assignment_id,
+                "run_revision": (
+                    run_revision
+                    if run_revision is not None
+                    else int(self.revision(run_id))
+                ),
+                "blocked_state": blocked_state,
+                "recovered_state": recovered_state,
+                "readback_ref": readback_ref,
+            },
+        )
+
+    def create_worker(
+        self,
+        run_id: str,
+        number: int = 1,
+        *,
+        observed_state: str = "active",
+        review_owner: str = "worker",
+    ) -> None:
         assignment = f"spec-{number:02d}"
         thread = f"thread-{run_id}-{number}"
         checkout = self.base / f"checkout {run_id} {number}"
@@ -265,7 +317,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
-                "observed_state": "active",
+                "observed_state": observed_state,
             },
         )
         self.operation(
@@ -275,6 +327,7 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             run_id, f"bootstrap-{run_id}-{number}", "send-bootstrap", assignment,
             {"thread_id": thread},
+            review_owner=review_owner,
         )
 
     def ready_worker(
@@ -557,6 +610,7 @@ class RunStateScenarios(unittest.TestCase):
                 )
                 begun = self.begin_operation(
                     run_id, "send-bootstrap", assignment,
+                    review_owner="worker",
                 )
                 observation = self.operation_observation(
                     begun,
@@ -593,6 +647,7 @@ class RunStateScenarios(unittest.TestCase):
                 )
                 self.assertEqual(replayed["operation_id"], begun["operation_id"])
                 self.assertEqual(replayed["bootstrap_id"], begun["bootstrap_id"])
+                self.assertEqual(replayed["review_owner"], "worker")
                 self.assertEqual(replayed["launch_count"], 2)
                 self.assertTrue(replayed["launch_authorized"])
 
@@ -621,6 +676,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         first_launch = self.begin_operation(
             "delayed-bootstrap", "send-bootstrap", assignment,
+            review_owner="worker",
         )
         first_unknown = self.operation_observation(
             first_launch,
@@ -729,6 +785,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         bootstrap = self.begin_operation(
             "replay-guards", "send-bootstrap", assignment,
+            review_owner="worker",
         )
         no_readback = self.operation_observation(
             bootstrap, status="unknown", values={"thread_id": thread},
@@ -958,6 +1015,27 @@ class RunStateScenarios(unittest.TestCase):
         self.assertIn("observed_title", descriptor["required_fields"])
         self.assertFalse(descriptor["additional_fields"])
 
+        worker_descriptor = self.invoke(
+            "app-operation", "observation", "template",
+            "--action", "create-worker", "--status", "succeeded",
+        )
+        self.assertEqual(
+            worker_descriptor["field_constraints"]["observed_state"][
+                "allowed_values"
+            ],
+            ["active", "idle"],
+        )
+        owner_descriptor = self.invoke(
+            "app-operation", "observation", "template",
+            "--action", "set-review-owner", "--status", "succeeded",
+        )
+        self.assertEqual(
+            owner_descriptor["field_constraints"]["observed_state"][
+                "allowed_values"
+            ],
+            ["root"],
+        )
+
         self.start("operation-builder")
         begun = self.begin_operation(
             "operation-builder", "set-root-title", "root-operation-builder",
@@ -1037,6 +1115,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         begun = self.begin_operation(
             "bootstrap-builder", "send-bootstrap", assignment,
+            review_owner="worker",
         )
         revision = self.revision("bootstrap-builder")
         output = self.base / "bootstrap-observation.json"
@@ -1489,14 +1568,60 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(blocked["state"], "blocked-durable-contract")
         self.assertTrue(blocked["claim_retained"])
+        revision = self.revision("peer-block")
+        missing_evidence = self.invoke(
+            "assignment", "resume", "--run-id", "peer-block",
+            "--expected-revision", revision,
+            "--assignment-id", "spec-01",
+            expected=2,
+        )
+        self.assertEqual(
+            missing_evidence["error"]["code"],
+            "invalid-command-line",
+        )
+        self.assertEqual(self.revision("peer-block"), revision)
+        stale_observation = self.resume_observation(
+            "peer-block",
+            "spec-01",
+            "blocked-durable-contract",
+            "durable-contract-restored",
+            "tracker-read:stale-peer-block",
+            run_revision=int(revision) - 1,
+        )
+        stale = self.invoke(
+            "assignment", "resume", "--run-id", "peer-block",
+            "--expected-revision", revision,
+            "--assignment-id", "spec-01",
+            "--observation", str(stale_observation),
+            expected=4,
+        )
+        self.assertEqual(stale["error"]["code"], "recovery-observation-drift")
+        self.assertEqual(self.revision("peer-block"), revision)
+        observation = self.resume_observation(
+            "peer-block",
+            "spec-01",
+            "blocked-durable-contract",
+            "durable-contract-restored",
+            "tracker-read:peer-block-restored",
+        )
         resumed = self.invoke(
             "assignment", "resume", "--run-id", "peer-block",
             "--expected-revision", self.revision("peer-block"),
             "--assignment-id", "spec-01",
+            "--observation", str(observation),
         )
         self.assertEqual(resumed["state"], "peer-input-ready")
         self.assertEqual(resumed["run_status"], "active")
         self.assertTrue(resumed["claim_retained"])
+        self.assertEqual(
+            resumed["recovery_kind"],
+            "durable-contract-restored",
+        )
+        shown = self.invoke("run", "show", "--run-id", "peer-block")
+        self.assertEqual(
+            shown["spec_claims"][0]["recovery_readback_ref"],
+            "tracker-read:peer-block-restored",
+        )
 
     def test_given_runtime_topology_is_unavailable_when_worker_blocks_then_capability_is_distinct(self) -> None:
         """Given post-bootstrap App limitations, capability blocking is not misclassified as contract drift."""
@@ -1510,13 +1635,236 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(blocked["state"], "blocked-app-capability")
         self.assertEqual(blocked["run_status"], "blocked")
         self.assertTrue(blocked["claim_retained"])
+        observation = self.resume_observation(
+            "capability-block",
+            "spec-01",
+            "blocked-app-capability",
+            "app-capability-restored",
+            "app-read:capability-restored",
+        )
         resumed = self.invoke(
             "assignment", "resume", "--run-id", "capability-block",
             "--expected-revision", self.revision("capability-block"),
             "--assignment-id", "spec-01",
+            "--observation", str(observation),
         )
         self.assertEqual(resumed["state"], "active")
         self.assertEqual(resumed["run_status"], "active")
+        self.assertEqual(
+            resumed["recovery_kind"],
+            "app-capability-restored",
+        )
+        self.assertEqual(
+            resumed["recovery_readback_ref"],
+            "app-read:capability-restored",
+        )
+        blocked_again = self.invoke(
+            "assignment", "capability-block", "--run-id", "capability-block",
+            "--expected-revision", self.revision("capability-block"),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(blocked_again["state"], "blocked-app-capability")
+        shown = self.invoke(
+            "run", "show", "--run-id", "capability-block"
+        )
+        self.assertIsNone(
+            shown["spec_claims"][0]["recovery_readback_ref"]
+        )
+
+    def test_given_bootstrap_when_review_owner_is_not_reconciled_then_authority_is_rejected(self) -> None:
+        """Bootstrap begin requires and atomically persists one canonical owner."""
+        self.start("review-owner-required")
+        checkout = self.base / "review owner required checkout"
+        checkout.mkdir()
+        self.operation(
+            "review-owner-required",
+            "create-review-owner-required",
+            "create-worker",
+            "spec-01",
+            {
+                "thread_id": "thread-review-owner-required-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "active",
+            },
+        )
+        self.operation(
+            "review-owner-required",
+            "title-review-owner-required",
+            "set-worker-title",
+            "spec-01",
+            {
+                "thread_id": "thread-review-owner-required-1",
+                "observed_title": "🛠️ Feature 1",
+            },
+        )
+        missing = self.begin_operation(
+            "review-owner-required",
+            "send-bootstrap",
+            "spec-01",
+            expected=2,
+        )
+        self.assertEqual(missing["error"]["code"], "invalid-input")
+        begun = self.begin_operation(
+            "review-owner-required",
+            "send-bootstrap",
+            "spec-01",
+            review_owner="root",
+        )
+        self.assertEqual(begun["review_owner"], "root")
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:review-owner-required",
+                "readback_ref": "readback:review-owner-required",
+                "thread_id": "thread-review-owner-required-1",
+            },
+        )
+        self.invoke(
+            "app-operation", "finish",
+            "--run-id", "review-owner-required",
+            "--expected-revision", self.revision("review-owner-required"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.write_json("review-owner-required-bootstrap.json", observation)
+            ),
+        )
+        shown = self.invoke("run", "show", "--run-id", "review-owner-required")
+        self.assertEqual(shown["assignments"][0]["review_owner"], "root")
+
+    def test_given_worker_review_owner_when_reroute_replays_then_one_root_owner_is_canonical(self) -> None:
+        """One failed reroute can replay by operation id; duplicate/conflicting owners cannot apply."""
+        self.start("review-owner-reroute")
+        self.create_worker("review-owner-reroute")
+        begun = self.begin_operation(
+            "review-owner-reroute",
+            "set-review-owner",
+            "spec-01",
+        )
+        failed_observation = self.operation_observation(
+            begun,
+            status="failed",
+            values={"readback_ref": "app-read:reroute-not-delivered"},
+        )
+        self.invoke(
+            "app-operation", "finish",
+            "--run-id", "review-owner-reroute",
+            "--expected-revision", self.revision("review-owner-reroute"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.write_json("review-owner-reroute-failed.json", failed_observation)
+            ),
+        )
+        replayed = self.invoke(
+            "app-operation", "replay",
+            "--run-id", "review-owner-reroute",
+            "--expected-revision", self.revision("review-owner-reroute"),
+            "--operation-id", str(begun["operation_id"]),
+        )
+        self.assertEqual(replayed["operation_id"], begun["operation_id"])
+        self.assertEqual(replayed["launch_count"], 2)
+        succeeded_observation = self.operation_observation(
+            replayed,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:review-owner-reroute",
+                "readback_ref": "app-read:review-owner-root",
+                "thread_id": "thread-review-owner-reroute-1",
+                "observed_state": "root",
+            },
+        )
+        observation_path = self.write_json(
+            "review-owner-reroute-succeeded.json",
+            succeeded_observation,
+        )
+        applied = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "review-owner-reroute",
+            "--expected-revision", self.revision("review-owner-reroute"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        self.assertFalse(applied["already_applied"])
+        revision = self.revision("review-owner-reroute")
+        duplicate = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "review-owner-reroute",
+            "--expected-revision", revision,
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(observation_path),
+        )
+        self.assertTrue(duplicate["already_applied"])
+        self.assertEqual(str(duplicate["revision"]), revision)
+        conflict = self.begin_operation(
+            "review-owner-reroute",
+            "set-review-owner",
+            "spec-01",
+            expected=4,
+        )
+        self.assertEqual(conflict["error"]["code"], "review-owner-conflict")
+        shown = self.invoke("run", "show", "--run-id", "review-owner-reroute")
+        self.assertEqual(shown["assignments"][0]["review_owner"], "root")
+        bootstrap = next(
+            row
+            for row in self.invoke(
+                "app-operation", "list", "--run-id", "review-owner-reroute"
+            )["operations"]
+            if row["action"] == "send-bootstrap"
+        )
+        self.assertEqual(bootstrap["review_owner"], "worker")
+
+    def test_given_created_task_is_idle_when_observed_then_worker_binding_is_accepted(self) -> None:
+        """A created task may be idle in the UI without losing its exact project/worktree binding."""
+        self.start("idle-worker")
+        self.create_worker("idle-worker", observed_state="idle")
+        shown = self.invoke("run", "show", "--run-id", "idle-worker")
+        self.assertEqual(shown["assignments"][0]["state"], "active")
+        operation = next(
+            row
+            for row in self.invoke(
+                "app-operation", "list", "--run-id", "idle-worker"
+            )["operations"]
+            if row["action"] == "create-worker"
+        )
+        self.assertEqual(operation["observed_state"], "idle")
+
+    def test_given_created_task_has_terminal_ui_state_when_observed_then_binding_is_rejected(self) -> None:
+        """Only active or idle can prove a newly created task binding."""
+        self.start("invalid-worker-state")
+        begun = self.begin_operation(
+            "invalid-worker-state", "create-worker", "spec-01"
+        )
+        checkout = self.base / "invalid worker state checkout"
+        checkout.mkdir()
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:invalid-worker-state",
+                "readback_ref": "readback:invalid-worker-state",
+                "thread_id": "thread-invalid-worker-state-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_state": "completed",
+            },
+        )
+        error = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-state",
+            "--expected-revision", self.revision("invalid-worker-state"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.write_json(
+                    "invalid-worker-state-observation.json",
+                    observation,
+                )
+            ),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "worker-project-drift")
 
     def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
         """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
@@ -2420,7 +2768,9 @@ class RunStateScenarios(unittest.TestCase):
         operations = self.invoke("app-operation", "list", "--run-id", "recover")
         bootstrap = next(row for row in operations["operations"] if row["action"] == "send-bootstrap")
         relaunch = self.begin_operation(
-            "recover", "send-bootstrap", assignment, expected=4,
+            "recover", "send-bootstrap", assignment,
+            expected=4,
+            review_owner="worker",
         )
         self.assertEqual(relaunch["error"]["code"], "protected-operation-already-started")
         observed = {

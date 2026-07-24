@@ -43,7 +43,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "2.0.0",
-  "runtime_contract_version": "2.0.0",
+  "runtime_contract_version": "3.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "repositories": [
@@ -108,19 +108,26 @@ directory; it never runs `git worktree add`. SQLite keeps only checkout identity
 needed for coordination, not the worker's technical contents.
 
 Each full bootstrap carries the canonical operational field
-`review_owner=worker|root`. Resolve it before implementation begins. Root may
-select itself only after its own AutoReview doctor succeeds. Prefer the worker
-when its capability is already proven. When capability is unknown, bootstrap
-with `review_owner=worker`; after read-only checkout identity preflight and
-before branch or implementation mutation, the worker runs
+`review_owner=worker|root`. Record its initial value atomically with
+`send-bootstrap begin --review-owner worker|root`; begin returns that persisted
+owner for the envelope. Root may select itself only
+after its own AutoReview doctor succeeds. Prefer the worker when its capability
+is already proven. When capability is unknown, record and bootstrap with
+`review_owner=worker`; after read-only checkout identity preflight and before
+branch or implementation mutation, the worker runs
 `<autoreview-skill-root>/scripts/autoreview --json doctor`. A successful doctor
 confirms the worker owner. `recovery=reroute-to-capable-root` is a hard handoff:
 the worker sends the structured doctor result, root runs the same doctor
-immediately, and either records `review_owner=root` in one evidence-only
-follow-up or blocks as `blocked-app-capability` before implementation. Never
-copy credentials or try
-an escalated worker launch after the reroute result. Review ownership is
-operational bootstrap data and is not added to the run manifest or SQLite.
+immediately, and either performs one reconciled worker-to-root
+`set-review-owner` operation whose evidence-only follow-up records
+`review_owner=root`, or blocks as `blocked-app-capability` before
+implementation. Never copy credentials or try an escalated worker launch after
+the reroute result. The owner stays out of the run manifest but is authoritative
+SQLite bootstrap-operation state: replay keeps the same operation ID and owner,
+duplicate effects are idempotent, a second reroute or root-to-worker reversal
+fails closed, and
+recovery reads `run show` instead of inferring ownership from conversation
+prose.
 
 After the required ordinary workers and worktrees exist, forward-test the
 declared distributed execution topology before combined validation. Every

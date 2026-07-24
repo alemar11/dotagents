@@ -1,16 +1,18 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. Release `2.0.0` is a breaking hard cut with no
-aliases, legacy payload acceptance, data migration, state copy, importer, or
-alternate state file.
+uses the shipped artifact. Release `3.0.0` is a CLI/runtime hard cut over the
+existing database schema `2`: `assignment resume` now requires authoritative
+recovery through a strict assignment-bound observation, and successful worker
+creation accepts the literal ChatGPT task states `active` and `idle`. There are
+no command aliases or compatibility flags.
 
 Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `2.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `2.0.0` | Coordination semantics required by an active run |
+| CLI | `3.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `3.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `2` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | named protocol plus `2.0.0` | Exact machine payload or envelope shape |
 
@@ -25,8 +27,9 @@ machine-readable registry for these identities and protocols:
 | ChatGPT task-operation observation | `implement-feature/app-operation-observation` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` |
 | Recovery observation | `implement-feature/recovery-observation` |
+| Assignment-resume observation | `implement-feature/assignment-resume-observation` |
 
-Every protocol in this release requires the string
+Every named protocol listed here requires the string
 `"schema_version": "2.0.0"` alongside its exact `schema`. An exact-key protocol
 change to a field name, type, required key, or closed enum is breaking and
 requires that protocol's major bump unless a real capability negotiation
@@ -146,7 +149,8 @@ scripts/run-state --json assignment block \
 scripts/run-state --json assignment capability-block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json assignment resume \
-  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
+  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
+  --observation /absolute/assignment-resume-observation.json
 scripts/run-state --json assignment recover \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
   --observation /absolute/recovery-observation.json
@@ -167,7 +171,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="2.0.0"`, `runtime_contract_version="2.0.0"`, and the
+`schema_version="2.0.0"`, `runtime_contract_version="3.0.0"`, and the
 `run_id`, `root_task_id`, `repositories`, and `assignments` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
 additional top-level keys.
@@ -192,9 +196,10 @@ never overwrites an existing path.
 
 `app-operation finish` remains the sole consumer and state mutator for an
 app-operation observation. `assignment ready` remains the sole consumer and
-state mutator for a delivery-ready observation. Each revalidates the complete
-payload inside its write transaction; successful builder output does not reserve
-or advance state.
+state mutator for a delivery-ready observation. `assignment resume` is the sole
+consumer of an assignment-resume observation. Each revalidates the complete
+payload inside its write transaction; successful builder output does not
+reserve or advance state.
 
 The app-operation builder accepts only the action/status fields described by
 its descriptor through `--receipt-ref`, `--readback-ref`, `--thread-id`,
@@ -203,6 +208,14 @@ and `--observed-state`. It also requires `--launch-count` copied from the
 authorizing `begin` or `replay` result; it does not derive the launch
 generation. A stale count is rejected before any observation file is written.
 The builder derives `bootstrap_id`.
+
+For a successful `create-worker`, `observed_state` is the literal ChatGPT task
+state and accepts `active` or `idle`; both prove that the exact created task is
+present and bound to its project/worktree. For the worker-to-root
+`set-review-owner` reroute, it accepts only `root`; for a successful
+`archive-worker`, it accepts `archived` or
+`completed`. The template exposes these closed values under
+`field_constraints`, so callers do not infer them from the UI label.
 
 Both ready-observation commands require
 `--readiness-mode terminal|peer-input`; the selected value is stored in the
@@ -223,8 +236,11 @@ never choose or replace one. That ID is the durable logical operation identity.
 The returned positive `launch_count` identifies one authorized execution
 generation: begin creates generation `1`, and every accepted replay increments
 it. For `send-bootstrap`, begin also derives the stable `bootstrap_id` in
-`bootstrap-*` form. Every begin or replay result authorizes only its reported
-generation.
+`bootstrap-*` form and returns the reconciled canonical `review_owner`; begin
+requires `--review-owner worker|root` and stores it on that same logical
+operation. Every begin or replay result reports that original owner,
+so a later worker-to-root reroute cannot rewrite the already delivered
+envelope. Every result authorizes only its reported generation.
 
 An app-operation observation uses the named app-operation protocol and carries
 exactly its `operation_id`, current `launch_count`, and
@@ -240,6 +256,7 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | --- | --- |
 | `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
 | `set-worker-title` | `thread_id`, `observed_title` |
+| `set-review-owner` | `thread_id`, `observed_state` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
 | `send-worker-message` | `thread_id` |
 | `set-root-title` | `observed_title` |
@@ -274,6 +291,7 @@ generation. Its action-specific gates are:
 | `send-bootstrap` | Prior generation is `unknown` or `failed` with `readback_ref`; the same `bootstrap_id` is preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
 | `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
+| `set-review-owner` | Prior generation is `failed` and `readback_ref` authoritatively proves the owner follow-up was not delivered; success permits the single worker-to-root reroute |
 | `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
 | `send-worker-message` | Never replayable |
@@ -365,7 +383,17 @@ release never proves upstream merge or combined behavior.
 `assignment resume` is the same-root CAS transition for a recovered
 `blocked-durable-contract` or `blocked-app-capability` assignment. It restores
 the exact prior `active` or `peer-input-ready` state and requires the retained
-claim. A `blocked-by-active-spec` assignment may run `run wait-sweep` again;
+claim plus a strict assignment-resume observation. That closed payload binds
+`run_id`, `assignment_id`, the exact current `run_revision`, the current
+`blocked_state`, the matching `recovered_state`, and `readback_ref`. Durable
+contract recovery requires `blocked-durable-contract` plus
+`durable-contract-restored`; capability recovery requires
+`blocked-app-capability` plus `app-capability-restored`. A stale, unrelated, or
+cross-reason observation fails before transition. The authoritative durable
+source or ChatGPT capability/task readback remains opaque data in
+`readback_ref`, which the transition stores on the retained claim. Entering
+either blocked state clears any older recovery ref. A `blocked-by-active-spec`
+assignment may run `run wait-sweep` again;
 `abandoned-recovery-required` may repeat `claim reconcile` with newer
 authoritative evidence.
 
@@ -422,7 +450,7 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `2.0.0`;
+or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `3.0.0`;
 `DATABASE_SCHEMA_VERSION` remains integer `2`; each protocol entry remains the
 named `2.0.0` identity declared above. Re-run `--help`, `--version`, read-only
 `capabilities` and `doctor`, Python compilation, unit/contract tests, and an

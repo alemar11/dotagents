@@ -3,10 +3,11 @@
 The worker executes one assigned Feature Spec end to end in the
 ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
-repairs, tests, validation, commits, the AutoReview-owned review gate, tracker
-progress, and final evidence. With `github-pr` it also owns push, PR creation
-and updates, CI, and provider review fixes. With `local-branch` it performs none of those
-provider operations.
+repairs, tests, validation, commits, review-candidate preparation, finding
+acceptance and fixes, tracker progress, and final evidence. The bootstrap's
+`review_owner=worker|root` owns AutoReview execution only. With `github-pr` the
+worker also owns push, PR creation and updates, CI, and provider review fixes.
+With `local-branch` it performs none of those provider operations.
 
 Before implementation, verify or create/select the declared named branch in the
 managed worktree. Detached HEAD, another branch, or a dirty baseline blocks
@@ -15,15 +16,17 @@ switch the original/main worktree and never treat the managed worktree alone as
 durable delivery.
 
 Resolve the bootstrap's `review_owner=worker|root` before editing
-implementation files. With worker ownership, run
+implementation files and treat the reconciled value returned with bootstrap as
+canonical. With worker ownership, run
 `<autoreview-skill-root>/scripts/autoreview --json doctor` immediately after
 read-only checkout identity preflight and before branch selection. Continue
 only when it succeeds. On
 `recovery=reroute-to-capable-root`, send the structured result to root and wait
-for its evidence-only owner readback; do not retry with escalation or copy
-credentials. Root ownership changes only the later review executor. The worker
-retains design, implementation, finding verification, fixes, validation,
-tracker, and delivery authority.
+for its evidence-only `set-review-owner` readback; accept only the single
+canonical worker-to-root transition and do not invoke AutoReview afterward. Do
+not retry with escalation or copy credentials. Root ownership changes only the
+later review executor. The worker retains design, implementation, finding
+verification, fixes, validation, tracker, and delivery authority.
 
 Before accepting implementation authority, deduplicate the bootstrap envelope
 by its opaque `bootstrap_id`:
@@ -57,12 +60,16 @@ Respect the accepted material attempt budget and required validation result.
 Use target-repository instructions for commits and validation. Use current
 GitStack workflows only for required GitHub operations. Finish implementation,
 focused validation, tracker checkbox/readback work, and the coherent committed
-candidate HEAD before invoking `$autoreview`. AutoReview owns
+candidate HEAD before starting the review handoff. With
+`review_owner=worker`, the worker invokes `$autoreview`. With
+`review_owner=root`, the worker sends only the authoritative review-candidate
+handoff and the root executes AutoReview read-only, returning its structured
+result and evidence refs. In either case, the worker verifies and aggregates
+findings, owns every fix and revalidation, and sends any changed candidate back
+to the same review owner for AutoReview fix verification. AutoReview owns
 `review_profile=standard|high-risk`; only its `high-risk` path adds one native
-current-head Codex review. Verify and aggregate findings before fixing them,
-then revalidate changed evidence and use AutoReview fix verification. Never
-force-push published history, merge, enqueue, deploy, release, or perform
-post-merge closure.
+current-head Codex review. Never force-push published history, merge, enqueue,
+deploy, release, or perform post-merge closure.
 
 Before a worker-owned review or a root reroute, run:
 

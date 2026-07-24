@@ -78,7 +78,12 @@ Terminal/missing worker plus released/absent checkout marks the assignment
 same root may use `run finish --outcome abandoned`. Unknown evidence fails
 closed. Use `assignment capability-block` only while the ChatGPT desktop app
 capability remains unavailable; after authoritative recovery, the same root
-uses `assignment resume`.
+uses `assignment resume --observation <absolute-path>`. The strict observation
+binds the exact run, assignment, current run revision, blocked reason, matching
+recovered state, and authoritative readback ref. Durable-contract recovery
+likewise supplies the exact durable-source reread ref. The resume transition
+stores that evidence on the retained claim; it must not rely only on controller
+judgment.
 
 ## Terminal Owner Reconciliation
 

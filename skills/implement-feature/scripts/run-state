@@ -18,8 +18,8 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "2.0.0"
-RUNTIME_CONTRACT_VERSION = "2.0.0"
+CLI_VERSION = "3.0.0"
+RUNTIME_CONTRACT_VERSION = "3.0.0"
 DATABASE_SCHEMA_VERSION = 2
 REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
@@ -49,6 +49,10 @@ PROTOCOLS = {
         "schema": "implement-feature/recovery-observation",
         "schema_version": "2.0.0",
     },
+    "assignment_resume_observation": {
+        "schema": "implement-feature/assignment-resume-observation",
+        "schema_version": "2.0.0",
+    },
 }
 
 TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
@@ -75,6 +79,7 @@ LOCAL_SPEC_REF_RE = re.compile(
 APP_ACTIONS = {
     "create-worker",
     "set-worker-title",
+    "set-review-owner",
     "send-bootstrap",
     "send-worker-message",
     "set-root-title",
@@ -87,6 +92,7 @@ SINGLE_USE_ACTIONS = {
     "set-root-title",
     "archive-worker",
 }
+PROTECTED_REPLAY_ACTIONS = SINGLE_USE_ACTIONS | {"set-review-owner"}
 
 APP_OPERATION_COMMON_FIELDS = {
     "schema",
@@ -105,6 +111,7 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "observed_state",
     },
     "set-worker-title": {"thread_id", "observed_title"},
+    "set-review-owner": {"thread_id", "observed_state"},
     "send-bootstrap": {"thread_id", "bootstrap_id"},
     "send-worker-message": {"thread_id"},
     "set-root-title": {"observed_title"},
@@ -1538,8 +1545,76 @@ def command_run_wait_sweep(args: argparse.Namespace) -> dict[str, Any]:
         connection.close()
 
 
-def assignment_projection(row: sqlite3.Row) -> dict[str, Any]:
-    return dict(row)
+def canonical_review_owner(
+    connection: sqlite3.Connection,
+    run_id: str,
+    assignment_id: str,
+) -> str | None:
+    bootstrap = connection.execute(
+        """SELECT sequence,observed_state FROM app_operations
+           WHERE run_id=? AND assignment_id=? AND action='send-bootstrap'
+           ORDER BY sequence LIMIT 1""",
+        (run_id, assignment_id),
+    ).fetchone()
+    if bootstrap is None:
+        return None
+    initial_owner = bootstrap["observed_state"]
+    if initial_owner not in {"worker", "root"}:
+        runtime = connection.execute(
+            "SELECT runtime_contract_version FROM runs WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        if runtime and runtime["runtime_contract_version"] != RUNTIME_CONTRACT_VERSION:
+            return None
+        raise StateError(
+            "invalid-state-schema",
+            "bootstrap operation has no canonical review owner",
+            4,
+        )
+    reroutes = [
+        row[0]
+        for row in connection.execute(
+            """SELECT observed_state FROM app_operations
+               WHERE run_id=? AND assignment_id=?
+                 AND action='set-review-owner' AND status='succeeded'
+                 AND sequence>?
+               ORDER BY sequence""",
+            (run_id, assignment_id, bootstrap["sequence"]),
+        )
+    ]
+    if reroutes not in ([], ["root"]) or (initial_owner == "root" and reroutes):
+        raise StateError(
+            "invalid-state-schema",
+            "review-owner history permits only one worker-to-root reroute",
+            4,
+        )
+    return "root" if reroutes else initial_owner
+
+
+def bootstrap_review_owner(
+    operation: sqlite3.Row,
+) -> str:
+    owner = operation["observed_state"]
+    if owner not in {"worker", "root"}:
+        raise StateError(
+            "invalid-state-schema",
+            "bootstrap operation has no canonical review owner",
+            4,
+        )
+    return owner
+
+
+def assignment_projection(
+    connection: sqlite3.Connection,
+    row: sqlite3.Row,
+) -> dict[str, Any]:
+    value = dict(row)
+    value["review_owner"] = canonical_review_owner(
+        connection,
+        row["run_id"],
+        row["assignment_id"],
+    )
+    return value
 
 
 def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
@@ -1550,7 +1625,7 @@ def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
             token(args.run_id, "run_id"),
             require_runtime_match=False,
         )
-        assignments = [assignment_projection(row) for row in connection.execute("SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
+        assignments = [assignment_projection(connection, row) for row in connection.execute("SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
         claims = [dict(row) for row in connection.execute("SELECT * FROM spec_claims WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
         unresolved = [dict(row) for row in connection.execute("SELECT sequence,operation_id,action,subject_id,status,launch_count FROM app_operations WHERE run_id=? AND status IN ('pending','unknown') ORDER BY sequence", (run["run_id"],))]
         result = dict(run)
@@ -1597,7 +1672,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     if run["status"] != "active":
         raise StateError("run-not-active", f"ChatGPT task changes require active claimed state, found {run['status']}", 4)
     assignment_id: str | None = None
-    if action in {"create-worker", "set-worker-title", "send-bootstrap", "send-worker-message", "archive-worker"}:
+    if action in {"create-worker", "set-worker-title", "set-review-owner", "send-bootstrap", "send-worker-message", "archive-worker"}:
         assignment = get_assignment(connection, run["run_id"], subject_id)
         assignment_id = assignment["assignment_id"]
         claim = assignment_claim(connection, run["run_id"], assignment_id)
@@ -1616,8 +1691,37 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 raise StateError("worker-capacity-reached", "at most three live workers are allowed", 4)
         elif action == "set-worker-title" and assignment["state"] != "worker-created":
             raise StateError("invalid-assignment-transition", "title readback requires a created worker", 4)
-        elif action == "send-bootstrap" and assignment["state"] != "worker-created":
-            raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
+        elif action == "set-review-owner":
+            if assignment["state"] != "active":
+                raise StateError(
+                    "invalid-assignment-transition",
+                    "review-owner reroute requires an active bootstrapped worker",
+                    4,
+                )
+            unresolved_owner = connection.execute(
+                """SELECT operation_id FROM app_operations
+                   WHERE run_id=? AND assignment_id=?
+                     AND action='set-review-owner'
+                     AND status IN ('pending','unknown')
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id),
+            ).fetchone()
+            if unresolved_owner:
+                raise StateError(
+                    "protected-operation-already-started",
+                    "review-owner transition already has an unresolved logical operation: "
+                    f"{unresolved_owner['operation_id']}",
+                    4,
+                )
+            if canonical_review_owner(connection, run["run_id"], assignment_id) != "worker":
+                raise StateError(
+                    "review-owner-conflict",
+                    "review ownership can reroute only once from worker to root",
+                    4,
+                )
+        elif action == "send-bootstrap":
+            if assignment["state"] != "worker-created":
+                raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
         elif action == "send-worker-message" and assignment["state"] not in {
             "active", "peer-input-ready"
         }:
@@ -1647,6 +1751,18 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     action = string(args.action, "action", 80)
     subject_id = string(args.subject_id, "subject_id", 256)
+    review_owner = args.review_owner
+    if action == "send-bootstrap":
+        if review_owner not in {"worker", "root"}:
+            raise StateError(
+                "invalid-input",
+                "send-bootstrap requires --review-owner worker|root",
+            )
+    elif review_owner is not None:
+        raise StateError(
+            "invalid-input",
+            "--review-owner is valid only for send-bootstrap",
+        )
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
@@ -1670,9 +1786,18 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         connection.execute(
             """INSERT INTO app_operations(
                    run_id,operation_id,action,subject_id,assignment_id,status,
-                   launch_count,created_at,updated_at
-               ) VALUES (?,?,?,?,?,'pending',1,?,?)""",
-            (run_id, operation_id, action, subject_id, assignment_id, now, now),
+                   launch_count,observed_state,created_at,updated_at
+               ) VALUES (?,?,?,?,?,'pending',1,?,?,?)""",
+            (
+                run_id,
+                operation_id,
+                action,
+                subject_id,
+                assignment_id,
+                review_owner,
+                now,
+                now,
+            ),
         )
         revision = advance(connection, run)
         connection.commit()
@@ -1686,6 +1811,7 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         }
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
+            result["review_owner"] = review_owner
         return result
     except Exception:
         connection.rollback()
@@ -1830,6 +1956,19 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
     ) - set(constants)
     required = sorted(required_fields)
     optional = sorted(possible_fields - required_fields)
+    field_constraints: dict[str, dict[str, list[str]]] = {}
+    if status == "succeeded" and action == "create-worker":
+        field_constraints["observed_state"] = {
+            "allowed_values": ["active", "idle"],
+        }
+    elif status == "succeeded" and action == "archive-worker":
+        field_constraints["observed_state"] = {
+            "allowed_values": ["archived", "completed"],
+        }
+    elif status == "succeeded" and action == "set-review-owner":
+        field_constraints["observed_state"] = {
+            "allowed_values": ["root"],
+        }
     return {
         "observation_kind": "app-operation",
         "action": action,
@@ -1837,6 +1976,7 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
         "constants": constants,
         "required_fields": required,
         "optional_fields": optional,
+        "field_constraints": field_constraints,
         "additional_fields": False,
     }
 
@@ -1958,7 +2098,10 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         common = Path(git_common_dir).stat()
         if (common.st_dev, common.st_ino) != (claim["git_common_dir_device"], claim["git_common_dir_inode"]):
             raise StateError("worker-repository-drift", "worker Git common-directory identity differs from the claimed repository", 4)
-        if observed["project_id"] != assignment["project_id"] or observed["observed_state"] != "active":
+        if (
+            observed["project_id"] != assignment["project_id"]
+            or observed["observed_state"] not in {"active", "idle"}
+        ):
             raise StateError("worker-project-drift", "worker project or state differs from the assignment", 4)
         collision = connection.execute(
             """SELECT a.run_id,a.assignment_id FROM assignments a
@@ -1994,6 +2137,26 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"] or observed["observed_title"] != assignment["title"]:
             raise StateError("worker-title-drift", "worker title readback differs from the assignment", 4)
+    elif action == "set-review-owner":
+        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
+        if observed["thread_id"] != assignment["thread_id"]:
+            raise StateError(
+                "worker-identity-drift",
+                "review-owner receipt belongs to another worker",
+                4,
+            )
+        next_owner = observed["observed_state"]
+        current_owner = canonical_review_owner(
+            connection,
+            run["run_id"],
+            assignment["assignment_id"],
+        )
+        if (current_owner, next_owner) != ("worker", "root"):
+            raise StateError(
+                "review-owner-conflict",
+                "review ownership permits only one worker-to-root reroute",
+                4,
+            )
     elif action == "set-root-title":
         assignment_count = connection.execute(
             "SELECT COUNT(*) FROM assignments WHERE run_id=?",
@@ -2008,6 +2171,7 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         titled = connection.execute("SELECT 1 FROM app_operations WHERE run_id=? AND assignment_id=? AND action='set-worker-title' AND status='succeeded'", (run["run_id"], assignment["assignment_id"])).fetchone()
         if not titled:
             raise StateError("worker-title-not-verified", "bootstrap requires verified worker title readback", 4)
+        bootstrap_review_owner(operation)
         connection.execute("UPDATE assignments SET state='active',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
         connection.execute("UPDATE runs SET implementation_started=1 WHERE run_id=?", (run["run_id"],))
     elif action == "send-worker-message":
@@ -2026,7 +2190,7 @@ def app_operation_replay_authorized(
     status: str,
     readback_ref: str | None,
 ) -> bool:
-    if not readback_ref or action not in SINGLE_USE_ACTIONS:
+    if not readback_ref or action not in PROTECTED_REPLAY_ACTIONS:
         return False
     if action == "send-bootstrap":
         return status in {"unknown", "failed"}
@@ -2062,6 +2226,10 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                 "observed_state",
             )
             if operation[field] is not None
+            and not (
+                operation["action"] == "send-bootstrap"
+                and field == "observed_state"
+            )
         }
         if operation["action"] == "send-bootstrap":
             stored_values["bootstrap_id"] = bootstrap_id_for(operation_id)
@@ -2114,6 +2282,8 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
             "receipt_ref", "readback_ref", "thread_id", "project_id", "checkout_path",
             "git_common_dir", "observed_title", "provider_observation_ref", "head_sha", "pr_url", "observed_state"
         )}
+        if operation["action"] == "send-bootstrap":
+            values["observed_state"] = bootstrap_review_owner(operation)
         connection.execute(
             """UPDATE app_operations SET status=?,receipt_ref=?,readback_ref=?,thread_id=?,project_id=?,
                checkout_path=?,git_common_dir=?,observed_title=?,provider_observation_ref=?,head_sha=?,pr_url=?,
@@ -2156,7 +2326,12 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         if operation is None:
             raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
         action = operation["action"]
-        if action not in SINGLE_USE_ACTIONS:
+        authorized_review_owner = (
+            bootstrap_review_owner(operation)
+            if action == "send-bootstrap"
+            else None
+        )
+        if action not in PROTECTED_REPLAY_ACTIONS:
             raise StateError(
                 "operation-replay-unsupported",
                 f"{action} does not support logical-operation replay",
@@ -2195,7 +2370,9 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
                SET status='pending',launch_count=launch_count+1,receipt_ref=NULL,
                    readback_ref=NULL,thread_id=NULL,project_id=NULL,checkout_path=NULL,
                    git_common_dir=NULL,observed_title=NULL,provider_observation_ref=NULL,
-                   head_sha=NULL,pr_url=NULL,observed_state=NULL,updated_at=?
+                   head_sha=NULL,pr_url=NULL,
+                   observed_state=CASE WHEN action='send-bootstrap' THEN observed_state ELSE NULL END,
+                   updated_at=?
                WHERE run_id=? AND operation_id=?""",
             (utc_now(), run_id, operation_id),
         )
@@ -2212,6 +2389,7 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         }
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
+            result["review_owner"] = authorized_review_owner
         return result
     except Exception:
         connection.rollback()
@@ -2220,10 +2398,14 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         connection.close()
 
 
-def app_operation_projection(row: sqlite3.Row) -> dict[str, Any]:
+def app_operation_projection(
+    connection: sqlite3.Connection,
+    row: sqlite3.Row,
+) -> dict[str, Any]:
     value = dict(row)
     if value["action"] == "send-bootstrap":
         value["bootstrap_id"] = bootstrap_id_for(value["operation_id"])
+        value["review_owner"] = bootstrap_review_owner(row)
     return value
 
 
@@ -2236,7 +2418,7 @@ def command_app_operation_list(args: argparse.Namespace) -> dict[str, Any]:
         rows = list(connection.execute("SELECT * FROM app_operations WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT ?", (args.run_id, args.after_sequence, args.limit + 1)))
         visible = rows[:args.limit]
         return {
-            "operations": [app_operation_projection(row) for row in visible],
+            "operations": [app_operation_projection(connection, row) for row in visible],
             "has_more": len(rows) > args.limit,
             "next_after_sequence": visible[-1]["sequence"] if visible else args.after_sequence,
         }
@@ -2733,6 +2915,11 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
                WHERE run_id=? AND assignment_id=?""",
             (assignment["state"], utc_now(), run_id, assignment_id),
         )
+        connection.execute(
+            """UPDATE spec_claims SET recovery_readback_ref=NULL
+               WHERE run_id=? AND assignment_id=?""",
+            (run_id, assignment_id),
+        )
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
@@ -2768,6 +2955,11 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
                WHERE run_id=? AND assignment_id=?""",
             (assignment["state"], utc_now(), run_id, assignment_id),
         )
+        connection.execute(
+            """UPDATE spec_claims SET recovery_readback_ref=NULL
+               WHERE run_id=? AND assignment_id=?""",
+            (run_id, assignment_id),
+        )
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
@@ -2783,13 +2975,69 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
         connection.close()
 
 
+def validate_assignment_resume_observation(value: dict[str, Any]) -> dict[str, Any]:
+    exact_keys(
+        value,
+        {
+            "schema",
+            "schema_version",
+            "run_id",
+            "assignment_id",
+            "run_revision",
+            "blocked_state",
+            "recovered_state",
+            "readback_ref",
+        },
+        "assignment resume observation",
+    )
+    require_protocol(
+        value,
+        "assignment_resume_observation",
+        "assignment resume observation",
+    )
+    if not isinstance(value["run_revision"], int) or value["run_revision"] < 1:
+        raise StateError("invalid-input", "run_revision must be a positive integer")
+    blocked_state = string(value["blocked_state"], "blocked_state", 32)
+    recovered_state = string(value["recovered_state"], "recovered_state", 32)
+    expected_recovery = {
+        "blocked-durable-contract": "durable-contract-restored",
+        "blocked-app-capability": "app-capability-restored",
+    }.get(blocked_state)
+    if expected_recovery is None or recovered_state != expected_recovery:
+        raise StateError(
+            "invalid-input",
+            "blocked_state and recovered_state do not describe a supported recovery",
+        )
+    return {
+        "run_id": token(value["run_id"], "run_id"),
+        "assignment_id": token(value["assignment_id"], "assignment_id"),
+        "run_revision": value["run_revision"],
+        "blocked_state": blocked_state,
+        "recovered_state": recovered_state,
+        "readback_ref": string(value["readback_ref"], "readback_ref", 2048),
+    }
+
+
 def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     assignment_id = token(args.assignment_id, "assignment_id")
+    observed = validate_assignment_resume_observation(
+        read_json_file(args.observation, "assignment resume observation")
+    )
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
+        if (
+            observed["run_id"] != run_id
+            or observed["assignment_id"] != assignment_id
+            or observed["run_revision"] != run["revision"]
+        ):
+            raise StateError(
+                "recovery-observation-drift",
+                "resume observation does not match the exact assignment revision",
+                4,
+            )
         assignment = get_assignment(connection, run_id, assignment_id)
         if assignment["state"] not in {
             "blocked-durable-contract", "blocked-app-capability"
@@ -2797,6 +3045,12 @@ def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError(
                 "invalid-assignment-transition",
                 "resume requires a recoverable blocked assignment",
+                4,
+            )
+        if assignment["state"] != observed["blocked_state"]:
+            raise StateError(
+                "recovery-observation-drift",
+                "resume observation does not match the current blocked state",
                 4,
             )
         restored = assignment["blocked_from_state"]
@@ -2813,10 +3067,26 @@ def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
                 "blocked assignment resume requires its retained claim",
                 4,
             )
+        recovery_kind = (
+            "durable-contract-restored"
+            if assignment["state"] == "blocked-durable-contract"
+            else "app-capability-restored"
+        )
+        if observed["recovered_state"] != recovery_kind:
+            raise StateError(
+                "recovery-observation-drift",
+                "resume observation does not match the required recovery state",
+                4,
+            )
         connection.execute(
             """UPDATE assignments SET state=?,blocked_from_state=NULL,updated_at=?
                WHERE run_id=? AND assignment_id=?""",
             (restored, utc_now(), run_id, assignment_id),
+        )
+        connection.execute(
+            """UPDATE spec_claims SET recovery_readback_ref=?
+               WHERE run_id=? AND assignment_id=?""",
+            (observed["readback_ref"], run_id, assignment_id),
         )
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
@@ -2825,6 +3095,8 @@ def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
             "run_id": run_id, "revision": revision,
             "assignment_id": assignment_id, "state": restored,
             "run_status": run_status, "claim_retained": True,
+            "recovery_kind": recovery_kind,
+            "recovery_readback_ref": observed["readback_ref"],
         }
     except Exception:
         connection.rollback()
@@ -3470,6 +3742,7 @@ def build_parser() -> argparse.ArgumentParser:
     begin.add_argument("--expected-revision", type=int, required=True)
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
     begin.add_argument("--subject-id", required=True)
+    begin.add_argument("--review-owner", choices=("worker", "root"))
     begin.set_defaults(handler=command_app_operation_begin, command_name="app-operation begin")
     op_finish = operation_commands.add_parser("finish", help="record or reconcile the immediate response and independent state inspection")
     op_finish.add_argument("--run-id", required=True)
@@ -3655,6 +3928,7 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("--run-id", required=True)
     resume.add_argument("--expected-revision", type=int, required=True)
     resume.add_argument("--assignment-id", required=True)
+    resume.add_argument("--observation", required=True)
     resume.set_defaults(
         handler=command_assignment_resume,
         command_name="assignment resume",

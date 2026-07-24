@@ -19,8 +19,10 @@ contract and continues producing coherent progress and evidence must not be
 micromanaged. Root owns scheduling, canonical Feature Spec claims, safely
 recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
-repairs, tests, validation, publication, reviews and fixes, tracker proof, and
-its final delivery-ready evidence.
+repairs, tests, validation, publication, review-candidate preparation, finding
+acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
+bootstrap's `review_owner=worker|root` owns AutoReview execution only; a
+root-owned review never grants root implementation or repair authority.
 
 A root task that owns an unfinished run remains the sole controller for that
 run. During executable work, root keeps its current turn open and monitors
@@ -69,8 +71,8 @@ continuation question during the run.
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `2.0.0` implements runtime
-   contract `2.0.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `3.0.0` implements runtime
+   contract `3.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
    schema integer `2` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
@@ -96,8 +98,10 @@ continuation question during the run.
    assignment whose Spec or head branch claim is waiting.
 5. For each worker, follow `references/chatgpt-task-orchestration.md` and send
    the full assignment under the generated `bootstrap_id`, including canonical
-   `review_owner=worker|root`. Resolve that owner through the early AutoReview
-   doctor path before implementation begins. A verified,
+   `review_owner=worker|root`. Persist the initial owner atomically on
+   `send-bootstrap begin --review-owner`; allow at most one worker-to-root
+   reroute through the reconciled `set-review-owner` operation after the early
+   AutoReview doctor path. A verified,
    worker-accepted bootstrap starts its complete implementation authority;
    duplicate delivery of that same logical bootstrap has one effect. There is
    no baseline-only phase or later GO.

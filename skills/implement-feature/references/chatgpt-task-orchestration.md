@@ -27,9 +27,13 @@ For every such change, root follows one crash-safe sequence:
 Bootstrap may replay after `unknown` or `failed` readback because the worker
 deduplicates its stable `bootstrap_id`; this provides exactly-once bootstrap
 effect, not exactly-once delivery. The protected `create-worker`,
-`set-worker-title`, `set-root-title`, and `archive-worker` actions may replay
+`set-worker-title`, `set-review-owner`, `set-root-title`, and `archive-worker`
+actions may replay
 only from `failed` with readback that authoritatively proves that launch had no
-effect. `send-worker-message` has no replay path. A pending operation is never
+effect. A successful `set-review-owner` history permits one initial
+`worker|root` selection and at most one `worker` to `root` reroute; the same
+logical operation is idempotent and a conflicting new owner fails closed.
+`send-worker-message` has no replay path. A pending operation is never
 replayable, an immediate tool error is not proof of no effect, and no operation
 is relaunched under a new logical identifier. SQLite stores only identity and
 reconciliation references, never prompts, message bodies, or hashes.
@@ -60,11 +64,14 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    create one visible Codex worker task with `environment=worktree` in the
    selected ChatGPT desktop project. The ChatGPT desktop app creates the
    worktree and assigns it to the task; root never runs `git worktree add`.
+   The successful creation observation records the literal task state
+   `active` or `idle`; both mean that the exact task binding exists, not that
+   implementation progress has begun.
 3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
-4. Send one full bootstrap envelope carrying the recorded `bootstrap_id`,
-   canonical `review_owner=worker|root`, and naming tracker backend, delivery
-   type, source ref, repository, branch,
+4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
+   canonical `review_owner=worker|root` into the full envelope with the recorded
+   `bootstrap_id`, tracker backend, delivery type, source ref, repository, branch,
    allowed paths, issue graph, acceptance and validation budgets, safety,
    worker autonomy, checklist rules, final evidence, and every known peer's
    exact task, repository, branch, role, and checkout identity.
@@ -131,9 +138,11 @@ Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
 durable-source change, an early AutoReview capability reroute, a root-owned
 AutoReview result, or an authoritative final-verification mismatch. An early
-review-owner follow-up contains only the structured doctor result and
-`review_owner=root`; it occurs before implementation and grants root review
-execution, not implementation authority. A new
+review-owner follow-up is the external effect of the recorded
+`set-review-owner` operation and contains only the structured doctor result and
+`review_owner=root`; it occurs before implementation, is reconciled by exact
+operation ID/readback, and grants root review execution, not implementation
+authority. A new
 peer-identity follow-up carries identity only; it does not introduce technical
 instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider

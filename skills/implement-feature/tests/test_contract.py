@@ -102,12 +102,28 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         bootstrap = self.text("references/root-bootstrap.md")
         orchestration = self.text("references/chatgpt-task-orchestration.md")
         worker = self.text("references/worker-execution.md")
+        runtime = self.text("scripts/run-state")
         for source in (skill, bootstrap, orchestration, worker):
             self.assertIn("review_owner=worker|root", source)
         self.assertIn("review-candidate", orchestration)
         self.assertIn("review-candidate", worker)
         self.assertIn("--review-phase full", orchestration)
         self.assertIn("--evidence-output", orchestration)
+        normalized_worker = self.normalized(worker)
+        self.assertIn(
+            "With `review_owner=worker`, the worker invokes `$autoreview`.",
+            normalized_worker,
+        )
+        self.assertIn(
+            "With `review_owner=root`, the worker sends only the authoritative review-candidate handoff",
+            normalized_worker,
+        )
+        self.assertNotIn("before invoking `$autoreview`", normalized_worker)
+        self.assertIn('"set-review-owner"', runtime)
+        self.assertIn("def canonical_review_owner", runtime)
+        self.assertIn("PROTECTED_REPLAY_ACTIONS", runtime)
+        self.assertIn("send-bootstrap requires --review-owner worker|root", runtime)
+        self.assertIn("review-owner-conflict", runtime)
         self.assertIn("A root-owned AutoReview result follow-up contains only", orchestration)
         self.assertIn("verbatim structured AutoReview result", orchestration)
 
@@ -168,8 +184,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """Given the breaking protocol cut, old state is rebuilt at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "2.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "2.0.0"', source)
+        self.assertIn('CLI_VERSION = "3.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "3.0.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
         self.assertIn('"schema": "implement-feature/run-manifest"', source)
         self.assertIn('"schema_version": "2.0.0"', source)
@@ -220,11 +236,11 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def test_given_local_delivery_when_contract_is_loaded_then_provider_gates_are_excluded(self) -> None:
         """Given local-branch delivery, when final gates run, then GitHub publication is not required."""
         spec = self.text("references/feature-spec-contract.md")
-        worker = self.text("references/worker-execution.md")
+        worker = self.normalized(self.text("references/worker-execution.md"))
         gates = self.text("references/final-verification.md")
         self.assertIn("local Markdown plus\n`local-branch`", spec)
         self.assertIn("`local-branch` owns no push or provider", spec)
-        self.assertIn("performs none of those\nprovider operations", worker)
+        self.assertIn("performs none of those provider operations", worker)
         self.assertIn("for `local-branch`: absence of push/PR/provider operations", gates)
 
     def test_given_multi_repo_boundaries_when_scheduled_then_existing_workers_collaborate(self) -> None:
@@ -268,8 +284,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "2.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "2.0.0"', source)
+        self.assertIn('CLI_VERSION = "3.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "3.0.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
         self.assertIn("command_capabilities", source)
         self.assertIn("runtime_artifact_sha256", source)
