@@ -42,8 +42,46 @@ identified as `github:owner/repository` may validly use a local Markdown
 `tracker_backend` fact while terminal validation keys from `delivery_type`.
 
 In a monorepo, one coherent Spec worker normally owns FE, BE, app, and their
-integration in one worktree. In a multi-repository bundle, existing repository
-workers own the combined boundaries named by the plan and communicate directly.
+integration in one worktree. In a multi-repository feature, every repo-owned
+Spec carries the same canonical lowercase UUID `Feature ID` and exact normalized
+`Feature Spec Set` table with columns
+`feature_spec_ref | affected_repository | responsibility`. Require one globally
+qualified row per member including self, deterministic repository ordering,
+non-empty responsibility, exact equality across every member, and no proposed
+refs. Normalize by parsing the table, trimming surrounding cell whitespace
+without case folding or alias rewriting, rejecting duplicate refs or
+repositories, sorting rows bytewise by `affected_repository`, and comparing
+the canonical header and rows byte-for-byte. Each self row must match its
+Spec's durable ref and repository. Planning Identity renders the parser-sensitive
+fields exactly as `- Feature ID: \`<uuid>\`.` and
+`- Repository key: \`<repository-key>\`.`. Every linked acceptance criterion
+uses the exact checklist prefix
+`- [ ] \`<repository-key>:ac-<NN>\` `, while every combined proof contract
+contains the exact bullet
+`- Proof ID: \`<repository-key>:proof-<slug>\`.`. Each ID must occur in exactly
+one member body and exactly once in that member's responsibility cell as an
+exact inline-code token; unbackticked IDs, prefix/suffix matches, malformed
+tokens, and checklist items without a canonical ID are invalid. An
+`Integration Execution Contract` requires at least one canonical Proof ID;
+duplicate, missing, foreign-row, or contradictory ownership is invalid. The
+root must prove this contract with read-only
+`scripts/run-state --json feature-spec-set validate --input <absolute-file>`
+over ephemeral complete member-body snapshots before permission, state, or
+claims. The successful command's exact `manifest_feature_set` is the only
+linked-set projection admitted to the run manifest, and `run start` must
+revalidate those same current inputs and require exact equality before it opens
+SQLite; proposed refs, validator-invalid bodies, missing or nonmatching
+evidence, and hand-composed fragments are invalid. Root must re-read the
+authoritative sources and replace/revalidate the snapshots if they change
+before startup; the CLI stores no body hash. For a linked local member, the
+validator also verifies
+the exact `<feature-id>--<repository-key>/` qualifier and emits the physical
+`repository_relative_spec_path` obtained by stripping it. The worker resolves
+that remainder only inside its separately verified owning checkout; the
+qualifier is never a directory or repository selector. The Feature Spec Set is the execution
+authority; the saved-project list only proves that each named repository can
+receive a worker. Existing repository workers own the combined boundaries
+named by the plan and communicate directly.
 Planning must assign component startup, HEAD readback, endpoint wiring, health,
 validation, and cleanup to those ordinary workers without assuming a shared
 filesystem. Before state, verify only that every repository can receive its
@@ -51,7 +89,7 @@ ordinary task/worktree and that the topology is complete. After those worktrees
 exist, every worker stays inside its own checkout and proves distributed
 peer-owned component execution. If the tasks cannot communicate or expose the
 required components, the affected bundle is `blocked-app-capability`;
-cross-worktree access, a dedicated integration task, root execution, raw
+cross-worktree access, a dedicated integration task, controller execution, raw
 worktrees, copied sources, and future manual testing are forbidden fallbacks.
 
 ## Drift Classification

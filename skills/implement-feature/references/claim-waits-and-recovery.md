@@ -25,7 +25,7 @@ branches may run under different roots in the same repository.
 An unfinished run keeps its exact `root_task_id` as the sole controller
 identity. Resume that same visible root task manually, read `run show`, and
 reconcile every pending or unknown task operation against authoritative
-ChatGPT desktop task state before scheduling or considering any authorized
+Codex task state in the ChatGPT App before scheduling or considering any authorized
 replay.
 Never create a replacement root, infer completion from task idleness, persist
 the objective, or use a heartbeat as lifecycle state.
@@ -33,7 +33,7 @@ the objective, or use a heartbeat as lifecycle state.
 ### Worker creation may already have happened
 
 If root was interrupted after requesting a visible worker but before recording
-the result, read the ChatGPT desktop task list and the candidate task. Verify
+the result, read the ChatGPT App task list and the candidate Codex task. Verify
 its stable task ID, selected project, checkout directory, Git common directory,
 and current state. If the exact worker exists, finish the already recorded
 operation and reuse it. If authoritative evidence proves no task was created,
@@ -76,7 +76,7 @@ and readback evidence. Active worker or present checkout retains ownership.
 Terminal/missing worker plus released/absent checkout marks the assignment
 `abandoned` and releases only its claim; after every sibling is terminal, the
 same root may use `run finish --outcome abandoned`. Unknown evidence fails
-closed. Use `assignment capability-block` only while the ChatGPT desktop app
+closed. Use `assignment capability-block` only while the ChatGPT App
 capability remains unavailable; after authoritative recovery, the same root
 uses `assignment resume --observation <absolute-path>`. The strict observation
 binds the exact run, assignment, current run revision, blocked reason, matching
@@ -88,7 +88,7 @@ judgment.
 ## Terminal Owner Reconciliation
 
 Before blocking a waiting Spec after recovery, read the exact owner root and
-worker from the ChatGPT desktop app and call `claim reconcile` with that exact
+worker from the ChatGPT App and call `claim reconcile` with that exact
 owner revision and typed observation.
 
 - Active worker or present checkout: retain the owner and continue the bounded

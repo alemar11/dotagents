@@ -67,7 +67,6 @@ class ProjectMemoryContractTests(unittest.TestCase):
             derived.index(f"{index}. `{value}`")
             for index, value in enumerate(
                 (
-                    "orchestrator-workspace",
                     "fresh-setup",
                     "existing-project-bootstrap",
                     "current-project",
@@ -76,17 +75,12 @@ class ProjectMemoryContractTests(unittest.TestCase):
             )
         ]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("wins even when root memory files are\n   missing", derived)
+        self.assertIn("no established Project Memory surface exists", derived)
         self.assertIn("Existing source code alone does not", derived)
         self.assertIn("Project Memory\n   identity/routing already exists", derived)
         self.assertIn("exact ordered precedence in\n`references/options.md`", skill)
         self.assertNotIn("selected files are missing", skill)
-        for value in (
-            "orchestrator-workspace",
-            "fresh-setup",
-            "existing-project-bootstrap",
-            "current-project",
-        ):
+        for value in ("fresh-setup", "existing-project-bootstrap", "current-project"):
             self.assertIn(f"`{value}`", setup)
         self.assertIn("execution context", setup)
         self.assertNotIn("- setup flow;", setup)
@@ -110,7 +104,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
             SKILL_ROOT / "references" / "tracker-publishing.md"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "proposed-spec:<project-slug>/<feature-slug>/<repository-slug>",
+            "proposed-spec:<feature-id>/<repository-key>",
             publishing,
         )
         self.assertNotIn("/<repository-slug>/integration", publishing)
@@ -148,7 +142,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
             self.assertIn("canonical hosted URL", text)
         for text in (local, publishing):
             self.assertIn(
-                "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
+                "<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md",
                 text,
             )
             self.assertIn("Feature Dependencies", text)
@@ -229,9 +223,9 @@ class ProjectMemoryContractTests(unittest.TestCase):
             "source_spec_ref=planning/features/<feature-slug>/SPEC.md",
             publishing,
         )
-        self.assertIn("repo-owned local planning subtrees", setup)
-        self.assertIn("coordination-root context", spec_phase)
-        self.assertIn("repo-owned partial Feature Specs", spec_phase)
+        self.assertIn("run setup\nindependently in each selected repository", setup)
+        self.assertIn("candidate local Git roots separately", spec_phase)
+        self.assertIn("repo-owned linked Feature Specs", spec_phase)
         self.assertIn(
             "`planning/features/<feature-slug>/SPEC.md` inside that repository",
             spec_phase,
@@ -241,7 +235,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
         )[0]
         for path in (
             "planning/features/<feature-slug>/SPEC.md",
-            "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
+            "<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md",
         ):
             self.assertIn(path, local_apply)
         self.assertNotIn("/integration/", local_apply)
@@ -293,11 +287,12 @@ class ProjectMemoryContractTests(unittest.TestCase):
 
         for relative_path in (
             "project-memory/config/issue-tracker.md",
-            "project-memory/config/project-layout.md",
             "project-memory/config/triage-labels.md",
         ):
             self.assertIn(relative_path, skill)
             self.assertIn(relative_path, setup)
+        self.assertNotIn("project-memory/config/project-layout.md", skill)
+        self.assertNotIn("project-memory/config/project-layout.md", setup)
 
         retired_domain_config = "project-memory/config/" + "domain.md"
         self.assertNotIn(retired_domain_config, skill)
@@ -322,10 +317,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn(
             "root `CONTEXT.md` is the single entry point", domain_normalized
         )
-        self.assertIn(
-            "coordination-workspace root and every available selected child-repository root context apply",
-            domain_normalized,
-        )
+        self.assertIn("supplies candidate local Git roots separately", domain_normalized)
         self.assertIn("## Scoped Contexts", domain)
         self.assertIn("| Scope | Owned paths | Context |", domain)
         self.assertIn("Multiple non-overlapping matches are valid", domain)
@@ -334,18 +326,8 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("Rows must be non-overlapping", domain)
         retired_overlap_rule = "explicit " + "precedence"
         self.assertNotIn(retired_overlap_rule, domain)
-        self.assertIn("## Repository Registry", domain)
-        self.assertIn("| Repository | Role | Location | Context |", domain)
-        self.assertIn(
-            "use its `## Repository Registry` to select every affected child",
-            domain_normalized,
-        )
-        self.assertIn("read each available child root `CONTEXT.md`", domain_normalized)
-        self.assertIn("The `Context` cell is optional", domain)
-        self.assertIn(
-            "do not invent child vocabulary or create a dangling pointer",
-            domain_normalized,
-        )
+        self.assertNotIn("## Repository Registry", domain)
+        self.assertIn("Explicit user scope or a durable linked Feature Spec Set", domain_normalized)
         self.assertIn("Use exactly one `project-memory/` directory", domain)
         self.assertIn("must not create\n  a nested `project-memory/` directory", domain)
         self.assertIn("read its `CONTEXT.md` first", modeling)
@@ -361,11 +343,8 @@ class ProjectMemoryContractTests(unittest.TestCase):
         )
         for contents in (skill, setup):
             normalized = " ".join(contents.split())
-            self.assertIn(
-                "child-repository root selected by the authorized setup scope",
-                normalized,
-            )
-            self.assertIn("outside that scope remain optional and untouched", normalized)
+            self.assertIn("additional Git repository", normalized)
+            self.assertIn("outside that scope remain untouched", normalized)
         retired_setup_terms = (
             "`context-" + "seed`",
             "`seed-" + "context`",
@@ -416,11 +395,10 @@ class ProjectMemoryContractTests(unittest.TestCase):
             headings,
             [
                 "Setup Target",
-                "Project Structure",
                 "Issue Location",
                 "Separate Project Contexts",
                 "Overlapping Project Ownership",
-                "Workspace Or Repository Rule",
+                "Repository Rule Ownership",
                 "Localization Conventions",
                 "Artifact-Marker Mapping",
                 "Issue-Type Mapping",
@@ -454,7 +432,6 @@ class ProjectMemoryContractTests(unittest.TestCase):
             )
             self.assertIn("`setup-workflow.md`", row)
         for reference_name in (
-            "project-layout.md",
             "translation.md",
             "triage-labels.md",
         ):
@@ -469,7 +446,6 @@ class ProjectMemoryContractTests(unittest.TestCase):
         for internal_term in (
             "memory-owning root",
             "scoped route",
-            "repository_layout",
             "tracker_backend",
             "translation memory",
             "authoritative scope",
@@ -488,7 +464,6 @@ class ProjectMemoryContractTests(unittest.TestCase):
         for prompt_fragment in (
             "Which projects should I set up?",
             "complete Project Memory setup",
-            "How should planning treat this",
             "Where should future Feature Specs",
             "Do they use different product vocabulary",
             "Which project should define the rules",
@@ -546,9 +521,9 @@ class ProjectMemoryContractTests(unittest.TestCase):
             with self.subTest(relative_path=relative_path):
                 self.assertIn("root `CONTEXT.md`", normalized)
                 self.assertIn("Scoped Contexts", normalized)
-                self.assertIn("Repository Registry", normalized)
                 self.assertIn("current Git repository", normalized)
                 self.assertIn("available", normalized)
+                self.assertNotIn("Repository Registry", normalized)
 
     def test_project_memory_owns_artifact_issue_type_and_state_registry(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -719,27 +694,22 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("`local-branch` executor performs no push or PR", normalized)
         self.assertIn("Project Memory does not choose between them", normalized)
 
-    def test_project_layout_is_owned_separately_from_tracker_routing(self) -> None:
+    def test_project_layout_configuration_is_retired(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         options = (SKILL_ROOT / "references" / "options.md").read_text(
-            encoding="utf-8"
-        )
-        layout = (SKILL_ROOT / "references" / "project-layout.md").read_text(
             encoding="utf-8"
         )
         setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("`project-layout`", options)
-        self.assertIn("`repository_layout`", skill)
-        self.assertIn("`repository_layout`", setup)
-        for value in ("`single-repository`", "`monorepo`", "`multi-repository-workspace`"):
-            self.assertIn(value, layout)
-            self.assertIn(value, skill)
-        self.assertIn("Keep `project-layout.md` limited to `repository_layout`", setup)
+        self.assertFalse((SKILL_ROOT / "references" / "project-layout.md").exists())
+        for contents in (skill, options, setup):
+            self.assertNotIn("`project-layout`", contents)
+            self.assertNotIn("`repository_layout`", contents)
+            self.assertNotIn("multi-repository-workspace", contents)
         self.assertIn("`tracker_backend`", skill)
-        self.assertIn("Keep tracker routing in `project-memory/config/issue-tracker.md`", layout)
+        self.assertIn("project-memory/config/issue-tracker.md", skill)
 
     def test_runtime_contracts_do_not_reference_legacy_agents_directory(self) -> None:
         roots = [

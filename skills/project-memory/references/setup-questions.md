@@ -1,6 +1,6 @@
 # Setup Questions
 
-Use this reference only when repository and workspace evidence plus the defaults
+Use this reference only when repository evidence plus the defaults
 in [setup-workflow.md](setup-workflow.md) cannot resolve a materially ambiguous
 setup target or behavior-affecting value.
 
@@ -16,7 +16,7 @@ Normally ask no questions. When a question is required:
   unresolved.
 
 Do not expose terms such as `memory-owning root`, `scoped route`,
-`repository_layout`, `tracker_backend`, or `translation memory` in the
+`tracker_backend`, or `translation memory` in the
 user-facing question. Canonical fields and values belong in the resulting
 configuration and completion report, not in the first-time-user prompt.
 
@@ -39,8 +39,8 @@ explicit full setup and named root already resolve the target.
 > - A different selection
 
 If the user chooses a different selection, ask only which listed paths to
-include. The selected Git repositories or coordination workspace become the
-setup scope internally.
+include. The selected Git repositories become the setup scope internally; run
+setup independently in each selected repository.
 
 When the project root is clear but the requested area is not, ask:
 
@@ -51,27 +51,8 @@ When the project root is clear but the requested area is not, ask:
 > - A specific area
 
 If the user selects a specific area, ask which one: issue tracking and workflow
-labels, Idea labels, project structure, project context, localization
-conventions, or agent pointers. Translate the answer to the corresponding
-`memory_slice` internally.
-
-## Project Structure
-
-Ask only when durable evidence supports conflicting project-layout
-classifications. Name the conflict instead of asking the user to understand a
-topology field.
-
-> I found `<evidence-a>`, which suggests `<interpretation-a>`, but
-> `<evidence-b>` suggests `<interpretation-b>`. How should planning treat this
-> workspace?
->
-> - One project
-> - One repository containing projects or packages that are planned separately
-> - A workspace coordinating separate repositories
-
-Map the answer internally to `single-repository`, `monorepo`, or
-`multi-repository-workspace`, in that order. Mark a choice Recommended only
-when the inspected evidence favors it.
+labels, Idea labels, project context, localization conventions, or agent
+pointers. Translate the answer to the corresponding `memory_slice` internally.
 
 ## Issue Location
 
@@ -129,18 +110,18 @@ path.
 If split ownership is selected, ask only for the concrete folder boundary. Do
 not persist overlapping routes.
 
-## Workspace Or Repository Rule
+## Repository Rule Ownership
 
-Ask only when evidence cannot establish whether a durable rule is local to one
-repository or coordinates several repositories.
+Ask only when a composed cross-repository update cannot establish which
+selected Git repository should own a durable rule.
 
 > I found this rule: `<rule-summary>`. Where does it apply?
 >
 > - Only to `<repository-name>` (Recommended)
-> - To every repository in this workspace
+> - To every selected repository
 
-Place the rule in the child repository unless the answer or evidence proves it
-is genuinely cross-repository.
+Place the rule in the named repository unless the answer or evidence proves it
+must be represented in every selected repository.
 
 ## Localization Conventions
 
@@ -254,8 +235,7 @@ Do not ask:
 - whether setup should create any Idea issue or file;
 - which execution context, write mode, or capture outcome to use;
 - whether to choose a context-creation mode; or
-- which abstract domain-layout classification the user prefers after project
-  structure is already resolved.
+- which abstract repository-shape classification the user prefers.
 
 When domain evidence is sparse, create the required minimal root `CONTEXT.md`
 and record explicit unknowns instead of converting missing evidence into a

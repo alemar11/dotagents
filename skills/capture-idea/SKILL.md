@@ -34,7 +34,7 @@ owns the complete selectable registry:
 | `write_mode` | `apply`, `propose` |
 
 Reject every unregistered field or noncanonical value. Tracker backend,
-repository topology, tracker owner, marker and state mappings, candidate
+explicit repository scope, tracker owner, marker and state mappings, candidate
 decisions, names, slugs, paths, refs, and queue intent are execution facts or
 data, not options.
 
@@ -45,8 +45,9 @@ data, not options.
   URL for GitHub, and
   `<repository-slug>/planning/ideas/<idea-slug>.md` for local storage. A bare
   local path is acceptable only as an additional same-repository display path.
-- Project Memory owns tracker routing, repository topology, the `idea` artifact
-  marker mapping, workflow-state mappings, and their explicit transports.
+- Project Memory owns tracker routing, the `idea` artifact marker mapping,
+  workflow-state mappings, and their explicit transports. Explicit user scope
+  owns the repository set; each Idea then names one tracker-owning repository.
   Require `label` for GitHub marker/state rows and `local-header` for local
   rows; reject missing or incompatible transports. Consume configured facts;
   do not define fallback taxonomy or silently write setup files.
@@ -84,7 +85,7 @@ depend on Codex-only tools.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Required tracker routing, topology, or Idea marker mapping is missing, stale, or contradictory. | Inspect or run the matching setup slice only when separately authorized in the same request. Otherwise stop with the exact prerequisite; Capture Idea never performs implicit setup writes. |
+| `$project-memory` | Required tracker routing or Idea marker mapping is missing, stale, or contradictory. | Inspect or run the matching setup slice only when separately authorized in the same request. Otherwise stop with the exact prerequisite; Capture Idea never performs implicit setup writes. |
 | `$gitstack:github-issues` | The resolved tracker backend is GitHub and Capture Idea needs exact issue or label reads, or `write_mode=apply` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
 
 Do not invoke GitStack for local storage. In `write_mode=propose`, allow only
@@ -99,13 +100,13 @@ Resolve `write_mode` once from [options.md](references/options.md). Read the
 selected memory-owning root's:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`.
 
-Use repository evidence plus Project Memory topology to determine the only
-valid tracker-owning repository for each possible Idea. In a multi-repository
-workspace, also read the coordination routing needed to identify affected
-children. Do not assume the current directory owns every candidate.
+Use explicit user scope and repository evidence to determine the only valid
+tracker-owning Git repository for each possible Idea. A cross-repository Idea
+must name one canonical owning repository; optional qualified backlinks may
+appear elsewhere. Do not infer ownership from the current Codex task, the
+ChatGPT App primary project or saved-project list, or filesystem proximity.
 
 Require an explicit configured mapping for `artifact_marker: idea`. For the
 GitHub backend, require transport `label`, its concrete `idea` label mapping,

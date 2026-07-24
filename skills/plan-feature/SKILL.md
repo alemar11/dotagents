@@ -33,9 +33,11 @@ default-path run registry:
 | --- | --- |
 | `write_mode` | `apply`, `propose` |
 
-Reject every unregistered field or value. Project Memory owns tracker routing
-and repository topology; Plan Feature consumes those as facts. Paths, slugs,
-refs, branches, dependencies, and domain handoffs are data.
+Reject every unregistered field or value. Project Memory owns tracker routing,
+issue types, workflow states, and their transports. Explicit intake or a
+validated linked Feature Spec Set owns the affected repository identities.
+Paths, local-root candidates, slugs, refs, branches, dependencies, and domain
+handoffs are data.
 
 Resolve `write_mode` once:
 
@@ -49,10 +51,10 @@ Resolve `write_mode` once:
   `references/issue-phase.md` plus `references/vertical-slices.md` before issue
   work. Load each template only with its owning phase. Those references own
   branch-specific validation, publication, recovery, and reporting detail.
-- Treat tracker routing, repository topology, issue types, workflow states, and
-  their transports as Project Memory facts. Reject missing, stale,
-  contradictory, or backend-incompatible facts instead of turning them into
-  Plan Feature options.
+- Treat tracker routing, issue types, workflow states, and their transports as
+  Project Memory facts. Treat the affected repository set as explicit feature
+  data. Reject missing, stale, contradictory, or backend-incompatible facts
+  instead of turning them into Plan Feature options.
 - Keep one run bounded to one feature and derive one `source_route` from intake
   evidence. No durable Spec selects `new-source`; one canonical durable Spec
   selects `existing-source`; an exact recognized incomplete publication
@@ -64,8 +66,9 @@ Resolve `write_mode` once:
   planning but never rewrite an existing Spec.
 - A successful run always returns one complete bundle: every required Feature
   Spec, a nonempty hardened issue graph for every implementation-eligible Spec,
-  tracker metadata, and relationships. Coordination-only parents are the only
-  zero-issue Specs. Withhold every incomplete bundle.
+  tracker metadata, and relationships. Every linked multi-repository Spec is
+  implementation-eligible; no additional top-level Spec exists. Withhold every
+  incomplete bundle.
 - Treat Specs and issues as executor-ready briefs, not immutable technical
   scripts. Stable content is the outcome and Non-Goals, source/repository/path/
   branch scope, dependencies, acceptance text/count/order, safety constraints,
@@ -96,7 +99,7 @@ Resolve `write_mode` once:
   use portable refs and evidence and keep executor transport, task scheduling,
   checkout, review, publication, and merge authority out of planning artifacts.
 - Each implementation-eligible Spec owns a unique
-  `(affected_repository, target_branch_name)` pair. Multi-repository bundles
+  `(affected_repository, target_branch_name)` pair. Multi-repository features
   assign every combined boundary to an existing repo-owned implementation Spec;
   its Feature Dependencies name the peer inputs whose exact revisions the proof
   requires. Ordinary workers collaborate directly, and no dedicated integration
@@ -105,9 +108,11 @@ Resolve `write_mode` once:
   `references/spec-phase.md` owns recoverable multi-repository publication.
 - Carry accepted durable planning decisions only as optional
   `knowledge_delta` phase data. Never persist it in a Feature Spec; put it only
-  on a final closeout issue whose repository and allowed paths
-  contain every target. `references/issue-phase.md` owns terminal dependency
-  derivation and continuation evidence.
+  on repository-owned final closeout issues whose repository and allowed paths
+  contain their exact target shards. One explicitly named canonical target owns
+  each cross-repository decision; other repositories may carry qualified
+  backlinks, never duplicate canonical records. `references/issue-phase.md`
+  owns sharding, terminal dependency derivation, and continuation evidence.
 - Compress the candidate graph before freezing new IDs or invoking
   `$plan-harder`. Issue count is observation, not a cap. Harden every missing
   final issue only after graph, scope, and ownership stabilize; retain matching
@@ -121,7 +126,7 @@ Resolve `write_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Tracker routing, repository topology, or an explicitly required Idea marker mapping is missing, stale, or contradictory. | Use only `tracker-routing` or `project-layout`; a missing Idea mapping blocks only Idea capture, discovery, or consumption, and Plan Feature never performs domain closeout. |
+| `$project-memory` | Tracker routing or an explicitly required Idea marker mapping is missing, stale, or contradictory. | Use only `tracker-routing`; a missing Idea mapping blocks only Idea capture, discovery, or consumption, and Plan Feature never performs domain closeout. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan Feature owns artifact writes. |
 | `$gitstack:github-issues` | The owning tracker backend is GitHub and Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, mapped metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
@@ -138,12 +143,12 @@ implementation begins.
 Read:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
-  as a selected root; in a coordination workspace, also select affected child
-  roots from its `Repository Registry` and read each available child root
-  context; then
+  as a selected root; for cross-repository work, use explicit user scope or a
+  durable linked Feature Spec Set to authorize repository identities, require
+  candidate local Git roots separately, verify each root against one authorized
+  identity, and read each available verified repository root context; then
   select every available scoped `CONTEXT.md` matched by affected paths in each
   selected root's `Scoped Contexts` table. Read every available matched context
   before drafting. For a root or matched route with no context, use repository
@@ -163,18 +168,21 @@ transaction, including its staged or final members, derives a continuation of
 that route. Multiple, conflicting, foreign, or ambiguous candidates block.
 Proposed refs never select the existing-source route. Then finish resolving
 `feature_slug`, affected repositories, allowed paths, one target branch shared
-only within each implementation-eligible Feature Spec, and any
-product/workspace identity from accepted input and repository evidence.
+only within each implementation-eligible Feature Spec, and any planning-scope
+identity from accepted input and repository evidence. For multi-repository
+work, generate or preserve one canonical lowercase UUID `feature_id` shared by
+every linked Spec.
 Resolve one stable `delivery_type` per implementation-eligible Spec without
 adding an option or Project Memory setting. GitHub tracking resolves to its only
 supported delivery, `github-pr`; local tracking requires accepted evidence for
 `local-branch` or `github-pr`, and repository identity alone is never evidence
 for PR delivery.
-For a multi-repository workspace, derive workspace behavior from
-`repository_layout`; do not ask for another workspace-mode option.
+The affected repository set is explicit feature data. Never infer it from the
+current Codex task, the ChatGPT App primary project or saved-project list, or
+filesystem proximity.
 
 On the existing-source route, collect the union of exact `- Source Idea:` refs
-from the stable intake Spec content and every required linked partial as
+from the stable intake Spec content and every required linked member as
 `bound_source_idea_refs`. Treat this as derived continuation evidence, never as
 an option or permission to draft from an Idea again. When the invocation also
 supplies `source_idea_refs`, require exact set equality with the bound set. An
@@ -212,11 +220,11 @@ Stop when selected Ideas do not describe one bounded feature. Do not route a
 missing Idea marker through implicit Project Memory writes; return the exact
 setup prerequisite unless the user separately authorized that setup.
 
-If an accepted parent/global Feature Spec is needed, produce it first. Resolve
-each affected child repository's tracker and topology facts independently and
-link every repo-scoped partial. Do not generate combined implementation issues
-until all required source refs and cross-links exist. Proposed refs remain
-non-executable.
+Resolve each affected Git repository's tracker facts independently and produce
+one repo-owned implementation-eligible Feature Spec per repository. Never
+synthesize another Spec above that linked set. Do not generate implementation issues until
+all required source refs and identical `Feature Spec Set` tables exist.
+Proposed refs remain non-executable.
 
 ### 2. Clarify Only Material Unknowns
 
@@ -254,9 +262,9 @@ Preserve current executor-owned checkbox markers and always run the canonical
 source-contract validation from
 `references/spec-phase.md`, including the exact Feature Dependencies heading
 and columns. On the existing-source route, start from any intake member and
-traverse its links to require the complete connected stable Spec set. Return
-each current body and ref without drafting or publication; a coordination-only
-parent owns no issues. If any source needs a change or the set is incomplete,
+traverse its `Feature Spec Set` to require the complete connected stable Spec
+set. Return each current body and ref without drafting or publication. If any
+source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
@@ -283,7 +291,7 @@ Feature Spec body.
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, facts, write mode,
-source ref, optional knowledge delta, workspace links, and validated cross-Spec
+source ref, optional knowledge delta, linked-set data, and validated cross-Spec
 graph, plus any exact continuation handoff.
 
 The issue phase owns vertical splitting, structural graph compression, durable
@@ -296,11 +304,12 @@ the run, while a complete matching applied bundle returns a verified no-op.
 If `knowledge_delta` is present in a single Spec, reuse or add a final
 closeout issue, exclude it and its own `dependency_ids` while deriving the
 remaining graph's no-dependent terminals, then make it depend directly on all
-of them and reject any dependent of the owner. In a
-multi-repository bundle, select an existing implementation partial whose scope
-contains every knowledge target and whose dependencies cover the inputs needed
-for final proof. Attach the delta only to that partial's final closeout issue.
-Harden and validate the selected final issue like every other issue.
+of them and reject any dependent of the owner. In a multi-repository feature,
+partition targets by repository, require one explicit canonical decision target
+for every cross-repository decision, and select one final closeout owner inside
+each member with a nonempty target shard. Attach only that repository's shard to
+its owner, never copy peer issue IDs, and harden and validate every selected
+final issue like every other issue.
 
 ### 5. Reconcile Idea Sources
 
@@ -354,17 +363,18 @@ Return:
   and `remaining_scope`, or the distinct `intended_coverage`,
   `intended_covered_scope`, and `intended_remaining_scope`; plus applied or
   proposed lifecycle transitions and any missing reconciliation operations;
-- domain closeout owner when present and the derived `capture_outcome`;
+- repository-owned domain closeout owners when present and the derived
+  `capture_outcome`;
 - exact continuation handoff when publication is incomplete, including every
   created or staged Spec ref, any applicable multi-repository
   publication-transaction identity and its complete predeclared body templates,
   selected Idea and prior-outcome refs, completed and missing operations, and
-  the complete `knowledge_delta` until its final owner issue is durable and
-  verified;
+  the complete `knowledge_delta` until every required repository-owned final
+  owner issue is durable and verified;
 - blockers and withheld artifacts;
 
-When `knowledge_delta` is present, report `capture_outcome=deferred` plus its
-actual or proposed final issue ref. Otherwise report
+When `knowledge_delta` is present, report `capture_outcome=deferred` plus every
+actual or proposed repository-owned final issue ref. Otherwise report
 `capture_outcome=no-durable-change`. This result is report-only and never
 persisted in the Feature Spec. Plan Feature never reports domain knowledge as
 captured.

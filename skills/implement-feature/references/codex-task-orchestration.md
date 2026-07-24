@@ -1,7 +1,7 @@
-# ChatGPT Task Orchestration
+# Codex Task Orchestration
 
 Root alone creates or changes visible Codex tasks, titles, and archives through
-the ChatGPT desktop app. Root owns only controller bootstrap and the explicitly
+the ChatGPT App. Root owns only controller bootstrap and the explicitly
 allowed controller follow-ups below. Workers never create tasks; they send the
 bounded direct peer messages defined below without routing routine
 collaboration through root.
@@ -9,10 +9,10 @@ collaboration through root.
 For every such change, root follows one crash-safe sequence:
 
 1. call `app-operation begin` to record the intended operation in SQLite before
-   changing the ChatGPT desktop task, then retain its generated opaque
+   changing the Codex task in the ChatGPT App, then retain its generated opaque
    `operation_id`; for `send-bootstrap`, also retain the deterministically
    derived `bootstrap_id`; retain the returned `launch_count` for every action;
-2. perform the change through the ChatGPT desktop app tools only when
+2. perform the change through the ChatGPT App tools only when
    `app-operation begin` returns `launch_authorized=true`;
 3. use both the immediate tool response and an independent reading of the
    actual task to build the typed observation for that exact `launch_count` and
@@ -62,7 +62,7 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    or durable state.
 2. For each claimed, path-disjoint assignment up to three,
    create one visible Codex worker task with `environment=worktree` in the
-   selected ChatGPT desktop project. The ChatGPT desktop app creates the
+   selected local Git project in the ChatGPT App. The ChatGPT App creates the
    worktree and assigns it to the task; root never runs `git worktree add`.
    The successful creation observation records the literal task state
    `active` or `idle`; both mean that the exact task binding exists, not that
@@ -71,8 +71,10 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    directory, then set and verify `🛠️ <Feature Spec title>`.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
    canonical `review_owner=worker|root` into the full envelope with the recorded
-   `bootstrap_id`, tracker backend, delivery type, source ref, repository, branch,
-   allowed paths, issue graph, acceptance and validation budgets, safety,
+   `bootstrap_id`, tracker backend, delivery type, source ref, validated local
+   `repository_relative_spec_path` when applicable, Feature ID, repository key,
+   repository, branch, allowed paths, issue graph, acceptance and validation
+   budgets, safety,
    worker autonomy, checklist rules, final evidence, and every known peer's
    exact task, repository, branch, role, and checkout identity.
 5. Verify the message was delivered to that exact task and that the worker
@@ -122,7 +124,7 @@ While runnable workers remain nonterminal, root keeps the current turn open and
 uses bounded task waits. Worker progress or completion wakes that existing
 wait. Root returns a final response only for a delivery-ready,
 preimplementation-aborted, owner-abandoned, or declaratively blocked run. After a crash,
-ChatGPT desktop app restart, or premature task completion, continuation is
+ChatGPT App restart, or premature task completion, continuation is
 manual in the exact same root task; recovery reads the unfinished run and
 authoritative SQLite, task, tracker, and repository state before taking action.
 Never create a replacement root, heartbeat, worker-to-root wake, or synthetic

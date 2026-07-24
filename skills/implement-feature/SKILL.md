@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Implement durable Feature Specs in collaborating visible ChatGPT desktop app tasks and deliver reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
+description: Implement durable Feature Specs in collaborating visible Codex tasks in the ChatGPT App and deliver reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
 ---
 
 # Implement Feature
@@ -8,7 +8,7 @@ description: Implement durable Feature Specs in collaborating visible ChatGPT de
 ## Fixed Contract
 
 Use this skill only after explicit `$implement-feature` invocation in the
-ChatGPT desktop app in Codex mode. Consume complete execution-ready Feature Specs and their
+ChatGPT App in Codex mode. Consume complete execution-ready Feature Specs and their
 issues unchanged. Never plan, repair planning artifacts, implement in root,
 create raw worktrees, merge, enqueue, deploy, release, or perform post-merge
 closure.
@@ -35,14 +35,14 @@ remains unfinished with its claims retained, so only the same root may resume
 after authoritative recovery or contract change.
 An unexpected task interruption does not make the run terminal: manually
 resume the exact root task and run, reconstruct current state from SQLite,
-visible ChatGPT tasks, trackers, and repositories, and never create a
+visible Codex tasks, trackers, and repositories, and never create a
 replacement controller while that run is unfinished. Do not add a heartbeat,
 worker-to-root wake, persisted objective, or second lifecycle state. The root
 title is UI evidence only and never durable state.
 
-A recoverable pre-bootstrap worker or ChatGPT desktop app failure must not
+A recoverable pre-bootstrap worker or ChatGPT App failure must not
 silently duplicate the attempted effect or release its claim. Reconcile the
-recorded ChatGPT desktop app operation before any continuation. Replay only
+recorded ChatGPT App operation before any continuation. Replay only
 when that exact operation reports `replay_authorized=true`, always with the
 same logical `operation_id` and a newly incremented `launch_count`; never begin
 a replacement operation. Bootstrap replay preserves its derived `bootstrap_id`
@@ -66,37 +66,50 @@ continuation question during the run.
    `references/root-bootstrap.md`. Validate current durable sources,
    dependencies, repository identities, allowed paths, acceptance, validation,
    delivery type, and exact saved Git-project mapping before state. Resolve the
-   one startup authorization interaction only after this read-only preflight.
+   current controller task's exact local saved Git-project binding as
+   controller identity only; a later UI-primary change does not alter it. The
+   bound project need not be affected and grants no implementation authority.
+   Require every affected repository to map to its own exact local saved Git
+   project. For each multi-repository set, run read-only
+   `scripts/run-state --json feature-spec-set validate --input <absolute-file>`
+   over ephemeral complete member-body snapshots and retain its exact
+   `manifest_feature_set`, including each validated local member's decoded
+   `repository_relative_spec_path`. Keep those inputs unchanged until
+   `run start` revalidates them. Resolve the one startup authorization interaction
+   only after this read-only preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `3.0.0` implements runtime
-   contract `3.0.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `4.0.0` implements runtime
+   contract `4.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
-   schema integer `2` is separate from those SemVer identities. Every run pins
+   schema integer `3` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
    schema-1 state with active owners cannot prove those pins and therefore
    stops fail-closed; a drained schema-1 state is atomically dropped and
-   recreated as schema 2 without carrying rows forward. For a future
-   recognized older schema that does record exact owner pins, pass every
-   required old executable with repeated `state prepare --retained-runtime`
-   flags and keep the root open for bounded drain sweeps. Never start a worker
-   or another run during a fenced cutover.
+   recreated as schema 3 without carrying rows forward. Schema 2 records exact
+   owner pins: pass every distinct required executable with repeated
+   `state prepare --retained-runtime` flags and keep the root open for bounded
+   drain sweeps. Never start a worker or another run during a fenced cutover.
    Unknown, newer, corrupt, unversioned, or same-version-invalid state stops
    before claims. SQLite transactions and `target_schema_version` fence
    concurrent CLI work; no filesystem lock is used.
-3. Atomically claim each free `(repository_identity, source_spec_ref)` pair.
+3. Call `run start` with the manifest plus one repeated
+   `--feature-spec-set-input <absolute-file>` per linked set; standalone Specs
+   pass none. The CLI revalidates every complete body and requires exact
+   validator-projection equality before SQLite access. Only then atomically
+   claim each free `(repository_identity, source_spec_ref)` pair.
    Different Specs and head branches may run under different roots in the same
    repository. Keep a conflicting assignment in its bounded Spec wait without
-   blocking claims already acquired by sibling assignments.
+   blocking claims already acquired by peer assignments.
 4. When at least one assignment owns its claim, set and verify the immutable
    root title once, then schedule up to three path-disjoint Feature Specs; serialize
    overlap inside this root. Dependency-related peers may start before their
    input HEADs stabilize so they can collaborate, but final proof must bind the
    exact prerequisite revisions. Never create a worker for an
    assignment whose Spec or head branch claim is waiting.
-5. For each worker, follow `references/chatgpt-task-orchestration.md` and send
+5. For each worker, follow `references/codex-task-orchestration.md` and send
    the full assignment under the generated `bootstrap_id`, including canonical
    `review_owner=worker|root`. Persist the initial owner atomically on
    `send-bootstrap begin --review-owner`; allow at most one worker-to-root
@@ -117,7 +130,7 @@ continuation question during the run.
    with exact pre/post HEAD evidence. Never create a dedicated integration
    worker or grant cross-worktree access.
 7. Apply `references/final-verification.md`. Root rereads authoritative tracker,
-ChatGPT task, Git, delivery-specific provider, CI, and AutoReview-owned review evidence without editing or
+Codex task, Git, delivery-specific provider, CI, and AutoReview-owned review evidence without editing or
    judging criteria. For local-branch delivery, use `scripts/verify-ready` for
    the deterministic Git and tracker snapshot instead of composing shell
    probes. Complete each assignment claim when its root-verified
@@ -132,7 +145,7 @@ own Feature Spec claim; independent assignments continue.
 ## Reference Routing
 
 - Always load `references/options.md`, `references/feature-spec-contract.md`,
-  `references/root-bootstrap.md`, and `references/chatgpt-task-orchestration.md` before
+  `references/root-bootstrap.md`, and `references/codex-task-orchestration.md` before
   startup mutation.
 - Workers load `references/worker-execution.md` and `references/tracker-checklists.md`.
 - Load `references/claim-waits-and-recovery.md` for claim waits, compaction,

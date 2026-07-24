@@ -53,28 +53,32 @@ Otherwise fold the enabling work into the first vertical consumer.
 
 ## Multi-Repository Slices
 
-Prefer one issue per independently mergeable repository outcome. Use one
-cross-repository issue only when the repositories must change atomically or one
-integration owner must prove the complete behavior.
+Every issue belongs to one repo-owned Feature Spec and may change only that
+Spec's Git repository. When repositories must coordinate atomically or one
+integration owner must prove the complete behavior, express the ordering
+through linked Feature Dependencies and place combined proof on an existing
+issue owned by the proof member; never create one issue that edits multiple Git
+repositories.
 
 Each issue must identify:
 
-- exact affected repository slugs;
+- its exact affected repository identity and, for a linked member, stable
+  repository key;
 - repo-relative or repo-qualified allowed paths;
 - interface, schema, version, migration, fixture, or deployment contracts;
 - named integration gates and validation order;
-- sibling Feature Spec refs when repo-scoped partials exist.
+- linked Feature Spec refs when the feature spans repositories.
 
 Potential delivery artifacts are planning context, not completion proof. The
 executor records real delivery evidence during implementation.
 
-Assign every cross-repository boundary to an existing implementation partial
+Assign every cross-repository boundary to an existing implementation member
 whose accepted repository, paths, tools, and validation budget can execute the
 combined proof. Record the exact peer Feature Specs as Feature Dependencies and
-put the executable integration contract on that proof-owning partial. Different
+put the executable integration contract on that proof-owning member. Different
 consumers may own different boundaries against the same producer HEAD. Withhold
-the bundle when no existing partial can own a required proof; never synthesize
-an integration partial, issue subtree, branch, or worker.
+the bundle when no existing member can own a required proof; never synthesize
+an integration-only Spec, issue subtree, branch, or worker.
 
 ## Dependency Graph
 
@@ -154,8 +158,7 @@ candidates; when the gate requires a durable-node change, stop on a graph
 conflict and require separately authorized replacement.
 
 Never compress across Feature Specs. Run the gate independently for each
-implementation-eligible Spec and exclude coordination-only parent artifacts.
-Preserve every required combined-proof owner and the unique final
+implementation-eligible Spec. Preserve every required combined-proof owner and the unique final
 domain-closeout owner. A repair must stay inside the
 accepted Feature Spec scope; otherwise return a planning blocker instead of
 widening the source.
@@ -180,17 +183,23 @@ rewrite a durable seed.
 
 ## Domain Knowledge Closeout
 
-When the issue phase receives a knowledge delta, exactly one final
-implementation closeout issue persists it. No Feature Spec body carries the
-payload. Exclude the selected owner and its outgoing `dependency_ids`, derive
-the nodes with no dependents in the remaining graph, then make the owner depend
-directly on every such node and reject any issue that depends on the owner.
+When the issue phase receives a knowledge delta, one final implementation
+closeout issue per nonempty repository-owned target shard persists it. No
+Feature Spec body carries the payload. Exclude each selected owner and its
+outgoing `dependency_ids`, derive the nodes with no dependents in that member's
+remaining graph, then make the owner depend directly on every such node and
+reject any issue that depends on the owner.
 
-For a multi-repository bundle, persist the delta only on the final issue of an
-existing implementation partial whose accepted paths contain every target. Its
-Feature Dependencies name the exact peer inputs required for final proof. Apply
-the owner-excluded terminal rule only inside that partial; never copy
-sibling-partial issue IDs across Specs.
+For a multi-repository bundle, one explicit canonical decision target in the
+exact `<feature-id>--<repository-key>/<repo-relative-path>` form owns the full
+cross-repository ADR or decision record. Its prefix must resolve to a declared
+Feature Spec Set member and its path must fit that member's accepted paths.
+Other member shards may persist only repo-local context changes and backlinks
+that copy that exact target. Every
+selected owner's accepted paths contain its complete shard, and its Feature
+Dependencies name the exact peer inputs required for final proof. Apply the
+owner-excluded terminal rule independently inside each member; never copy issue IDs
+across Specs.
 
 The final issue must:
 

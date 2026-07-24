@@ -27,10 +27,7 @@ Place `TRANSLATION.md` beside the relevant `CONTEXT.md`:
 
 - repository root: root `TRANSLATION.md` for shared localization rules;
 - scoped monorepo context: scoped `TRANSLATION.md` beside the selected scoped
-  `CONTEXT.md` when that scope has independent localization rules;
-- multi-repository coordination workspace: root `TRANSLATION.md` only when the
-  workspace itself has localization rules. Child repositories keep their own
-  translation memory.
+  `CONTEXT.md` when that scope has independent localization rules.
 
 Use product vocabulary from the neighboring `CONTEXT.md`; do not duplicate the
 project glossary here. `CONTEXT.md` may include a one-line pointer to this file

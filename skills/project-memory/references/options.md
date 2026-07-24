@@ -18,7 +18,7 @@ Memory and its composed callers.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `tracker-routing`, `project-layout`, `domain-memory`, `translation-memory`, `agents-pointers`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. |
+| `memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`, `agents-pointers`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | A domain operation is required only for `memory_slice=domain-memory`. |
 | `write_mode` | `apply`, `propose` | Derived from scoped authority | Inspect-only, review-only, dry-run, and proposal requests select `propose`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for direct Grill Me With Context invocation | Selects whether a composed domain workflow may capture now or must return its data to the caller. |
@@ -28,32 +28,31 @@ domain-memory handoffs. Other slices omit it.
 
 ## Derived Context
 
-`execution_context` is a factual classification derived from the current
-workspace and selected memory surfaces, not an input option. Evaluate these
+`execution_context` is a factual classification derived from the current Git
+repository and selected memory surfaces, not an input option. Evaluate these
 mutually exclusive rules in order:
 
-1. `orchestrator-workspace`: `repository_layout=multi-repository-workspace` and
-   the current root coordinates child repositories that retain their own
-   project memory and code ownership. This wins even when root memory files are
-   missing.
-2. `fresh-setup`: the first rule is false and no established Project Memory
-   surface exists yet at this project root. Existing source code alone does not
-   turn a first Project Memory setup into bootstrap.
-3. `existing-project-bootstrap`: the first two rules are false, Project Memory
+1. `fresh-setup`: no established Project Memory surface exists yet at this Git
+   repository root. Existing source code alone does not turn a first Project
+   Memory setup into bootstrap.
+2. `existing-project-bootstrap`: the first rule is false, Project Memory
    identity/routing already exists, and the selected domain-memory surface
    needs its initial accepted population from repository or same-repo session
    evidence.
-4. `current-project`: none of the earlier rules applies; established Project
+3. `current-project`: none of the earlier rules applies; established Project
    Memory is being read or updated without bootstrap semantics.
 
 Report the derived classification and its evidence. A structured caller may
-provide workspace facts, but it must not select or override this result.
+provide repository facts, but it must not select or override this result.
 
 ## Domain Data And Results
 
 - `knowledge_delta` is optional input data containing accepted durable terms,
   rules, boundaries, or decisions plus their evidence and intended targets. It
-  is not an enum and is not part of the option registry.
+  is not an enum and is not part of the option registry. A repository-owned
+  cross-repository shard additionally carries the qualified
+  `canonical_decision_target`; only the named owner shard carries the full
+  canonical record, while peer shards may carry repo-local backlinks.
 - `capture_outcome` is a closeout result with value `captured`, `deferred`, or
   `no-durable-change`. Destinations and deferral reasons remain separate result
   data. It is never accepted as an input option.
@@ -72,10 +71,17 @@ provide workspace facts, but it must not select or override this result.
 - `capture_outcome=captured` requires accepted durable knowledge,
   `write_mode=apply`, every accepted delta item reconciled, every required named
   target updated or verified already current, and documentation-diff
-  verification across all destinations. One successful destination never
+  verification across all destinations inside the current Git root. One
+  successful destination never
   masks an unresolved item or target. Every supplied accepted item must remain
   supported by landed behavior and be durably represented; a rejected or
   contradicted item cannot count as reconciled.
+- A cross-repository shard must name exactly one canonical decision target,
+  exactly `<feature-id>--<repository-key>/<repo-relative-path>`, whose prefix
+  resolves to the declared owner in the validated Feature Spec Set. Ordinary
+  target surfaces must remain inside the current Git root. A non-owner shard
+  may copy the exact canonical target only as a backlink and must not duplicate
+  the canonical record.
 - `capture_outcome=deferred` requires accepted durable knowledge and names every
   unresolved item or target with its intended destination and reason.
 - For `domain_operation=implementation-closeout` with a nonempty accepted
@@ -90,5 +96,5 @@ provide workspace facts, but it must not select or override this result.
 
 Structured option objects must use only the four registry fields and their
 canonical values. Reject unknown option fields or values instead of translating
-them. Keep workspace facts and `knowledge_delta` in separate input data, and
+them. Keep repository facts and `knowledge_delta` in separate input data, and
 emit `execution_context` and `capture_outcome` only as derived output.

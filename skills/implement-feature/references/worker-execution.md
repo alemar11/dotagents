@@ -47,7 +47,12 @@ controller's launch generation. A missing ID is not an accepted bootstrap.
 
 Before each issue, after recovery, and before final verification:
 
-1. read the current Feature Spec and complete issue graph;
+1. read the current Feature Spec and complete issue graph. For a linked local
+   source, use the validator-provided `repository_relative_spec_path` only
+   after verifying its qualified source ref prefix exactly matches the
+   bootstrap Feature ID and repository key; resolve the remainder inside this
+   worker's verified checkout. Never treat the qualifier as a directory or
+   read another worker's checkout;
 2. compare the stable fields from `feature-spec-contract.md` directly;
 3. accept compatible operational changes and continue autonomously;
 4. stop declaratively as `blocked-durable-contract` if a stable field changed.

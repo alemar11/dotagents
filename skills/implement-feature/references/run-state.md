@@ -1,39 +1,39 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. Release `3.0.0` is a CLI/runtime hard cut over the
-existing database schema `2`: `assignment resume` now requires authoritative
-recovery through a strict assignment-bound observation, and successful worker
-creation accepts the literal ChatGPT task states `active` and `idle`. There are
-no command aliases or compatibility flags.
+uses the shipped artifact. Release `4.0.0` is a CLI/runtime hard cut over
+database schema `3`: the controller's saved project is explicit control-plane
+identity, each affected repository maps bijectively to its own saved project,
+and assignments inherit that normalized binding. There are no command aliases
+or compatibility flags.
 
 Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `3.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `3.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `2` | Exact SQLite tables, columns, indexes, and constraints |
-| JSON protocols | named protocol plus `2.0.0` | Exact machine payload or envelope shape |
+| CLI | `4.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `4.0.0` | Coordination semantics required by an active run |
+| Database schema | integer `3` | Exact SQLite tables, columns, indexes, and constraints |
+| JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
 are integers, never SemVer. `scripts/run-state --json capabilities` is the
 machine-readable registry for these identities and protocols:
 
-| Protocol | `schema` |
-| --- | --- |
-| CLI envelope | `implement-feature/cli-envelope` |
-| Run manifest | `implement-feature/run-manifest` |
-| ChatGPT task-operation observation | `implement-feature/app-operation-observation` |
-| Delivery-ready observation | `implement-feature/delivery-ready-observation` |
-| Recovery observation | `implement-feature/recovery-observation` |
-| Assignment-resume observation | `implement-feature/assignment-resume-observation` |
+| Protocol | `schema` | Version |
+| --- | --- | --- |
+| CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
+| Run manifest | `implement-feature/run-manifest` | `3.0.0` |
+| Feature Spec Set input | `implement-feature/feature-spec-set-input` | `1.0.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `2.0.0` |
+| Delivery-ready observation | `implement-feature/delivery-ready-observation` | `2.0.0` |
+| Recovery observation | `implement-feature/recovery-observation` | `2.0.0` |
+| Assignment-resume observation | `implement-feature/assignment-resume-observation` | `2.0.0` |
 
-Every named protocol listed here requires the string
-`"schema_version": "2.0.0"` alongside its exact `schema`. An exact-key protocol
-change to a field name, type, required key, or closed enum is breaking and
-requires that protocol's major bump unless a real capability negotiation
-contract is introduced first.
+Every payload carries the exact string `schema_version` listed for its
+`schema`. An exact-key protocol change to a field name, type, required key, or
+closed enum is breaking and requires that protocol's major bump unless a real
+capability-negotiation contract is introduced first.
 
 All controllers for the same machine user share:
 
@@ -59,9 +59,9 @@ CREATE TABLE runtime_metadata (
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=2, target_schema_version=NULL)`. The integer stored here is not
-the CLI, runtime-contract, or JSON protocol version. Schema number `2` does not
-authorize another shape: every table, column, index, and constraint must match
+`(schema_version=3, target_schema_version=NULL)`. The integer stored here is not
+the CLI, runtime-contract, or JSON protocol version. Schema number `3` does not
+authorize an alternate shape: every table, column, index, and constraint must match
 exactly or the CLI returns `invalid-state-schema` without deleting or rewriting
 the DB. `PRAGMA user_version` is not application state and is never read or
 written. Local coordination does not span different machines.
@@ -74,12 +74,13 @@ SemVer but different bytes is not the retained runtime for that run.
 
 ## Stored Data Allowlist
 
-The schema contains only runtime metadata, runs, assignments, canonical Feature Spec
-claims, and typed ChatGPT task-operation reconciliation facts. It may retain durable
-source refs, tracker backend, delivery type, assignment prerequisites, ChatGPT
-project/thread/worktree identity, exact `receipt_ref`/`readback_ref` machine
-fields, release reason, normal Git
-head/base/ancestry facts, and PR/provider refs only when applicable.
+The schema contains only runtime metadata, runs, normalized run-repository
+bindings, assignments, canonical Feature Spec claims, and typed Codex
+task-operation reconciliation facts. It may retain durable source refs, linked
+`feature_id` membership, tracker backend, delivery type, assignment
+prerequisites, Codex controller/repository project identity, thread/worktree
+identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
+normal Git head/base/ancestry facts, and PR/provider refs only when applicable.
 
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
@@ -92,8 +93,11 @@ head SHAs remain valid evidence.
 scripts/run-state --version
 scripts/run-state --json capabilities
 scripts/run-state --json doctor
+scripts/run-state --json feature-spec-set validate \
+  --input /absolute/feature-spec-set-input.json
 scripts/run-state --json state prepare
-scripts/run-state --json run start --manifest /absolute/manifest.json
+scripts/run-state --json run start --manifest /absolute/manifest.json \
+  --feature-spec-set-input /absolute/feature-spec-set-input.json
 scripts/run-state --json run wait-sweep \
   --run-id RUN --assignment-id ASSIGNMENT --expected-revision N
 scripts/run-state --json run show --run-id RUN
@@ -171,10 +175,36 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="2.0.0"`, `runtime_contract_version="3.0.0"`, and the
-`run_id`, `root_task_id`, `repositories`, and `assignments` described in
+`schema_version="3.0.0"`, `runtime_contract_version="4.0.0"`, and the
+`run_id`, `root_task_id`, `controller_project_id`, `repositories`,
+`assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
-additional top-level keys.
+additional top-level keys. For each linked set, `run start` also requires one
+repeated `--feature-spec-set-input` path. It revalidates the complete current
+bodies before opening SQLite and requires the sorted validator projections to
+equal `feature_sets` exactly. Standalone manifests use an empty `feature_sets`
+array and no evidence flags.
+
+`feature-spec-set validate` is a pure read command. Its input uses the exact
+`implement-feature/feature-spec-set-input` protocol and contains at least two
+member objects with exact `source_spec_ref`, `affected_repository`, and
+absolute `body_file` fields. It parses each complete member body, requires the
+same canonical lowercase UUID, distinct lower-kebab repository keys, one exact
+normalized Feature Spec Set table, exact self rows, globally unique owned
+criterion/proof IDs, and responsibility cells that own precisely those IDs.
+Every owned ID in a responsibility cell is an exact inline-code token; the
+validator rejects unbackticked text, malformed prefix/suffix matches, and
+unidentified acceptance checklist items. An Integration Execution Contract
+requires at least one canonical Proof ID.
+Applied refs cannot use `proposed-spec:`. Success emits a sorted canonical
+projection and a `manifest_feature_set` containing only `feature_id`,
+`source_spec_ref`, `repository_identity`, and `repository_key`. It never
+creates or mutates the database, and neither the bodies, normalized table,
+responsibility text, criterion text, nor hashes enter persistent state.
+For a linked local ref, it also verifies the exact
+`<feature-id>--<repository-key>/` qualifier and emits the transient
+`repository_relative_spec_path` produced by stripping that prefix. Only that
+remainder may be resolved inside the separately verified owning repository.
 
 ## Observation Builders
 
@@ -209,7 +239,7 @@ authorizing `begin` or `replay` result; it does not derive the launch
 generation. A stale count is rejected before any observation file is written.
 The builder derives `bootstrap_id`.
 
-For a successful `create-worker`, `observed_state` is the literal ChatGPT task
+For a successful `create-worker`, `observed_state` is the literal Codex task
 state and accepts `active` or `idle`; both prove that the exact created task is
 present and bound to its project/worktree. For the worker-to-root
 `set-review-owner` reroute, it accepts only `root`; for a successful
@@ -229,7 +259,7 @@ later repeats. `assignment ready` has no readiness flag: it derives the
 mutation exclusively from the observation's `readiness_mode`, preventing the
 builder and consumer from selecting different outcomes.
 
-## ChatGPT Task-Operation Identity And Replay
+## Codex Task-Operation Identity And Replay
 
 `app-operation begin` generates an opaque `operation_id` in `op-*` form; callers
 never choose or replace one. That ID is the durable logical operation identity.
@@ -390,7 +420,7 @@ contract recovery requires `blocked-durable-contract` plus
 `durable-contract-restored`; capability recovery requires
 `blocked-app-capability` plus `app-capability-restored`. A stale, unrelated, or
 cross-reason observation fails before transition. The authoritative durable
-source or ChatGPT capability/task readback remains opaque data in
+source or Codex capability/task readback remains opaque data in
 `readback_ref`, which the transition stores on the retained claim. Entering
 either blocked state clears any older recovery ref. A `blocked-by-active-spec`
 assignment may run `run wait-sweep` again;
@@ -450,11 +480,12 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `3.0.0`;
-`DATABASE_SCHEMA_VERSION` remains integer `2`; each protocol entry remains the
-named `2.0.0` identity declared above. Re-run `--help`, `--version`, read-only
-`capabilities` and `doctor`, Python compilation, unit/contract tests, and an
-isolated lifecycle fixture after changes.
+or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `4.0.0`;
+`DATABASE_SCHEMA_VERSION` remains integer `3`; each protocol entry remains at
+the independently named identity declared above. Re-run `--help`, `--version`,
+read-only `capabilities`, `doctor`, and `feature-spec-set validate`, Python
+compilation, unit/contract tests, and an isolated lifecycle fixture after
+changes.
 
 Version each domain for its own contract:
 
@@ -483,23 +514,24 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schema 1 is the only recognized rebuild source for release 2.0.0, but its runs
-did not record exact runtime-contract, CLI, and artifact pins. Therefore:
+Schemas 1 and 2 are the only recognized rebuild sources for release 4.0.0.
+Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
+Therefore:
 
 - with any schema-1 owner in `waiting-for-spec`, `active`, or `blocked`,
   preparation fails closed with the legacy runtime identity unresolved; a
   caller-supplied executable cannot manufacture the missing per-run proof;
 - with zero schema-1 owners, preparation begins one exclusive transaction,
-  rechecks zero, drops every application object, creates exact schema 2 and its
+  rechecks zero, drops every application object, creates exact schema 3 and its
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
-original artifact. The 2.0.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 2.0.0 preparation only after authoritative schema-1
+original artifact. The 4.0.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 4.0.0 preparation only after authoritative schema-1
 state reports zero owners.
 
-For a future recognized older schema that does persist exact run pins,
-`state prepare` first writes the target database-schema integer to
+Schema 2 does persist exact per-run pins. With active schema-2 owners,
+`state prepare` first writes database-schema integer `3` to
 `target_schema_version` transactionally while preserving the old schema. A
 non-NULL target fences every new run. Pass each distinct required executable
 with a repeated absolute

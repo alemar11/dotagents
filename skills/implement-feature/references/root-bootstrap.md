@@ -4,30 +4,41 @@ Root is a lightweight control plane. Before mutation:
 
 1. Read and validate the complete current Feature Spec frontier through
    `feature-spec-contract.md`.
-2. Resolve each repository's canonical identity. Use
+2. Read the current Codex task and `list_projects`. Require the controller task
+   to be anchored to one local saved Git project on the current host and record
+   its exact `controller_project_id`. The controller project is UI/control-plane
+   identity only: it may be unrelated to the feature, never expands scope, and
+   owns no implementation claim, branch, worker, or PR unless a separate
+   repo-owned Spec selects that repository.
+3. Resolve each affected repository's canonical identity. Use
    `github:owner/repository` for GitHub repositories. For local-only repositories,
    resolve `git rev-parse --path-format=absolute --git-common-dir`, stat that
    real directory, and use the exact identity printed by the helper's local
    identity rule. Linked worktrees therefore share one target.
-3. Run the saved-project preflight with `list_projects`. Every selected
-   repository must map to a saved project whose path is exactly that repository
-   root and whose independently resolved Git common directory matches the
-   canonical repository identity. A non-Git coordination workspace is not a
-   substitute, because worktree creation targets the selected project's Git
-   root. Never infer a child repository from a workspace project and never
-   treat a project or workspace path as repository identity.
-4. Read `tracker_backend` and exact `delivery_type` from each stable contract.
+4. Run the saved-project preflight with `list_projects`. Every affected
+   repository must map bijectively to one local saved Git project on the current
+   host whose path is exactly that repository root and whose independently
+   resolved Git common directory matches the canonical repository identity.
+   Reject remote, non-Git, shared-project, duplicate-project, parent-path, and
+   ambiguous mappings before state. No multi-folder group identity is required
+   or inferred; a broad project is never a substitute.
+5. Read `tracker_backend` and exact `delivery_type` from each stable contract.
    Check branches and required dependency proof, calculate allowed-path overlap,
    derive worker order, and disclose startup scope. Repository identity never
    substitutes for either transport fact.
-5. For multi-repository combined proof, verify before permission or state only
+6. For every multi-repository Feature Spec Set, validate ephemeral snapshots of
+   all authoritative member bodies with
+   `scripts/run-state --json feature-spec-set validate --input <absolute-file>`.
+   Require one successful result before permission or state and retain only its
+   exact `manifest_feature_set` result for the run manifest.
+7. For multi-repository combined proof, verify before permission or state only
    the static prerequisites that can exist at that point: every repository maps
-   to a saved ChatGPT desktop project capable of creating its ordinary worker
-   and worktree; every combined boundary names an ordinary proof owner; and its
-   Integration Execution Contract assigns each component either to that proof
-   owner or to the peer that owns the component. Do not require access to
-   worktrees that do not exist yet.
-6. Resolve the startup fields from `options.md`. If every mapping in step 3
+   to a saved local Git project in the ChatGPT App capable of creating its
+   ordinary worker and worktree; every combined boundary names an ordinary
+   proof owner; and its Integration Execution Contract assigns each component
+   either to that proof owner or to the peer that owns the component. Do not
+   require access to worktrees that do not exist yet.
+8. Resolve the startup fields from `options.md`. If every mapping in step 4
    already exists, resolve only `visible_app_task_permission`. If mappings are
    missing, list the exact repository roots in the standard question and
    resolve both `missing_project_action` and
@@ -37,19 +48,21 @@ Root is a lightweight control plane. Before mutation:
    saved-project preflight. With `stop`, denied task permission, unavailable
    Computer Use, a locked host, ambiguous selection, or any mismatched
    readback, stop before run state, claim, task, or worktree creation.
-7. Write a private manifest containing only controller identity:
+9. Write a private manifest containing only coordination identity:
 
 ```json
 {
   "schema": "implement-feature/run-manifest",
-  "schema_version": "2.0.0",
-  "runtime_contract_version": "3.0.0",
+  "schema_version": "3.0.0",
+  "runtime_contract_version": "4.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
+  "controller_project_id": "controller-task-project-id",
   "repositories": [
     {
       "repository_identity": "github:owner/repository",
-      "git_common_dir": "/absolute/repository/.git"
+      "git_common_dir": "/absolute/repository/.git",
+      "project_id": "affected-repository-project-id"
     }
   ],
   "assignments": [
@@ -59,18 +72,45 @@ Root is a lightweight control plane. Before mutation:
       "repository_identity": "github:owner/repository",
       "tracker_backend": "github",
       "delivery_type": "github-pr",
-      "project_id": "current-app-project-id",
       "title": "🛠️ Exact Feature Spec title",
       "target_branch_name": "feature/example",
       "prerequisite_assignment_ids": []
     }
-  ]
+  ],
+  "feature_sets": []
 }
 ```
 
+The Feature Spec Set validator input has the exact protocol
+`schema="implement-feature/feature-spec-set-input"` and
+`schema_version="1.0.0"`. Its `members` array contains exact objects with
+`source_spec_ref`, `affected_repository`, and `body_file`; each body path is an
+absolute regular non-symlink file containing the complete current member body.
+The command is read-only and emits the canonical member table plus one
+`manifest_feature_set` object. Copy that object byte-for-byte into
+`feature_sets`; its transient member projection contains `source_spec_ref`,
+`repository_identity`, and `repository_key`. Sort multiple set objects
+bytewise by `feature_id`; use an empty array for standalone Specs. Keep every
+ephemeral input and body snapshot unchanged through successful `run start`,
+which revalidates them and compares the current projections to the manifest
+before opening SQLite. Pass one repeated
+`--feature-spec-set-input <absolute-file>` flag per linked set and no such flag
+for standalone Specs. Delete the ephemeral inputs and body snapshots only after
+`run start` succeeds. Never persist those bodies, their normalized table text,
+responsibilities, criterion text, repository key, or hashes in SQLite.
+
+For a linked local source, the validator requires the exact
+`<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`
+identity and emits
+`repository_relative_spec_path=planning/features/<feature-slug>/SPEC.md`.
+The qualified prefix is not a directory. Include the validated relative path
+in the owning worker bootstrap, and resolve it only inside that assignment's
+separately verified repository/worktree.
+
 The manifest deliberately omits raw Spec and issue bodies, checklists, allowed
 path text, validation attempts, worker technical state, provider state, and text
-hashes. Those remain authoritative at their sources.
+hashes. It retains only `feature_id` membership for assignments belonging to a
+validated linked set. The authoritative bodies remain at their sources.
 
 The manifest protocol and the runtime contract are independent, bare SemVer
 identities; neither is the SQLite database schema integer. `run start` accepts
@@ -87,9 +127,14 @@ setup is reported exactly and never converted into an active run.
 One root task may own only one unfinished run. A second run from that task
 starts only after the first is terminal.
 
-Call `scripts/run-state --json run start --manifest <absolute-file>`. One
-transaction claims every free canonical Feature Spec and head branch and leaves
-only conflicting assignments in `waiting-for-spec`. With
+Call `scripts/run-state --json run start --manifest <absolute-file>` and append
+the unchanged `--feature-spec-set-input <absolute-file>` evidence flags for
+every linked set. Immediately before startup, re-read the authoritative member
+sources; if any changed, replace the snapshots and repeat validation. A
+missing, extra, reordered, validator-invalid, or nonmatching evidence
+projection fails before database access. One transaction claims every free
+canonical Feature Spec and head branch and leaves only conflicting assignments
+in `waiting-for-spec`. With
 `tracker_backend=github`, a GitHub URL and `owner/repository#number` normalize
 to the same claim identity. With `tracker_backend=local`, the globally
 unambiguous repository-scoped Spec path remains local even when the repository
@@ -102,7 +147,7 @@ mutation. Never use a default PR base such as `main` as a head-branch collision:
 only the implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
-`environment=worktree`. The ChatGPT desktop app creates the worktree and assigns
+`environment=worktree`. The ChatGPT App creates the worktree and assigns
 it to that task. Root verifies the task, checkout directory, and Git common
 directory; it never runs `git worktree add`. SQLite keeps only checkout identity
 needed for coordination, not the worker's technical contents.

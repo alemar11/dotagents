@@ -12,7 +12,6 @@ memory:
 
 - lean project-memory pointers in `AGENTS.md`;
 - tracker routing in `project-memory/config/issue-tracker.md`;
-- durable project topology in `project-memory/config/project-layout.md`;
 - canonical artifact-marker, issue-type, and workflow-state vocabulary and
   repository mappings plus explicit transport in
   `project-memory/config/triage-labels.md`;
@@ -34,7 +33,6 @@ structured fields in current handoffs and reports.
 | `memory_slice` | Owns |
 | --- | --- |
 | `tracker-routing` | Tracker backend plus canonical artifact-marker, issue-type, and workflow-state vocabulary and mappings. |
-| `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -46,9 +44,9 @@ For `memory_slice=domain-memory`, resolve `domain_operation` from
 
 Derive `execution_context` from repository evidence after selecting the slice;
 it is not a user or caller option. Apply the exact ordered precedence in
-`references/options.md`, which yields one of `orchestrator-workspace`,
-`fresh-setup`, `existing-project-bootstrap`, or `current-project`. Do not
-redefine or reorder those predicates in another reference.
+`references/options.md`, which yields one of `fresh-setup`,
+`existing-project-bootstrap`, or `current-project`. Do not redefine or reorder
+those predicates in another reference.
 
 Resolve `write_mode=propose` for a non-mutating run. Use `write_mode=apply` only
 when the selected scope has write authority.
@@ -65,14 +63,18 @@ when the selected scope has write authority.
   root selected by that setup scope, even when evidence supports only a minimal
   entry point with explicit unknowns. Outside setup/bootstrap, use repository
   evidence until authorized durable content warrants creation. Treat the
-  current Git repository as a selected root; in a coordination workspace also
-  follow its repository registry to affected child roots and read each
-  available child root context. Then select every matched available scoped
-  `CONTEXT.md` from each selected repository root.
-- Use one `project-memory/` directory per memory-owning root: one at a Git
-  repository root, or one at a non-Git coordination-workspace root. Internal
+  current Git repository as the selected root, then select every matched
+  available scoped `CONTEXT.md`. For cross-repository work, explicit user scope
+  or a durable linked Feature Spec Set authorizes repository identities; the
+  composed caller must supply candidate local Git roots separately, verify each
+  root against exactly one authorized identity, reject extra or unmatched
+  roots, and run Project Memory once per verified repository. Never fabricate
+  paths from Spec refs or discover scope from the ChatGPT App saved-project
+  list.
+- Use one `project-memory/` directory at each Git repository root. Internal
   monorepo projects use scoped `CONTEXT.md` files and centralized root ADRs,
-  not nested `project-memory/` directories.
+  not nested `project-memory/` directories. Non-Git roots never own Project
+  Memory.
 - Seed durable memory only from strong repo evidence, committed behavior,
   accepted tracker decisions, final session evidence, or explicit user
   acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
@@ -106,13 +108,11 @@ Behavior-affecting setup uses human-first Markdown tables with
 | Key | Values | Owner |
 | --- | --- | --- |
 | `tracker_backend` | `github`, `local` | `issue-tracker.md` |
-| `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | `project-layout.md` |
 
 Project Memory does not store implementation delivery targets, branch or PR
 policy, or executor authorization. Those belong to the current Feature Spec or
-the executing workflow. Unknown tracker keys and retired repository-layout
-values are invalid input; configuration must already use this schema before the
-runtime consumes it.
+the executing workflow. Unknown tracker keys are invalid input; configuration
+must already use this schema before the runtime consumes it.
 
 `references/triage-labels.md` is the sole reusable registry for canonical
 `artifact_marker`, `issue_type`, and `workflow_state` values plus their mapping
@@ -128,11 +128,11 @@ The `artifact_marker: idea` mapping is required only for Idea capture and
 Idea-source consumption. If it is absent, stop those Idea-specific operations
 with a setup prerequisite while leaving unrelated planning and implementation
 workflows valid.
-Do not add durable keys for Codex runtime workspace shape, source-root lists,
-worktree paths, setup flow, GitHub repo, coordination repo, workers,
+Do not add durable keys for Codex runtime project topology, repository sets,
+source-root lists, worktree paths, setup flow, GitHub repo, workers,
 implementation delivery, publication/issue-mutation authority, scheduled
 checks, or current-run mutation intent. Use prose, planning artifacts, or the
-orchestrator ledger for those concerns.
+controller ledger for those concerns.
 
 `references/setup-workflow.md` owns the settings editor, canonical table
 validation, draft checklist, pointer block, and completion report.
@@ -146,7 +146,6 @@ Load only the selected branch:
 | Work | Required references |
 | --- | --- |
 | Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
-| Project layout | `project-layout.md` and `setup-workflow.md` for edits. |
 | Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`, and `setup-workflow.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md` and `setup-workflow.md`. |
@@ -173,9 +172,7 @@ persisting run intent as configuration.
 ### 2. Inspect Focused Evidence
 
 - tracker: current setup, remotes/config, templates, tracker docs, artifact
-  marker labels, and relevant local/workspace conventions;
-- project layout: Git root shape, package/workspace manifests, child repository
-  evidence, and existing project-memory topology config;
+  marker labels, and relevant local conventions;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
   root and scoped context files, context routing, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
@@ -187,8 +184,8 @@ recent same-repo evidence is strong enough to be durable.
 
 When `AGENTS.md` mixes concerns, keep operating rules there and route project
 purpose/vocabulary to `CONTEXT.md`, localization to `TRANSLATION.md`, tracker
-and layout settings to `project-memory/config/*`, and accepted load-bearing
-decisions to ADRs.
+settings to `project-memory/config/*`, and accepted load-bearing decisions to
+ADRs.
 
 ### 3. Resolve Settings Or Delta
 
@@ -214,13 +211,13 @@ language and verify the docs diff alongside feature proof.
 
 For authorized domain setup/bootstrap, ensure root `CONTEXT.md` exists at every
 memory-owning root selected by the setup scope before completion. Scoped
-contexts remain optional and evidence-backed. A child-repository root selected
-by the authorized setup scope follows the same mandatory root-context rule;
-child repositories outside that scope remain optional and untouched.
+contexts remain optional and evidence-backed. Every additional Git repository
+explicitly selected by an authorized composed setup follows the same mandatory
+root-context rule; repositories outside that scope remain untouched.
 
-In orchestrator-workspace setup, do not create Feature Spec, Idea, or issue
-subtrees, and do not create runtime worker configuration or state. Project
-Memory setup never creates Idea artifacts in any repository layout. Before
+Project Memory setup does not create Feature Spec, Idea, or issue subtrees and
+does not create runtime worker configuration or state. It never creates Idea
+artifacts. Before
 completing a touched `issue-tracker.md`, reject unknown configuration keys
 rather than rewriting or removing them implicitly.
 
@@ -248,8 +245,6 @@ it never counts as captured.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
 - [setup-questions.md](references/setup-questions.md): conditional
   first-time-user ambiguity prompts and internal answer mapping.
-- `project-layout.md`: durable `repository_layout` configuration and topology
-  detection boundaries.
 - `triage-labels.md`: sole reusable canonical artifact-marker,
   issue-type/workflow-state registry and repository mapping template.
 - `issue-tracker-*.md`, `tracker-publishing.md`: tracker artifact, source-ref,

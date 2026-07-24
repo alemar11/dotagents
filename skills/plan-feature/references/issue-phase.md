@@ -15,8 +15,9 @@ deferred domain-memory closeout.
 - Do not perform implementation or domain-memory writes.
 - Use the incoming `write_mode` and derived `source_route`; do not create
   phase-specific choices.
-- Treat tracker routing, repository topology, issue types, workflow states, and
-  their explicit transports as Project Memory facts. Reject missing, unknown,
+- Treat tracker routing, issue types, workflow states, and their explicit
+  transports as Project Memory facts. Treat affected repository identities as
+  explicit intake or validated Feature Spec Set data. Reject missing, unknown,
   or backend-incompatible transports instead of inferring them.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, write
   nothing and return bodies, locations, metadata, and publication order rather
@@ -43,8 +44,9 @@ Receive:
 - the complete Feature Spec body and validated cross-Spec dependency graph;
 - planning identity, affected repositories, allowed paths, shared target
   branch, and stable `delivery_type`;
-- tracker backend and repository layout facts for every owning repository;
-- workspace parent/child refs when applicable;
+- tracker backend facts for every owning repository;
+- optional shared `feature_id` and the validated identical `Feature Spec Set`
+  when multiple repositories are affected;
 - current durable implementation-issue bodies, generated IDs, refs, metadata,
   relationships, and verification evidence when any exist;
 - optional `knowledge_delta` plus separate `planning_blockers`. On the
@@ -85,15 +87,15 @@ Read the Feature Spec and verify:
   a prose failure policy naming its attempt/retry budget, allowed fallback,
   retained evidence, and required terminal outcome;
 - affected repositories and allowed paths resolve to real planning scope;
-- the target branch is valid and shared across all affected repositories;
+- the target branch is valid and shared by every generated issue owned by that
+  Feature Spec; linked Specs may use different branch names;
 - every Feature Spec dependency ref resolves and the cross-Spec graph is
   acyclic;
 - every applied multi-repository source and dependency ref is globally
   unambiguous: `owner/repository#<number>` or a canonical hosted URL for GitHub,
-  and `<repository-slug>/planning/features/<feature-slug>/SPEC.md` for
+  and `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md` for
   local Markdown;
-- the complete parent/child Feature Spec mapping exists for multi-repository
-  work;
+- the complete linked Feature Spec Set exists for multi-repository work;
 - portable evidence contains no developer-machine absolute path;
 - the Feature Spec body contains neither `knowledge_delta` nor
   `## Domain Knowledge Handoff`;
@@ -158,9 +160,9 @@ graph-compression gate passes. IDs are planning graph identities and remain
 separate from hosted issue numbers.
 
 Require a nonempty final graph for every implementation-eligible Feature Spec.
-A coordination-only parent never enters this phase. If the source has no
-implementable vertical outcome, return a planning blocker rather than an empty
-successful bundle.
+Every linked Spec enters independently. If the source has no implementable
+vertical outcome, return a planning blocker rather than an empty successful
+bundle.
 
 For each issue, store only `dependency_ids` pointing to earlier generated IDs.
 Require every ref to exist, reject self-dependencies, and validate the graph is
@@ -174,9 +176,9 @@ list.
 
 ### 3. Assign Repository Scope
 
-For a single repository or monorepo issue, use `current-repository` as the
-affected repository when no repo slug is needed. For a workspace issue, list
-the exact child repo slugs.
+For one affected Git repository, use `current-repository` when no repo slug is
+needed. For multi-repository work, list the exact canonical repository
+identities.
 
 Set `allowed_paths` to the smallest safe repo-relative or repo-qualified scope.
 Include shared contracts or integration fixtures only when the slice owns
@@ -190,25 +192,28 @@ repository to `affected_repositories`, and add both exact paths to
 inside the issue's authorized execution scope; do not replace either path with a
 wildcard. Verify both paths resolve inside that affected Git repository and a
 future executor checkout can expose them. If the tracker artifact lives at a
-non-Git workspace root or outside every affected repository, withhold the issue
+non-Git root or outside every affected repository, withhold the issue
 as non-executable; never invent a tracker-owning repository.
 
-All issues use the Feature Spec's shared `target_branch_name`. Repository
-topology stays a Project Memory fact and is not copied into a selectable issue
-field.
+All issues use the Feature Spec's shared `target_branch_name`. Repository shape
+is not copied into a selectable issue field.
 
 ### 4. Assign Combined Proof And Domain Closeout
 
-For every cross-repository boundary, choose an existing implementation partial
+For every cross-repository boundary, choose an existing implementation member
 whose worker can execute the proof within its accepted paths and tools. Record
-the required producer partials in Feature Dependencies and describe the exact
+the required producer members in Feature Dependencies and describe the exact
 revision vector, startup, wiring, health, validation, evidence, and cleanup in
-that partial's Integration Execution Contract. Assign each component process to
+that member's Integration Execution Contract. Assign each component process to
 the proof owner or its owning peer and require that worker's pre/post HEAD
-readback; never assume the proof owner can access sibling filesystems. Multiple consumer partials may
-own separate proofs against one producer. A bundle-wide criterion must name one
-existing partial as owner. If no existing partial can own it, withhold the
-bundle instead of creating another Spec, issue subtree, branch, or worker.
+readback; never assume the proof owner can access peer filesystems. Multiple
+consumer members may own separate proofs against one producer. A bundle-wide
+criterion must name one existing member as owner, carry its globally unique
+criterion ID only in that member's Acceptance Criteria, and list that ID in the
+same member's Feature Spec Set responsibility cell. Combined proof IDs follow
+the same exact-once ownership rule. If no existing member can own an obligation,
+withhold the bundle instead of creating another Spec, issue subtree, branch, or
+worker.
 
 If `knowledge_delta` is absent, generate no domain closeout section.
 
@@ -222,24 +227,36 @@ If `knowledge_delta` is present:
    it can remain topologically last after these dependencies; reuse a durable
    seed only when its existing closeout payload and dependencies are already
    exact. Otherwise append a new owner without modifying the retained issue.
-2. For a multi-repository bundle, assign the delta to one existing
-   implementation partial whose accepted repository and paths contain every
-   target. Reject assignment to the coordination parent and reject the bundle
-   when no existing partial can own all targets without scope expansion. Within
-   the selected partial, reuse or append the closeout owner and apply the same
-   owner-excluded terminal algorithm only to that partial. Reject a dependent
-   of the owner and never copy sibling-partial issue IDs. Reuse an unpublished
-   candidate only when it can remain topologically last inside that partial;
-   reuse a durable seed only when its existing closeout payload and dependencies
-   are already exact. Otherwise append a new owner.
-3. Copy the exact decisions, portable targets, and evidence into that final
-   issue's `## Domain Knowledge Closeout` section.
-4. Before hardening, require every target repository in that payload to appear
-   in the final issue's `affected_repositories` and every normalized target path
-   to equal or descend from one of that issue's `allowed_paths`. Add a missing
-   repository or path only when it is already inside the accepted Feature Spec
-   scope; otherwise withhold the issue as blocked. Never rely on Project Memory
-   to write outside the issue's execution scope.
+2. For a multi-repository feature, partition targets into repository-owned
+   shards. Every cross-repository decision must name one exact
+   `canonical_decision_target` in the form
+   `<feature-id>--<repository-key>/<repo-relative-path>`. The Feature ID and
+   repository key must resolve to one declared Feature Spec Set member, and the
+   path must be contained by that member's accepted paths. That member's shard
+   owns the full ADR or decision record; another repository's shard may own
+   only its repo-local context change and a backlink that copies the exact same
+   canonical target string, never a duplicate canonical record. Repository-
+   owned `target_surfaces` use only
+   `current-repository/<repo-relative-path>`; a repo slug never selects a root.
+   Assign each nonempty shard to
+   one existing implementation member whose accepted repository and paths
+   contain all targets in that shard. Within every selected member, reuse or
+   append one closeout owner and apply the same owner-excluded terminal
+   algorithm only to that member. Reject a dependent of the owner and never
+   copy peer issue IDs. Reuse an unpublished candidate only when it can remain
+   topologically last inside that member; reuse a durable seed only when its
+   existing closeout payload and dependencies are already exact. Otherwise
+   append a new owner. Withhold the feature when any shard or canonical target
+   lacks an in-scope owner.
+3. Copy each exact repository-owned shard—its decisions or qualified backlinks,
+   portable targets, evidence, and canonical target identity—into that
+   member's final `## Domain Knowledge Closeout` section.
+4. Before hardening each owner, require every target repository in its payload
+   to equal the final issue's sole Git repository and every normalized target
+   path to equal or descend from one of that issue's `allowed_paths`. Add a
+   missing path only when it is already inside the accepted Feature Spec scope;
+   otherwise withhold the issue as blocked. Never rely on Project Memory or one
+   worker to write another repository.
 5. Require `$project-memory domain-memory` with
    `memory_slice=domain-memory` and
    `domain_operation=implementation-closeout` only after integrated behavior
@@ -268,10 +285,12 @@ change dependencies or scope on a retained durable issue. If the gate can pass
 only by changing a durable node, stop on a graph conflict and require a
 separately authorized replacement rather than synthesizing a parallel graph.
 
-After repairs, rerun step 4's owner-excluded terminal derivation when
-`knowledge_delta` is present, using the repaired remaining graph and replacing
-an unpublished closeout owner's `dependency_ids`; a retained owner must already
-match the result. Then rerun verticality, overlap,
+After repairs, rerun the owner-excluded terminal derivation from this section
+for every
+repository-owned closeout owner when `knowledge_delta` is present, using each
+member's repaired remaining graph and replacing an unpublished closeout
+owner's `dependency_ids`; a retained owner must already match the result. Then
+rerun verticality, overlap,
 dependency, acyclicity, integration, and closeout validation. Build a transient
 acceptance coverage map from every Feature Spec criterion to one or more final
 issues. Spec and issue criteria are independently authored and need not be
@@ -435,7 +454,7 @@ current Spec and complete issue set before each issue, after recovery, and
 before final verification. Compatible operational edits remain usable. Drift
 in a stable field blocks declaratively without asking the user from the worker
 task. The implementing Codex task owns its issue checkbox markers after
-current-head proof and a fresh artifact read, updates parent Spec criteria only
+current-head proof and a fresh artifact read, updates owning Spec criteria only
 after Spec-level proof, and restores unchecked state when later invalidated.
 Root coordination never edits or judges individual criteria.
 
@@ -469,7 +488,7 @@ intended operation and perform no mutation. Preserve verified label creations
 in partial-failure recovery and retry only a still-missing operation.
 
 Order output topologically, with the final combined-proof or closeout issue last
-inside its owning implementation partial and its domain closeout attached only
+inside its owning implementation member and its domain closeout attached only
 when a delta exists.
 
 - `write_mode=apply`, GitHub: retain exact existing issues and publish only
@@ -503,8 +522,8 @@ when a delta exists.
   every missing proposed body, intended path or repository, mapped metadata,
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
-  `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/<NN>` for an
-  issue owned by a multi-repository implementation partial.
+  `proposed-issue:<feature_id>/<repository_key>/<NN>` for an issue owned by a
+  linked multi-repository member.
   On the new-source route, state that neither proposed source nor proposed
   issues are executable until applied. On the existing-source route, preserve
   the supplied source as durable and state that only the proposed issue or
@@ -516,10 +535,10 @@ use pure read operations with mutation fields omitted to prove current hosted
 state and convergence safety. GitStack does not interpret Plan Feature's tracker
 or write policy.
 
-In a multi-repository workspace, publish each issue through its owning
-repository's configured tracker. Preserve source links to sibling partial
-Feature Specs and cross-repository integration gates. Do not create a separate
-scheduling artifact; the issue graph is authoritative.
+In multi-repository work, publish each issue through its owning repository's
+configured tracker. Preserve source links to peer Feature Specs and
+cross-repository integration gates. Do not create a separate scheduling
+artifact; the issue graph is authoritative.
 
 Use transient body transport outside repositories for hosted writes and remove
 it after verified mutation. Plan Feature owns only the planning-artifact writes
@@ -536,8 +555,9 @@ When no issue, metadata, or relationship operation is missing, perform no
 mutation and report the verified complete bundle as a no-op only after the
 final fresh comparison above remains exact.
 
-If apply exits before the final issue carrying a nonempty `knowledge_delta` is
-durable and verified, the result is incomplete and must include the exact
+If apply exits before every required final issue carrying a nonempty
+repository-owned `knowledge_delta` shard is durable and verified, the result is
+incomplete and must include the exact
 continuation handoff received or constructed by this run: `feature_slug`, all
 staged or durable Spec refs, any multi-repository publication-transaction
 identity and its role map plus reconstructable templates, selected Idea refs and
@@ -559,13 +579,14 @@ Return:
   removed artificial dependencies, and avoided initial hardening calls;
 - mapped issue type/state applied or proposed;
 - confirmation that every issue has one valid Execution Contract;
-- domain closeout issue and deferred capture result when required;
+- repository-owned domain closeout issues and deferred capture result when
+  required;
 - withheld issues and blockers;
-- exact continuation handoff for any partial apply whose domain-closeout owner
-  is not yet durable, including the complete `knowledge_delta` and missing
-  operation list.
+- exact continuation handoff for any partial apply whose required
+  domain-closeout owners are not all durable, including the complete
+  `knowledge_delta` and missing operation list.
 
-When `knowledge_delta` is present, report `capture_outcome=deferred` and the
+When `knowledge_delta` is present, report `capture_outcome=deferred` and every
 final issue ref. Otherwise report `capture_outcome=no-durable-change`. This is
 a derived report result, not persisted artifact metadata. Never report
 planning-time capture.

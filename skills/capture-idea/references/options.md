@@ -9,7 +9,7 @@ owner of selectable Capture Idea behavior.
 - User wording is selection evidence, never an alternative field or value.
 - Reject every field or value not listed in the Run Registry. Do not accept
   aliases, retired syntax, or compatibility mappings.
-- Keep tracker backend, repository topology, tracker owner, marker and state
+- Keep tracker backend, explicit repository scope, tracker owner, marker and state
   mappings, candidate decisions, queue intent, names, slugs, paths, refs,
   duplicate state, and evidence as facts or execution data.
 

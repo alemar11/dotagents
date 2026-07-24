@@ -21,8 +21,8 @@ through the caller.
 - Do not invent users, requirements, constraints, or acceptance criteria.
 - Use `references/options.md` for `write_mode`; consume the derived
   `source_route` and do not create another phase-level option.
-- Treat tracker backend, repository layout, and tracker mappings as Project
-  Memory facts. Resolve the canonical `feature` type mapping before rendering
+- Treat tracker backend and tracker mappings as Project Memory facts. Resolve
+  the canonical `feature` type mapping before rendering
   or validating a Feature Spec. Local trackers require `local-header`; GitHub
   requires one supported hosted transport.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
@@ -39,17 +39,19 @@ through the caller.
 Receive:
 
 - `write_mode` and the frozen derived `source_route`;
-- `tracker_backend`, `repository_layout`, and issue-type mappings with explicit
-  transport plus exact tracker value from Project Memory;
+- one `tracker_backend` and issue-type mapping per affected repository, each
+  with explicit transport plus exact tracker value from that repository's
+  Project Memory;
 - one stable `delivery_type` per implementation-eligible Spec: `github-pr` or
   `local-branch`; this is accepted execution data, not a Plan Feature option or
   Project Memory setting;
-- planning identity: `feature_slug` and any selected `product_slug`,
-  `project_slug`, `workspace_path`, or `context_files`, containing every
-  applicable available root, child-root, and matched scoped context used for
-  planning;
-- affected repositories, allowed paths, per-Spec target branch, and any
-  parent/child workspace links;
+- planning identity: `feature_slug`, optional `planning_scope`, optional
+  canonical lowercase UUID `feature_id`, and `context_files` containing every
+  applicable available repository root and matched scoped context used for
+  planning; `feature_id` is required and identical across every linked
+  multi-repository Spec and omitted for a standalone Spec;
+- affected repositories, allowed paths, per-Spec target branch, and linked-set
+  membership;
 - intake, existing, or pending `source_spec_ref` state;
 - optional explicitly selected `source_idea_refs`, their normalized canonical
   section evidence, verified prior partial-outcome refs, transient per-element
@@ -84,12 +86,12 @@ or an unreconstructable template blocks.
 Read the minimum evidence needed to establish the contract:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
-  as a selected root; in a coordination workspace, also select affected child
-  roots from its `Repository Registry` and read each available child root
-  context; then
+  as a selected root; for cross-repository work, use explicit user scope or a
+  durable linked Feature Spec Set to authorize repository identities, require
+  candidate local Git roots separately, verify each root against one authorized
+  identity, and read each available verified repository root context; then
   select every available scoped `CONTEXT.md` matched by affected paths in each
   selected root's `Scoped Contexts` table and read every available matched
   context before drafting. For a root or matched route with no context, use
@@ -97,9 +99,8 @@ Read the minimum evidence needed to establish the contract:
   pointer;
 - relevant ADRs, product documentation, source, and tests when they constrain
   the feature;
-- coordination-root context, an accepted parent Feature Spec when one exists,
-  repo-owned partial Feature Specs, and named integration-gate evidence when
-  the selected scope is a multi-repository workspace.
+- repo-owned linked Feature Specs and named integration-gate evidence when the
+  selected scope spans multiple Git repositories.
 
 Do not broadly scan unrelated domain or localization material. Widen evidence
 only when the current sources are incomplete or contradictory.
@@ -107,7 +108,7 @@ only when the current sources are incomplete or contradictory.
 On the new-source route, when `source_idea_refs` are present, run ordinary
 durable-artifact validation through `idea-source.md` before drafting. Read every
 canonical Idea section and planning outcome, validate tracker ownership and
-prior partial Feature Spec refs, and derive the cumulative covered and
+prior coverage Feature Spec refs, and derive the cumulative covered and
 remaining scope. Reject proposed refs, missing marker mappings, consumed or
 typed GitHub Ideas, malformed local Ideas, and ambiguous repository ownership.
 
@@ -123,62 +124,100 @@ Do not apply that ordinary consumed-source rejection to source-only recovery.
 Plan Feature must route reconciliation-only recovery before this phase; a
 recovery invocation never drafts or republishes a Feature Spec.
 
-When root context routes multiple products or workspaces, resolve the selected
-product, workspace path, applicable context files, and feature slug before
-drafting. Stop rather than guess when more than one owner remains plausible.
+When root context routes multiple products or packages, resolve the selected
+planning scope, applicable context files, and feature slug before drafting.
+Stop rather than guess when more than one owner remains plausible.
 
 ### 2. Resolve Artifact Targets
 
-Use Project Memory facts to choose locations:
+Choose locations from the explicit affected Git repositories and each
+repository's tracker facts:
 
-| Repository layout | Tracker backend | Feature Spec location |
+| Affected Git repositories | Tracker backend | Feature Spec location |
 | --- | --- | --- |
-| `single-repository` | `github` | `Feature Spec: <Feature Name>` issue in the current repository. |
-| `single-repository` | `local` | `planning/features/<feature-slug>/SPEC.md`. |
-| `monorepo` | `github` or `local` | One Feature Spec scoped to the selected product/workspace and its configured tracker. |
-| `multi-repository-workspace` | Per owning repository | Accepted parent/global Feature Spec when one exists, plus linked repo-scoped partial Feature Specs for affected child repositories. |
+| One | `github` | `Feature Spec: <Feature Name>` issue in that repository. |
+| One | `local` | `planning/features/<feature-slug>/SPEC.md`. |
+| Multiple | Per owning repository | One linked implementation-eligible Feature Spec in every affected repository. |
 
-Do not invent a global workspace Feature Spec. Use one only when it is the
-accepted planning source. Resolve every affected child repository's tracker
-and topology facts independently. A GitHub child gets a repo-scoped hosted
-Feature Spec; a local child gets
-`planning/features/<feature-slug>/SPEC.md` inside that repository.
+One Git repository may contain a monorepo; use `planning_scope`, affected paths,
+and scoped contexts without adding a topology enum. Never synthesize another
+Spec above the repo-owned linked set. Resolve every affected repository's tracker facts
+independently. A GitHub repository gets a repo-owned hosted Feature Spec; a local
+repository gets `planning/features/<feature-slug>/SPEC.md` inside that repository.
 
 For multi-repository work:
 
-1. Produce the accepted parent/global artifact first when one is required.
-2. Produce every child partial to obtain stable durable or proposed refs. In
-   proposal mode use
-   `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for each
-   partial; never reuse the parent ref for a child.
+1. Generate or preserve one canonical lowercase UUID `feature_id` and use it
+   unchanged in every member. Give each member one stable lower-kebab
+   `repository_key`, at most 48 characters, derived from its accepted canonical
+   repository identity, unique inside the set, persisted in Planning Identity,
+   and frozen with membership.
+2. Produce every repo-owned member to obtain stable durable or proposed refs.
+   In proposal mode use `proposed-spec:<feature_id>/<repository_key>` for each
+   member.
    In apply mode, make every multi-repository ref globally unambiguous: use
    `owner/repository#<number>` or a canonical hosted URL for GitHub and
-   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` for
-   local Markdown. Use those same refs in the repo-to-child mapping, sibling
-   links, and Feature Dependencies; bare `#<number>` and bare repo-relative
-   paths are invalid in a multi-repository bundle.
-3. Assign each cross-repository boundary to one existing implementation partial
+   `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`
+   for local Markdown. The shared UUID prevents equal repository names in
+   unrelated sets from colliding. Use those same refs in every member's
+   `Feature Spec Set` and Feature Dependencies; bare `#<number>`, a bare
+   repository key, and bare repo-relative paths are invalid in a
+   multi-repository feature. This qualified local ref is a portable identity,
+   not the physical path: after exact Feature ID and repository-key
+   verification, strip precisely the `<feature-id>--<repository-key>/` prefix
+   to recover `planning/features/<feature-slug>/SPEC.md`, then resolve that
+   remainder only inside the separately verified owning repository root.
+3. Assign each cross-repository boundary and every bundle-level acceptance or
+   proof obligation to one existing implementation member
    that can execute the combined proof within its accepted repository, paths,
    tools, and validation budget. Multiple boundaries may have different owners:
    for example, web owns web-to-backend proof and mobile owns mobile-to-backend
    proof against the same backend revision. Name the required peer Specs in the
    owner's Feature Dependencies and include the executable Integration Execution
-   Contract in that existing partial. If no existing partial can own a required
-   bundle-wide proof, withhold the bundle; never create a dedicated integration
+   Contract in that existing member. If no existing member can own a required
+   feature-wide proof, withhold the feature; never create a dedicated integration
    Spec or future worker as a fallback.
-4. Validate every implementation-eligible partial as one bundle: each
+4. Validate every implementation-eligible member as one feature: each
    `(affected_repository, target_branch_name)` pair must have exactly one
    Feature Spec owner. The same branch string may appear in different
-   repositories, but two partials in the same repository must not share it,
+   repositories, but two Specs in the same repository must not share it,
    even when paths are disjoint or dependencies serialize them. Resolve collisions
    before new publication; for an immutable existing source, stop rather than
    rename it.
-5. Add the complete repo-to-child-ref mapping and sibling links to every child.
-6. Start issue generation only after the complete linked artifact set exists.
+5. Add an identical `## Feature Spec Set` table to every member. It has exactly
+   the columns `feature_spec_ref | affected_repository | responsibility`,
+   exactly one globally qualified row per member including self, non-empty
+   responsibility, deterministic repository ordering, and exact normalized equality
+   across the set. Final applied tables contain no proposed refs.
+   Normalize by parsing the table, trimming surrounding whitespace in every
+   cell, preserving case and content otherwise, rejecting duplicate refs or
+   repositories, sorting rows bytewise by `affected_repository`, and rendering
+   the exact canonical header and row sequence. Each self row must match that
+   member's own durable ref and repository. Every normalized table and
+   `feature_id` must then be byte-for-byte equal across the set. Give every
+   linked acceptance criterion one globally unique
+   `<repository-key>:ac-<NN>` ID rendered as the exact checklist prefix
+   `- [ ] \`<repository-key>:ac-<NN>\` ` and every combined proof one
+   `<repository-key>:proof-<slug>` ID rendered as the exact bullet
+   `- Proof ID: \`<repository-key>:proof-<slug>\`.`. Render linked Planning
+   Identity as exact `- Feature ID: \`<uuid>\`.` and
+   `- Repository key: \`<repository-key>\`.` lines. Persist each criterion only
+   in its owning member and each proof only in its owning Integration Execution
+   Contract.
+   The owning row's `responsibility` cell must contain every ID owned by that
+   member as an exact inline-code token and no ID owned by another row. Across
+   the complete set, require every declared criterion and proof ID to occur
+   exactly once in member content and exactly once in the matching
+   responsibility cell. Reject unbackticked IDs, malformed prefix/suffix
+   matches, any acceptance checklist item without its canonical ID, and an
+   Integration Execution Contract without at least one canonical Proof ID.
+6. Freeze membership after publication. Any membership or responsibility
+   change requires a separately authorized whole-set update.
+7. Start issue generation only after the complete linked artifact set exists.
 
-Mixed child tracker backends are valid because routing is an owning-repository
-fact, not one run-wide choice. Preserve one publication plan ordered by parent,
-implementation partials, cross-link updates, then
+Mixed tracker backends are valid because routing is an owning-repository fact,
+not one run-wide choice. Preserve one publication plan ordered by member
+creation, linked-set finalization, then
 generated issues. Proposed refs are inspection-only and never agent-executable.
 In apply mode, place every role, including an all-local bundle, in one
 recoverable publication transaction. Hosted roles use staging when their refs
@@ -214,19 +253,18 @@ source's unchanged affected repositories and allowed paths. An out-of-scope or
 ambiguously owned target blocks issue generation; never widen the immutable
 source or a future issue to accommodate it.
 
-When the intake source is any member of a multi-repository bundle, traverse its
-canonical parent, repo-to-child, sibling, and Feature Dependency links to load
-the complete connected coordination and implementation Spec set. Validate every
-body's stable fields and ref through the same gates,
-preserving current acceptance checkbox markers. The
-coordination parent owns no generated implementation issues; pass only
-implementation-eligible partials to issue generation. A missing, ambiguous,
-disconnected, or incompatible linked source blocks the run instead of being
-drafted or repaired.
+When the intake source is any member of a multi-repository feature, require its
+canonical lowercase UUID `Feature ID`, traverse its `Feature Spec Set`, and
+load the complete connected implementation Spec set. Validate every body's
+stable fields and ref through the same gates, preserving current acceptance
+checkbox markers. Pass every implementation-eligible member to issue
+generation. A missing, ambiguous, disconnected, differently identified, or
+incompatible linked source blocks the run instead of being drafted or repaired.
 
-A missing sibling map, Feature Dependency, or other relationship represented
-inside an immutable Feature Spec body is a source-contract failure. Do not hand
-it to the issue phase as a repairable tracker relationship.
+A missing or unequal `Feature Spec Set`, Feature Dependency, or other
+relationship represented inside an immutable Feature Spec body is a
+source-contract failure. Do not hand it to the issue phase as a repairable
+tracker relationship.
 
 On the existing-source route, preserve every `- Source Idea:` line unchanged.
 The Spec phase never adds, removes, or rewrites Idea evidence. Bound refs may
@@ -264,9 +302,9 @@ evidence or clarification, and do not treat a candidate destination as durable
 coverage.
 
 Render each relevant ref exactly once as `- Source Idea: <durable-ref>` in
-`## Source`. In a multi-repository bundle, include a ref in every parent or
-partial whose scope derives from that Idea, and omit it from unrelated
-partials. Preserve the Idea body and keep its refs and transient coverage maps
+`## Source`. In a multi-repository feature, include a ref in every member whose
+scope derives from that Idea, and omit it from unrelated members. Preserve the
+Idea body and keep its refs and transient coverage maps
 out of generated implementation issues.
 
 Render `Delivery type: <delivery_type>` exactly once in `## Planning Identity`
@@ -295,7 +333,7 @@ For every edge:
   `write_mode=propose`;
 - in a multi-repository applied bundle, require every upstream ref to identify
   its owning repository through `owner/repository#<number>`, a canonical hosted
-  URL, or `<repository-slug>/planning/features/<feature-slug>/SPEC.md`;
+  URL, or `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`;
 - reject self, duplicate, missing, and ambiguous refs;
 - require a concrete portable reason;
 - normalize upstream-to-downstream edges and validate the reachable Feature
@@ -325,7 +363,7 @@ until a separate explicitly authorized source update lands.
 Portable forms are:
 
 - current repository: `path/to/file` or `path/to/file:line`;
-- sibling repository: `<repo-slug>/<repo-relative-path>`;
+- peer repository: `<repo-slug>/<repo-relative-path>`;
 - hosted evidence: URL, issue, PR, or `owner/repo:path`;
 - local-only evidence without a stable identity: a descriptive source label.
 
@@ -350,9 +388,9 @@ Then verify:
   the accepted Feature Spec repository/path scope, so the final issue can cover
   it without a later scope expansion;
 - every cross-repository acceptance boundary names one or more existing
-  implementation partials as combined-proof owners and the exact peer Feature
+  implementation members as combined-proof owners and the exact peer Feature
   Dependencies required by each owner;
-- every implementation partial that owns combined proof contains an executable
+- every implementation member that owns combined proof contains an executable
   `## Integration Execution Contract` covering component roles and start
   commands, endpoint/environment wiring, collision-safe ports, health checks,
   integration/E2E proof, timeout/retry/material budget, retained evidence,
@@ -429,8 +467,8 @@ Hosted roles require staging because final issue numbers are unavailable before
 creation; deterministic local refs are resolved before mutation:
 
 1. Before any mutation, validate every role-keyed parameterized final-body
-   template and predeclare the complete parent, implementation, sibling, and
-   Feature Dependency ref slots plus the exact optional configured
+   template and predeclare the complete member, `Feature Spec Set`, and Feature
+   Dependency ref slots plus the exact optional configured
    body-metadata slot and value. Generate one transaction identity and record
    each role, exact target, title, complete reconstructable template, allowed
    ref slots, and allowed body-metadata insertion. Materialize final bodies only
@@ -479,7 +517,7 @@ member and traverses the whole connected set.
 
 - `write_mode=apply`, GitHub: for a single Spec, publish the final sanitized
   body directly as `Feature Spec: <Feature Name>`. For a multi-repository
-  bundle, publish each parent or implementation role through the transaction
+  feature, publish each implementation member through the transaction
   above, then finalize each hosted body through the authorized `edit`. Translate each write to
   GitStack-owned `mutation_mode=apply`, its exact target, and one canonical
   `issue_operation`; apply the configured feature metadata transport only after
@@ -491,18 +529,20 @@ member and traverses the whole connected set.
   use that path as `source_spec_ref`. Require the Project Memory `feature`
   mapping to use `local-header`, then insert exactly
   `issue_type: <configured tracker value>` after the H1 and before `## Source`.
-  Do not add a workflow-state header to a Feature Spec. In a multi-repository bundle, use
-  `<repository-slug>/planning/features/<feature-slug>/SPEC.md` as the qualified
-  ref and create the file only as its predeclared transaction operation. On
+  Do not add a workflow-state header to a Feature Spec. In a multi-repository feature, use
+  `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md` as the qualified
+  ref while creating the physical file only at
+  `planning/features/<feature-slug>/SPEC.md` inside the owning repository.
+  Treat the qualified prefix as identity metadata, never as a directory, and
+  create the file only as its predeclared transaction operation. On
   exact continuation, create only missing
   predeclared local files whose targets and final bodies still match; never
   overwrite or repair a conflicting file.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
   location, mapped metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,
-  `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,
-  or `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for a
-  repo-scoped implementation partial.
+  or `proposed-spec:<feature_id>/<repository_key>` for a linked
+  multi-repository member.
   Return publication order and state that every proposed source and the
   complete proposed issue bundle are non-executable until applied.
 
@@ -529,11 +569,11 @@ generated Markdown.
 Return:
 
 - title, feature slug, source ref, and intended or actual location;
-- `write_mode`, derived `source_route`, tracker backend, repository layout, and
-  selected context identity;
+- `write_mode`, derived `source_route`, tracker backends, optional `feature_id`,
+  and selected context identity;
 - affected repositories, allowed paths, and each per-Spec target branch;
 - validated Feature Spec dependencies and acyclicity result;
-- workspace parent/child refs and publication order when applicable;
+- linked Feature Spec refs and publication order when applicable;
 - issue type applied or proposed;
 - open blockers and withheld output;
 - selected or bound durable Idea refs, verified prior outcome refs, and each per-Idea

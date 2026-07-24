@@ -69,41 +69,48 @@ Every handoff from a Feature Spec to generated issues carries
 
 - applied hosted Feature Spec in one repository:
   `source_spec_ref=#<spec-number>`;
-- applied hosted partial in a multi-repository bundle:
+- applied hosted member in a multi-repository feature:
   `source_spec_ref=owner/repository#<spec-number>` or its canonical hosted URL;
 - applied local Feature Spec in one repository:
   `source_spec_ref=planning/features/<feature-slug>/SPEC.md`;
-- applied local partial in a multi-repository bundle:
-  `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md`;
+- applied local member in a multi-repository feature:
+  `source_spec_ref=<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`;
 - proposed output before publication:
   `source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
-  `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>` for a
-  multi-repository parent, or
-  `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>`
-  for a repo-scoped implementation partial.
+  or `source_spec_ref=proposed-spec:<feature-id>/<repository-key>` for a
+  linked multi-repository member.
 
-Proposed output also carries the Feature Spec title, `feature_slug`,
-`project_slug` when applicable, and enough proposal identity to keep child
-issue bodies attached to the same proposed parent. For one Feature Spec, create
+Proposed multi-repository output carries one canonical lowercase UUID
+`feature_id`, the Feature Spec title, `feature_slug`, and one stable lower-kebab
+`repository_key` per member. Each key is at most 48 characters, unique inside
+the set, persisted in that member's Planning Identity, and frozen with set
+membership. For one Feature Spec, create
 that Spec, replace its proposed ref with the resulting durable ref, then create
-and attach its issues. For multi-repository work, create the accepted parent
-when present, create every implementation partial, update repo-to-child mappings,
-sibling links, and Feature Dependencies with the same globally unambiguous
+and attach its issues. For multi-repository work, create every member, update every
+`Feature Spec Set` and Feature Dependencies with the same globally unambiguous
 `owner/repository#<number>`, hosted URL, or
-`<repository-slug>/planning/features/<feature-slug>/SPEC.md`
-identities, then create issues under their owning Specs. Bare issue numbers and
-bare repo-relative paths are repository-local and invalid across siblings.
+`<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`
+identities, verify exact normalized set equality, then create issues under
+their owning Specs. Bare issue numbers and bare repo-relative paths are
+repository-local and invalid across repositories.
+
+A qualified local ref is an identity wrapper around the ordinary physical
+repo-relative path. After verifying that its prefix exactly equals the owning
+body's `<feature-id>--<repository-key>/`, strip that one prefix and resolve the
+remaining `planning/features/<feature-slug>/SPEC.md` only against the separately
+verified owning repository root. The prefix is never a directory and never
+selects a repository.
 
 A `proposed-spec:<...>` ref is non-executable. It cannot dispatch an
 implementation worker or become durable through permission metadata; publish
-the parent or write the canonical local file first.
+the complete linked set or write the canonical local files first.
 
 ## Phase Ownership
 
 - The `$plan-feature` Feature Spec phase owns new Feature Spec body creation and
   publication. When intake supplies any canonical durable member of a
-  multi-repository bundle, the phase traverses the canonical mapping and
-  validates the complete connected parent and implementation set
+  multi-repository feature, the phase traverses its `Feature Spec Set` and
+  validates the complete connected implementation set
   unchanged. For a single Spec, it validates and preserves that source body and
   ref unchanged.
 - The `$plan-feature` issue phase owns desired issue bodies,
@@ -123,7 +130,7 @@ the parent or write the canonical local file first.
 | Tracker backend | Feature Spec | Implementation issues |
 | --- | --- | --- |
 | `github` | GitHub Feature Spec issue; multi-repository refs use `owner/repository#<number>` or canonical URLs | GitHub sub-issues under their owning Feature Spec |
-| `local` | `planning/features/<feature-slug>/SPEC.md` inside each owning repository; multi-repository refs prefix that repo-relative path with the owning repository slug | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` inside the owning repository |
+| `local` | `planning/features/<feature-slug>/SPEC.md` inside each owning repository; multi-repository refs prefix that repo-relative path with `<feature-id>--<repository-key>` | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` inside the owning repository |
 
 Lower-kebab-case values are canonical. Reject noncanonical option values
 instead of rewriting them.

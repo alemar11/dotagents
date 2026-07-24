@@ -11,15 +11,15 @@ Write each Idea to exactly:
 planning/ideas/<idea-slug>.md
 ```
 
-The durable workspace-qualified ref is:
+The durable repository-qualified ref is:
 
 ```text
 <repository-slug>/planning/ideas/<idea-slug>.md
 ```
 
-The owning repository must be a Project Memory-selected memory-owning root.
+The owning repository must be the explicitly selected tracker-owning Git root.
 Never put Ideas under `project-memory/`, `planning/features/`, `planning/tmp/`,
-or a coordination root that does not own the selected tracker artifact.
+or a non-Git root.
 
 Render the full local form from `idea-template.md`. The header metadata region
 must contain:

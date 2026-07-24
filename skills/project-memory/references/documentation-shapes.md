@@ -31,9 +31,8 @@ Short project-specific definition.
 - Question that remains unresolved.
 ```
 
-When the root routes internal scopes or child repositories, add the canonical
-`## Scoped Contexts` or `## Repository Registry` table from `domain.md`. Do not
-invent a second routing shape.
+When the root routes internal scopes, add the canonical `## Scoped Contexts`
+table from `domain.md`. Do not invent a second routing shape.
 
 ## Scoped CONTEXT.md
 

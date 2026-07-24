@@ -1,20 +1,20 @@
 # Initial CONTEXT.md Seed
 
-Use this reference when `project-memory` bootstraps a repository or coordination
-workspace. It controls how much evidence-backed content to add; it does not
+Use this reference when `project-memory` bootstraps a Git repository. It
+controls how much evidence-backed content to add; it does not
 decide whether root `CONTEXT.md` exists.
 
 ## Mandatory root entry point
 
 Authorized setup/bootstrap always creates or updates root `CONTEXT.md` at every
-memory-owning root selected by the setup scope. When durable repository evidence
+selected Git root in the setup scope. When durable repository evidence
 is sparse, create a minimal entry point and make the missing knowledge explicit
 without inventing project facts. For example:
 
 ```markdown
 # Context
 
-Project Memory entry point for this repository or workspace.
+Project Memory entry point for this repository.
 
 ## Open Questions
 
@@ -23,9 +23,9 @@ Project Memory entry point for this repository or workspace.
 ```
 
 Scoped contexts remain optional and require evidence and authority for durable
-scoped content. A child-repository root selected by the authorized setup scope
-follows the same mandatory root-context rule; child repositories outside that
-scope remain optional and untouched.
+scoped content. Every additional Git repository explicitly selected by a
+composed setup follows the same mandatory root-context rule; repositories
+outside that scope remain untouched.
 
 ## Evidence threshold
 
@@ -51,11 +51,10 @@ repo behavior. Leave agent operating rules in `AGENTS.md`, and move tracker or
 triage details to `project-memory/config/*` instead of copying them into
 `CONTEXT.md`.
 
-For a detected monorepo or multi-repository workspace, verified topology is
-enough evidence for stable scope or repository routing in the mandatory root
-`CONTEXT.md`. It is not evidence for richer vocabulary, behavioral rules, or
-scoped context files.
-Routing tables may use `—` for context pointers when topology proves the route
+For a detected monorepo, verified repository structure is enough evidence for
+stable scope routing in the mandatory root `CONTEXT.md`. It is not evidence for
+richer vocabulary, behavioral rules, or scoped context files. Routing tables
+may use `—` for context pointers when repository structure proves the route
 but durable evidence does not support creating the child or scoped context
 file.
 
@@ -79,7 +78,7 @@ verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 
 - Project purpose and explicit non-goals.
 - Product areas, subprojects, services, packages, or ownership boundaries.
-- Stable scoped-context or child-repository routing proved by topology.
+- Stable scoped-context routing proved by repository structure.
 - Canonical names and terms future Feature Specs/issues should reuse.
 - Durable rules that affect implementation, validation, promotion, or docs.
 - Open questions only when current evidence clearly leaves a decision

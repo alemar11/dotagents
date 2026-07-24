@@ -77,6 +77,14 @@ verifies that task operations are reconciled and assignment-level release
 already occurred; it does not perform a repository-wide release. No terminal
 result merges.
 
+For a linked multi-repository feature, require exactly one independently
+verified terminal branch or PR for every Feature Spec Set member. Report one
+exact final vector of
+`feature_id, repository_identity, source_spec_ref, target_branch_name,
+head_sha, delivery_type, pr_url|null`; every row must come from that member's
+unchanged terminal snapshot. The vector is aggregate evidence only and does not
+replace any member's assignment, claim, review, tracker, or delivery proof.
+
 An ordinary worker may first be recorded as `peer-input-ready`; its task and
 claim stay available while its exact HEAD becomes available to dependent peers
 and its execution slot becomes free.

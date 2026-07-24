@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import contextlib
 import gc
+import gzip
 import hashlib
 import io
 import json
@@ -19,17 +21,33 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
-CLI_VERSION = "3.0.0"
-RUNTIME_CONTRACT_VERSION = "3.0.0"
-DATABASE_SCHEMA_VERSION = 2
+CLI_VERSION = "4.0.0"
+RUNTIME_CONTRACT_VERSION = "4.0.0"
+DATABASE_SCHEMA_VERSION = 3
+HISTORICAL_RUNTIME_FIXTURES = {
+    "2.0.0": {
+        "commit": "52991ddca22cf358503a7572b5716dadbed4ccd4",
+        "file": "run-state-2.0.0.py.gz.b64",
+        "sha256": "af1ed9c8d8c685e954dd411f929b762dabee3f1052e2377d630557eb93153d7d",
+    },
+    "3.0.0": {
+        "commit": "8c34c213b4ce8de70b56d0b7f30b7d3da7c0b156",
+        "file": "run-state-3.0.0.py.gz.b64",
+        "sha256": "8e54d2926bba5aab3d39f79248e351db8f886dcaf24d5bfa31deb80940749068",
+    },
+}
 PROTOCOLS = {
     "cli": {
         "schema": "implement-feature/cli-envelope",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
     },
     "manifest": {
         "schema": "implement-feature/run-manifest",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
+    },
+    "feature_spec_set_input": {
+        "schema": "implement-feature/feature-spec-set-input",
+        "schema_version": "1.0.0",
     },
     "operation": {
         "schema": "implement-feature/app-operation-observation",
@@ -48,7 +66,6 @@ PROTOCOLS = {
         "schema_version": "2.0.0",
     },
 }
-
 
 class RunStateScenarios(unittest.TestCase):
     def setUp(self) -> None:
@@ -134,6 +151,107 @@ class RunStateScenarios(unittest.TestCase):
             warnings.simplefilter("ignore", ResourceWarning)
             gc.collect()
 
+    def historical_runtime(
+        self,
+        version: str,
+        *,
+        name: str | None = None,
+        append_bytes: bytes = b"",
+    ) -> tuple[Path, tuple[str, str, str]]:
+        """Materialize one byte-exact shipped schema-2 runtime fixture."""
+        fixture = HISTORICAL_RUNTIME_FIXTURES[version]
+        encoded = (
+            ROOT
+            / "tests"
+            / "fixtures"
+            / str(fixture["file"])
+        ).read_bytes()
+        artifact = gzip.decompress(base64.b64decode(encoded))
+        self.assertEqual(
+            hashlib.sha256(artifact).hexdigest(),
+            fixture["sha256"],
+            f"historical fixture drifted from commit {fixture['commit']}",
+        )
+        path = self.base / (name or f"run-state-{version}")
+        path.write_bytes(artifact + append_bytes)
+        path.chmod(0o700)
+        return (
+            path,
+            (
+                version,
+                version,
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+            ),
+        )
+
+    def initialize_historical_schema_two(self, runtime: Path) -> None:
+        """Use the retained public CLI to create its own authentic schema."""
+        self.database.unlink(missing_ok=True)
+        self.database.with_name(f"{self.database.name}-wal").unlink(
+            missing_ok=True
+        )
+        self.database.with_name(f"{self.database.name}-shm").unlink(
+            missing_ok=True
+        )
+        prepared = self.invoke_tool(runtime, "state", "prepare")
+        self.assertEqual(prepared["database_schema_version"], 2)
+
+    def start_historical_run(
+        self,
+        runtime: Path,
+        version: str,
+        run_id: str,
+    ) -> dict[str, object]:
+        """Create a real active owner through the historical public run API."""
+        repository = f"github:example/{run_id}"
+        manifest = {
+            "schema": "implement-feature/run-manifest",
+            "schema_version": "2.0.0",
+            "runtime_contract_version": version,
+            "run_id": run_id,
+            "root_task_id": f"root-{run_id}",
+            "repositories": [
+                {
+                    "repository_identity": repository,
+                    "git_common_dir": str(self.common_a),
+                }
+            ],
+            "assignments": [
+                {
+                    "assignment_id": "spec-01",
+                    "source_spec_ref": f"example/{run_id}#1",
+                    "repository_identity": repository,
+                    "tracker_backend": "github",
+                    "delivery_type": "github-pr",
+                    "project_id": f"project-{run_id}",
+                    "title": f"Historical {version} run",
+                    "target_branch_name": f"feature/{run_id}",
+                    "prerequisite_assignment_ids": [],
+                }
+            ],
+        }
+        return self.invoke_tool(
+            runtime,
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json(f"{run_id}-historical.json", manifest)),
+        )
+
+    def finish_historical_run(self, runtime: Path, run_id: str) -> dict[str, object]:
+        """Drain one owner through the retained runtime's public finish command."""
+        return self.invoke_tool(
+            runtime,
+            "run",
+            "finish",
+            "--run-id",
+            run_id,
+            "--expected-revision",
+            self.revision(run_id),
+            "--outcome",
+            "preimplementation-aborted",
+        )
+
     def revision(self, run_id: str) -> str:
         return str(self.revisions[run_id])
 
@@ -142,6 +260,110 @@ class RunStateScenarios(unittest.TestCase):
         resolved = str(path.resolve())
         info = path.stat()
         return f"local:git-common-dir:{info.st_dev}:{info.st_ino}:{quote(resolved, safe='')}"
+
+    def feature_spec_member(
+        self,
+        name: str,
+        *,
+        feature_id: str,
+        repository_key: str,
+        table_rows: list[tuple[str, str, str]],
+        criterion_id: str,
+        proof_id: str | None = None,
+    ) -> Path:
+        table = "\n".join(
+            (
+                "| feature_spec_ref | affected_repository | responsibility |",
+                "| --- | --- | --- |",
+                *(
+                    f"| {source_ref} | {repository} | {responsibility} |"
+                    for source_ref, repository, responsibility in table_rows
+                ),
+            )
+        )
+        integration = (
+            "\n".join(
+                (
+                    "",
+                    "## Integration Execution Contract",
+                    "",
+                    f"- Proof ID: `{proof_id}`.",
+                )
+            )
+            if proof_id is not None
+            else ""
+        )
+        body = "\n".join(
+            (
+                f"# {name}",
+                "",
+                "## Planning Identity",
+                "",
+                f"- Feature ID: `{feature_id}`.",
+                f"- Repository key: `{repository_key}`.",
+                "",
+                "## Feature Spec Set",
+                "",
+                table,
+                "",
+                "## Acceptance Criteria",
+                "",
+                f"- [ ] `{criterion_id}` is satisfied.",
+                integration,
+                "",
+            )
+        )
+        path = self.inputs / f"{name}.md"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def feature_spec_set_input(
+        self,
+        *,
+        feature_id: str = "123e4567-e89b-42d3-a456-426614174000",
+    ) -> tuple[dict[str, object], Path, Path]:
+        table_rows = [
+            ("example/api#1", "github:example/api", "`api:ac-01`"),
+            (
+                "example/web#2",
+                "github:example/web",
+                "`web:ac-01` and `web:proof-api-web`",
+            ),
+        ]
+        api = self.feature_spec_member(
+            "api-spec",
+            feature_id=feature_id,
+            repository_key="api",
+            table_rows=table_rows,
+            criterion_id="api:ac-01",
+        )
+        web = self.feature_spec_member(
+            "web-spec",
+            feature_id=feature_id,
+            repository_key="web",
+            table_rows=table_rows,
+            criterion_id="web:ac-01",
+            proof_id="web:proof-api-web",
+        )
+        return (
+            {
+                **self.protocol("feature_spec_set_input"),
+                "members": [
+                    {
+                        "source_spec_ref": "example/web#2",
+                        "affected_repository": "github:example/web",
+                        "body_file": str(web),
+                    },
+                    {
+                        "source_spec_ref": "example/api#1",
+                        "affected_repository": "github:example/api",
+                        "body_file": str(api),
+                    },
+                ],
+            },
+            api,
+            web,
+        )
 
     def manifest(
         self,
@@ -155,8 +377,12 @@ class RunStateScenarios(unittest.TestCase):
     ) -> dict[str, object]:
         repositories = repositories or [("github:example/project", self.common_a)]
         repo_rows = [
-            {"repository_identity": identity, "git_common_dir": str(common)}
-            for identity, common in repositories
+            {
+                "repository_identity": identity,
+                "git_common_dir": str(common),
+                "project_id": f"{project_prefix}-{index + 1}",
+            }
+            for index, (identity, common) in enumerate(repositories)
         ]
         assignments = []
         for index in range(assignment_count):
@@ -179,7 +405,6 @@ class RunStateScenarios(unittest.TestCase):
                     "repository_identity": identity,
                     "tracker_backend": assignment_tracker,
                     "delivery_type": assignment_delivery,
-                    "project_id": f"{project_prefix}-{index % len(repositories) + 1}",
                     "title": f"🛠️ Feature {index + 1}",
                     "target_branch_name": f"feature/example-{index + 1}",
                     "prerequisite_assignment_ids": [],
@@ -190,8 +415,10 @@ class RunStateScenarios(unittest.TestCase):
             "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
+            "controller_project_id": f"controller-{run_id}",
             "repositories": repo_rows,
             "assignments": assignments,
+            "feature_sets": [],
         }
 
     def start(self, run_id: str, **kwargs: object) -> dict[str, object]:
@@ -445,13 +672,20 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
-        """Given no DB, when doctor runs, then it reports schema 2 without creating cache state."""
+        """Given no DB, doctor reports schema 3 without creating cache state."""
         self.database.unlink()
         result = self.invoke("doctor")
         self.assertEqual(result["cli_version"], CLI_VERSION)
         self.assertEqual(result["runtime_contract_version"], RUNTIME_CONTRACT_VERSION)
         self.assertEqual(result["database_schema_version"], DATABASE_SCHEMA_VERSION)
         self.assertEqual(result["runtime_artifact_sha256"], hashlib.sha256(TOOL.read_bytes()).hexdigest())
+        self.assertEqual(
+            result["protocols"]["feature_spec_set_input"],
+            {
+                "schema": PROTOCOLS["feature_spec_set_input"]["schema"],
+                "version": PROTOCOLS["feature_spec_set_input"]["schema_version"],
+            },
+        )
         self.assertEqual(result["active_owner_runs"], 0)
         self.assertEqual(result["busy_timeout_ms"], 5000)
         self.assertFalse(self.database.exists())
@@ -481,7 +715,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-command-line")
 
     def test_given_fresh_user_when_state_prepares_then_schema_and_metadata_are_created(self) -> None:
-        """Given no DB, explicit preparation creates the fresh schema-2 claim domain."""
+        """Given no DB, explicit preparation creates the fresh schema-3 claim domain."""
         self.database.unlink()
         prepared = self.invoke("state", "prepare")
         self.assertEqual(prepared["state"], "initialized")
@@ -499,6 +733,624 @@ class RunStateScenarios(unittest.TestCase):
             )
         started = self.start("prepared-fresh")
         self.assertEqual(started["status"], "active")
+
+    def test_given_linked_feature_specs_when_validated_then_membership_is_canonical_and_read_only(self) -> None:
+        """Linked bodies produce one canonical manifest fragment without touching SQLite."""
+        input_payload, _, _ = self.feature_spec_set_input()
+        before = self.database.read_bytes()
+        input_path = self.write_json("feature-spec-set.json", input_payload)
+
+        validated = self.invoke(
+            "feature-spec-set",
+            "validate",
+            "--input",
+            str(input_path),
+        )
+
+        feature_id = "123e4567-e89b-42d3-a456-426614174000"
+        self.assertEqual(validated["feature_id"], feature_id)
+        self.assertEqual(validated["member_count"], 2)
+        self.assertFalse(validated["writes_performed"])
+        self.assertEqual(self.database.read_bytes(), before)
+        self.assertEqual(
+            validated["manifest_feature_set"],
+            {
+                "feature_id": feature_id,
+                "members": [
+                    {
+                        "source_spec_ref": "example/api#1",
+                        "repository_identity": "github:example/api",
+                        "repository_key": "api",
+                    },
+                    {
+                        "source_spec_ref": "example/web#2",
+                        "repository_identity": "github:example/web",
+                        "repository_key": "web",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(
+            [member["repository_key"] for member in validated["members"]],
+            ["api", "web"],
+        )
+
+        manifest = self.manifest(
+            "linked-feature",
+            repositories=[
+                ("github:example/api", self.common_a),
+                ("github:example/web", self.common_b),
+            ],
+            assignment_count=2,
+        )
+        manifest["assignments"][0]["source_spec_ref"] = "example/api#1"
+        manifest["assignments"][1]["source_spec_ref"] = "example/web#2"
+        manifest["feature_sets"] = [validated["manifest_feature_set"]]
+        self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("linked-feature-manifest.json", manifest)),
+            "--feature-spec-set-input",
+            str(input_path),
+        )
+        shown = self.invoke("run", "show", "--run-id", "linked-feature")
+        self.assertEqual(
+            {assignment["feature_id"] for assignment in shown["assignments"]},
+            {feature_id},
+        )
+
+    def test_given_local_or_mixed_linked_sets_when_started_then_qualified_refs_decode_inside_the_owner(self) -> None:
+        """All-local and mixed sets bind each portable ref to its owning repo-relative file."""
+        feature_id = "123e4567-e89b-42d3-a456-426614174000"
+        local_api = self.local_identity(self.common_a)
+        local_web = self.local_identity(self.common_b)
+        cases = (
+            (
+                "all-local",
+                [
+                    (
+                        f"{feature_id}--api/planning/features/export/SPEC.md",
+                        local_api,
+                        "api",
+                    ),
+                    (
+                        f"{feature_id}--web/planning/features/export/SPEC.md",
+                        local_web,
+                        "web",
+                    ),
+                ],
+            ),
+            (
+                "mixed",
+                [
+                    ("example/api#1", "github:example/api", "api"),
+                    (
+                        f"{feature_id}--web/planning/features/export/SPEC.md",
+                        local_web,
+                        "web",
+                    ),
+                ],
+            ),
+        )
+        for case_name, members in cases:
+            with self.subTest(case=case_name):
+                table_rows = sorted(
+                    [
+                        (
+                            source_ref,
+                            repository,
+                            f"`{repository_key}:ac-01`",
+                        )
+                        for source_ref, repository, repository_key in members
+                    ],
+                    key=lambda row: row[1].encode("utf-8"),
+                )
+                body_paths = {
+                    repository_key: self.feature_spec_member(
+                        f"{case_name}-{repository_key}",
+                        feature_id=feature_id,
+                        repository_key=repository_key,
+                        table_rows=table_rows,
+                        criterion_id=f"{repository_key}:ac-01",
+                    )
+                    for _, _, repository_key in members
+                }
+                input_payload = {
+                    **self.protocol("feature_spec_set_input"),
+                    "members": [
+                        {
+                            "source_spec_ref": source_ref,
+                            "affected_repository": repository,
+                            "body_file": str(body_paths[repository_key]),
+                        }
+                        for source_ref, repository, repository_key in reversed(members)
+                    ],
+                }
+                input_path = self.write_json(
+                    f"{case_name}-feature-spec-set.json",
+                    input_payload,
+                )
+                validated = self.invoke(
+                    "feature-spec-set",
+                    "validate",
+                    "--input",
+                    str(input_path),
+                )
+                projections = {
+                    member["repository_key"]: member[
+                        "repository_relative_spec_path"
+                    ]
+                    for member in validated["members"]
+                }
+                self.assertEqual(
+                    projections,
+                    {
+                        "api": (
+                            "planning/features/export/SPEC.md"
+                            if case_name == "all-local"
+                            else None
+                        ),
+                        "web": "planning/features/export/SPEC.md",
+                    },
+                )
+
+                manifest = self.manifest(
+                    f"{case_name}-linked",
+                    repositories=[
+                        (repository, self.common_a if index == 0 else self.common_b)
+                        for index, (_, repository, _) in enumerate(members)
+                    ],
+                    assignment_count=2,
+                )
+                for assignment, (source_ref, _, _) in zip(
+                    manifest["assignments"],
+                    members,
+                    strict=True,
+                ):
+                    assignment["source_spec_ref"] = source_ref
+                manifest["feature_sets"] = [validated["manifest_feature_set"]]
+                self.invoke(
+                    "run",
+                    "start",
+                    "--manifest",
+                    str(
+                        self.write_json(
+                            f"{case_name}-linked-manifest.json",
+                            manifest,
+                        )
+                    ),
+                    "--feature-spec-set-input",
+                    str(input_path),
+                )
+                shown = self.invoke(
+                    "run",
+                    "show",
+                    "--run-id",
+                    f"{case_name}-linked",
+                )
+                self.assertEqual(
+                    {assignment["feature_id"] for assignment in shown["assignments"]},
+                    {feature_id},
+                )
+
+    def test_given_mismatched_local_ref_qualifier_when_validated_then_member_binding_is_rejected(self) -> None:
+        """The UUID/key identity prefix cannot select or masquerade as another member."""
+        feature_id = "123e4567-e89b-42d3-a456-426614174000"
+        api_identity = self.local_identity(self.common_a)
+        web_identity = self.local_identity(self.common_b)
+        api_ref = (
+            f"{feature_id}--wrong/planning/features/export/SPEC.md"
+        )
+        web_ref = f"{feature_id}--web/planning/features/export/SPEC.md"
+        table_rows = sorted(
+            [
+                (api_ref, api_identity, "`api:ac-01`"),
+                (web_ref, web_identity, "`web:ac-01`"),
+            ],
+            key=lambda row: row[1].encode("utf-8"),
+        )
+        api = self.feature_spec_member(
+            "wrong-local-api",
+            feature_id=feature_id,
+            repository_key="api",
+            table_rows=table_rows,
+            criterion_id="api:ac-01",
+        )
+        web = self.feature_spec_member(
+            "wrong-local-web",
+            feature_id=feature_id,
+            repository_key="web",
+            table_rows=table_rows,
+            criterion_id="web:ac-01",
+        )
+        error = self.invoke(
+            "feature-spec-set",
+            "validate",
+            "--input",
+            str(
+                self.write_json(
+                    "wrong-local-qualifier.json",
+                    {
+                        **self.protocol("feature_spec_set_input"),
+                        "members": [
+                            {
+                                "source_spec_ref": api_ref,
+                                "affected_repository": api_identity,
+                                "body_file": str(api),
+                            },
+                            {
+                                "source_spec_ref": web_ref,
+                                "affected_repository": web_identity,
+                                "body_file": str(web),
+                            },
+                        ],
+                    },
+                )
+            ),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-feature-spec-set")
+
+    def test_given_drifted_linked_feature_specs_when_validated_then_each_failure_is_closed(self) -> None:
+        """Membership, table, ownership, ordering, and UUID drift are all rejected."""
+        cases = (
+            (
+                "planning-identity-shape",
+                lambda payload, api, web: api.write_text(
+                    api.read_text(encoding="utf-8").replace(
+                        "- Repository key: `api`.",
+                        "- Repository key: `api`",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "criterion-shape",
+                lambda payload, api, web: api.write_text(
+                    api.read_text(encoding="utf-8").replace(
+                        "- [ ] `api:ac-01` is satisfied.",
+                        "- [ ] api:ac-01 is satisfied.",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "proof-shape",
+                lambda payload, api, web: web.write_text(
+                    web.read_text(encoding="utf-8").replace(
+                        "- Proof ID: `web:proof-api-web`.",
+                        "- Proof ID: `web:proof-api-web`",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "feature-id-mismatch",
+                lambda payload, api, web: web.write_text(
+                    web.read_text(encoding="utf-8").replace(
+                        "123e4567-e89b-42d3-a456-426614174000",
+                        "223e4567-e89b-42d3-a456-426614174000",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "table-mismatch",
+                lambda payload, api, web: web.write_text(
+                    web.read_text(encoding="utf-8").replace(
+                        "`api:ac-01` |",
+                        "`api:ac-01` and `api:proof-drift` |",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "unowned-checklist-item",
+                lambda payload, api, web: api.write_text(
+                    api.read_text(encoding="utf-8").replace(
+                        "- [ ] `api:ac-01` is satisfied.",
+                        "- [ ] `api:ac-01` is satisfied.\n"
+                        "- [ ] This checklist item has no stable ID.",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "integration-without-proof-id",
+                lambda payload, api, web: (
+                    api.write_text(
+                        api.read_text(encoding="utf-8").replace(
+                            "`web:ac-01` and `web:proof-api-web`",
+                            "`web:ac-01`",
+                        ),
+                        encoding="utf-8",
+                    ),
+                    web.write_text(
+                        web.read_text(encoding="utf-8")
+                        .replace(
+                            "`web:ac-01` and `web:proof-api-web`",
+                            "`web:ac-01`",
+                        )
+                        .replace(
+                            "- Proof ID: `web:proof-api-web`.",
+                            "The proof owner is not identified.",
+                        ),
+                        encoding="utf-8",
+                    ),
+                ),
+            ),
+            (
+                "criterion-responsibility-suffix",
+                lambda payload, api, web: (
+                    api.write_text(
+                        api.read_text(encoding="utf-8").replace(
+                            "| example/api#1 | github:example/api | `api:ac-01` |",
+                            "| example/api#1 | github:example/api | "
+                            "`api:ac-01bogus` |",
+                        ),
+                        encoding="utf-8",
+                    ),
+                    web.write_text(
+                        web.read_text(encoding="utf-8").replace(
+                            "| example/api#1 | github:example/api | `api:ac-01` |",
+                            "| example/api#1 | github:example/api | "
+                            "`api:ac-01bogus` |",
+                        ),
+                        encoding="utf-8",
+                    ),
+                ),
+            ),
+            (
+                "proof-responsibility-suffix",
+                lambda payload, api, web: (
+                    api.write_text(
+                        api.read_text(encoding="utf-8").replace(
+                            "`web:proof-api-web`",
+                            "`web:proof-api-web.extra`",
+                        ),
+                        encoding="utf-8",
+                    ),
+                    web.write_text(
+                        web.read_text(encoding="utf-8").replace(
+                            "`web:ac-01` and `web:proof-api-web`",
+                            "`web:ac-01` and `web:proof-api-web.extra`",
+                        ),
+                        encoding="utf-8",
+                    ),
+                ),
+            ),
+            (
+                "duplicate-ref",
+                lambda payload, api, web: payload["members"][0].__setitem__(
+                    "source_spec_ref",
+                    "example/api#1",
+                ),
+            ),
+            (
+                "missing-self",
+                lambda payload, api, web: payload["members"][0].__setitem__(
+                    "affected_repository",
+                    "github:example/other",
+                ),
+            ),
+            (
+                "proposed-ref",
+                lambda payload, api, web: payload["members"][0].__setitem__(
+                    "source_spec_ref",
+                    "proposed-spec:123e4567-e89b-42d3-a456-426614174000/web",
+                ),
+            ),
+            (
+                "reordered-table",
+                lambda payload, api, web: (
+                    api.write_text(
+                        api.read_text(encoding="utf-8").replace(
+                            "| example/api#1 | github:example/api | `api:ac-01` |\n"
+                            "| example/web#2 | github:example/web | "
+                            "`web:ac-01` and `web:proof-api-web` |",
+                            "| example/web#2 | github:example/web | "
+                            "`web:ac-01` and `web:proof-api-web` |\n"
+                            "| example/api#1 | github:example/api | `api:ac-01` |",
+                        ),
+                        encoding="utf-8",
+                    ),
+                    web.write_text(
+                        web.read_text(encoding="utf-8").replace(
+                            "| example/api#1 | github:example/api | `api:ac-01` |\n"
+                            "| example/web#2 | github:example/web | "
+                            "`web:ac-01` and `web:proof-api-web` |",
+                            "| example/web#2 | github:example/web | "
+                            "`web:ac-01` and `web:proof-api-web` |\n"
+                            "| example/api#1 | github:example/api | `api:ac-01` |",
+                        ),
+                        encoding="utf-8",
+                    ),
+                ),
+            ),
+            (
+                "foreign-owned-id",
+                lambda payload, api, web: web.write_text(
+                    web.read_text(encoding="utf-8").replace(
+                        "`web:ac-01` is satisfied.",
+                        "`api:ac-02` is satisfied.",
+                    ),
+                    encoding="utf-8",
+                ),
+            ),
+        )
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                payload, api, web = self.feature_spec_set_input()
+                mutate(payload, api, web)
+                error = self.invoke(
+                    "feature-spec-set",
+                    "validate",
+                    "--input",
+                    str(self.write_json(f"{name}.json", payload)),
+                    expected=2,
+                )
+                self.assertEqual(error["error"]["code"], "invalid-feature-spec-set")
+
+    def test_given_invalid_manifest_feature_sets_when_run_starts_then_grouping_is_rejected(self) -> None:
+        """Run manifests cannot invent, duplicate, or ambiguously group linked members."""
+        base = self.manifest(
+            "bad-feature-set",
+            repositories=[
+                ("github:example/api", self.common_a),
+                ("github:example/web", self.common_b),
+            ],
+            assignment_count=2,
+        )
+        base["assignments"][0]["source_spec_ref"] = "example/api#1"
+        base["assignments"][1]["source_spec_ref"] = "example/web#2"
+        feature_id = "123e4567-e89b-42d3-a456-426614174000"
+        members = [
+            {
+                "source_spec_ref": "example/api#1",
+                "repository_identity": "github:example/api",
+                "repository_key": "api",
+            },
+            {
+                "source_spec_ref": "example/web#2",
+                "repository_identity": "github:example/web",
+                "repository_key": "web",
+            },
+        ]
+        invalid_sets = {
+            "bad-uuid": [{"feature_id": "FEATURE-1", "members": members}],
+            "one-member": [{"feature_id": feature_id, "members": members[:1]}],
+            "unknown-member": [
+                {
+                    "feature_id": feature_id,
+                    "members": [
+                        members[0],
+                        {
+                            "source_spec_ref": "example/web#99",
+                            "repository_identity": "github:example/web",
+                            "repository_key": "web",
+                        },
+                    ],
+                }
+            ],
+            "duplicate-membership": [
+                {"feature_id": feature_id, "members": members},
+                {
+                    "feature_id": "223e4567-e89b-42d3-a456-426614174000",
+                    "members": members,
+                },
+            ],
+        }
+        for name, feature_sets in invalid_sets.items():
+            with self.subTest(name=name):
+                manifest = dict(base)
+                manifest["run_id"] = f"bad-feature-set-{name}"
+                manifest["root_task_id"] = f"root-bad-feature-set-{name}"
+                manifest["feature_sets"] = feature_sets
+                error = self.invoke(
+                    "run",
+                    "start",
+                    "--manifest",
+                    str(self.write_json(f"bad-feature-set-{name}.json", manifest)),
+                    expected=2,
+                )
+                self.assertEqual(error["error"]["code"], "invalid-input")
+
+    def test_given_hand_composed_linked_membership_when_run_starts_then_evidence_is_required(self) -> None:
+        """A structurally valid fragment cannot bypass current complete-body validation."""
+        manifest = self.manifest(
+            "unproven-feature-set",
+            repositories=[
+                ("github:example/api", self.common_a),
+                ("github:example/web", self.common_b),
+            ],
+            assignment_count=2,
+        )
+        manifest["assignments"][0]["source_spec_ref"] = "example/api#1"
+        manifest["assignments"][1]["source_spec_ref"] = "example/web#2"
+        manifest["feature_sets"] = [
+            {
+                "feature_id": "123e4567-e89b-42d3-a456-426614174000",
+                "members": [
+                    {
+                        "source_spec_ref": "example/api#1",
+                        "repository_identity": "github:example/api",
+                        "repository_key": "api",
+                    },
+                    {
+                        "source_spec_ref": "example/web#2",
+                        "repository_identity": "github:example/web",
+                        "repository_key": "web",
+                    },
+                ],
+            }
+        ]
+        self.database.unlink()
+        error = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("unproven-feature-set.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(
+            error["error"]["code"],
+            "invalid-feature-spec-set-evidence",
+        )
+        self.assertFalse(self.database.exists())
+
+    def test_given_validator_projection_drift_when_run_starts_then_no_claim_is_created(self) -> None:
+        """Run start revalidates current bodies and rejects a changed membership projection."""
+        payload, api, web = self.feature_spec_set_input()
+        input_path = self.write_json("drifted-start-input.json", payload)
+        validated = self.invoke(
+            "feature-spec-set",
+            "validate",
+            "--input",
+            str(input_path),
+        )
+        manifest = self.manifest(
+            "drifted-start",
+            repositories=[
+                ("github:example/api", self.common_a),
+                ("github:example/web", self.common_b),
+            ],
+            assignment_count=2,
+        )
+        manifest["assignments"][0]["source_spec_ref"] = "example/api#1"
+        manifest["assignments"][1]["source_spec_ref"] = "example/web#2"
+        manifest["feature_sets"] = [validated["manifest_feature_set"]]
+        manifest_path = self.write_json("drifted-start-manifest.json", manifest)
+
+        for body in (api, web):
+            body.write_text(
+                body.read_text(encoding="utf-8").replace(
+                    "123e4567-e89b-42d3-a456-426614174000",
+                    "223e4567-e89b-42d3-a456-426614174000",
+                ),
+                encoding="utf-8",
+            )
+
+        error = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(manifest_path),
+            "--feature-spec-set-input",
+            str(input_path),
+            expected=2,
+        )
+        self.assertEqual(
+            error["error"]["code"],
+            "invalid-feature-spec-set-evidence",
+        )
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM runs WHERE run_id='drifted-start'"
+                ).fetchone(),
+                (0,),
+            )
 
     def test_given_unversioned_manifest_when_run_starts_then_payload_is_rejected_before_state(self) -> None:
         """Given an unversioned protocol payload, startup fails closed without creating the database."""
@@ -1884,18 +2736,119 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "root-task-already-active")
 
-    def test_given_one_workspace_project_for_two_repositories_when_manifest_is_validated_then_both_assignments_are_allowed(self) -> None:
-        """Given a multi-repository project, when start validates exact repos, then the shared project ID is not repository identity."""
+    def test_given_one_saved_project_for_two_repositories_when_manifest_is_validated_then_start_is_rejected(self) -> None:
+        """One saved project cannot stand in for two affected Git repositories."""
         manifest = self.manifest(
             "bad-project",
             repositories=[("github:example/a", self.common_a), ("github:example/b", self.common_b)],
             assignment_count=2,
         )
-        manifest["assignments"][1]["project_id"] = manifest["assignments"][0]["project_id"]
+        manifest["repositories"][1]["project_id"] = manifest["repositories"][0]["project_id"]
         result = self.invoke(
             "run", "start", "--manifest", str(self.write_json("workspace-project.json", manifest)),
+            expected=2,
         )
-        self.assertEqual(result["acquired_assignment_ids"], ["spec-01", "spec-02"])
+        self.assertEqual(result["error"]["code"], "invalid-input")
+
+    def test_given_two_repository_projects_when_run_starts_then_assignments_inherit_exact_bindings(self) -> None:
+        """Repository project bindings are normalized once and inherited by workers."""
+        manifest = self.manifest(
+            "repository-projects",
+            repositories=[
+                ("github:example/a", self.common_a),
+                ("github:example/b", self.common_b),
+            ],
+            assignment_count=2,
+        )
+        self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("repository-projects.json", manifest)),
+        )
+        shown = self.invoke("run", "show", "--run-id", "repository-projects")
+        self.assertEqual(
+            {
+                row["repository_identity"]: row["project_id"]
+                for row in shown["repositories"]
+            },
+            {
+                "github:example/a": "project-1",
+                "github:example/b": "project-2",
+            },
+        )
+        self.assertEqual(
+            {
+                row["repository_identity"]: row["project_id"]
+                for row in shown["assignments"]
+            },
+            {
+                "github:example/a": "project-1",
+                "github:example/b": "project-2",
+            },
+        )
+
+        begun = self.begin_operation(
+            "repository-projects",
+            "create-worker",
+            "spec-02",
+        )
+        checkout = self.base / "repository projects checkout"
+        checkout.mkdir()
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:repository-projects",
+                "readback_ref": "readback:repository-projects",
+                "thread_id": "thread-repository-projects-2",
+                "project_id": "project-2",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_b),
+                "observed_state": "active",
+            },
+        )
+        result = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "repository-projects",
+            "--expected-revision",
+            self.revision("repository-projects"),
+            "--operation-id",
+            str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("repository-projects-worker.json", observation)),
+        )
+        self.assertEqual(result["status"], "succeeded")
+
+    def test_given_controller_task_project_is_affected_when_run_starts_then_controller_stays_control_plane_only(self) -> None:
+        """The controller may share a saved project with one affected repository."""
+        manifest = self.manifest("affected-primary")
+        manifest["controller_project_id"] = manifest["repositories"][0]["project_id"]
+        self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("affected-primary.json", manifest)),
+        )
+        shown = self.invoke("run", "show", "--run-id", "affected-primary")
+        self.assertEqual(shown["controller_project_id"], "project-1")
+        self.assertEqual(shown["repositories"][0]["project_id"], "project-1")
+        self.assertEqual(shown["assignments"][0]["state"], "planned")
+
+    def test_given_assignment_embeds_retired_project_id_when_run_starts_then_manifest_is_rejected(self) -> None:
+        """Project identity belongs only to the repository map in manifest 3."""
+        manifest = self.manifest("retired-assignment-project")
+        manifest["assignments"][0]["project_id"] = "project-1"
+        result = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("retired-assignment-project.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(result["error"]["code"], "invalid-input")
 
     def test_given_state_writes_when_inspected_then_sqlite_coordinates_them_without_lockfile(self) -> None:
         """Given a writer, SQLite owns the transaction and no filesystem lock is created."""
@@ -2845,7 +3798,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(owner["owner"]["run_id"], "started")
 
     def test_given_schema_when_inspected_then_state_is_narrow_and_run_pins_exact_runtime(self) -> None:
-        """Given schema 2, each run stores the exact contract, CLI, and runtime artifact digest."""
+        """Schema 3 separates project bindings while pinning the exact runtime."""
         self.start("schema")
         with sqlite3.connect(self.database) as connection:
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
@@ -2853,12 +3806,38 @@ class RunStateScenarios(unittest.TestCase):
             metadata = connection.execute(
                 "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
             ).fetchall()
-        self.assertEqual(tables, {"runtime_metadata", "runs", "assignments", "spec_claims", "app_operations"})
+        self.assertEqual(
+            tables,
+            {
+                "runtime_metadata",
+                "runs",
+                "run_repositories",
+                "assignments",
+                "spec_claims",
+                "app_operations",
+            },
+        )
         self.assertEqual(metadata, [(1, DATABASE_SCHEMA_VERSION, None)])
         self.assertNotIn("goal_state", columns)
         self.assertIn("runtime_artifact_sha256", columns)
+        self.assertIn("feature_id", columns)
         self.assertFalse(any("body" in column or "checklist" in column or "attempt" in column for column in columns))
+        self.assertFalse(
+            any(
+                "responsibility" in column or "feature_spec_set" in column
+                for column in columns
+            )
+        )
         shown = self.invoke("run", "show", "--run-id", "schema")
+        self.assertEqual(shown["controller_project_id"], "controller-schema")
+        self.assertEqual(
+            shown["repositories"][0]["project_id"],
+            "project-1",
+        )
+        self.assertEqual(
+            shown["assignments"][0]["project_id"],
+            "project-1",
+        )
         self.assertEqual(shown["runtime_contract_version"], RUNTIME_CONTRACT_VERSION)
         self.assertEqual(shown["runtime_cli_version"], CLI_VERSION)
         self.assertEqual(shown["runtime_artifact_sha256"], hashlib.sha256(TOOL.read_bytes()).hexdigest())
@@ -2896,8 +3875,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(str(shown["revision"]), revision)
         self.assertEqual(shown["runtime_artifact_sha256"], "0" * 64)
 
-    def test_given_drained_schema_one_when_schema_two_prepares_then_state_is_regenerated_without_carry_forward(self) -> None:
-        """Given no legacy owners, schema 2 replaces schema 1 atomically without copying rows."""
+    def test_given_drained_schema_one_when_schema_three_prepares_then_state_is_regenerated_without_carry_forward(self) -> None:
+        """With no legacy owners, schema 3 replaces schema 1 without copying rows."""
         self.replace_with_schema_one()
 
         diagnosis = self.invoke("doctor")
@@ -2914,13 +3893,13 @@ class RunStateScenarios(unittest.TestCase):
                 connection.execute(
                     "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
                 ).fetchone(),
-                (1, 2, None),
+                (1, DATABASE_SCHEMA_VERSION, None),
             )
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
         self.assertFalse(self.database.with_name("run-state.lock").exists())
 
-    def test_given_active_schema_one_when_schema_two_prepares_then_it_fails_closed_without_runtime_identity(self) -> None:
-        """Given legacy active owners lack exact pins, schema 2 cannot guess a retained runtime."""
+    def test_given_active_schema_one_when_schema_three_prepares_then_it_fails_closed_without_runtime_identity(self) -> None:
+        """Schema 3 cannot guess exact runtime identity for active schema-1 owners."""
         self.replace_with_schema_one(active=True)
         diagnosis = self.invoke("doctor")
         self.assertEqual(diagnosis["state"], "waiting-for-schema-drain")
@@ -2946,6 +3925,172 @@ class RunStateScenarios(unittest.TestCase):
                 (1, None),
             )
 
+    def test_given_active_schema_two_when_exact_runtime_is_retained_then_cutover_waits_for_drain(self) -> None:
+        """A real 2.0 owner drains through its byte-exact public runtime API."""
+        retained, retained_identity = self.historical_runtime("2.0.0")
+        self.initialize_historical_schema_two(retained)
+        started = self.start_historical_run(
+            retained,
+            "2.0.0",
+            "schema-two-active",
+        )
+        self.assertEqual(started["status"], "active")
+
+        diagnosis = self.invoke("doctor")
+        self.assertEqual(diagnosis["state"], "waiting-for-schema-drain")
+        self.assertEqual(diagnosis["observed_database_schema_version"], 2)
+        waiting = self.invoke(
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(retained),
+        )
+        self.assertEqual(waiting["state"], "waiting-for-schema-drain")
+        self.assertEqual(waiting["active_owner_runs"], 1)
+        self.assertFalse(waiting["regenerated"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (2, DATABASE_SCHEMA_VERSION),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT runtime_artifact_sha256 FROM runs"
+                ).fetchone(),
+                (retained_identity[2],),
+            )
+
+        drained = self.finish_historical_run(
+            retained,
+            "schema-two-active",
+        )
+        self.assertEqual(drained["outcome"], "preimplementation-aborted")
+        self.assertTrue(drained["claims_released"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT state FROM assignments WHERE run_id=?",
+                    ("schema-two-active",),
+                ).fetchone(),
+                ("preimplementation-aborted",),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT active,release_reason FROM spec_claims WHERE run_id=?",
+                    ("schema-two-active",),
+                ).fetchone(),
+                (0, "preimplementation-aborted"),
+            )
+
+        prepared = self.invoke("state", "prepare")
+        self.assertEqual(prepared["state"], "regenerated")
+        self.assertEqual(prepared["previous_schema_version"], 2)
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (DATABASE_SCHEMA_VERSION, None),
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0],
+                0,
+            )
+
+    def test_given_schema_two_owner_when_only_a_lookalike_runtime_is_retained_then_hash_mismatch_fails(self) -> None:
+        """Matching version strings cannot substitute for the pinned executable bytes."""
+        pinned, _ = self.historical_runtime(
+            "2.0.0",
+            name="pinned-runtime",
+        )
+        lookalike, _ = self.historical_runtime(
+            "2.0.0",
+            name="lookalike-runtime",
+            append_bytes=b"\n",
+        )
+        self.initialize_historical_schema_two(pinned)
+        self.start_historical_run(
+            pinned,
+            "2.0.0",
+            "schema-two-lookalike",
+        )
+
+        error = self.invoke(
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(lookalike),
+            expected=4,
+        )
+
+        self.assertEqual(error["error"]["code"], "retained-runtime-unavailable")
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (2, None),
+            )
+
+    def test_given_mixed_schema_two_owners_when_all_exact_runtimes_are_retained_then_each_drains_before_cutover(self) -> None:
+        """Authentic 2.0 and 3.0 owners each drain through their own public CLI."""
+        retained_two, _ = self.historical_runtime(
+            "2.0.0",
+            name="retained-runtime-2",
+        )
+        retained_three, _ = self.historical_runtime(
+            "3.0.0",
+            name="retained-runtime-3",
+        )
+        self.initialize_historical_schema_two(retained_two)
+        self.start_historical_run(
+            retained_two,
+            "2.0.0",
+            "schema-two-active-1",
+        )
+        self.start_historical_run(
+            retained_three,
+            "3.0.0",
+            "schema-two-active-2",
+        )
+
+        missing = self.invoke(
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(retained_two),
+            expected=4,
+        )
+        self.assertEqual(
+            missing["error"]["code"],
+            "retained-runtime-unavailable",
+        )
+
+        waiting = self.invoke(
+            "state",
+            "prepare",
+            "--retained-runtime",
+            str(retained_two),
+            "--retained-runtime",
+            str(retained_three),
+        )
+        self.assertEqual(waiting["state"], "waiting-for-schema-drain")
+        self.assertEqual(waiting["active_owner_runs"], 2)
+
+        for runtime, run_id in (
+            (retained_two, "schema-two-active-1"),
+            (retained_three, "schema-two-active-2"),
+        ):
+            drained = self.finish_historical_run(runtime, run_id)
+            self.assertEqual(drained["outcome"], "preimplementation-aborted")
+            self.assertTrue(drained["claims_released"])
+
+        prepared = self.invoke("state", "prepare")
+        self.assertEqual(prepared["state"], "regenerated")
+        self.assertEqual(prepared["previous_schema_version"], 2)
+
     def test_given_injected_recreate_failure_when_cutover_rolls_back_then_old_state_is_exact(self) -> None:
         """Given DROP has begun, a creation failure rolls back both schema and rows."""
         self.replace_with_schema_one()
@@ -2966,7 +4111,7 @@ class RunStateScenarios(unittest.TestCase):
                 try:
                     connection.execute("BEGIN EXCLUSIVE")
                     connection.execute(
-                        "UPDATE runtime_metadata SET target_schema_version=2 WHERE singleton=1"
+                        "UPDATE runtime_metadata SET target_schema_version=3 WHERE singleton=1"
                     )
                     with self.assertRaises(sqlite3.OperationalError):
                         namespace["recreate_schema_in_place"](connection)
@@ -2986,11 +4131,11 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before_bytes)
 
     def test_given_newer_schema_when_old_runtime_prepares_then_it_fails_closed(self) -> None:
-        """Given a newer DB, schema-2 runtime never destroys or downgrades it."""
+        """A schema-3 runtime never destroys or downgrades a newer database."""
         self.start("newer-schema")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET schema_version=3 WHERE singleton=1"
+                "UPDATE runtime_metadata SET schema_version=4 WHERE singleton=1"
             )
         before = self.database.read_bytes()
         doctor = self.invoke("doctor", expected=4)
@@ -3000,11 +4145,11 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_future_cutover_fence_when_new_run_starts_then_existing_state_remains_readable(self) -> None:
-        """Given a later runtime has fenced starts, schema 2 may inspect owners but cannot create another run."""
+        """A later cutover fence keeps schema-3 owners readable but blocks new runs."""
         self.start("fenced-owner")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET target_schema_version=3 WHERE singleton=1"
+                "UPDATE runtime_metadata SET target_schema_version=4 WHERE singleton=1"
             )
         error = self.invoke(
             "run", "start", "--manifest",
@@ -3019,7 +4164,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertFalse(diagnosis["ready"])
 
     def test_given_unversioned_database_when_read_then_runtime_rejects_it_byte_for_byte(self) -> None:
-        """Given unversioned tables, schema 2 rejects them without destructive preparation."""
+        """Schema 3 rejects unversioned tables without destructive preparation."""
         self.start("unversioned")
         with sqlite3.connect(self.database) as connection:
             connection.execute("DROP TABLE runtime_metadata")
@@ -3045,7 +4190,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
-        """Given a stale schema-2 DB, when opened, then exact structure fails closed and the file is preserved."""
+        """A stale schema-3 database fails closed and remains preserved."""
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
@@ -3053,7 +4198,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_two_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
+    def test_given_schema_three_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
         """Given protocol metadata drift, doctor fails closed and preserves the database bytes."""
         self.start("stale-metadata")
         with sqlite3.connect(self.database) as connection:
@@ -3087,7 +4232,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
 
     def test_given_same_number_schema_with_retired_input_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given the former integration-only state constraint, schema 2 rejects it before a later write."""
+        """Schema 3 rejects the former integration-only state constraint."""
         self.start("stale-state-constraint")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")
@@ -3101,7 +4246,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(self.database.exists())
 
     def test_given_schema_three_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
-        """Given a stale schema-2 constraint, the runtime rejects it without migration or deletion."""
+        """A stale schema-3 constraint is rejected without migration or deletion."""
         self.start("stale-capability-state")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")

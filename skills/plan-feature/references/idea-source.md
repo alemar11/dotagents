@@ -21,7 +21,7 @@ implementation issue, or another Plan Feature mode.
   `source_spec_ref`.
 - On the existing-source route, derive `bound_source_idea_refs` only as the
   union of exact `- Source Idea:` refs in the immutable intake Spec and every
-  required linked partial. Use them only to continue validation and reconcile
+  required linked member. Use them only to continue validation and reconcile
   lifecycle after the complete bundle converges. If explicit
   `source_idea_refs` are also supplied, require exact set equality with the
   bound refs; reject additional, missing, different, or unbound refs.
@@ -189,7 +189,7 @@ never projects or edits a Feature Spec from bound Idea evidence.
   Project Memory evidence, and accepted clarification results.
 - Render each consumed ref as `- Source Idea: <durable-ref>` in the Feature
   Spec's existing `## Source` section.
-- In a multi-repository bundle, place a source ref in every parent or partial
+- In a multi-repository bundle, place a source ref in every linked repo-owned
   Feature Spec whose scope derives from that Idea. Do not copy an unrelated ref
   merely because it belongs to the same planning run.
 - Keep Idea refs and coverage maps out of generated implementation issues and

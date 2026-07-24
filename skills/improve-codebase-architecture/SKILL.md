@@ -34,9 +34,11 @@ Load `references/options.md` before classifying candidate strength.
 ### 1. Ground in repo evidence
 
 - Inspect project docs and root `CONTEXT.md` when it exists, treating the
-  current Git repository as a selected root. In a coordination workspace, also
-  follow its `Repository Registry` to affected child-repository roots and read
-  each available child root context. Then read every available scoped `CONTEXT.md`
+  current Git repository as a selected root. For cross-repository work, use
+  explicit user scope or a durable linked Feature Spec Set to authorize
+  repository identities, require candidate local Git roots separately, verify
+  each root against one authorized identity, and inspect each verified
+  repository independently. Then read every available scoped `CONTEXT.md`
   matched by affected paths in each selected root's `Scoped Contexts` table,
   the relevant root `project-memory/adr/` trees, package boundaries, public
   APIs, tests, and the files near the requested area. When a root or matched

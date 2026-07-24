@@ -37,6 +37,17 @@ terms, rules, boundaries, or decisions plus evidence and intended targets.
 Reconcile it against the current repository before capture. Do not reduce it to
 an enum or treat its presence as write authority.
 
+For a repository-owned shard of a cross-repository delta, require every target
+to remain inside the current Git root. A cross-repository decision additionally
+names one `canonical_decision_target` in the exact
+`<feature-id>--<repository-key>/<repo-relative-path>` form. Resolve that prefix
+to the explicitly selected owning member of the caller's validated Feature
+Spec Set and require the remainder to fit the owner's accepted paths. Only that
+owner writes the full record; another repository may capture a repo-local
+context change and a backlink that copies the exact target. Reject a shard that
+duplicates the canonical record, targets a peer root, or leaves canonical
+ownership ambiguous.
+
 ## Workflow
 
 ### 1. Inspect existing context
@@ -46,19 +57,19 @@ an enum or treat its presence as write authority.
   memory-owning root selected by the setup scope, even when evidence supports
   only a minimal entry point with explicit unknowns. Outside setup/bootstrap,
   use repository evidence and create it only with authorized durable content.
-  In a multi-repository coordination workspace, follow its `Repository Registry`
-  to every affected child repository and read each available child root
-  `CONTEXT.md`. An empty registry context cell means no child context exists;
-  inspect that child's repository evidence without inventing or creating a
-  context unless separately authorized. Also inspect the relevant
-  `project-memory/adr/` trees, `README.md`, project docs, product specs, issue
+  Explicit user scope or a durable linked Feature Spec Set authorizes
+  repository identities. A composed cross-repository caller supplies candidate
+  local Git roots separately, verifies each root against one authorized
+  identity, and runs this workflow independently in each verified repository.
+  Also inspect the relevant
+  `project-memory/adr/` tree, `README.md`, project docs, product specs, issue
   templates, and nearby source or tests that define the vocabulary already in
   use.
 - When a selected repository's root `CONTEXT.md` contains
   `## Scoped Contexts`, select every non-overlapping row matched by the
   affected paths or accepted product identities, then read each available
-  scoped `CONTEXT.md`. The coordination root and selected repository root
-  remain applicable after selection. For a matched row without a context file,
+  scoped `CONTEXT.md`. The repository root remains applicable after selection.
+  For a matched row without a context file,
   inspect its owned paths directly and create the scoped file only when
   authorized evidence supports durable scope-specific content.
 - Stop and ask only when scoped routes overlap or ownership remains
@@ -68,8 +79,8 @@ an enum or treat its presence as write authority.
 - During authorized setup/bootstrap, ensure root `CONTEXT.md` exists before
   completion even when no durable term or rule is yet established. Outside
   setup/bootstrap, create it when an authorized durable term or rule needs a
-  home. For a verified monorepo or multi-repository workspace, create the
-  minimal root routing surface before creating any scoped context.
+  home. For a verified monorepo, create the minimal root routing surface before
+  creating any scoped context.
 - If no suitable authorized destination exists, defer capture and name the
   missing file or surface explicitly.
 

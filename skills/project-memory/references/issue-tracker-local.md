@@ -22,22 +22,30 @@ and executing workflows.
   metadata, relationships, and publication order without writing files.
 
 Proposed output may use `source_spec_ref=proposed-spec:<feature-slug>` for one
-Feature Spec,
-`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>` for a
-multi-repository parent, or
-`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>`
-for a repo-scoped implementation partial. A
+Feature Spec or
+`source_spec_ref=proposed-spec:<feature-id>/<repository-key>` for a linked
+multi-repository member. A
 proposed ref and any `planning/tmp/` artifact are non-executable and must never
 be used as a durable `ready-for-agent` source.
 
 Applied single-repository refs use the repo-relative durable path. Applied
-multi-repository partials prefix that path with the owning repository slug,
-using the canonical
-`<repository-slug>/planning/features/<feature-slug>/SPEC.md` shape. For example,
-`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md`.
-Use the same qualified refs in repo-to-child mappings, sibling links, and
-Feature Dependencies. A bare repo-relative path is invalid across sibling
-repositories because identical tracker paths can exist in more than one child.
+multi-repository members prefix that path with the shared Feature ID and the
+owning member's stable repository key, using the canonical
+`<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md` shape.
+The lower-kebab key is at most 48 characters, unique inside the linked set,
+persisted in the member's Planning Identity, and frozen with membership.
+For example,
+`source_spec_ref=<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`.
+Use the same qualified refs in every member's `Feature Spec Set` and Feature Dependencies.
+A bare repo-relative path is invalid across repositories because
+identical tracker paths and repository names can exist in unrelated sets.
+The qualified ref is a portable set identity, not a physical file path. Decode
+it only after the member body proves the exact same Feature ID and repository
+key: strip exactly the leading `<feature-id>--<repository-key>/`, yielding
+`planning/features/<feature-slug>/SPEC.md`. Resolve that remainder only inside
+the separately verified owning repository root. Never join the qualified prefix
+to a filesystem root, infer a repository root from it, or use one repository's
+decoded path in another repository.
 
 ## Conventions
 
@@ -63,15 +71,15 @@ repositories because identical tracker paths can exist in more than one child.
 - Comments and conversation history append under a `## Comments` heading.
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
   `source_spec_ref`, affected repositories and paths, dependency ids, planning
-  identity, partial Feature Spec links, and graph validation.
+  identity, linked Feature Spec Set refs, and graph validation.
 - App-compatible generated issues include the Git repository that owns the
   tracker file in `affected_repositories` and include both the exact active
   issue path and exact derived `done/` path in `allowed_paths`. Both paths must
-  resolve inside that repository. A tracker artifact at a non-Git workspace root
-  or outside every affected Git repository is non-App-executable; do not invent
+  resolve inside that repository. A tracker artifact outside every affected Git
+  repository is non-App-executable; do not invent
   a tracker owner.
 - In scoped-context monorepos, include the accepted product or
-  workspace slug when needed to avoid collisions.
+  repository scope slug when needed to avoid collisions.
 - When a Feature Spec has an accepted Planning Identity, use its
   `feature_slug` rather than deriving a new slug from the title.
 

@@ -99,26 +99,31 @@ completion.]
 
 ## Domain Knowledge Closeout
 
-[Include only on the final closeout issue when the issue
-phase receives a knowledge delta as run data. In a single Spec, this issue must
+[Include only on a repository-owned final closeout issue when the issue phase
+receives a knowledge delta as run data. In a single Spec, this issue must
 prove integrated feature behavior and satisfy the owner-excluded terminal rule
 from `issue-phase.md`. In
-a multi-repository bundle, it belongs to an existing implementation partial
+a multi-repository feature, it belongs to an existing implementation member
 whose Feature Dependencies supply the exact peer inputs required for proof;
-its issue dependencies remain local to that partial. Every
-target surface below must resolve to a repository named in this issue's
-`affected_repositories` and a path equal to or contained by one of this issue's
-`allowed_paths`.]
+its issue dependencies remain local to that member. The payload is only that
+member's repository-owned shard. One exact `canonical_decision_target` owns a
+cross-repository decision; a non-owner shard may carry a qualified backlink but
+not duplicate the record. Every target surface below must resolve to this
+issue's sole Git repository and a path equal to or contained by one of this
+issue's `allowed_paths`.]
 
 - Required workflow:
   - Invoke `$project-memory` with `memory_slice=domain-memory` and
     `domain_operation=implementation-closeout` after integrated behavior is
     proven. Project Memory runs its internal domain-modeling workflow.
 knowledge_delta:
+  canonical_decision_target: [for a cross-repository decision, exactly
+    <feature-id>--<repository-key>/<repo-relative-path> naming the declared
+    owning Feature Spec Set member; every backlink copies this exact value]
   decisions:
     - [Accepted durable term, rule, boundary, or decision.]
   target_surfaces:
-    - [current-repository/<repo-relative-path> or <repo-slug>/<repo-relative-path>.]
+    - [current-repository/<repo-relative-path>.]
   evidence:
     - [Portable implementation evidence.]
 - Closeout proof:

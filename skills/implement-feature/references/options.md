@@ -2,7 +2,7 @@
 
 The behavior-affecting startup fields are:
 
-| Field | Values | Meaning |
+| Field | Allowed values | Meaning |
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories are not saved Git projects, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
 | `visible_app_task_permission` | `granted`, `denied` | Permit the disclosed visible Codex worker tasks and ChatGPT-created worktrees for this run. |
@@ -22,12 +22,13 @@ When projects are missing, use this standard question in the same startup
 authorization interaction:
 
 > To create the visible tasks with managed worktrees, every affected repository
-> must be saved as a separate Codex project. These projects are missing:
+> must be saved as a separate local Git project in the ChatGPT App. These
+> projects are missing:
 >
 > - `<repository>` — `<absolute-path>`
 >
 > Do you authorize me to create exactly these persistent projects in the
-> ChatGPT desktop app through Computer Use and then start the disclosed
+> ChatGPT App through Computer Use and then start the disclosed
 > implementation? Project creation is distinct from task creation. Otherwise I
 > will stop without creating run state, claims, tasks, or worktrees.
 
@@ -45,14 +46,15 @@ path and require exact equality with the expected Git root. After creation,
 read `list_projects` again and require the saved path and independently resolved
 Git common directory to match the expected repository. Ambiguous selection,
 inaccessible Computer Use, a locked host, a parent path, or a mismatched
-readback stops immediately. Never create a broader substitute such as the
-workspace root or `/private/tmp`, never silently create another project, and
+readback stops immediately. Never create a broader substitute such as a parent
+root or `/private/tmp`, never silently create another project, and
 never treat task permission as project-creation permission.
 
-`granted` covers the full worker lifecycle: implementation, compatible rewrites,
-repairs, tests, command approvals through the ChatGPT desktop app, publication, review fixes,
-tracker checkboxes, recovery, and final evidence. It does not authorize merge,
-deployment, release, post-merge closure, or work outside the durable contract.
+`granted` covers the full worker lifecycle: implementation, compatible
+rewrites, repairs, tests, command approvals through the ChatGPT App,
+publication, review fixes, tracker checkboxes, recovery, and final evidence. It
+does not authorize merge, deployment, release, post-merge closure, or work
+outside the durable contract.
 
 After the startup interaction grants the required fields, do not ask another
 user question. Validation authority,

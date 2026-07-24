@@ -44,10 +44,10 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         skill = self.normalized(self.text("SKILL.md"))
         bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
         options = self.normalized(self.text("references/options.md"))
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
         self.assertIn("exact saved Git-project mapping before state", skill)
         self.assertIn("whose path is exactly that repository root", bootstrap)
-        self.assertIn("A non-Git coordination workspace is not a substitute", bootstrap)
+        self.assertIn("Reject remote, non-Git, shared-project, duplicate-project", bootstrap)
         self.assertIn("before writing the manifest or calling `scripts/run-state`", bootstrap)
         self.assertIn("Project creation is distinct from task creation", options)
         self.assertIn("never treat task permission as project-creation permission", options)
@@ -60,7 +60,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("require exact equality with the expected Git root", options)
         self.assertIn("read `list_projects` again", options)
         self.assertIn("Never create a broader substitute", options)
-        self.assertIn("the workspace root or `/private/tmp`", options)
+        self.assertIn("a parent root or `/private/tmp`", options)
 
     def test_given_compatible_operational_edits_when_worker_rereads_then_it_continues(self) -> None:
         """Given compatible design or test edits, when reread occurs, then worker accepts them autonomously."""
@@ -100,7 +100,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """The bootstrap field and review command are literal machine-facing contracts."""
         skill = self.text("SKILL.md")
         bootstrap = self.text("references/root-bootstrap.md")
-        orchestration = self.text("references/chatgpt-task-orchestration.md")
+        orchestration = self.text("references/codex-task-orchestration.md")
         worker = self.text("references/worker-execution.md")
         runtime = self.text("scripts/run-state")
         for source in (skill, bootstrap, orchestration, worker):
@@ -129,7 +129,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
 
     def test_given_bootstrap_recovery_when_state_is_ambiguous_then_actual_task_state_prevents_duplicates(self) -> None:
         """Given ambiguous delivery, when recovering, then root inspects the task before repeating and stores no body hash."""
-        orchestration = self.text("references/chatgpt-task-orchestration.md")
+        orchestration = self.text("references/codex-task-orchestration.md")
         recovery = self.text("references/claim-waits-and-recovery.md")
         normalized = self.normalized(orchestration)
         self.assertIn("record the intended operation in SQLite before changing", normalized)
@@ -146,7 +146,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def test_given_same_repo_assignments_when_paths_overlap_then_root_serializes_them(self) -> None:
         """Given overlap in one repository, when scheduling, then root serializes while disjoint work may reach three."""
         skill = self.text("SKILL.md")
-        orchestration = self.text("references/chatgpt-task-orchestration.md")
+        orchestration = self.text("references/codex-task-orchestration.md")
         self.assertIn("schedule up to three path-disjoint", skill)
         self.assertIn("overlapping paths or issue dependencies serialize", self.text("references/feature-spec-contract.md"))
         self.assertIn("At most three workers may be executing", orchestration)
@@ -154,7 +154,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
 
     def test_given_root_assignments_when_title_is_set_then_it_is_exact_and_immutable(self) -> None:
         """Given one or many Specs, when root is titled, then its static total is exact UI evidence."""
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
         self.assertIn("`🤖 Feature Orchestrator`", orchestration)
         self.assertIn("`🤖 Feature Orchestrator · N Features`", orchestration)
         self.assertIn("including waiting or blocked assignments", orchestration)
@@ -169,7 +169,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         runtime = self.runtime_text()
         source = self.text("scripts/run-state")
         skill = self.normalized(self.text("SKILL.md"))
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
         self.assertIn("unfinished run remains the sole controller", skill)
         self.assertIn("root keeps its current turn open", skill)
         self.assertIn("manual in the exact same root task", orchestration)
@@ -180,15 +180,23 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             self.assertNotIn(retired_action, source)
             self.assertNotIn(retired_action, runtime)
 
-    def test_given_schema_two_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
+    def test_given_schema_three_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
         """Given the breaking protocol cut, old state is rebuilt at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "3.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "3.0.0"', source)
-        self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
+        self.assertIn('CLI_VERSION = "4.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
         self.assertIn('"schema": "implement-feature/run-manifest"', source)
-        self.assertIn('"schema_version": "2.0.0"', source)
+        self.assertIn('"schema_version": "3.0.0"', source)
+        self.assertIn(
+            '"schema": "implement-feature/feature-spec-set-input"',
+            source,
+        )
+        self.assertIn("SCHEMA_TWO_COLUMNS", source)
+        self.assertIn("run_repositories", source)
+        self.assertIn('"feature_id"', source)
+        self.assertIn("feature-spec-set validate", state)
         self.assertIn("scripts/run-state --json state prepare", state)
         self.assertIn("drops all application tables, indexes, and triggers", state)
         self.assertIn("without carrying any row forward", (REPO / "AGENTS.md").read_text(encoding="utf-8"))
@@ -245,7 +253,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
 
     def test_given_multi_repo_boundaries_when_scheduled_then_existing_workers_collaborate(self) -> None:
         """Given cross-repo behavior, ordinary workers communicate and own exact-revision combined proof."""
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
         worker = self.normalized(self.text("references/worker-execution.md"))
         spec = self.text("references/feature-spec-contract.md")
         self.assertIn("There is no dedicated integration worker or reserved integration slot", orchestration)
@@ -255,16 +263,29 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("Peer Collaboration And Combined Proof", worker)
         self.assertIn("Each combined boundary has an existing worker as its proof owner", worker)
         self.assertIn("ChatGPT-created worktree evidence", spec)
+        self.assertIn("feature-spec-set validate", spec)
+        self.assertIn("--feature-spec-set-input", self.text("references/root-bootstrap.md"))
+        self.assertIn(
+            "requires exact validator-projection equality",
+            self.normalized(self.text("SKILL.md")),
+        )
+        self.assertIn("repository_relative_spec_path", worker)
+        self.assertIn("qualifier as a directory", worker)
         self.assertIn("Every worker remains isolated to its own worktree", worker)
         self.assertIn("must not infer a peer HEAD", worker)
         final_verification = self.normalized(self.text("references/final-verification.md"))
         self.assertIn("must not access a peer worktree", final_verification)
+        self.assertIn(
+            "exactly one independently verified terminal branch or PR for every Feature Spec Set member",
+            final_verification,
+        )
+        self.assertIn("one exact final vector", final_verification)
         self.assertNotIn("direct-worktree execution", worker)
         self.assertIn("`blocked-app-capability`", spec)
 
     def test_given_final_gate_mismatch_when_root_follows_up_then_message_is_evidence_only(self) -> None:
         """Given repairable final evidence mismatch, when root messages, then worker autonomy and App reconciliation remain intact."""
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
         verification = self.normalized(self.text("references/final-verification.md"))
         self.assertIn("authoritative final-verification mismatch", orchestration)
         self.assertIn("send only the missing or inconsistent evidence", orchestration)
@@ -284,9 +305,9 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "3.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "3.0.0"', source)
-        self.assertIn("DATABASE_SCHEMA_VERSION = 2", source)
+        self.assertIn('CLI_VERSION = "4.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
         self.assertIn("command_capabilities", source)
         self.assertIn("runtime_artifact_sha256", source)
         self.assertIn("BEGIN IMMEDIATE", source)
@@ -337,20 +358,23 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def test_given_runtime_contract_when_state_boundary_is_read_then_text_content_stays_authoritative_elsewhere(self) -> None:
         """Given generic coordinator docs, when state ownership is read, then raw delivery content is excluded structurally."""
         state = self.text("references/run-state.md")
+        normalized = self.normalized(state)
         self.assertIn("Stored Data Allowlist", state)
-        self.assertIn("typed ChatGPT task-operation reconciliation facts", state)
+        self.assertIn("typed Codex task-operation reconciliation facts", normalized)
         self.assertIn("must not store raw Spec or issue bodies", state)
+        self.assertIn("linked `feature_id` membership", normalized)
+        self.assertIn("normalized table", state)
         self.assertIn("Normal Git\nhead SHAs remain valid evidence", state)
 
     def test_given_runtime_docs_when_product_and_worktrees_are_described_then_language_is_public_and_concrete(self) -> None:
         """Given runtime documentation, when read by an operator, then product, task, and worktree actions are explicit."""
         runtime = self.runtime_text()
-        orchestration = self.normalized(self.text("references/chatgpt-task-orchestration.md"))
-        self.assertIn("ChatGPT desktop app", runtime)
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
+        self.assertIn("ChatGPT App", runtime)
         self.assertNotIn("Codex App", runtime)
-        self.assertIsNone(re.search(r"(?<![a-z-])\bApp\b", runtime))
+        self.assertIsNone(re.search(r"(?<!ChatGPT )\bApp\b", runtime))
         self.assertIn("visible Codex worker task", orchestration)
-        self.assertIn("ChatGPT desktop app creates the worktree and assigns it to the task", orchestration)
+        self.assertIn("ChatGPT App creates the worktree and assigns it to the task", orchestration)
         self.assertIn("root never runs `git worktree add`", orchestration)
 
 

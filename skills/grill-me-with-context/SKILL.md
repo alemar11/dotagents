@@ -12,7 +12,7 @@ terminology, rules, and accepted decisions through
 `$project-memory domain-memory` with `capture_mode=inline`, or return them as a
 structured handoff with `capture_mode=defer-to-caller`.
 
-Use this when the plan lives in a codebase or project workspace and the output
+Use this when the plan lives in a codebase or explicit repository set and the output
 should improve future agent context, not just the current conversation.
 
 ## Capture Modes
@@ -66,9 +66,10 @@ explicit override, direct invocation preserves `capture_mode=inline`.
 
 - Inspect the relevant repository files and existing docs. Read root
   `CONTEXT.md` when it exists and treat the current Git repository as a
-  selected root. In a coordination workspace, also follow its
-  `Repository Registry` to affected child-repository roots and read each
-  available child root context. Then read
+  selected root. For cross-repository work, use explicit user scope or a
+  durable linked Feature Spec Set to authorize repository identities, require
+  candidate local Git roots separately, verify each root against one authorized
+  identity, and inspect each verified repository independently. Then read
   every available scoped `CONTEXT.md` matched by affected paths in each
   selected root's `Scoped Contexts` table and the relevant root
   `project-memory/adr/` trees before asking questions. When a root or matched

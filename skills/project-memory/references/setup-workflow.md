@@ -4,16 +4,19 @@ Use this reference for the interactive setup editor, draft checklist, write
 rules, `AGENTS.md` pointer block, and completion report. Keep the public
 `SKILL.md` focused on routing and hard boundaries.
 
+When a composed caller selects multiple Git repositories, run setup
+independently in each selected repository. Never create shared coordination
+memory at their common parent.
+
 ## Current Settings Summary
 
 When reviewing existing setup, summarize values in the selected setup slice
 before recommending changes. Include the full list only for an explicit full
 review:
 
-- execution context: `orchestrator-workspace`, `fresh-setup`,
-  `existing-project-bootstrap`, or `current-project` (derived in the exact
+- execution context: `fresh-setup`, `existing-project-bootstrap`, or
+  `current-project` (derived in the exact
   precedence from `options.md`, not a stored key or option)
-- `repository_layout`
 - `tracker_backend`
 - `artifact_marker` transport and mapping
 - `issue_type` transport and mapping
@@ -39,7 +42,6 @@ unless the user explicitly changes them.
 Editable sections:
 
 - `issue-tracker`
-- `project-layout`
 - `artifact-marker-mapping`
 - `issue-type-mapping`
 - `workflow-state-mapping`
@@ -52,8 +54,6 @@ For each selected configuration section, show the current value first, then
 `keep-current` and the relevant alternatives:
 
 - `issue-tracker`: `github` or `local`.
-- `project-layout`: `single-repository`, `monorepo`, or
-  `multi-repository-workspace`.
 - `artifact-marker-mapping`: default or custom GitHub `label`, or canonical
   local `local-header`, for the `idea` marker.
 - `issue-type-mapping`: default GitHub `native-type`, evidence-backed GitHub
@@ -61,8 +61,8 @@ For each selected configuration section, show the current value first, then
   with one transport and exact tracker value per canonical type.
 - `workflow-state-mapping`: default or custom GitHub `label`, or canonical local
   `local-header`, with one transport and exact tracker value per state.
-- `domain-memory`: show the current root `CONTEXT.md`, scoped routes, workspace
-  repository registry when applicable, and centralized ADR root. Refresh those
+- `domain-memory`: show the current root `CONTEXT.md`, scoped routes, and
+  centralized ADR root. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
   update root `CONTEXT.md` at every memory-owning root selected by the setup
   scope. Do not present or persist a domain-layout enum.
@@ -86,11 +86,6 @@ prompt.
 
 - Default to GitHub for code repos with a GitHub remote; default to local
   markdown when no clear GitHub issue tracker exists.
-- Default `repository_layout` from durable repo evidence: `single-repository` for one
-  Git repo and one primary context, `monorepo` for one Git repo with multiple
-  independently planned contexts, and `multi-repository-workspace` for a parent
-  coordination workspace with multiple child Git repos. Ask when evidence is
-  contradictory.
 - For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
   mutation. Resolve `write_mode=propose` and treat it as current-run behavior,
   not durable issue-tracker configuration.
@@ -105,12 +100,11 @@ prompt.
   vocabulary, rules, boundaries, and routing. When richer evidence is absent,
   keep a minimal entry point and state the missing knowledge explicitly rather
   than inventing it.
-- For a verified monorepo or multi-repository workspace, use stable topology
-  evidence for root scope or repository routing. Create scoped contexts only
-  when durable evidence and authority support their content. A child-repository
-  root selected by the authorized setup scope follows the mandatory
-  root-context rule; child repositories outside that scope remain optional and
-  untouched.
+- For a verified monorepo, use repository evidence for root scope routing.
+  Create scoped contexts only when durable evidence and authority support their
+  content. Every additional Git repository explicitly selected by a composed
+  setup follows the mandatory root-context rule; repositories outside that
+  scope remain untouched.
 - Recommend enabled translation memory only when localization support and
   durable translation rules are confirmed by evidence or the user.
 
@@ -122,33 +116,13 @@ Before writing, show only applicable items from this list:
 - before/after summary for proposed changes;
 - intended `AGENTS.md` pointer block;
 - `AGENTS.md` minimization plan;
-- intended `project-memory/config/project-layout.md`;
 - intended `project-memory/config/issue-tracker.md`;
 - intended `project-memory/config/triage-labels.md`;
 - intended root `CONTEXT.md` creation or update, including evidence-backed
   content, stable routing, and any explicit unknowns;
-- intended workspace repository-registry context pointers, omitting child
-  context paths that do not exist and are not authorized for creation;
 - intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
 - intended `TRANSLATION.md`, or why localization memory should not be written;
 - intended ADR drafts, if any.
-
-For orchestrator workspace mode, preserve these points in the draft:
-
-- selected local or GitHub tracker backend;
-- accepted parent Feature Specs, linked repo-scoped partial Feature Specs,
-  repo-owned local planning subtrees, vertical issues, sibling mappings, and
-  combined-proof gates are durable planning artifacts only when
-  `$plan-feature` handles them during real feature planning;
-- setup is config-only and must not create Feature Spec or issue subtrees;
-- setup must not create Idea issues, Idea files, or `planning/ideas/`
-  subtrees;
-- local planning artifacts remain inside their owning child repositories;
-- child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
-  `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
-- `implement-feature` owns runtime worker state and ledgers.
-- project memory must not carry worker surfaces, worker counts, approval state,
-  or runtime worker progress.
 
 ## Write Rules
 
@@ -175,9 +149,6 @@ After direct write authority or separate affirmative confirmation:
 - Keep `issue-tracker.md` limited to `tracker_backend` plus human-readable
   tracker conventions. Implementation delivery policy belongs to Feature Specs
   and executors.
-- Keep `project-layout.md` limited to `repository_layout`. Do not store
-  source-root lists, worktree paths, worker surfaces, thread limits, or Codex
-  App runtime state there.
 - Preserve custom prose outside known configuration tables. Report unknown
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
@@ -209,10 +180,6 @@ exists or is authorized; never create a broken pointer:
 
 [one-line summary of where Feature Specs and issues live]. See `project-memory/config/issue-tracker.md`.
 
-### Project layout
-
-[one-line summary of project topology]. See `project-memory/config/project-layout.md`.
-
 ### Artifact markers, issue types, and workflow states
 
 [one-line summary of the canonical artifact-marker, issue-type, and workflow-state vocabulary and its tracker mappings]. See `project-memory/config/triage-labels.md`.
@@ -229,9 +196,7 @@ exists or is authorized; never create a broken pointer:
 Keep this block concise. Do not paste domain vocabulary, tracker procedures,
 implementation policy, localization rules, worker-dispatch rules, or context seed
 material into `AGENTS.md`. `$implement-feature` owns its session worker
-questions, checkpoint, dispatch, and ledger progress record. For orchestrator
-workspaces, explicitly say the workspace coordinates external repos and child
-repos keep their own project memory and code ownership.
+questions, checkpoint, dispatch, and ledger progress record.
 
 ## Completion Report
 
@@ -241,13 +206,11 @@ Summarize only the applicable fields:
 - files written;
 - settings reviewed and changed;
 - selected issue tracker;
-- project topology;
 - artifact-marker transport and mapping;
 - issue-type and workflow-state transport and mapping;
 - root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
-- workspace mode, if applicable;
 - session-history window and whether it was used;
 - root-context creation or update, evidence-backed terms/rules/routing, and
   explicit unknowns;
@@ -261,8 +224,8 @@ Normally ask no questions. After repository evidence and the defaults above
 leave a material ambiguity, load
 [setup-questions.md](setup-questions.md) and use exactly one applicable
 evidence-first template. Its canonical question set covers setup target,
-conflicting project structure, conflicting issue locations, separate project
-contexts, overlapping project ownership, workspace-versus-repository rules,
+  conflicting issue locations, separate project contexts, overlapping project
+  ownership, repository-rule ownership,
 localization conventions, artifact-marker mappings, issue-type mappings, and
 workflow-state mappings.
 

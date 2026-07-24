@@ -18,10 +18,10 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "3.0.0"
-RUNTIME_CONTRACT_VERSION = "3.0.0"
-DATABASE_SCHEMA_VERSION = 2
-REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1})
+CLI_VERSION = "4.0.0"
+RUNTIME_CONTRACT_VERSION = "4.0.0"
+DATABASE_SCHEMA_VERSION = 3
+REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
@@ -31,11 +31,15 @@ MAX_UNCHANGED_WAIT_SWEEPS = 3
 PROTOCOLS = {
     "cli_envelope": {
         "schema": "implement-feature/cli-envelope",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
     },
     "run_manifest": {
         "schema": "implement-feature/run-manifest",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
+    },
+    "feature_spec_set_input": {
+        "schema": "implement-feature/feature-spec-set-input",
+        "schema_version": "1.0.0",
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
@@ -74,6 +78,24 @@ GITHUB_SPEC_URL_RE = re.compile(
 LOCAL_SPEC_REF_RE = re.compile(
     r"^(?:[a-z0-9][a-z0-9._-]{0,100}/)?planning/features/"
     r"[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?/SPEC\.md$"
+)
+FEATURE_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+REPOSITORY_KEY_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$"
+)
+CRITERION_ID_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?:ac-[0-9]{2}$"
+)
+PROOF_ID_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?:proof-"
+    r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+)
+INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+OWNED_ID_LIKE_RE = re.compile(
+    r"[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?:(?:ac-|proof-)"
 )
 
 APP_ACTIONS = {
@@ -309,7 +331,7 @@ SCHEMA_ONE_COLUMNS = {
 }
 
 
-CURRENT_SCHEMA_COLUMNS = {
+SCHEMA_TWO_COLUMNS = {
     **SCHEMA_ONE_COLUMNS,
     "runs": (
         "run_id",
@@ -350,9 +372,43 @@ CURRENT_SCHEMA_COLUMNS = {
 }
 
 
+CURRENT_SCHEMA_COLUMNS = {
+    **SCHEMA_TWO_COLUMNS,
+    "runs": (
+        "run_id",
+        "root_task_id",
+        "controller_project_id",
+        "runtime_contract_version",
+        "runtime_cli_version",
+        "runtime_artifact_sha256",
+        "status",
+        "implementation_started",
+        "revision",
+        "created_at",
+        "updated_at",
+        "finished_at",
+    ),
+    "run_repositories": (
+        "run_id",
+        "repository_identity",
+        "project_id",
+        "git_common_dir",
+        "git_common_dir_device",
+        "git_common_dir_inode",
+    ),
+    "assignments": tuple(
+        column
+        for column in SCHEMA_TWO_COLUMNS["assignments"]
+        if column != "project_id"
+    ) + ("feature_id",),
+}
+
+
 def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
     if version == 1:
         return SCHEMA_ONE_COLUMNS
+    if version == 2:
+        return SCHEMA_TWO_COLUMNS
     if version == DATABASE_SCHEMA_VERSION:
         return CURRENT_SCHEMA_COLUMNS
     raise StateError(
@@ -501,7 +557,7 @@ def create_schema(
     *,
     schema_version: int = DATABASE_SCHEMA_VERSION,
 ) -> None:
-    if schema_version not in {1, DATABASE_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, DATABASE_SCHEMA_VERSION}:
         raise StateError(
             "unsupported-state-schema",
             f"cannot create database schema {schema_version}",
@@ -516,13 +572,36 @@ def create_schema(
             runtime_artifact_sha256 TEXT NOT NULL,
         """
     )
+    controller_project_column = (
+        "controller_project_id TEXT NOT NULL,"
+        if schema_version >= 3
+        else ""
+    )
     operation_id_column = "operation_key" if schema_version == 1 else "operation_id"
     launch_count_column = (
         ""
         if schema_version == 1
         else "launch_count INTEGER NOT NULL CHECK(launch_count >= 1),"
     )
-    statements = (
+    assignment_project_column = (
+        "project_id TEXT NOT NULL,"
+        if schema_version < 3
+        else ""
+    )
+    assignment_feature_column = (
+        "feature_id TEXT,"
+        if schema_version >= 3
+        else ""
+    )
+    assignment_repository_foreign_key = (
+        """,
+            FOREIGN KEY(run_id, repository_identity)
+                REFERENCES run_repositories(run_id, repository_identity)
+                ON DELETE RESTRICT"""
+        if schema_version >= 3
+        else ""
+    )
+    statements = [
         """CREATE TABLE runtime_metadata (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
             schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
@@ -535,6 +614,7 @@ def create_schema(
         f"""CREATE TABLE runs (
             run_id TEXT PRIMARY KEY,
             root_task_id TEXT NOT NULL,
+            {controller_project_column}
             {runtime_columns}
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
@@ -547,6 +627,22 @@ def create_schema(
             updated_at TEXT NOT NULL,
             finished_at TEXT
         )""",
+    ]
+    if schema_version >= 3:
+        statements.append(
+            """CREATE TABLE run_repositories (
+                run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+                repository_identity TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                git_common_dir TEXT NOT NULL,
+                git_common_dir_device INTEGER NOT NULL,
+                git_common_dir_inode INTEGER NOT NULL,
+                PRIMARY KEY(run_id, repository_identity),
+                UNIQUE(run_id, project_id),
+                UNIQUE(run_id, git_common_dir_device, git_common_dir_inode)
+            )"""
+        )
+    statements.extend([
         """CREATE TABLE assignments (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             assignment_id TEXT NOT NULL,
@@ -555,7 +651,7 @@ def create_schema(
             repository_identity TEXT NOT NULL,
             tracker_backend TEXT NOT NULL CHECK(tracker_backend IN ('github','local')),
             delivery_type TEXT NOT NULL CHECK(delivery_type IN ('github-pr','local-branch')),
-            project_id TEXT NOT NULL,
+            {assignment_project_column}
             title TEXT NOT NULL,
             target_branch_name TEXT NOT NULL,
             prerequisite_assignment_ids TEXT NOT NULL,
@@ -585,10 +681,16 @@ def create_schema(
             default_branch_name TEXT,
             provider_observation_ref TEXT,
             updated_at TEXT NOT NULL,
+            {assignment_feature_column}
             PRIMARY KEY(run_id, assignment_id),
             UNIQUE(run_id, source_spec_ref),
             UNIQUE(run_id, repository_identity, target_branch_name)
-        )""",
+            {assignment_repository_foreign_key}
+        )""".format(
+            assignment_project_column=assignment_project_column,
+            assignment_feature_column=assignment_feature_column,
+            assignment_repository_foreign_key=assignment_repository_foreign_key,
+        ),
         """CREATE TABLE spec_claims (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             assignment_id TEXT NOT NULL,
@@ -635,7 +737,7 @@ def create_schema(
         )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
         f"INSERT INTO runtime_metadata(singleton,schema_version,target_schema_version) VALUES (1,{schema_version},NULL)",
-    )
+    ])
     for statement in statements:
         connection.execute(statement)
 
@@ -655,11 +757,491 @@ def read_json_file(path_text: str, label: str) -> dict[str, Any]:
     return value
 
 
+def read_text_file(path_text: str, label: str) -> str:
+    path = Path(path_text)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise StateError(
+            "invalid-input-path",
+            f"{label} must be an absolute regular non-symlink file",
+        )
+    if path.stat().st_size > MAX_INPUT_BYTES:
+        raise StateError("input-too-large", f"{label} exceeds {MAX_INPUT_BYTES} bytes")
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise StateError("invalid-input", f"cannot read {label}: {error}") from error
+
+
 def exact_keys(value: dict[str, Any], keys: set[str], label: str) -> None:
     if set(value) != keys:
         raise StateError(
             "invalid-input",
             f"{label} keys mismatch; missing={sorted(keys-set(value))}, extra={sorted(set(value)-keys)}",
+        )
+
+
+def markdown_section(
+    body: str,
+    heading: str,
+    *,
+    required: bool = True,
+) -> list[str]:
+    lines = body.splitlines()
+    indexes = [index for index, line in enumerate(lines) if line == heading]
+    if not indexes:
+        if required:
+            raise StateError("invalid-feature-spec-set", f"missing {heading}")
+        return []
+    if len(indexes) != 1:
+        raise StateError("invalid-feature-spec-set", f"expected exactly one {heading}")
+    start = indexes[0] + 1
+    end = next(
+        (
+            index
+            for index in range(start, len(lines))
+            if lines[index].startswith("## ")
+        ),
+        len(lines),
+    )
+    return lines[start:end]
+
+
+def metadata_value(lines: list[str], label: str, pattern: re.Pattern[str]) -> str:
+    values = [
+        match.group(1)
+        for line in lines
+        if (match := pattern.fullmatch(line))
+    ]
+    if len(values) != 1:
+        raise StateError(
+            "invalid-feature-spec-set",
+            f"expected exactly one canonical {label} line",
+        )
+    return values[0]
+
+
+def parse_feature_spec_set_table(body: str) -> tuple[list[tuple[str, str, str]], str]:
+    section = markdown_section(body, "## Feature Spec Set")
+    header = "| feature_spec_ref | affected_repository | responsibility |"
+    delimiter = "| --- | --- | --- |"
+    header_indexes = [
+        index for index, line in enumerate(section) if line.strip() == header
+    ]
+    if len(header_indexes) != 1:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set must contain one canonical table header",
+        )
+    header_index = header_indexes[0]
+    if (
+        header_index + 1 >= len(section)
+        or section[header_index + 1].strip() != delimiter
+    ):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set must use the canonical delimiter row",
+        )
+    rows: list[tuple[str, str, str]] = []
+    rendered_rows: list[str] = []
+    for line in section[header_index + 2 :]:
+        if not line.strip():
+            break
+        if not line.startswith("|") or not line.endswith("|"):
+            raise StateError(
+                "invalid-feature-spec-set",
+                "Feature Spec Set contains a malformed row",
+            )
+        cells = tuple(cell.strip() for cell in line[1:-1].split("|"))
+        if len(cells) != 3 or any(not cell for cell in cells):
+            raise StateError(
+                "invalid-feature-spec-set",
+                "Feature Spec Set rows require three nonempty cells",
+            )
+        row = (cells[0], cells[1], cells[2])
+        rows.append(row)
+        rendered_rows.append(f"| {row[0]} | {row[1]} | {row[2]} |")
+    if len(rows) < 2:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "a linked Feature Spec Set requires at least two members",
+        )
+    if rows != sorted(rows, key=lambda row: row[1].encode("utf-8")):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set rows must be bytewise ordered by affected_repository",
+        )
+    refs = [row[0] for row in rows]
+    repositories = [row[1] for row in rows]
+    if len(refs) != len(set(refs)) or len(repositories) != len(set(repositories)):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set refs and repositories must be unique",
+        )
+    if any(ref.startswith("proposed-spec:") for ref in refs):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "applied Feature Spec Set rows cannot contain proposed refs",
+        )
+    canonical = "\n".join((header, delimiter, *rendered_rows))
+    return rows, canonical
+
+
+def parse_member_contract(body: str) -> dict[str, Any]:
+    planning = markdown_section(body, "## Planning Identity")
+    feature_id = metadata_value(
+        planning,
+        "Feature ID",
+        re.compile(r"^- Feature ID: `([^`]+)`\.$"),
+    )
+    if FEATURE_ID_RE.fullmatch(feature_id) is None:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature ID must be one canonical lowercase UUID",
+        )
+    repository_key = metadata_value(
+        planning,
+        "Repository key",
+        re.compile(r"^- Repository key: `([^`]+)`\.$"),
+    )
+    if (
+        REPOSITORY_KEY_RE.fullmatch(repository_key) is None
+        or len(repository_key) > 48
+    ):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Repository key must be lower-kebab and at most 48 characters",
+        )
+    criteria: list[str] = []
+    criterion_pattern = re.compile(
+        r"^- \[[ xX]\] `([^`]+)`\s+\S.*$"
+    )
+    checklist_pattern = re.compile(r"^- \[[ xX]\](?:\s|$)")
+    for line in markdown_section(body, "## Acceptance Criteria"):
+        if checklist_pattern.match(line) is None:
+            continue
+        match = criterion_pattern.fullmatch(line)
+        if match is None:
+            raise StateError(
+                "invalid-feature-spec-set",
+                "every linked acceptance checklist item requires the canonical "
+                "backticked criterion ID prefix and nonempty outcome",
+            )
+        criterion_id = match.group(1)
+        if CRITERION_ID_RE.fullmatch(criterion_id) is None:
+            raise StateError(
+                "invalid-feature-spec-set",
+                f"invalid linked acceptance criterion ID: {criterion_id}",
+            )
+        criteria.append(criterion_id)
+    if not criteria:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "each linked member requires at least one identified acceptance criterion",
+        )
+    proofs: list[str] = []
+    proof_pattern = re.compile(r"^- Proof ID: `([^`]+)`\.$")
+    integration_heading = "## Integration Execution Contract"
+    integration_present = integration_heading in body.splitlines()
+    for line in markdown_section(
+        body,
+        integration_heading,
+        required=False,
+    ):
+        match = proof_pattern.fullmatch(line)
+        if line.startswith("- Proof ID:") and match is None:
+            raise StateError(
+                "invalid-feature-spec-set",
+                "each Proof ID line must use the canonical backticked form",
+            )
+        if match is None:
+            continue
+        proof_id = match.group(1)
+        if PROOF_ID_RE.fullmatch(proof_id) is None:
+            raise StateError(
+                "invalid-feature-spec-set",
+                f"invalid combined proof ID: {proof_id}",
+            )
+        proofs.append(proof_id)
+    if integration_present and not proofs:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "an Integration Execution Contract requires at least one canonical Proof ID",
+        )
+    owned_ids = criteria + proofs
+    if len(owned_ids) != len(set(owned_ids)):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "criterion and proof IDs must be unique inside a member",
+        )
+    if any(not value.startswith(f"{repository_key}:") for value in owned_ids):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "criterion and proof IDs must use the member repository key",
+        )
+    rows, canonical_table = parse_feature_spec_set_table(body)
+    return {
+        "feature_id": feature_id,
+        "repository_key": repository_key,
+        "owned_ids": owned_ids,
+        "rows": rows,
+        "canonical_table": canonical_table,
+    }
+
+
+def linked_source_projection(
+    source_spec_ref: str,
+    affected_repository: str,
+    feature_id: str,
+    repository_key: str,
+    *,
+    error_code: str,
+) -> str | None:
+    if LOCAL_SPEC_REF_RE.fullmatch(source_spec_ref):
+        prefix = f"{feature_id}--{repository_key}/"
+        if not source_spec_ref.startswith(prefix):
+            raise StateError(
+                error_code,
+                "a linked local source ref must begin with its exact "
+                "Feature ID and repository key",
+            )
+        return source_spec_ref.removeprefix(prefix)
+    github_match = (
+        GITHUB_SPEC_REF_RE.fullmatch(source_spec_ref)
+        or GITHUB_SPEC_URL_RE.fullmatch(source_spec_ref)
+    )
+    if github_match is None:
+        raise StateError(
+            error_code,
+            "a linked source ref must be a canonical GitHub ref or qualified local ref",
+        )
+    owner, repository, _ = github_match.groups()
+    if affected_repository != f"github:{owner}/{repository}":
+        raise StateError(
+            error_code,
+            "a linked GitHub source ref must belong to affected_repository",
+        )
+    return None
+
+
+def validate_feature_spec_set_input(raw: dict[str, Any]) -> dict[str, Any]:
+    exact_keys(
+        raw,
+        {"schema", "schema_version", "members"},
+        "Feature Spec Set input",
+    )
+    require_protocol(raw, "feature_spec_set_input", "Feature Spec Set input")
+    raw_members = raw["members"]
+    if not isinstance(raw_members, list) or len(raw_members) < 2:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set input requires at least two members",
+        )
+    members: list[dict[str, Any]] = []
+    for index, item in enumerate(raw_members):
+        if not isinstance(item, dict):
+            raise StateError(
+                "invalid-input",
+                f"members[{index}] must be an object",
+            )
+        exact_keys(
+            item,
+            {"source_spec_ref", "affected_repository", "body_file"},
+            f"members[{index}]",
+        )
+        source_spec_ref = string(
+            item["source_spec_ref"],
+            f"members[{index}].source_spec_ref",
+            4096,
+        )
+        if source_spec_ref.startswith("proposed-spec:"):
+            raise StateError(
+                "invalid-feature-spec-set",
+                "applied member input cannot use a proposed source ref",
+            )
+        affected_repository = string(
+            item["affected_repository"],
+            f"members[{index}].affected_repository",
+            8192,
+        )
+        body_file = string(
+            item["body_file"],
+            f"members[{index}].body_file",
+            8192,
+        )
+        contract = parse_member_contract(
+            read_text_file(body_file, f"members[{index}].body_file")
+        )
+        repository_relative_spec_path = linked_source_projection(
+            source_spec_ref,
+            affected_repository,
+            contract["feature_id"],
+            contract["repository_key"],
+            error_code="invalid-feature-spec-set",
+        )
+        members.append(
+            {
+                "source_spec_ref": source_spec_ref,
+                "affected_repository": affected_repository,
+                "repository_relative_spec_path": repository_relative_spec_path,
+                **contract,
+            }
+        )
+    feature_ids = {member["feature_id"] for member in members}
+    repository_keys = [member["repository_key"] for member in members]
+    source_refs = [member["source_spec_ref"] for member in members]
+    repositories = [member["affected_repository"] for member in members]
+    if len(feature_ids) != 1:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "every linked member must use the same Feature ID",
+        )
+    if len(repository_keys) != len(set(repository_keys)):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "repository keys must be unique inside the linked set",
+        )
+    if len(source_refs) != len(set(source_refs)) or len(repositories) != len(
+        set(repositories)
+    ):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "member refs and affected repositories must be unique",
+        )
+    canonical_tables = {member["canonical_table"] for member in members}
+    if len(canonical_tables) != 1:
+        raise StateError(
+            "invalid-feature-spec-set",
+            "every linked member must carry the exact same normalized Feature Spec Set",
+        )
+    expected_pairs = set(zip(source_refs, repositories, strict=True))
+    table_rows = members[0]["rows"]
+    observed_pairs = {(row[0], row[1]) for row in table_rows}
+    if observed_pairs != expected_pairs or len(table_rows) != len(members):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "Feature Spec Set rows must exactly match the supplied members",
+        )
+    member_by_repository = {
+        member["affected_repository"]: member for member in members
+    }
+    all_owned_ids: list[str] = []
+    for member in members:
+        self_rows = [
+            row
+            for row in member["rows"]
+            if row[1] == member["affected_repository"]
+        ]
+        if len(self_rows) != 1 or self_rows[0][0] != member["source_spec_ref"]:
+            raise StateError(
+                "invalid-feature-spec-set",
+                "each member requires one matching self row",
+            )
+        all_owned_ids.extend(member["owned_ids"])
+    if len(all_owned_ids) != len(set(all_owned_ids)):
+        raise StateError(
+            "invalid-feature-spec-set",
+            "criterion and proof IDs must be globally unique across the set",
+        )
+    for source_ref, repository, responsibility in table_rows:
+        owner = member_by_repository[repository]
+        if owner["source_spec_ref"] != source_ref:
+            raise StateError(
+                "invalid-feature-spec-set",
+                "Feature Spec Set self refs do not match member identities",
+            )
+        inline_values = INLINE_CODE_RE.findall(responsibility)
+        responsibility_ids = [
+            value
+            for value in inline_values
+            if CRITERION_ID_RE.fullmatch(value) is not None
+            or PROOF_ID_RE.fullmatch(value) is not None
+        ]
+        malformed_inline_ids = [
+            value
+            for value in inline_values
+            if OWNED_ID_LIKE_RE.search(value)
+            and value not in responsibility_ids
+        ]
+        prose_without_inline_code = INLINE_CODE_RE.sub("", responsibility)
+        if (
+            malformed_inline_ids
+            or OWNED_ID_LIKE_RE.search(prose_without_inline_code)
+            or len(responsibility_ids) != len(set(responsibility_ids))
+            or set(responsibility_ids) != set(owner["owned_ids"])
+        ):
+            raise StateError(
+                "invalid-feature-spec-set",
+                "each responsibility cell must own exactly that member's criterion "
+                "and proof IDs as canonical inline-code tokens",
+            )
+    feature_id = next(iter(feature_ids))
+    manifest_members = [
+        {
+            "source_spec_ref": member["source_spec_ref"],
+            "repository_identity": member["affected_repository"],
+            "repository_key": member["repository_key"],
+        }
+        for member in sorted(
+            members,
+            key=lambda member: member["affected_repository"].encode("utf-8"),
+        )
+    ]
+    return {
+        "feature_id": feature_id,
+        "member_count": len(members),
+        "members": [
+            {
+                "source_spec_ref": member["source_spec_ref"],
+                "affected_repository": member["affected_repository"],
+                "repository_key": member["repository_key"],
+                "repository_relative_spec_path": member[
+                    "repository_relative_spec_path"
+                ],
+                "owned_ids": member["owned_ids"],
+            }
+            for member in sorted(
+                members,
+                key=lambda member: member["affected_repository"].encode("utf-8"),
+            )
+        ],
+        "canonical_feature_spec_set": [
+            {
+                "feature_spec_ref": row[0],
+                "affected_repository": row[1],
+                "responsibility": row[2],
+            }
+            for row in table_rows
+        ],
+        "manifest_feature_set": {
+            "feature_id": feature_id,
+            "members": manifest_members,
+        },
+        "writes_performed": False,
+    }
+
+
+def command_feature_spec_set_validate(args: argparse.Namespace) -> dict[str, Any]:
+    return validate_feature_spec_set_input(
+        read_json_file(args.input, "Feature Spec Set input")
+    )
+
+
+def validate_feature_spec_set_evidence(
+    manifest_feature_sets: list[dict[str, Any]],
+    input_paths: list[str],
+) -> None:
+    observed = [
+        validate_feature_spec_set_input(
+            read_json_file(path, f"Feature Spec Set evidence input {index}")
+        )["manifest_feature_set"]
+        for index, path in enumerate(input_paths)
+    ]
+    observed.sort(key=lambda item: item["feature_id"].encode("utf-8"))
+    if manifest_feature_sets != observed:
+        raise StateError(
+            "invalid-feature-spec-set-evidence",
+            "run start requires each feature_sets entry to equal the current "
+            "read-only validator projection from one supplied evidence input",
         )
 
 
@@ -769,8 +1351,10 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             "runtime_contract_version",
             "run_id",
             "root_task_id",
+            "controller_project_id",
             "repositories",
             "assignments",
+            "feature_sets",
         },
         "manifest",
     )
@@ -783,6 +1367,11 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
     run = {
         "run_id": token(raw["run_id"], "run_id"),
         "root_task_id": string(raw["root_task_id"], "root_task_id", 256),
+        "controller_project_id": string(
+            raw["controller_project_id"],
+            "controller_project_id",
+            256,
+        ),
         "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
         "runtime_cli_version": CLI_VERSION,
         "runtime_artifact_sha256": current_runtime_sha256(),
@@ -791,17 +1380,47 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         raise StateError("invalid-input", "repositories must be a nonempty list")
     repositories: list[dict[str, Any]] = []
     identities: set[str] = set()
+    project_ids: set[str] = set()
+    git_common_identities: set[tuple[int, int]] = set()
     for index, item in enumerate(raw["repositories"]):
         if not isinstance(item, dict):
             raise StateError("invalid-input", f"repositories[{index}] must be an object")
-        exact_keys(item, {"repository_identity", "git_common_dir"}, f"repositories[{index}]")
+        exact_keys(
+            item,
+            {"repository_identity", "git_common_dir", "project_id"},
+            f"repositories[{index}]",
+        )
         common_dir = directory(item["git_common_dir"], f"repositories[{index}].git_common_dir")
         identity = repository_identity(item["repository_identity"], common_dir)
         if identity in identities:
             raise StateError("invalid-input", "repository identities must be unique")
         info = Path(common_dir).stat()
-        repositories.append({"repository_identity": identity, "git_common_dir": common_dir, "device": info.st_dev, "inode": info.st_ino})
+        project_id = string(
+            item["project_id"],
+            f"repositories[{index}].project_id",
+            256,
+        )
+        git_common_identity = (info.st_dev, info.st_ino)
+        if project_id in project_ids:
+            raise StateError(
+                "invalid-input",
+                "each affected repository must use a distinct saved project",
+            )
+        if git_common_identity in git_common_identities:
+            raise StateError(
+                "invalid-input",
+                "Git common-directory identities must be unique",
+            )
+        repositories.append({
+            "repository_identity": identity,
+            "project_id": project_id,
+            "git_common_dir": common_dir,
+            "device": info.st_dev,
+            "inode": info.st_ino,
+        })
         identities.add(identity)
+        project_ids.add(project_id)
+        git_common_identities.add(git_common_identity)
     if not isinstance(raw["assignments"], list) or not raw["assignments"]:
         raise StateError("invalid-input", "assignments must be a nonempty list")
     assignments: list[dict[str, Any]] = []
@@ -811,7 +1430,7 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
     used_identities: set[str] = set()
     keys = {
         "assignment_id", "source_spec_ref", "repository_identity", "tracker_backend",
-        "delivery_type", "project_id", "title", "target_branch_name",
+        "delivery_type", "title", "target_branch_name",
         "prerequisite_assignment_ids",
     }
     for index, item in enumerate(raw["assignments"]):
@@ -851,7 +1470,6 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
                 "invalid-input",
                 "assignment ids, canonical Feature Specs, and repository/branch pairs must be unique",
             )
-        project_id = string(item["project_id"], f"assignments[{index}].project_id", 256)
         prerequisites = item["prerequisite_assignment_ids"]
         if (
             not isinstance(prerequisites, list)
@@ -870,10 +1488,10 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             "assignment_id": assignment_id,
             "source_spec_ref": source_spec_ref,
             "claim_spec_identity": claim_spec_identity,
+            "feature_id": None,
             "repository_identity": identity,
             "tracker_backend": tracker_backend,
             "delivery_type": delivery_type,
-            "project_id": project_id,
             "title": string(item["title"], f"assignments[{index}].title", 256),
             "target_branch_name": target_branch,
             "prerequisite_assignment_ids": normalized_prerequisites,
@@ -902,6 +1520,119 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         resolved.update(ready)
         for assignment_id in ready:
             del remaining[assignment_id]
+    if not isinstance(raw["feature_sets"], list):
+        raise StateError("invalid-input", "feature_sets must be a list")
+    assignment_by_member = {
+        (item["source_spec_ref"], item["repository_identity"]): item
+        for item in assignments
+    }
+    used_members: set[tuple[str, str]] = set()
+    feature_ids: set[str] = set()
+    feature_repository_keys: set[tuple[str, str]] = set()
+    for set_index, feature_set in enumerate(raw["feature_sets"]):
+        if not isinstance(feature_set, dict):
+            raise StateError(
+                "invalid-input",
+                f"feature_sets[{set_index}] must be an object",
+            )
+        exact_keys(
+            feature_set,
+            {"feature_id", "members"},
+            f"feature_sets[{set_index}]",
+        )
+        feature_id = string(
+            feature_set["feature_id"],
+            f"feature_sets[{set_index}].feature_id",
+            36,
+        )
+        if FEATURE_ID_RE.fullmatch(feature_id) is None:
+            raise StateError(
+                "invalid-input",
+                "feature_sets feature_id must be one canonical lowercase UUID",
+            )
+        if feature_id in feature_ids:
+            raise StateError("invalid-input", "feature_ids must be unique in one run")
+        feature_ids.add(feature_id)
+        members = feature_set["members"]
+        if not isinstance(members, list) or len(members) < 2:
+            raise StateError(
+                "invalid-input",
+                "each feature_set requires at least two members",
+            )
+        set_members: list[tuple[str, str]] = []
+        set_repositories: set[str] = set()
+        for member_index, member in enumerate(members):
+            if not isinstance(member, dict):
+                raise StateError(
+                    "invalid-input",
+                    f"feature_sets[{set_index}].members[{member_index}] must be an object",
+                )
+            exact_keys(
+                member,
+                {
+                    "source_spec_ref",
+                    "repository_identity",
+                    "repository_key",
+                },
+                f"feature_sets[{set_index}].members[{member_index}]",
+            )
+            repository_key = string(
+                member["repository_key"],
+                f"feature_sets[{set_index}].members[{member_index}].repository_key",
+                48,
+            )
+            if REPOSITORY_KEY_RE.fullmatch(repository_key) is None:
+                raise StateError(
+                    "invalid-input",
+                    "feature_set repository_key must be lower-kebab and at most "
+                    "48 characters",
+                )
+            feature_repository_key = (feature_id, repository_key)
+            if feature_repository_key in feature_repository_keys:
+                raise StateError(
+                    "invalid-input",
+                    "repository keys must be unique inside one feature_set",
+                )
+            member_key = (
+                string(
+                    member["source_spec_ref"],
+                    f"feature_sets[{set_index}].members[{member_index}].source_spec_ref",
+                    4096,
+                ),
+                string(
+                    member["repository_identity"],
+                    f"feature_sets[{set_index}].members[{member_index}].repository_identity",
+                    8192,
+                ),
+            )
+            if member_key not in assignment_by_member:
+                raise StateError(
+                    "invalid-input",
+                    "feature_set members must exactly match run assignments",
+                )
+            if member_key in used_members or member_key in set_members:
+                raise StateError(
+                    "invalid-input",
+                    "one assignment may belong to only one feature_set",
+                )
+            if member_key[1] in set_repositories:
+                raise StateError(
+                    "invalid-input",
+                    "one linked feature may own only one member per repository",
+                )
+            linked_source_projection(
+                member_key[0],
+                member_key[1],
+                feature_id,
+                repository_key,
+                error_code="invalid-input",
+            )
+            set_members.append(member_key)
+            set_repositories.add(member_key[1])
+            feature_repository_keys.add(feature_repository_key)
+        for member_key in set_members:
+            assignment_by_member[member_key]["feature_id"] = feature_id
+            used_members.add(member_key)
     return run, repositories, assignments
 
 
@@ -939,7 +1670,13 @@ def get_run(
 
 def get_assignment(connection: sqlite3.Connection, run_id: str, assignment_id: str) -> sqlite3.Row:
     row = connection.execute(
-        "SELECT * FROM assignments WHERE run_id=? AND assignment_id=?", (run_id, assignment_id)
+        """SELECT a.*,rr.project_id
+           FROM assignments a
+           JOIN run_repositories rr
+             ON rr.run_id=a.run_id
+            AND rr.repository_identity=a.repository_identity
+           WHERE a.run_id=? AND a.assignment_id=?""",
+        (run_id, assignment_id),
     ).fetchone()
     if row is None:
         raise StateError("assignment-not-found", f"assignment does not exist: {assignment_id}", 3)
@@ -1049,12 +1786,13 @@ def insert_run(
     status = "active" if acquired else "waiting-for-spec"
     connection.execute(
         """INSERT INTO runs(
-               run_id,root_task_id,runtime_contract_version,runtime_cli_version,
-               runtime_artifact_sha256,status,revision,created_at,updated_at
-           ) VALUES (?,?,?,?,?,?,1,?,?)""",
+               run_id,root_task_id,controller_project_id,runtime_contract_version,
+               runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at
+           ) VALUES (?,?,?,?,?,?,?,1,?,?)""",
         (
             run["run_id"],
             run["root_task_id"],
+            run["controller_project_id"],
             run["runtime_contract_version"],
             run["runtime_cli_version"],
             run["runtime_artifact_sha256"],
@@ -1064,6 +1802,21 @@ def insert_run(
         ),
     )
     repositories_by_identity = {item["repository_identity"]: item for item in repositories}
+    for repository in repositories:
+        connection.execute(
+            """INSERT INTO run_repositories(
+                   run_id,repository_identity,project_id,git_common_dir,
+                   git_common_dir_device,git_common_dir_inode
+               ) VALUES (?,?,?,?,?,?)""",
+            (
+                run["run_id"],
+                repository["repository_identity"],
+                repository["project_id"],
+                repository["git_common_dir"],
+                repository["device"],
+                repository["inode"],
+            ),
+        )
     waiting: list[dict[str, Any]] = []
     for assignment in assignments:
         conflict = conflicts.get(assignment["assignment_id"])
@@ -1071,19 +1824,21 @@ def insert_run(
         connection.execute(
             """INSERT INTO assignments(
                 run_id,assignment_id,source_spec_ref,claim_spec_identity,repository_identity,
-                tracker_backend,delivery_type,project_id,title,target_branch_name,
+                tracker_backend,delivery_type,title,target_branch_name,
                 prerequisite_assignment_ids,state,waiting_owner_run_id,
-                waiting_owner_assignment_id,waiting_owner_root_task_id,updated_at
+                waiting_owner_assignment_id,waiting_owner_root_task_id,updated_at,
+                feature_id
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 run["run_id"], assignment["assignment_id"], assignment["source_spec_ref"],
                 assignment["claim_spec_identity"], assignment["repository_identity"],
                 assignment["tracker_backend"], assignment["delivery_type"],
-                assignment["project_id"], assignment["title"], assignment["target_branch_name"],
+                assignment["title"], assignment["target_branch_name"],
                 canonical_json(assignment["prerequisite_assignment_ids"]), state,
                 conflict["run_id"] if conflict else None,
                 conflict["assignment_id"] if conflict else None,
                 conflict["root_task_id"] if conflict else None, now,
+                assignment["feature_id"],
             ),
         )
         repository = repositories_by_identity[assignment["repository_identity"]]
@@ -1231,10 +1986,11 @@ def recreate_schema_in_place(connection: sqlite3.Connection) -> None:
         "app_operations",
         "spec_claims",
         "assignments",
+        "run_repositories",
         "runs",
         "runtime_metadata",
     ):
-        connection.execute(f"DROP TABLE {table}")
+        connection.execute(f"DROP TABLE IF EXISTS {table}")
     create_schema(connection)
 
 
@@ -1437,7 +2193,12 @@ def require_new_run_allowed(connection: sqlite3.Connection) -> None:
 
 
 def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
-    run, repositories, assignments = validate_manifest(read_json_file(args.manifest, "manifest"))
+    manifest = read_json_file(args.manifest, "manifest")
+    run, repositories, assignments = validate_manifest(manifest)
+    validate_feature_spec_set_evidence(
+        manifest["feature_sets"],
+        args.feature_spec_set_input,
+    )
     connection = connect(write=True)
     try:
         require_new_run_allowed(connection)
@@ -1625,11 +2386,39 @@ def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
             token(args.run_id, "run_id"),
             require_runtime_match=False,
         )
-        assignments = [assignment_projection(connection, row) for row in connection.execute("SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
+        repositories = [
+            dict(row)
+            for row in connection.execute(
+                """SELECT repository_identity,project_id,git_common_dir,
+                          git_common_dir_device,git_common_dir_inode
+                   FROM run_repositories
+                   WHERE run_id=?
+                   ORDER BY repository_identity""",
+                (run["run_id"],),
+            )
+        ]
+        assignments = [
+            assignment_projection(connection, row)
+            for row in connection.execute(
+                """SELECT a.*,rr.project_id
+                   FROM assignments a
+                   JOIN run_repositories rr
+                     ON rr.run_id=a.run_id
+                    AND rr.repository_identity=a.repository_identity
+                   WHERE a.run_id=?
+                   ORDER BY a.assignment_id""",
+                (run["run_id"],),
+            )
+        ]
         claims = [dict(row) for row in connection.execute("SELECT * FROM spec_claims WHERE run_id=? ORDER BY assignment_id", (run["run_id"],))]
         unresolved = [dict(row) for row in connection.execute("SELECT sequence,operation_id,action,subject_id,status,launch_count FROM app_operations WHERE run_id=? AND status IN ('pending','unknown') ORDER BY sequence", (run["run_id"],))]
         result = dict(run)
-        result.update({"assignments": assignments, "spec_claims": claims, "unresolved_app_operations": unresolved})
+        result.update({
+            "repositories": repositories,
+            "assignments": assignments,
+            "spec_claims": claims,
+            "unresolved_app_operations": unresolved,
+        })
         return result
     finally:
         connection.close()
@@ -1639,9 +2428,9 @@ def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
     connection = connect(write=False)
     try:
         if args.status == "all":
-            rows = connection.execute("SELECT run_id,root_task_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs ORDER BY created_at DESC")
+            rows = connection.execute("SELECT run_id,root_task_id,controller_project_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs ORDER BY created_at DESC")
         else:
-            rows = connection.execute("SELECT run_id,root_task_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs WHERE status=? ORDER BY created_at DESC", (args.status,))
+            rows = connection.execute("SELECT run_id,root_task_id,controller_project_id,runtime_contract_version,runtime_cli_version,runtime_artifact_sha256,status,revision,created_at,updated_at,finished_at FROM runs WHERE status=? ORDER BY created_at DESC", (args.status,))
         return {"runs": [dict(row) for row in rows]}
     finally:
         connection.close()
@@ -1668,9 +2457,9 @@ def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
 
 def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action: str, subject_id: str) -> str | None:
     if action not in APP_ACTIONS:
-        raise StateError("invalid-app-action", f"unsupported ChatGPT task action: {action}")
+        raise StateError("invalid-app-action", f"unsupported Codex task action: {action}")
     if run["status"] != "active":
-        raise StateError("run-not-active", f"ChatGPT task changes require active claimed state, found {run['status']}", 4)
+        raise StateError("run-not-active", f"Codex task changes require active claimed state, found {run['status']}", 4)
     assignment_id: str | None = None
     if action in {"create-worker", "set-worker-title", "set-review-owner", "send-bootstrap", "send-worker-message", "archive-worker"}:
         assignment = get_assignment(connection, run["run_id"], subject_id)
@@ -1743,7 +2532,7 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                     4,
                 )
     elif subject_id != run["root_task_id"]:
-        raise StateError("invalid-app-subject", "root ChatGPT action subject must be root_task_id", 4)
+        raise StateError("invalid-app-subject", "root Codex action subject must be root_task_id", 4)
     return assignment_id
 
 
@@ -1824,13 +2613,13 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
     if not APP_OPERATION_COMMON_FIELDS.issubset(value):
         raise StateError(
             "invalid-input",
-            "ChatGPT operation observation is missing fields: "
+            "Codex operation observation is missing fields: "
             f"{sorted(APP_OPERATION_COMMON_FIELDS - set(value))}",
         )
     require_protocol(
         value,
         "app_operation_observation",
-        "ChatGPT operation observation",
+        "Codex operation observation",
     )
     if value["operation_id"] != operation["operation_id"]:
         raise StateError(
@@ -1867,14 +2656,14 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
             APP_OPERATION_COMMON_FIELDS
             | APP_OPERATION_RECONCILIATION_FIELDS
             | expected_extra,
-            "ChatGPT operation observation",
+            "Codex operation observation",
         )
     elif not actual_extra.issubset(
         APP_OPERATION_RECONCILIATION_FIELDS | expected_extra
     ):
         raise StateError(
             "invalid-input",
-            "ChatGPT operation observation has unsupported fields: "
+            "Codex operation observation has unsupported fields: "
             f"{sorted(actual_extra - APP_OPERATION_RECONCILIATION_FIELDS - expected_extra)}",
         )
     if value["status"] == "failed" and "readback_ref" not in value:
@@ -1933,7 +2722,7 @@ def operation_observation_payload(
 def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]:
     action = string(action, "action", 80)
     if action not in APP_ACTIONS:
-        raise StateError("invalid-app-action", f"unsupported ChatGPT task action: {action}")
+        raise StateError("invalid-app-action", f"unsupported Codex task action: {action}")
     if status not in {"unknown", "succeeded", "failed"}:
         raise StateError("invalid-input", "status must be unknown, succeeded, or failed")
     required_fields = {"launch_count"}
@@ -2209,7 +2998,7 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         ).fetchone()
         if operation is None:
             raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
-        observed = validate_operation_observation(operation, read_json_file(args.observation, "ChatGPT operation observation"))
+        observed = validate_operation_observation(operation, read_json_file(args.observation, "Codex operation observation"))
         stored_values = {
             field: operation[field]
             for field in (
@@ -2946,7 +3735,7 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
         if assignment["state"] not in {"active", "peer-input-ready"}:
             raise StateError(
                 "invalid-assignment-transition",
-                "ChatGPT desktop app capability blocking requires an active or peer-input-ready post-bootstrap worker",
+                "ChatGPT App capability blocking requires an active or peer-input-ready post-bootstrap worker",
                 4,
             )
         connection.execute(
@@ -3659,8 +4448,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-2 SQLite coordination for Implement Feature "
-            "controllers in the ChatGPT desktop app."
+            "Database-schema-3 SQLite coordination for Implement Feature "
+            "controllers in the ChatGPT App."
         ),
     )
     parser.add_argument("--json", action="store_true", help="emit one machine-readable JSON object")
@@ -3676,6 +4465,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor = commands.add_parser("doctor", help="inspect shared state readiness without writing")
     doctor.set_defaults(handler=command_doctor, command_name="doctor")
+
+    feature_spec_set = commands.add_parser(
+        "feature-spec-set",
+        help="validate linked Feature Spec membership without writing state",
+    )
+    feature_spec_set_commands = feature_spec_set.add_subparsers(
+        dest="feature_spec_set_command",
+        required=True,
+    )
+    feature_spec_set_validate = feature_spec_set_commands.add_parser(
+        "validate",
+        help="validate ephemeral linked member bodies and emit manifest membership",
+    )
+    feature_spec_set_validate.add_argument("--input", required=True)
+    feature_spec_set_validate.set_defaults(
+        handler=command_feature_spec_set_validate,
+        command_name="feature-spec-set validate",
+    )
 
     state = commands.add_parser("state", help="prepare the canonical SQLite claim domain")
     state_commands = state.add_subparsers(dest="state_command", required=True)
@@ -3695,6 +4502,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_commands = run.add_subparsers(dest="run_command", required=True)
     start = run_commands.add_parser("start", help="atomically acquire each free Feature Spec claim")
     start.add_argument("--manifest", required=True)
+    start.add_argument(
+        "--feature-spec-set-input",
+        action="append",
+        default=[],
+        help=(
+            "absolute current validator input for one manifest feature set; "
+            "repeat once per linked set"
+        ),
+    )
     start.set_defaults(handler=command_run_start, command_name="run start")
     wait = run_commands.add_parser("wait-sweep", help="perform one bounded Feature Spec owner sweep")
     wait.add_argument("--run-id", required=True)
@@ -3720,7 +4536,7 @@ def build_parser() -> argparse.ArgumentParser:
     find.add_argument("--tracker-backend", choices=("github", "local"), required=True)
     find.add_argument("--source-spec-ref", required=True)
     find.set_defaults(handler=command_claim_find, command_name="claim find")
-    reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative ChatGPT task inspection")
+    reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative Codex task inspection")
     reconcile.add_argument("--run-id", required=True)
     reconcile.add_argument("--assignment-id", required=True)
     reconcile.add_argument("--expected-revision", type=int, required=True)
@@ -3735,9 +4551,9 @@ def build_parser() -> argparse.ArgumentParser:
     abandon.add_argument("--owner-expected-revision", type=int, required=True)
     abandon.set_defaults(handler=command_claim_abandon, command_name="claim abandon")
 
-    operation = commands.add_parser("app-operation", help="record and reconcile one ChatGPT task change")
+    operation = commands.add_parser("app-operation", help="record and reconcile one Codex task change")
     operation_commands = operation.add_subparsers(dest="operation_command", required=True)
-    begin = operation_commands.add_parser("begin", help="authorize one ChatGPT task change")
+    begin = operation_commands.add_parser("begin", help="authorize one Codex task change")
     begin.add_argument("--run-id", required=True)
     begin.add_argument("--expected-revision", type=int, required=True)
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
@@ -3763,7 +4579,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     observation = operation_commands.add_parser(
         "observation",
-        help="describe or build strict ChatGPT task-operation observations",
+        help="describe or build strict Codex task-operation observations",
     )
     observation_commands = observation.add_subparsers(
         dest="operation_observation_command",
@@ -3816,7 +4632,7 @@ def build_parser() -> argparse.ArgumentParser:
         handler=command_app_operation_observation_create,
         command_name="app-operation observation create",
     )
-    op_list = operation_commands.add_parser("list", help="page through typed ChatGPT task-operation facts")
+    op_list = operation_commands.add_parser("list", help="page through typed Codex task-operation facts")
     op_list.add_argument("--run-id", required=True)
     op_list.add_argument("--after-sequence", type=int, default=0)
     op_list.add_argument("--limit", type=int, default=50)
@@ -3912,7 +4728,7 @@ def build_parser() -> argparse.ArgumentParser:
     block.set_defaults(handler=command_assignment_block, command_name="assignment block")
     capability_block = assignment_commands.add_parser(
         "capability-block",
-        help="retain claims when the declared ChatGPT desktop app execution topology is unavailable",
+        help="retain claims when the declared ChatGPT App execution topology is unavailable",
     )
     capability_block.add_argument("--run-id", required=True)
     capability_block.add_argument("--expected-revision", type=int, required=True)

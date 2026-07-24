@@ -29,19 +29,18 @@ Temporary body files must live outside the repo and be removed after use.
   executable commands.
 
 When proposed output precedes the hosted Feature Spec, use
-`source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
-`proposed-spec:<project-slug>/<feature-slug>` for a multi-repository parent, or
-`proposed-spec:<project-slug>/<feature-slug>/<repository-slug>` for each
-repo-scoped implementation partial.
+`source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec or
+`proposed-spec:<feature-id>/<repository-key>` for each linked
+multi-repository Feature Spec.
 Order the proposal so each owning Feature Spec is created before its issues.
 Before hosted child creation, replace that proposed ref in the child's canonical
 `## Execution Contract` `source_spec_ref` row with the owning
 `#<spec-number>` for a single-repository bundle, or with
 `owner/repository#<spec-number>` or its canonical hosted URL for a
-multi-repository partial. Use the same globally qualified identity in
-repo-to-child mappings, sibling links, and cross-repository Feature Dependency
-rows. Never treat a proposed ref as an executable source, use a bare issue
-number across repositories, or add a duplicate header field.
+multi-repository member. Use the same globally qualified identity in every
+member's `Feature Spec Set` and cross-repository Feature Dependency rows. Never
+treat a proposed ref as an executable source, use a bare issue number across
+repositories, or add a duplicate header field.
 
 ## Conventions
 
@@ -106,10 +105,11 @@ Idea issues.
   using the format above.
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
   `source_spec_ref`, affected repositories and paths, dependency ids, planning
-  identity, partial Feature Spec links, and graph validation.
-- For multi-repo planning, use one accepted parent when appropriate or link
-  repo-scoped partial Feature Specs and issues. Do not persist a coordination
-  repo or global project label as setup configuration.
+  identity, linked Feature Spec Set refs, and graph validation.
+- For multi-repository planning, publish one linked repo-owned Feature Spec in
+  every affected repository and attach that repository's implementation issues
+  beneath it. Do not persist a coordination repository or global project label
+  as setup configuration.
 
 ## Existing Issue Classification
 

@@ -21,7 +21,6 @@ source_route: new-source
 
 Project Memory facts:
   tracker_backend: github
-  repository_layout: single-repository
   issue_type_mappings:
     feature:
       transport: body-field
@@ -160,7 +159,6 @@ attach, enqueue, or otherwise mutate a tracker object.
 ## Planning Identity
 
 - Feature slug: `account-settings-export`.
-- Repository layout: `single-repository`.
 - Delivery type: `github-pr`.
 
 ## Problem
@@ -392,42 +390,45 @@ knowledge_delta:
 
 ## Multi-Repository Identity Probe
 
-This second propose-only case proves that two repo-scoped partials and their
+This second propose-only case proves that two repo-owned linked Specs and their
 first generated issues cannot collide:
 
 ```text
-project_slug: account-platform
+feature_id: 019f930d-6879-7ef2-8570-69b9ed8a35dd
 feature_slug: account-settings-export
-parent_source_spec_ref: proposed-spec:account-platform/account-settings-export
-child_source_spec_refs:
-  api: proposed-spec:account-platform/account-settings-export/api
-  web: proposed-spec:account-platform/account-settings-export/web
-child_issue_refs:
-  api: proposed-issue:account-platform/account-settings-export/api/01
-  web: proposed-issue:account-platform/account-settings-export/web/01
+repository_keys:
+  api: api
+  web: web
+feature_spec_refs:
+  api: proposed-spec:019f930d-6879-7ef2-8570-69b9ed8a35dd/api
+  web: proposed-spec:019f930d-6879-7ef2-8570-69b9ed8a35dd/web
+issue_refs:
+  api: proposed-issue:019f930d-6879-7ef2-8570-69b9ed8a35dd/api/01
+  web: proposed-issue:019f930d-6879-7ef2-8570-69b9ed8a35dd/web/01
 implementation_target_branches:
   api: feature/account-settings-export
   web: feature/account-settings-export
 ```
 
-The parent is coordination-only. Each generated implementation issue belongs
-to one repo-scoped partial and uses that partial's source ref.
+Each generated implementation issue belongs to one repo-owned Spec and uses
+that member's source ref. Both Specs carry the same `feature_id` and exact
+normalized `Feature Spec Set`.
 
-The existing web partial owns web-to-API combined proof. It names the API as a
+The web member owns web-to-API combined proof. It names the API as a
 Feature Dependency and carries the executable Integration Execution Contract:
 
 ```text
-combined_proof_owner: proposed-spec:account-platform/account-settings-export/web
+combined_proof_owner: proposed-spec:019f930d-6879-7ef2-8570-69b9ed8a35dd/web
 web_feature_dependencies:
-  - upstream_feature_spec_ref: proposed-spec:account-platform/account-settings-export/api
+  - upstream_feature_spec_ref: proposed-spec:019f930d-6879-7ef2-8570-69b9ed8a35dd/api
     dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
-combined_proof_issue_ref: proposed-issue:account-platform/account-settings-export/web/01
+combined_proof_issue_ref: proposed-issue:019f930d-6879-7ef2-8570-69b9ed8a35dd/web/01
 combined_proof_target_branch: feature/account-settings-export
 knowledge_delta_owner: combined_proof_issue_ref
 ```
 
 The web and API workers may start together and communicate directly. Final web
-proof binds the exact API HEAD; no sibling-partial issue ID is copied into
+proof binds the exact API HEAD; no peer issue ID is copied into
 `dependency_ids`. The `knowledge_delta_owner` line is present only when a delta
 exists. No additional Spec, issue subtree, branch, or worker is created.
 
@@ -438,25 +439,25 @@ persist. Hosted and local refs remain globally unambiguous after proposed refs
 are replaced:
 
 ```text
-github_child_source_spec_refs:
+github_feature_spec_refs:
   api: acme/account-api#241
   web: acme/account-web#118
 github_combined_proof_owner: acme/account-web#118
 github_web_feature_dependencies:
   - upstream_feature_spec_ref: acme/account-api#241
     dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
-local_child_source_spec_refs:
-  api: api/planning/features/account-settings-export/SPEC.md
-  web: web/planning/features/account-settings-export/SPEC.md
-local_combined_proof_owner: web/planning/features/account-settings-export/SPEC.md
+local_feature_spec_refs:
+  api: 019f930d-6879-7ef2-8570-69b9ed8a35dd--api/planning/features/account-settings-export/SPEC.md
+  web: 019f930d-6879-7ef2-8570-69b9ed8a35dd--web/planning/features/account-settings-export/SPEC.md
+local_combined_proof_owner: 019f930d-6879-7ef2-8570-69b9ed8a35dd--web/planning/features/account-settings-export/SPEC.md
 local_web_feature_dependencies:
-  - upstream_feature_spec_ref: api/planning/features/account-settings-export/SPEC.md
+  - upstream_feature_spec_ref: 019f930d-6879-7ef2-8570-69b9ed8a35dd--api/planning/features/account-settings-export/SPEC.md
     dependency_reason: Supply the exact API branch and HEAD for web-to-API proof.
-local_combined_proof_issue: web/planning/features/account-settings-export/issues/01-prove-integrated-export.md
-local_combined_proof_done: web/planning/features/account-settings-export/issues/done/01-prove-integrated-export.md
+local_combined_proof_issue: 019f930d-6879-7ef2-8570-69b9ed8a35dd--web/planning/features/account-settings-export/issues/01-prove-integrated-export.md
+local_combined_proof_done: 019f930d-6879-7ef2-8570-69b9ed8a35dd--web/planning/features/account-settings-export/issues/done/01-prove-integrated-export.md
 ```
 
-Bare `#<number>` and bare repo-relative paths are not valid sibling identities.
+Bare `#<number>` and bare repo-relative paths are not valid peer identities.
 The applied implementation Specs and their issues are executable only after
 these durable refs replace every proposed ref; this projection does not publish
 or enqueue them.
@@ -469,9 +470,8 @@ transaction across hosted and local roles before the first mutation:
 ```text
 publication_transaction: plan-feature/account-settings-export/<generated-id>
 roles:
-  - parent: hosted
-  - implementation/api: hosted
-  - implementation/web: local
+  - api: hosted
+  - web: local
 staging_contract:
   applies_to: hosted roles with unknown refs only
   marker: unique transaction and role
@@ -523,7 +523,7 @@ feature_spec_publication: skipped
 reconciliation_outcomes:
   contract_equivalent_existing_issue: retain without regenerating hardening prose
   absent_required_issue: create only operations proven missing
-  missing_mapped_metadata_or_parent_attachment: repair only the supported operation
+  missing_mapped_metadata_or_feature_attachment: repair only the supported operation
   complete_equivalent_bundle: no-op when the complete bundle already matches
   body_graph_or_conflicting_metadata_mismatch: conflict-stop without rewriting the artifact
 ```
@@ -548,31 +548,30 @@ missing_generated_id: 04
 invalid_repair: insert an upstream node that requires changing retained 01 or 03
 ```
 
-The final source, Project Memory mappings, and complete issue/metadata/parent
+The final source, Project Memory mappings, and complete issue/metadata/attachment
 state are re-read before proposal, no-op, or mutation. Every create also proves
 its exact target remains absent; concurrent drift forces recomputation or a
 block instead of duplicate publication.
 
 ## Existing Multi-Repository Partial Intake Probe
 
-An existing-source request may begin from any canonical member, not only the
-coordination parent:
+An existing-source request may begin from any canonical member:
 
 ```text
 intake_source_spec_ref: acme/account-web#118
-intake_role: implementation-partial
+feature_id: 019f930d-6879-7ef2-8570-69b9ed8a35dd
+intake_role: implementation-member
 required_connected_set:
-  - coordination-parent
-  - implementation/api
-  - implementation/web
-completion_scope: every implementation-eligible partial in the connected set
+  - api
+  - web
+completion_scope: every implementation member in the connected set
 ```
 
-Plan Feature follows the intake partial's canonical parent, sibling map, and
-Feature Dependencies in both directions, validates the complete connected set
-unchanged, and converges issues for every implementation-eligible member. A
-missing, disconnected, or contradictory member blocks the whole run; success
-for only the intake partial is invalid.
+Plan Feature follows the intake member's `Feature Spec Set` and Feature
+Dependencies in both directions, validates the complete connected set
+unchanged, and converges issues for every member. A missing, disconnected,
+differently identified, or contradictory member blocks the whole run; success
+for only the intake member is invalid.
 
 ## Knowledge Delta Single-Run Probe
 
@@ -593,8 +592,8 @@ handoff to match current state and must not reinterpret omission as
 
 ## Expected Pipeline
 
-1. Resolve the sole run control, `write_mode`, and consume tracker/topology
-   facts plus any durable `source_spec_ref` from Project Memory and intake
+1. Resolve the sole run control, `write_mode`, and consume tracker facts plus
+   any durable `source_spec_ref` from Project Memory and intake
    evidence.
 2. Run `$grill-me-with-context` only if the supplied intent and repository
    evidence leave a material blocker; defer domain capture.
@@ -622,11 +621,11 @@ handoff to match current state and must not reinterpret omission as
    transport when a mapped native type is unavailable.
 2. For one directly created Feature Spec, insert the configured final-only
    `body-field` before computing and publishing the final body. For a
-   multi-repository bundle, stage every predeclared hosted role that needs a ref
+   multi-repository feature, stage every predeclared hosted role that needs a ref
    while excluding that `body-field`; deterministic local refs are already
    resolved. Capture every globally unambiguous durable ref before finalization.
 3. Finalize every hosted staged body using only the predeclared qualified-ref
-   substitutions, sibling maps, Feature Dependencies, exact final-only
+   substitutions, `Feature Spec Set` tables, Feature Dependencies, exact final-only
    `body-field` insertion, and staging-marker removal. Verify each final body
    before applying any mapped native type or label. In a mixed-backend bundle,
    keep local bodies unwritten until this point, then write their deterministic
@@ -650,7 +649,7 @@ This sequence is descriptive output only; it contains no executable command.
   contract-equivalent match, creates an operation not proven missing, treats a
   complete matching bundle as work, repairs an unsupported relationship, or
   continues after a body, graph, or conflicting-metadata mismatch.
-- An applied multi-repository sibling or dependency uses a bare hosted issue
+- An applied multi-repository member or dependency uses a bare hosted issue
   number or bare repo-relative path.
 - A proposed issue body contains an applied `workflow_state` header.
 - A proposed Feature Spec body contains the applied `Issue Type: Feature`
@@ -666,7 +665,7 @@ This sequence is descriptive output only; it contains no executable command.
   owner's terminal dependencies are not recomputed.
 - A Feature Spec body persists `knowledge_delta` or a
   `## Domain Knowledge Handoff` section.
-- A cross-repository acceptance boundary has no existing implementation partial
+- A cross-repository acceptance boundary has no existing implementation member
   capable of owning its exact-revision combined proof.
 - Domain knowledge is captured during planning or assigned to a docs-only
   issue.
