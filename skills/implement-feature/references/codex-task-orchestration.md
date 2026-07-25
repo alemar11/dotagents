@@ -50,7 +50,7 @@ and add only newly authoritative evidence.
 
 ## Root Title And Worker Creation
 
-This section is reachable only after the saved-project preflight and any
+This section is reachable only after the worker-project preflight and any
 explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 

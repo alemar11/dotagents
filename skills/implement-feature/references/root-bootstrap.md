@@ -5,23 +5,29 @@ Root is a lightweight control plane. Before mutation:
 1. Read and validate the complete current Feature Spec frontier through
    `feature-spec-contract.md`.
 2. Read the current Codex task and `list_projects`. Require the controller task
-   to be anchored to one local saved Git project on the current host and record
-   its exact `controller_project_id`. The controller project is UI/control-plane
-   identity only: it may be unrelated to the feature, never expands scope, and
-   owns no implementation claim, branch, worker, or PR unless a separate
-   repo-owned Spec selects that repository.
+   to be anchored to one local saved Codex project on the current host and
+   record its exact `controller_project_id`; also read its current primary
+   folder. The controller project may be multi-folder or unrelated to the
+   feature. It is UI/control-plane identity and read-only coordination context
+   only: its primary-folder Git defaults never expand scope or grant an
+   implementation claim, branch, worker, or PR.
 3. Resolve each affected repository's canonical identity. Use
    `github:owner/repository` for GitHub repositories. For local-only repositories,
    resolve `git rev-parse --path-format=absolute --git-common-dir`, stat that
    real directory, and use the exact identity printed by the helper's local
    identity rule. Linked worktrees therefore share one target.
-4. Run the saved-project preflight with `list_projects`. Every affected
-   repository must map bijectively to one local saved Git project on the current
-   host whose path is exactly that repository root and whose independently
-   resolved Git common directory matches the canonical repository identity.
-   Reject remote, non-Git, shared-project, duplicate-project, parent-path, and
-   ambiguous mappings before state. No multi-folder group identity is required
-   or inferred; a broad project is never a substitute.
+4. Run the worker-project preflight with `list_projects`. Every affected
+   repository must map bijectively to one separate local saved Git project on
+   the current host whose reported primary folder is exactly that repository
+   root and whose independently resolved Git common directory matches the
+   canonical repository identity. When the controller project is multi-folder,
+   exclude its project ID from worker mapping even when an affected repository
+   is its primary folder. Its primary and secondary folder memberships are
+   context only and never satisfy the worker-project requirement. The same
+   repository may appear in multiple multi-folder projects without becoming
+   multiple repository identities or execution targets. Reject remote, non-Git,
+   duplicate eligible repo-project, parent-path, and ambiguous worker mappings
+   before state; a broad or multi-folder project is never a substitute.
 5. Read `tracker_backend` and exact `delivery_type` from each stable contract.
    Check branches and required dependency proof, calculate allowed-path overlap,
    derive worker order, and disclose startup scope. Repository identity never
@@ -33,11 +39,12 @@ Root is a lightweight control plane. Before mutation:
    exact `manifest_feature_set` result for the run manifest.
 7. For multi-repository combined proof, verify before permission or state only
    the static prerequisites that can exist at that point: every repository maps
-   to a saved local Git project in the ChatGPT App capable of creating its
-   ordinary worker and worktree; every combined boundary names an ordinary
-   proof owner; and its Integration Execution Contract assigns each component
-   either to that proof owner or to the peer that owns the component. Do not
-   require access to worktrees that do not exist yet.
+   to a separate repo-specific saved local Git project in the ChatGPT App
+   capable of creating its ordinary worker and worktree; every combined
+   boundary names an ordinary proof owner; and its Integration Execution
+   Contract assigns each component either to that proof owner or to the peer
+   that owns the component. Do not require access to worktrees that do not
+   exist yet.
 8. Resolve the startup fields from `options.md`. If every mapping in step 4
    already exists, resolve only `visible_app_task_permission`. If mappings are
    missing, list the exact repository roots in the standard question and
@@ -118,7 +125,7 @@ only the exact named manifest protocol shown above. It records the current
 runtime contract, CLI version, and SHA-256 of the shipped `run-state` artifact
 on the new run so later mutations can require that exact runtime.
 
-The saved-project preflight and any explicitly authorized project setup finish
+The worker-project preflight and any explicitly authorized project setup finish
 before writing the manifest or calling `scripts/run-state`. Project creation is
 not worker recovery and task permission alone never authorizes it. Do not create
 a broader parent project as a diagnostic step. A failed or partial project
@@ -151,6 +158,10 @@ The root creates each worker as a visible Codex task with
 it to that task. Root verifies the task, checkout directory, and Git common
 directory; it never runs `git worktree add`. SQLite keeps only checkout identity
 needed for coordination, not the worker's technical contents.
+The operation always targets the assignment's recorded repo-specific
+`project_id`, never the multi-folder controller project. If task readback does
+not resolve to that project and repository identity, reconcile or fail the
+operation before bootstrap.
 
 Each full bootstrap carries the canonical operational field
 `review_owner=worker|root`. Record its initial value atomically with

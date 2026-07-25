@@ -24,6 +24,22 @@ acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
 bootstrap's `review_owner=worker|root` owns AutoReview execution only; a
 root-owned review never grants root implementation or repair authority.
 
+The controller task may be bound to a local Codex multi-folder project. Codex
+uses that project's primary folder for new-task working directory, default Git
+operations, worktree and review actions, and automatic `AGENTS.md`, skills, and
+`config.toml` discovery; secondary folders remain attached as file context. Those
+defaults grant the root no implementation authority. When the controller
+project is multi-folder, treat every attached folder as read-only coordination
+context and never use that controller project as a worker target.
+
+When the controller project is multi-folder, every worker still runs in the
+separate saved Git project associated with its assigned repository. That worker
+project's reported primary folder must be the exact repository root and its
+independently resolved Git common directory must match the assignment's
+canonical repository identity. A repository's presence as a primary or
+secondary folder in the controller project does not satisfy this worker-project
+requirement or create another repository identity, claim, or execution target.
+
 A root task that owns an unfinished run remains the sole controller for that
 run. During executable work, root keeps its current turn open and monitors
 workers with bounded task waits until the run is delivery-ready,
@@ -51,26 +67,28 @@ replay only after authoritative failed readback proves the prior launch had no
 effect. Controller follow-up messages are not replayable.
 
 Resolve the startup authorization interaction defined in
-`references/options.md` only after the saved-project preflight. When a required
-repository is not a saved Git project, that same interaction either authorizes
-creation of only the listed projects plus the disclosed worker run, or stops
-before state. Otherwise it resolves only `visible_app_task_permission`. The
-worker grant covers the selected workers, ChatGPT-created worktrees, normal
-command approvals, validation, publication, review fixes, tracker updates, and
-recovery. Never ask another authority, recovery, validation, blocker, or
-continuation question during the run.
+`references/options.md` only after the worker-project preflight. When a required
+repository has no separate saved Git project whose reported primary folder is
+the exact repository root, that same interaction either authorizes creation of
+only the listed projects plus the disclosed worker run, or stops before state.
+Otherwise it resolves only `visible_app_task_permission`. The worker grant
+covers the selected workers, ChatGPT-created worktrees, normal command
+approvals, validation, publication, review fixes, tracker updates, and recovery.
+Never ask another authority, recovery, validation, blocker, or continuation
+question during the run.
 
 ## Controller Flow
 
 1. Load `references/feature-spec-contract.md` and
    `references/root-bootstrap.md`. Validate current durable sources,
    dependencies, repository identities, allowed paths, acceptance, validation,
-   delivery type, and exact saved Git-project mapping before state. Resolve the
-   current controller task's exact local saved Git-project binding as
-   controller identity only; a later UI-primary change does not alter it. The
-   bound project need not be affected and grants no implementation authority.
-   Require every affected repository to map to its own exact local saved Git
-   project. For each multi-repository set, run read-only
+   delivery type, and exact repository-to-worker-project mapping before state.
+   Resolve the current controller task's exact local saved Codex-project binding
+   as controller identity only; a later UI-primary change does not alter it.
+   The bound project may be multi-folder, need not be affected, and grants no
+   implementation authority. Require every affected repository to map to its
+   own exact repo-specific saved Git project. For each multi-repository set, run
+   read-only
    `scripts/run-state --json feature-spec-set validate --input <absolute-file>`
    over ephemeral complete member-body snapshots and retain its exact
    `manifest_feature_set`, including each validated local member's decoded

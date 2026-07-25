@@ -45,13 +45,26 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
         options = self.normalized(self.text("references/options.md"))
         orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
-        self.assertIn("exact saved Git-project mapping before state", skill)
-        self.assertIn("whose path is exactly that repository root", bootstrap)
-        self.assertIn("Reject remote, non-Git, shared-project, duplicate-project", bootstrap)
+        self.assertIn("exact repository-to-worker-project mapping before state", skill)
+        self.assertIn("whose reported primary folder is exactly that repository root", bootstrap)
+        self.assertIn("Reject remote, non-Git, duplicate eligible repo-project", bootstrap)
         self.assertIn("before writing the manifest or calling `scripts/run-state`", bootstrap)
         self.assertIn("Project creation is distinct from task creation", options)
         self.assertIn("never treat task permission as project-creation permission", options)
-        self.assertIn("saved-project preflight", orchestration)
+        self.assertIn("worker-project preflight", orchestration)
+
+    def test_given_multifolder_controller_when_workers_are_created_then_repo_projects_remain_separate(self) -> None:
+        """Given a multi-folder root, workers still target their repo-specific saved projects."""
+        skill = self.normalized(self.text("SKILL.md"))
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        options = self.normalized(self.text("references/options.md"))
+        self.assertIn("controller task may be bound to a local Codex multi-folder project", skill)
+        self.assertIn("treat every attached folder as read-only coordination context", skill)
+        self.assertIn("never use that controller project as a worker target", skill)
+        self.assertIn("exclude its project ID from worker mapping", bootstrap)
+        self.assertIn("primary and secondary folder memberships are context only", bootstrap)
+        self.assertIn("always targets the assignment's recorded repo-specific `project_id`", bootstrap)
+        self.assertIn("do not satisfy this worker-project requirement", options)
 
     def test_given_authorized_project_setup_when_computer_use_selects_then_exact_paths_are_required(self) -> None:
         """Given create-projects authority, Computer Use may create only exact verified Git roots."""
