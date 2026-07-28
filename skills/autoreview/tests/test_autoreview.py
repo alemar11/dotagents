@@ -87,7 +87,7 @@ class AutoreviewContractTests(unittest.TestCase):
         )
         self.assertIn("`terminal-full` is not an automatic closeout phase", policy)
 
-    def test_codex_transfer_is_intrinsic_without_a_second_authorization(self) -> None:
+    def test_codex_transfer_scope_is_documented_without_authorization_policy(self) -> None:
         skill = SKILL_PATH.read_text(encoding="utf-8")
         normalized_skill = " ".join(skill.split())
 
@@ -102,18 +102,10 @@ class AutoreviewContractTests(unittest.TestCase):
             "--dataset",
         ):
             self.assertIn(disclosed_content, normalized_skill)
-        self.assertIn(
-            "This transfer is intrinsic read-only runtime behavior, not a separate permission boundary.",
-            normalized_skill,
-        )
-        self.assertIn(
-            "run without a separate authorization question, acknowledgement flag, or user-controlled option",
-            normalized_skill,
-        )
-        self.assertIn(
-            "treat that single grant as covering later Auto Review reruns required by a changed target",
-            normalized_skill,
-        )
+        self.assertNotIn("authorizes a calling workflow", normalized_skill)
+        self.assertNotIn("separate authorization question", normalized_skill)
+        self.assertNotIn("same disclosed review authorization", normalized_skill)
+        self.assertNotIn("single grant", normalized_skill)
         self.assertIn(
             "--no-web-search` disables reviewer web search, not the Codex engine transfer",
             normalized_skill,
