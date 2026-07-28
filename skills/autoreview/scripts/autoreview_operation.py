@@ -10,7 +10,7 @@ from typing import Any
 import autoreview_protocol as protocol
 
 
-OWNER_VERSION = "4.0.0"
+OWNER_VERSION = "5.0.0"
 REQUEST_SCHEMA = "autoreview-operation-request:v1"
 RESULT_SCHEMA = "autoreview-operation-result:v1"
 START_RECEIPT_SCHEMA = "implement-feature-owned-operation-start:v1"

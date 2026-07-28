@@ -3,19 +3,38 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import json
 import os
 import re
+import stat
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
+SPEC_VERSION = "0.2"
 SPEC_REQUIRED = ("type",)
-REFERENCE_AGENT_REQUIRED = ("type", "title", "description", "timestamp")
-RECOMMENDED = ("title", "description", "resource", "tags", "timestamp")
-PREFERRED_KEY_ORDER = ("type", "title", "description", "resource", "tags", "timestamp")
+RECOMMENDED = ("title", "description", "resource", "tags")
+PREFERRED_KEY_ORDER = (
+    "type",
+    "title",
+    "description",
+    "resource",
+    "tags",
+    "status",
+    "generated",
+    "verified",
+    "stale_after",
+    "sources",
+    "usage_window",
+    "runtime",
+    "parameters",
+    "computation",
+    "executor",
+    "attester",
+)
 FRONTMATTER_DELIM = "---"
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 DATE_HEADING_RE = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$")
@@ -24,6 +43,13 @@ try:  # pragma: no cover - exercised only when PyYAML is installed.
     import yaml  # type: ignore
 except Exception:  # pragma: no cover - default in this repo's Python.
     yaml = None
+
+ANCHORED_IO_SUPPORTED = (
+    hasattr(os, "O_DIRECTORY")
+    and hasattr(os, "O_NOFOLLOW")
+    and os.open in os.supports_dir_fd
+    and os.mkdir in os.supports_dir_fd
+)
 
 
 @dataclass
@@ -40,7 +66,6 @@ class ValidationResult:
     warnings: list[Message] = field(default_factory=list)
     files_checked: int = 0
     concepts_checked: int = 0
-    mode: str = "spec"
     pyyaml: bool = yaml is not None
 
     def error(self, path: Path | str, message: str) -> None:
@@ -53,7 +78,6 @@ class ValidationResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok,
-            "mode": self.mode,
             "pyyaml": self.pyyaml,
             "files_checked": self.files_checked,
             "concepts_checked": self.concepts_checked,
@@ -66,18 +90,60 @@ class OkfError(ValueError):
     pass
 
 
+class UnsafePathError(OkfError):
+    pass
+
+
+class OkfArgumentParser(argparse.ArgumentParser):
+    json_errors = False
+
+    def error(self, message: str) -> None:
+        if self.json_errors:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "command": "parse",
+                        "error": {"code": "invalid_arguments", "message": message},
+                    },
+                    indent=2,
+                )
+            )
+            raise SystemExit(2)
+        super().error(message)
+
+
 def _parse_scalar(value: str) -> Any:
     value = value.strip()
     if not value:
         return ""
-    if (value.startswith('"') and value.endswith('"')) or (
-        value.startswith("'") and value.endswith("'")
-    ):
+    if value.startswith(('"', "'")):
+        if not value.endswith(value[0]) or len(value) == 1:
+            raise OkfError("Limited parser found an unterminated quoted scalar.")
         return value[1:-1]
-    if value.startswith("[") and value.endswith("]"):
+    if value.startswith("{"):
+        if not value.endswith("}"):
+            raise OkfError("Limited parser found an unterminated flow mapping.")
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise OkfError(
+                "Limited parser supports mappings only in JSON-compatible flow syntax."
+            ) from exc
+    if value.startswith("["):
+        if not value.endswith("]"):
+            raise OkfError("Limited parser found an unterminated flow list.")
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
         inner = value[1:-1].strip()
         if not inner:
             return []
+        if "{" in inner or "}" in inner:
+            raise OkfError(
+                "Limited parser does not support mappings nested in flow lists."
+            )
         return [_parse_scalar(part.strip()) for part in inner.split(",")]
     if value in {"true", "false"}:
         return value == "true"
@@ -93,11 +159,27 @@ def limited_yaml_load(text: str) -> tuple[dict[str, Any], list[str]]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
+        leading = line[: len(line) - len(line.lstrip())]
+        if "\t" in leading:
+            raise OkfError(
+                f"Limited parser does not support tab indentation on line {line_no}."
+            )
+        indentation = len(leading)
         if current_list_key and stripped.startswith("- "):
+            item = stripped[2:].strip()
+            if re.match(r"^[A-Za-z_][^:]*:(?:\s|$)", item):
+                raise OkfError(
+                    f"Limited parser does not support nested mappings on line {line_no}."
+                )
             if not isinstance(data.get(current_list_key), list):
                 data[current_list_key] = []
-            data[current_list_key].append(_parse_scalar(stripped[2:]))
+            data[current_list_key].append(_parse_scalar(item))
             continue
+        if indentation:
+            raise OkfError(
+                f"Limited parser does not support nested YAML on line {line_no}; "
+                "use JSON-compatible flow syntax or install PyYAML."
+            )
         current_list_key = None
         if ":" not in stripped:
             raise OkfError(f"Limited parser could not parse frontmatter line {line_no}: {raw}")
@@ -148,13 +230,150 @@ def is_reserved(path: Path) -> bool:
     return path.name in {"index.md", "log.md"}
 
 
-def iter_markdown_files(bundle: Path) -> list[Path]:
-    return sorted(path for path in bundle.rglob("*.md") if path.is_file())
+def discover_bundle_paths(bundle: Path) -> tuple[list[Path], list[Path]]:
+    markdown_files: list[Path] = []
+    symlinked_directories: list[Path] = []
+    for root, directory_names, file_names in os.walk(
+        bundle,
+        topdown=True,
+        followlinks=False,
+    ):
+        root_path = Path(root)
+        traversable_directories: list[str] = []
+        for name in directory_names:
+            path = root_path / name
+            if path.is_symlink():
+                symlinked_directories.append(path)
+            else:
+                traversable_directories.append(name)
+        directory_names[:] = traversable_directories
+        markdown_files.extend(
+            root_path / name
+            for name in file_names
+            if name.endswith(".md")
+        )
+    return sorted(markdown_files), sorted(symlinked_directories)
+
+
+def first_symlink_component(root: Path, path: Path) -> Path | None:
+    current = root
+    for part in path.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            return current
+    return None
+
+
+def supports_anchored_io() -> bool:
+    return ANCHORED_IO_SUPPORTED
+
+
+def open_anchored_parent(
+    bundle: Path,
+    path: Path,
+    *,
+    create_parents: bool,
+) -> tuple[int, str]:
+    if not supports_anchored_io():
+        raise UnsafePathError(
+            "This platform cannot safely anchor bundle-relative file access."
+        )
+
+    relative = path.relative_to(bundle)
+    if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+        raise UnsafePathError("File path must be a safe bundle-relative path.")
+    if create_parents:
+        bundle.mkdir(parents=True, exist_ok=True)
+
+    directory_flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptor = os.open(bundle, directory_flags)
+    try:
+        for part in relative.parts[:-1]:
+            try:
+                next_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                if not create_parents:
+                    raise
+                try:
+                    os.mkdir(part, 0o777, dir_fd=descriptor)
+                except FileExistsError:
+                    pass
+                next_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor, relative.parts[-1]
+    except OSError as exc:
+        os.close(descriptor)
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise UnsafePathError(
+                "Bundle-relative path changed or contains a symlink."
+            ) from exc
+        raise
+
+
+def open_anchored_file(
+    bundle: Path,
+    path: Path,
+    flags: int,
+    *,
+    mode: int = 0o666,
+    create_parents: bool = False,
+) -> int:
+    parent_descriptor, leaf = open_anchored_parent(
+        bundle,
+        path,
+        create_parents=create_parents,
+    )
+    try:
+        return os.open(
+            leaf,
+            flags | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            mode,
+            dir_fd=parent_descriptor,
+        )
+    except OSError as exc:
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise UnsafePathError(
+                "Bundle-relative path changed or contains a symlink."
+            ) from exc
+        raise
+    finally:
+        os.close(parent_descriptor)
+
+
+def validate_markdown_path(
+    bundle: Path,
+    path: Path,
+    result: ValidationResult,
+) -> bool:
+    rel = path.relative_to(bundle)
+    symlink = first_symlink_component(bundle, path)
+    if symlink is not None:
+        result.error(
+            rel,
+            f"Markdown paths must not contain symlinks: {symlink.relative_to(bundle)}.",
+        )
+        return False
+    try:
+        resolved = path.resolve(strict=True)
+        resolved.relative_to(bundle.resolve(strict=True))
+    except (FileNotFoundError, ValueError):
+        result.error(rel, "Markdown path is missing or resolves outside the bundle.")
+        return False
+    if not resolved.is_file():
+        result.error(rel, "Markdown path must resolve to a regular file.")
+        return False
+    return True
 
 
 def validate_reserved_file(bundle: Path, path: Path, result: ValidationResult) -> None:
     rel = path.relative_to(bundle)
-    text = read_utf8(path, rel, result)
+    text = read_utf8(bundle, path, rel, result)
     if text is None:
         return
     if path.name == "index.md":
@@ -242,12 +461,33 @@ def link_target_exists(bundle: Path, source: Path, target: str) -> bool | None:
     return candidate.exists()
 
 
-def read_utf8(path: Path, rel: Path, result: ValidationResult) -> str | None:
+def read_utf8(
+    bundle: Path,
+    path: Path,
+    rel: Path,
+    result: ValidationResult,
+) -> str | None:
     try:
-        return path.read_text(encoding="utf-8")
+        descriptor = open_anchored_file(bundle, path, os.O_RDONLY)
+    except (OSError, UnsafePathError) as exc:
+        result.error(rel, f"File could not be opened safely: {exc}.")
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            result.error(rel, "Markdown path must remain a regular file while reading.")
+            return None
+        with os.fdopen(descriptor, encoding="utf-8") as handle:
+            descriptor = -1
+            return handle.read()
     except UnicodeDecodeError as exc:
         result.error(rel, f"File is not valid UTF-8: {exc}")
         return None
+    except OSError as exc:
+        result.error(rel, f"File could not be read safely: {exc}.")
+        return None
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def validate_concept_file(
@@ -255,12 +495,11 @@ def validate_concept_file(
     path: Path,
     result: ValidationResult,
     *,
-    mode: str,
     strict_links: bool,
 ) -> None:
     rel = path.relative_to(bundle)
     result.concepts_checked += 1
-    text = read_utf8(path, rel, result)
+    text = read_utf8(bundle, path, rel, result)
     if text is None:
         return
     try:
@@ -269,24 +508,20 @@ def validate_concept_file(
         result.error(rel, str(exc))
         return
 
-    required = REFERENCE_AGENT_REQUIRED if mode == "reference-agent" else SPEC_REQUIRED
     invalid_required: list[str] = []
-    for key in required:
+    for key in SPEC_REQUIRED:
         value = frontmatter.get(key)
-        if key == "timestamp" and isinstance(value, (dt.date, dt.datetime)):
-            continue
         if not isinstance(value, str) or not value.strip():
             invalid_required.append(key)
     if invalid_required:
         result.error(
             rel,
-            f"Required frontmatter keys for {mode} must be non-empty strings: {', '.join(invalid_required)}.",
+            f"Required frontmatter keys must be non-empty strings: {', '.join(invalid_required)}.",
         )
 
-    if mode == "spec":
-        for key in RECOMMENDED:
-            if key not in frontmatter:
-                result.warn(rel, f"Recommended frontmatter key is missing: {key}.")
+    for key in RECOMMENDED:
+        if key not in frontmatter:
+            result.warn(rel, f"Recommended frontmatter key is missing: {key}.")
 
     for warning in parser_warnings:
         result.warn(rel, warning)
@@ -301,23 +536,33 @@ def validate_concept_file(
                 result.warn(rel, message)
 
 
-def validate_bundle(bundle: Path, *, mode: str, strict_links: bool) -> ValidationResult:
-    result = ValidationResult(mode=mode)
+def validate_bundle(bundle: Path, *, strict_links: bool) -> ValidationResult:
+    result = ValidationResult()
+    if bundle.is_symlink():
+        result.error(bundle, "Bundle root must not be a symlink.")
+        return result
     if not bundle.exists() or not bundle.is_dir():
         result.error(bundle, "Bundle path does not exist or is not a directory.")
         return result
 
-    files = iter_markdown_files(bundle)
+    files, symlinked_directories = discover_bundle_paths(bundle)
     result.files_checked = len(files)
+    for path in symlinked_directories:
+        result.error(
+            path.relative_to(bundle),
+            "Bundle directories must not be symlinks because they can hide concepts.",
+        )
     if not files:
         result.warn(bundle, "No markdown files found in bundle.")
         return result
 
     for path in files:
+        if not validate_markdown_path(bundle, path, result):
+            continue
         if is_reserved(path):
             validate_reserved_file(bundle, path, result)
         else:
-            validate_concept_file(bundle, path, result, mode=mode, strict_links=strict_links)
+            validate_concept_file(bundle, path, result, strict_links=strict_links)
     return result
 
 
@@ -327,7 +572,6 @@ def print_validation(result: ValidationResult, *, as_json: bool) -> int:
     else:
         status = "PASS" if result.ok else "FAIL"
         print(f"OKF validation {status}")
-        print(f"- mode: {result.mode}")
         print(f"- PyYAML available: {'yes' if result.pyyaml else 'no'}")
         print(f"- files checked: {result.files_checked}")
         print(f"- concepts checked: {result.concepts_checked}")
@@ -347,17 +591,10 @@ def ordered_frontmatter(frontmatter: dict[str, Any]) -> dict[str, Any]:
     return ordered
 
 
-def yaml_quote(value: str) -> str:
-    return json.dumps(value)
-
-
 def serialize_frontmatter(frontmatter: dict[str, Any]) -> str:
     lines = [FRONTMATTER_DELIM]
     for key, value in ordered_frontmatter(frontmatter).items():
-        if isinstance(value, list):
-            lines.append(f"{key}: [{', '.join(yaml_quote(str(item)) for item in value)}]")
-        else:
-            lines.append(f"{key}: {yaml_quote(str(value))}")
+        lines.append(f"{key}: {json.dumps(value, ensure_ascii=False)}")
     lines.append(FRONTMATTER_DELIM)
     return "\n".join(lines) + "\n"
 
@@ -376,7 +613,12 @@ def concept_path(bundle: Path, concept_id: str) -> Path:
     try:
         resolved_path.relative_to(bundle_root)
     except ValueError as exc:
-        raise OkfError("Concept path resolves outside the bundle root.") from exc
+        raise UnsafePathError("Concept path resolves outside the bundle root.") from exc
+    symlink = first_symlink_component(bundle, path)
+    if symlink is not None:
+        raise UnsafePathError(
+            f"Concept path contains a symlink: {symlink.relative_to(bundle)}."
+        )
     return path
 
 
@@ -384,14 +626,59 @@ def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def normalized_generated_at(value: str) -> str:
+    if value == "now":
+        return utc_now()
+    if "T" not in value and " " not in value:
+        raise OkfError("--generated-at must be an ISO 8601 datetime or \"now\".")
+    parse_value = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        dt.datetime.fromisoformat(parse_value)
+    except ValueError as exc:
+        raise OkfError("--generated-at must be an ISO 8601 datetime or \"now\".") from exc
+    return value
+
+
+def write_text_no_follow(
+    bundle: Path,
+    path: Path,
+    text: str,
+    *,
+    force: bool,
+) -> None:
+    flags = os.O_WRONLY | os.O_CREAT
+    flags |= os.O_TRUNC if force else os.O_EXCL
+    try:
+        descriptor = open_anchored_file(
+            bundle,
+            path,
+            flags,
+            create_parents=True,
+        )
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise UnsafePathError("Concept destination must not be a symlink.") from exc
+        raise
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write(text)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
 def command_doctor(args: argparse.Namespace) -> int:
+    anchored_io = supports_anchored_io()
     payload = {
-        "ok": True,
+        "ok": anchored_io,
         "version": VERSION,
+        "spec_version": SPEC_VERSION,
         "checks": {
             "python": sys.version.split()[0],
             "pyyaml": bool(yaml is not None),
             "executable": os.access(Path(__file__), os.X_OK),
+            "anchored_io": anchored_io,
         },
     }
     if args.json:
@@ -400,26 +687,96 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"okf {VERSION}")
         print(f"- Python: {payload['checks']['python']}")
         print(f"- PyYAML available: {'yes' if yaml is not None else 'no'}")
+        print(f"- Anchored file access: {'yes' if anchored_io else 'no'}")
         if yaml is None:
             print("- YAML parser: limited stdlib fallback")
-    return 0
+    return 0 if anchored_io else 69
 
 
 def command_validate(args: argparse.Namespace) -> int:
-    result = validate_bundle(Path(args.bundle), mode=args.mode, strict_links=args.strict_links)
+    result = validate_bundle(Path(args.bundle), strict_links=args.strict_links)
     return print_validation(result, as_json=args.json)
+
+
+def print_command_error(
+    args: argparse.Namespace,
+    command: str,
+    message: str,
+    exit_code: int,
+    error_code: str,
+) -> int:
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "command": command,
+                    "error": {
+                        "code": error_code,
+                        "exit_code": exit_code,
+                        "message": message,
+                    },
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"okf: {message}", file=sys.stderr)
+    return exit_code
 
 
 def command_scaffold(args: argparse.Namespace) -> int:
     bundle = Path(args.bundle)
-    path = concept_path(bundle, args.concept_id)
+    if bundle.is_symlink():
+        return print_command_error(
+            args,
+            "scaffold",
+            "Bundle root must not be a symlink.",
+            64,
+            "unsafe_path",
+        )
+    try:
+        path = concept_path(bundle, args.concept_id)
+    except UnsafePathError as exc:
+        return print_command_error(
+            args,
+            "scaffold",
+            str(exc),
+            64,
+            "unsafe_path",
+        )
     if path.exists() and not args.force:
-        print(f"Refusing to overwrite existing concept: {path}", file=sys.stderr)
-        return 73
+        return print_command_error(
+            args,
+            "scaffold",
+            f"Refusing to overwrite existing concept: {path}",
+            73,
+            "overwrite_refused",
+        )
 
-    timestamp = args.timestamp
-    if timestamp == "now":
-        timestamp = utc_now()
+    if bool(args.generated_by) != bool(args.generated_at):
+        return print_command_error(
+            args,
+            "scaffold",
+            "--generated-by and --generated-at must be supplied together.",
+            64,
+            "invalid_generation",
+        )
+
+    try:
+        generated_at = (
+            normalized_generated_at(args.generated_at)
+            if args.generated_at
+            else None
+        )
+    except OkfError as exc:
+        return print_command_error(
+            args,
+            "scaffold",
+            str(exc),
+            64,
+            "invalid_generation",
+        )
 
     frontmatter: dict[str, Any] = {
         "type": args.type,
@@ -427,38 +784,89 @@ def command_scaffold(args: argparse.Namespace) -> int:
         "description": args.description,
         "resource": args.resource,
         "tags": args.tag or [],
-        "timestamp": timestamp,
     }
-    required = REFERENCE_AGENT_REQUIRED if args.mode == "reference-agent" else SPEC_REQUIRED
-    missing = [key for key in required if not frontmatter.get(key)]
+    if args.generated_by and generated_at:
+        frontmatter["generated"] = {"by": args.generated_by, "at": generated_at}
+
+    missing = [key for key in SPEC_REQUIRED if not frontmatter.get(key)]
     if missing:
-        print(f"Missing required scaffold fields for {args.mode}: {', '.join(missing)}", file=sys.stderr)
-        return 64
+        return print_command_error(
+            args,
+            "scaffold",
+            f"Missing required scaffold fields: {', '.join(missing)}",
+            64,
+            "missing_required_field",
+        )
 
     if args.body_file:
-        body = Path(args.body_file).read_text(encoding="utf-8")
+        try:
+            body = Path(args.body_file).read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            return print_command_error(
+                args,
+                "scaffold",
+                f"Body file is not valid UTF-8: {exc}",
+                65,
+                "invalid_utf8",
+            )
     else:
         body = f"# {args.title or args.concept_id}\n\n"
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(serialize_frontmatter(frontmatter) + "\n" + body, encoding="utf-8")
-    print(path)
+    try:
+        write_text_no_follow(
+            bundle,
+            path,
+            serialize_frontmatter(frontmatter) + "\n" + body,
+            force=args.force,
+        )
+    except FileExistsError:
+        return print_command_error(
+            args,
+            "scaffold",
+            f"Refusing to overwrite existing concept: {path}",
+            73,
+            "overwrite_refused",
+        )
+    except UnsafePathError as exc:
+        return print_command_error(
+            args,
+            "scaffold",
+            str(exc),
+            64,
+            "unsafe_path",
+        )
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "command": "scaffold",
+                    "version": VERSION,
+                    "spec_version": SPEC_VERSION,
+                    "path": str(path),
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(path)
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="okf", description="Work with Open Knowledge Format bundles.")
+    parser = OkfArgumentParser(
+        prog="okf",
+        description=f"Work with Open Knowledge Format v{SPEC_VERSION} bundles.",
+    )
     parser.add_argument("--version", action="version", version=VERSION)
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     doctor = subparsers.add_parser("doctor")
-    doctor.add_argument("--json", action="store_true")
     doctor.set_defaults(func=command_doctor)
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("bundle")
-    validate.add_argument("--mode", choices=("spec", "reference-agent"), default="spec")
-    validate.add_argument("--json", action="store_true")
     validate.add_argument("--strict-links", action="store_true")
     validate.set_defaults(func=command_validate)
 
@@ -470,8 +878,8 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold.add_argument("--description")
     scaffold.add_argument("--resource")
     scaffold.add_argument("--tag", action="append", default=[])
-    scaffold.add_argument("--timestamp")
-    scaffold.add_argument("--mode", choices=("spec", "reference-agent"), default="spec")
+    scaffold.add_argument("--generated-by")
+    scaffold.add_argument("--generated-at", help='ISO 8601 datetime or "now".')
     scaffold.add_argument("--body-file")
     scaffold.add_argument("--force", action="store_true")
     scaffold.set_defaults(func=command_scaffold)
@@ -479,16 +887,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    parse_argv = list(sys.argv[1:] if argv is None else argv)
+    OkfArgumentParser.json_errors = "--json" in parse_argv
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(parse_argv)
     try:
         return args.func(args)
+    except UnsafePathError as exc:
+        return print_command_error(args, args.command, str(exc), 64, "unsafe_path")
     except OkfError as exc:
-        print(f"okf: {exc}", file=sys.stderr)
-        return 64
+        return print_command_error(args, args.command, str(exc), 64, "invalid_input")
     except OSError as exc:
-        print(f"okf: {exc}", file=sys.stderr)
-        return 74
+        return print_command_error(args, args.command, str(exc), 74, "io_error")
 
 
 if __name__ == "__main__":

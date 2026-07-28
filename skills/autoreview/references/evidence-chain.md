@@ -94,6 +94,10 @@ journal by its exact hash, size, classification, validator code, bounded
 preview/artifact reference, prompt fingerprints, and `model_launch_count`.
 The evidence schema and logical `counts.model_calls` remain `2.0.0` semantics;
 the external attempt journal is `2.1.0` and counts physical launches.
+AutoReview 5 requires every consumed evidence report to carry helper-owned
+`review_input` metadata with `input_complete=true` and no omissions. Evidence
+without that proof must start a new full lineage; disposition must not upgrade
+legacy evidence to a clean terminal state.
 
 Before every append, the helper replays the exact journal schema, identity,
 parent fingerprint chain, transitions, and monotonic launch count. A second
@@ -129,26 +133,31 @@ scripts/autoreview --json findings prepare \
   --input /tmp/autoreview-finding-draft.json \
   --output /tmp/autoreview-findings.json
 
-scripts/autoreview --mode branch --base origin/main \
+scripts/autoreview --review-profile standard --mode branch --base origin/main \
   --review-phase full --evidence-output /tmp/autoreview-full.json
 
-scripts/autoreview --mode branch --base origin/main \
+scripts/autoreview --review-profile standard --mode branch --base origin/main \
   --review-phase fix-verification \
   --prior-evidence /tmp/autoreview-full.json \
   --finding-file /tmp/autoreview-findings.json \
   --evidence-output /tmp/autoreview-delta.json
 
-scripts/autoreview --mode branch --base origin/main \
+scripts/autoreview --review-profile standard --mode branch --base origin/main \
   --review-phase terminal-full \
   --prior-evidence /tmp/autoreview-delta.json \
   --evidence-output /tmp/autoreview-terminal.json
 
-scripts/autoreview --mode branch --base origin/main \
+scripts/autoreview --review-profile standard --mode branch --base origin/main \
   --review-phase disposition \
   --prior-evidence /tmp/autoreview-full.json \
   --finding-file /tmp/autoreview-rejections.json \
   --evidence-output /tmp/autoreview-disposition.json
 ```
+
+Use the same derived `review_profile` for every model-running phase in one
+lineage. Replace `standard` with `high-risk` throughout a high-risk lineage;
+native `codex review` still runs only once, during its initial full-review
+candidate.
 
 Evidence files contain reports and fingerprints, not source bundles. The Git
 revisions named by the evidence must remain available so the helper can

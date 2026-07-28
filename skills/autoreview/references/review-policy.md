@@ -7,13 +7,18 @@ or when the change may need a second native Codex review.
 
 AutoReview owns the derived `review_profile` result:
 
-- `standard`: run the structured AutoReview path only.
+- `standard`: run the structured AutoReview path only, using `gpt-5.6-sol`
+  with `model_reasoning_effort=high`.
 - `high-risk`: run structured AutoReview plus one native `codex review` on the
-  same committed candidate HEAD.
+  same committed candidate HEAD, using `gpt-5.6-sol` with
+  `model_reasoning_effort=xhigh` for both lenses.
 
-`review_profile` is not a user option. Derive it from the accepted change and
-the actual diff. Use `high-risk` when either source touches at least one of
-these boundaries:
+`review_profile` is a derived execution value, not a user preference. Derive it
+from the accepted change and the actual diff, then pass it to
+`scripts/autoreview --review-profile <derived-profile>`. The derived profile
+must be exactly `standard` or `high-risk`. AutoReview must not
+use a lower effort, `max`, `ultra`, or an alternate model. Use `high-risk` when
+either source touches at least one of these boundaries:
 
 - authentication, authorization, identity, secrets, cryptography, or another
   security boundary;
@@ -44,9 +49,9 @@ supports it; otherwise run them back to back without changing HEAD between
 them. Use one exact native selector and no positional custom prompt:
 
 ```bash
-codex review --base <base-branch>
-codex review --commit <head-sha>
-codex review --uncommitted
+codex --model gpt-5.6-sol --config 'model_reasoning_effort="xhigh"' review --base <base-branch>
+codex --model gpt-5.6-sol --config 'model_reasoning_effort="xhigh"' review --commit <head-sha>
+codex --model gpt-5.6-sol --config 'model_reasoning_effort="xhigh"' review --uncommitted
 ```
 
 Current Codex CLI rejects a positional prompt combined with `--base`,

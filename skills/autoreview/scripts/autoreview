@@ -7,11 +7,13 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
 import textwrap
 from pathlib import Path
+from pathlib import PureWindowsPath
 from typing import Any
 
 PROTOCOL_PATH = Path(__file__).resolve().with_name("autoreview_protocol.py")
@@ -32,15 +34,42 @@ sys.modules[OPERATION_SPEC.name] = owned_operation
 sys.modules.setdefault("autoreview_protocol", protocol)
 OPERATION_SPEC.loader.exec_module(owned_operation)
 
-VERSION = "4.0.0"
+VERSION = "5.0.0"
 
+MAX_REVIEW_PROMPT_BYTES = 512_000
 MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
 INVALID_OUTPUT_PREVIEW_BYTES = 2048
 MAX_REPAIR_APPENDIX_BYTES = 2048
+OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+REVIEW_MODEL = "gpt-5.6-sol"
+REVIEW_REASONING_EFFORTS = {
+    "standard": "high",
+    "high-risk": "xhigh",
+}
 
 PRIORITIES = {0, 1, 2, 3}
 FINDING_CATEGORIES = {"bug", "security", "regression", "test-gap", "maintainability"}
 REVIEW_OUTCOMES = {"pass", "fail"}
+REVIEW_INPUT_SOURCES = {
+    "branch-diff",
+    "commit-diff",
+    "dataset",
+    "fix-delta",
+    "prompt-file",
+    "review-prompt",
+    "staged-diff",
+    "unstaged-diff",
+    "untracked-file",
+}
+REVIEW_INPUT_OMISSION_REASONS = {
+    "binary",
+    "changed-during-read",
+    "non-utf8",
+    "size-limit",
+    "symlink",
+    "unreadable",
+    "unsafe-path",
+}
 REVIEW_PHASES = protocol.REVIEW_PHASES
 TERMINAL_STATES = protocol.TERMINAL_STATES
 
@@ -131,10 +160,12 @@ class AutoreviewError(RuntimeError):
         *,
         code: str = "autoreview-failed",
         recovery: str = "inspect-error",
+        review_input: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.recovery = recovery
+        self.review_input = review_input
 
 
 class ReviewOutputError(AutoreviewError):
@@ -287,6 +318,25 @@ def run(
     return result
 
 
+def run_bytes(
+    args: list[str],
+    cwd: Path,
+    *,
+    check: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
+    result = subprocess.run(
+        args,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if check and result.returncode != 0:
+        command = " ".join(args)
+        detail = (result.stderr or result.stdout).decode("utf-8", errors="replace")
+        raise AutoreviewError(f"command failed ({result.returncode}): {command}\n{detail}")
+    return result
+
+
 def run_with_heartbeat(
     args: list[str],
     cwd: Path,
@@ -392,6 +442,14 @@ def git(repo: Path, *args: str, check: bool = True) -> str:
     return run([resolve_command("git", repo), *args], repo, check=check).stdout
 
 
+def git_bytes(repo: Path, *args: str, check: bool = True) -> bytes:
+    return run_bytes(
+        [resolve_command("git", repo), *args],
+        repo,
+        check=check,
+    ).stdout
+
+
 def repo_root() -> Path:
     git_bin = resolve_command("git")
     result = run([git_bin, "rev-parse", "--show-toplevel"], Path.cwd(), check=False)
@@ -454,83 +512,704 @@ def choose_target(repo: Path, mode: str, base_ref: str | None) -> tuple[str, str
     raise AutoreviewError("no review target: clean default-branch checkout and no forced mode")
 
 
-def bounded(text: str, limit: int = 180_000) -> str:
-    if len(text) <= limit:
-        return text
-    return text[:limit] + f"\n\n[truncated at {limit} characters]\n"
+def review_input_status(
+    omissions: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    rows = list(omissions or [])
+    return validate_review_input_status(
+        {
+            "input_complete": not rows,
+            "omissions": rows,
+        }
+    )
 
 
-def read_text(path: Path, limit: int = 40_000) -> str:
+def validate_review_input_status(status: Any) -> dict[str, Any]:
+    if not isinstance(status, dict) or set(status) != {"input_complete", "omissions"}:
+        raise AutoreviewError(
+            "review_input metadata has invalid fields",
+            code="review-input-metadata-invalid",
+            recovery="needs-owner",
+        )
+    omissions = status["omissions"]
+    if not isinstance(status["input_complete"], bool) or not isinstance(omissions, list):
+        raise AutoreviewError(
+            "review_input metadata has invalid values",
+            code="review-input-metadata-invalid",
+            recovery="needs-owner",
+        )
+    if status["input_complete"] != (not omissions):
+        raise AutoreviewError(
+            "review_input completeness disagrees with omissions",
+            code="review-input-metadata-invalid",
+            recovery="needs-owner",
+        )
+    for index, omission in enumerate(omissions):
+        if not isinstance(omission, dict) or set(omission) != {"source", "path", "reason"}:
+            raise AutoreviewError(
+                f"review_input omission {index} has invalid fields",
+                code="review-input-metadata-invalid",
+                recovery="needs-owner",
+            )
+        path = omission["path"]
+        source = omission["source"]
+        reason = omission["reason"]
+        if (
+            not isinstance(source, str)
+            or source not in REVIEW_INPUT_SOURCES
+            or not isinstance(reason, str)
+            or reason not in REVIEW_INPUT_OMISSION_REASONS
+            or (path is not None and (not isinstance(path, str) or not path))
+        ):
+            raise AutoreviewError(
+                f"review_input omission {index} has invalid values",
+                code="review-input-metadata-invalid",
+                recovery="needs-owner",
+            )
+    return status
+
+
+def input_omission(
+    *,
+    source: str,
+    path: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    omission = {
+        "source": source,
+        "path": path,
+        "reason": reason,
+    }
+    validate_review_input_status(
+        {
+            "input_complete": False,
+            "omissions": [omission],
+        }
+    )
+    return omission
+
+
+def incomplete_review_input(
+    message: str,
+    omissions: list[dict[str, Any]],
+    *,
+    code: str = "review-input-incomplete",
+) -> AutoreviewError:
+    status = review_input_status(omissions)
+    if status["input_complete"]:
+        raise AutoreviewError(
+            "incomplete review input requires at least one omission",
+            code="review-input-metadata-invalid",
+            recovery="needs-owner",
+        )
+    return AutoreviewError(
+        message,
+        code=code,
+        recovery="fix-review-input",
+        review_input=status,
+    )
+
+
+def path_has_symlink_component(repo: Path, relative: Path) -> bool:
+    current = repo
+    for part in relative.parts:
+        current = current / part
+        try:
+            if current.is_symlink():
+                return True
+        except OSError:
+            return True
+    return False
+
+
+def lexical_repo_path(
+    raw_path: str,
+    *,
+    label: str,
+    source: str,
+) -> Path:
+    relative = Path(raw_path)
+    windows_path = PureWindowsPath(raw_path)
+    unsafe = (
+        not raw_path
+        or relative == Path(".")
+        or relative.is_absolute()
+        or bool(relative.drive)
+        or windows_path.is_absolute()
+        or bool(windows_path.drive)
+        or ".." in relative.parts
+        or ".." in windows_path.parts
+    )
+    if unsafe:
+        raise incomplete_review_input(
+            f"{label} must be a repo-relative path without parent traversal: {raw_path}",
+            [input_omission(source=source, path=raw_path or None, reason="unsafe-path")],
+            code="review-input-path-invalid",
+        )
+    return relative
+
+
+def validate_repo_input_path(
+    repo: Path,
+    raw_path: str,
+    *,
+    label: str,
+    source: str,
+) -> tuple[Path, str]:
+    repo = repo.resolve()
+    relative = lexical_repo_path(raw_path, label=label, source=source)
+    if path_has_symlink_component(repo, relative):
+        raise incomplete_review_input(
+            f"{label} must not traverse a symlink: {raw_path}",
+            [input_omission(source=source, path=raw_path, reason="symlink")],
+            code="review-input-path-invalid",
+        )
+    return repo / relative, relative.as_posix()
+
+
+def open_repo_regular_file(repo: Path, relative: Path) -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if not nofollow or not OPEN_SUPPORTS_DIR_FD:
+        raise OSError("platform cannot safely open repository-relative input")
+    common_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    root_descriptor = os.open(repo, common_flags | directory)
+    directory_descriptors = [root_descriptor]
     try:
-        data = path.read_bytes()
+        parent_descriptor = root_descriptor
+        for part in relative.parts[:-1]:
+            child_descriptor = os.open(
+                part,
+                common_flags | directory | nofollow,
+                dir_fd=parent_descriptor,
+            )
+            if not stat.S_ISDIR(os.fstat(child_descriptor).st_mode):
+                os.close(child_descriptor)
+                raise OSError(f"repository path component is not a directory: {part}")
+            directory_descriptors.append(child_descriptor)
+            parent_descriptor = child_descriptor
+        descriptor = os.open(
+            relative.parts[-1],
+            common_flags | getattr(os, "O_BINARY", 0) | nofollow,
+            dir_fd=parent_descriptor,
+        )
+        return descriptor
+    finally:
+        for directory_descriptor in reversed(directory_descriptors):
+            os.close(directory_descriptor)
+
+
+def read_review_text(
+    repo: Path,
+    path: Path,
+    *,
+    source: str,
+    display_path: str,
+) -> str:
+    repo = repo.resolve()
+    relative = lexical_repo_path(display_path, label=source, source=source)
+    if path_has_symlink_component(repo, relative):
+        raise incomplete_review_input(
+            f"{source} must not traverse a symlink: {display_path}",
+            [input_omission(source=source, path=display_path, reason="symlink")],
+            code="review-input-path-invalid",
+        )
+    # The descriptor walk below uses only the validated relative path. The
+    # caller-supplied Path is retained for API clarity but is never opened.
+    del path
+    descriptor: int | None = None
+    try:
+        descriptor = open_repo_regular_file(repo, relative)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise OSError("not a regular file")
+        if opened.st_size > MAX_REVIEW_PROMPT_BYTES:
+            raise incomplete_review_input(
+                f"{source} exceeds the {MAX_REVIEW_PROMPT_BYTES}-byte review input limit: {display_path}",
+                [input_omission(source=source, path=display_path, reason="size-limit")],
+                code="review-input-too-large",
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_REVIEW_PROMPT_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, remaining)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        after = os.fstat(descriptor)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+        ):
+            raise OSError("file changed while reading")
+    except AutoreviewError:
+        raise
     except OSError as exc:
-        return f"[unreadable: {exc}]"
+        reason = "symlink" if path_has_symlink_component(repo, relative) else "unreadable"
+        raise incomplete_review_input(
+            f"{source} is unreadable: {display_path} ({type(exc).__name__}: {exc})",
+            [input_omission(source=source, path=display_path, reason=reason)],
+        ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if len(data) > MAX_REVIEW_PROMPT_BYTES:
+        raise incomplete_review_input(
+            f"{source} exceeds the {MAX_REVIEW_PROMPT_BYTES}-byte review input limit: {display_path}",
+            [input_omission(source=source, path=display_path, reason="size-limit")],
+            code="review-input-too-large",
+        )
     if b"\0" in data:
-        return "[binary file omitted]"
-    return bounded(data.decode("utf-8", errors="replace"), limit)
+        raise incomplete_review_input(
+            f"{source} is binary and cannot be included completely: {display_path}",
+            [input_omission(source=source, path=display_path, reason="binary")],
+        )
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise incomplete_review_input(
+            f"{source} is not valid UTF-8 and cannot be included completely: {display_path}",
+            [input_omission(source=source, path=display_path, reason="non-utf8")],
+        ) from exc
+
+
+def git_review_bytes(repo: Path, source: str, *args: str) -> bytes:
+    result = run_bytes(
+        [resolve_command("git", repo), *args],
+        repo,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).decode("utf-8", errors="replace").strip()
+        raise incomplete_review_input(
+            f"{source} could not be read completely: {detail or 'git command failed'}",
+            [input_omission(source=source, path=None, reason="unreadable")],
+        )
+    return result.stdout
+
+
+def decode_review_bytes(raw: bytes, source: str) -> str:
+    if b"\0" in raw:
+        raise incomplete_review_input(
+            f"{source} contains NUL-bearing content and cannot be included completely",
+            [input_omission(source=source, path=None, reason="binary")],
+        )
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise incomplete_review_input(
+            f"{source} is not valid UTF-8 and cannot be included completely",
+            [input_omission(source=source, path=None, reason="non-utf8")],
+        ) from exc
+
+
+def decode_git_path(raw: bytes, source: str) -> str:
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        display = raw.decode("utf-8", errors="backslashreplace")
+        raise incomplete_review_input(
+            f"{source} contains a non-UTF-8 path: {display}",
+            [input_omission(source=source, path=display, reason="non-utf8")],
+        ) from exc
+
+
+def parse_git_paths(raw: bytes, source: str) -> list[str]:
+    if raw and not raw.endswith(b"\0"):
+        raise incomplete_review_input(
+            f"{source} returned an incomplete path list",
+            [input_omission(source=source, path=None, reason="unreadable")],
+        )
+    return [
+        decode_git_path(item, source)
+        for item in raw.split(b"\0")
+        if item
+    ]
+
+
+def git_paths(repo: Path, source: str, *args: str) -> list[str]:
+    return parse_git_paths(git_review_bytes(repo, source, *args), source)
+
+
+def binary_paths(numstat: bytes, source: str) -> list[str]:
+    paths: list[str] = []
+    records = numstat.split(b"\0")
+    if records and records[-1] == b"":
+        records.pop()
+    index = 0
+    while index < len(records):
+        fields = records[index].split(b"\t", 2)
+        index += 1
+        if len(fields) != 3:
+            raise incomplete_review_input(
+                f"{source} returned malformed numstat data",
+                [input_omission(source=source, path=None, reason="unreadable")],
+            )
+        added, deleted, raw_path = fields
+        if raw_path:
+            path = decode_git_path(raw_path, source)
+        else:
+            if index + 1 >= len(records):
+                raise incomplete_review_input(
+                    f"{source} returned malformed rename data",
+                    [input_omission(source=source, path=None, reason="unreadable")],
+                )
+            decode_git_path(records[index], source)
+            path = decode_git_path(records[index + 1], source)
+            index += 2
+        if added == b"-" and deleted == b"-":
+            paths.append(path)
+    return paths
+
+
+def require_no_binary_changes(source: str, paths: list[str]) -> None:
+    if not paths:
+        return
+    raise incomplete_review_input(
+        f"{source} contains binary changes that AutoReview cannot include completely: "
+        + ", ".join(paths),
+        [
+            input_omission(source=source, path=path, reason="binary")
+            for path in paths
+        ],
+    )
+
+
+def require_complete_prompt(prompt: str) -> None:
+    size = len(prompt.encode("utf-8"))
+    if size <= MAX_REVIEW_PROMPT_BYTES:
+        return
+    raise incomplete_review_input(
+        f"review input is {size} bytes, exceeding the {MAX_REVIEW_PROMPT_BYTES}-byte aggregate limit",
+        [input_omission(source="review-prompt", path=None, reason="size-limit")],
+        code="review-input-too-large",
+    )
+
+
+def snapshot_fingerprint(*values: str) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        encoded = value.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+    return digest.hexdigest()
+
+
+def collect_local_snapshot(repo: Path) -> dict[str, Any]:
+    status = decode_review_bytes(
+        git_review_bytes(repo, "review-prompt", "status", "--short"),
+        "review-prompt",
+    )
+    staged_numstat = git_review_bytes(
+        repo, "staged-diff", "diff", "--cached", "--numstat", "-z"
+    )
+    require_no_binary_changes(
+        "staged-diff",
+        binary_paths(staged_numstat, "staged-diff"),
+    )
+    staged_stat = decode_review_bytes(
+        git_review_bytes(repo, "staged-diff", "diff", "--cached", "--stat"),
+        "staged-diff",
+    )
+    staged_patch = decode_review_bytes(
+        git_review_bytes(
+            repo,
+            "staged-diff",
+            "diff",
+            "--cached",
+            "--patch",
+            "--find-renames",
+        ),
+        "staged-diff",
+    )
+    staged_paths = git_paths(
+        repo,
+        "staged-diff",
+        "diff",
+        "--cached",
+        "--name-only",
+        "-z",
+    )
+    unstaged_numstat = git_review_bytes(
+        repo, "unstaged-diff", "diff", "--numstat", "-z"
+    )
+    require_no_binary_changes(
+        "unstaged-diff",
+        binary_paths(unstaged_numstat, "unstaged-diff"),
+    )
+    unstaged_stat = decode_review_bytes(
+        git_review_bytes(repo, "unstaged-diff", "diff", "--stat"),
+        "unstaged-diff",
+    )
+    unstaged_patch = decode_review_bytes(
+        git_review_bytes(
+            repo,
+            "unstaged-diff",
+            "diff",
+            "--patch",
+            "--find-renames",
+        ),
+        "unstaged-diff",
+    )
+    unstaged_paths = git_paths(
+        repo,
+        "unstaged-diff",
+        "diff",
+        "--name-only",
+        "-z",
+    )
+    untracked_paths = git_paths(
+        repo,
+        "untracked-file",
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+    )
+    untracked_sections: list[str] = []
+    for relative in untracked_paths:
+        untracked_sections.append(
+            f"## {relative}\n"
+            + read_review_text(
+                repo,
+                repo / relative,
+                source="untracked-file",
+                display_path=relative,
+            )
+        )
+    parts = [
+        "# Git Status",
+        status,
+        "# Staged Diff",
+        staged_stat,
+        staged_patch,
+        "# Unstaged Diff",
+        unstaged_stat,
+        unstaged_patch,
+    ]
+    if untracked_sections:
+        parts.extend(["# Untracked Files", *untracked_sections])
+    return {
+        "bundle": "\n\n".join(parts),
+        "changed": set(staged_paths) | set(unstaged_paths) | set(untracked_paths),
+        "fingerprints": {
+            "review-prompt": snapshot_fingerprint(status),
+            "staged-diff": snapshot_fingerprint(
+                staged_numstat.hex(),
+                staged_stat,
+                staged_patch,
+                *staged_paths,
+            ),
+            "unstaged-diff": snapshot_fingerprint(
+                unstaged_numstat.hex(),
+                unstaged_stat,
+                unstaged_patch,
+                *unstaged_paths,
+            ),
+            "untracked-file": snapshot_fingerprint(
+                *untracked_paths,
+                *untracked_sections,
+            ),
+        },
+    }
+
+
+def local_review_snapshot(repo: Path) -> tuple[str, set[str]]:
+    first = collect_local_snapshot(repo)
+    second = collect_local_snapshot(repo)
+    omissions = [
+        input_omission(source=source, path=None, reason="changed-during-read")
+        for source in (
+            "review-prompt",
+            "staged-diff",
+            "unstaged-diff",
+            "untracked-file",
+        )
+        if first["fingerprints"][source] != second["fingerprints"][source]
+    ]
+    if omissions:
+        raise incomplete_review_input(
+            "local review input changed while AutoReview was collecting it",
+            omissions,
+        )
+    return second["bundle"], second["changed"]
+
+
+def attach_review_input(
+    report: dict[str, Any],
+    status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if "review_input" in report:
+        raise AutoreviewError(
+            "review engine returned helper-owned review_input metadata",
+            code="review-output-schema-invalid",
+            recovery="needs-owner",
+        )
+    resolved_status = validate_review_input_status(
+        status if status is not None else review_input_status()
+    )
+    if not resolved_status["input_complete"]:
+        raise AutoreviewError(
+            "incomplete review input cannot be attached to a model result",
+            code="review-input-incomplete",
+            recovery="fix-review-input",
+            review_input=resolved_status,
+        )
+    return {
+        **report,
+        "review_input": resolved_status,
+    }
 
 
 def local_bundle(repo: Path) -> str:
-    parts = [
-        "# Git Status",
-        git(repo, "status", "--short"),
-        "# Staged Diff",
-        git(repo, "diff", "--cached", "--stat"),
-        bounded(git(repo, "diff", "--cached", "--patch", "--find-renames")),
-        "# Unstaged Diff",
-        git(repo, "diff", "--stat"),
-        bounded(git(repo, "diff", "--patch", "--find-renames")),
-    ]
-    untracked = [
-        line
-        for line in git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
-        if line.strip()
-    ]
-    if untracked:
-        parts.append("# Untracked Files")
-        for rel in untracked:
-            parts.append(f"## {rel}\n{read_text(repo / rel)}")
-    return "\n\n".join(parts)
+    return local_review_snapshot(repo)[0]
 
 
-def branch_bundle(repo: Path, base_ref: str) -> str:
+def branch_review_snapshot(repo: Path, base_ref: str) -> tuple[str, set[str]]:
     if base_ref.startswith("origin/"):
         git(repo, "fetch", "origin", "--quiet", check=False)
-    return "\n\n".join(
+    base_revision = git(repo, "rev-parse", f"{base_ref}^{{commit}}").strip()
+    head_revision = current_head(repo)
+    diff_range = f"{base_revision}...{head_revision}"
+    numstat = git_review_bytes(
+        repo, "branch-diff", "diff", "--numstat", "-z", diff_range
+    )
+    require_no_binary_changes(
+        "branch-diff",
+        binary_paths(numstat, "branch-diff"),
+    )
+    bundle = "\n\n".join(
         [
             "# Branch Diff",
             f"base: {base_ref}",
-            git(repo, "diff", "--stat", f"{base_ref}...HEAD"),
-            bounded(git(repo, "diff", "--patch", "--find-renames", f"{base_ref}...HEAD")),
+            decode_review_bytes(
+                git_review_bytes(repo, "branch-diff", "diff", "--stat", diff_range),
+                "branch-diff",
+            ),
+            decode_review_bytes(
+                git_review_bytes(
+                    repo,
+                    "branch-diff",
+                    "diff",
+                    "--patch",
+                    "--find-renames",
+                    diff_range,
+                ),
+                "branch-diff",
+            ),
         ]
     )
+    changed = set(
+        git_paths(
+            repo,
+            "branch-diff",
+            "diff",
+            "--name-only",
+            "-z",
+            diff_range,
+        )
+    )
+    return bundle, changed
+
+
+def branch_bundle(repo: Path, base_ref: str) -> str:
+    return branch_review_snapshot(repo, base_ref)[0]
+
+
+def commit_review_snapshot(repo: Path, commit_ref: str) -> tuple[str, set[str]]:
+    commit_revision = git(repo, "rev-parse", f"{commit_ref}^{{commit}}").strip()
+    numstat = git_review_bytes(
+        repo,
+        "commit-diff",
+        "show",
+        "--numstat",
+        "-z",
+        "--format=",
+        commit_revision,
+    )
+    require_no_binary_changes(
+        "commit-diff",
+        binary_paths(numstat, "commit-diff"),
+    )
+    bundle = "\n\n".join(
+        [
+            "# Commit Diff",
+            f"commit: {commit_revision}",
+            decode_review_bytes(
+                git_review_bytes(
+                    repo,
+                    "commit-diff",
+                    "show",
+                    "--stat",
+                    "--format=fuller",
+                    commit_revision,
+                ),
+                "commit-diff",
+            ),
+            decode_review_bytes(
+                git_review_bytes(
+                    repo,
+                    "commit-diff",
+                    "show",
+                    "--patch",
+                    "--find-renames",
+                    "--format=fuller",
+                    commit_revision,
+                ),
+                "commit-diff",
+            ),
+        ]
+    )
+    changed = set(
+        git_paths(
+            repo,
+            "commit-diff",
+            "show",
+            "--name-only",
+            "-z",
+            "--format=",
+            commit_revision,
+        )
+    )
+    return bundle, changed
 
 
 def commit_bundle(repo: Path, commit_ref: str) -> str:
-    return "\n\n".join(
-        [
-            "# Commit Diff",
-            f"commit: {commit_ref}",
-            git(repo, "show", "--stat", "--format=fuller", commit_ref),
-            bounded(git(repo, "show", "--patch", "--find-renames", "--format=fuller", commit_ref)),
-        ]
-    )
+    return commit_review_snapshot(repo, commit_ref)[0]
 
 
 def changed_paths(repo: Path, target: str, target_ref: str | None, commit_ref: str) -> set[str]:
     if target == "local":
-        sources = [
-            git(repo, "diff", "--name-only", "--cached"),
-            git(repo, "diff", "--name-only"),
-            git(repo, "ls-files", "--others", "--exclude-standard"),
-        ]
+        return local_review_snapshot(repo)[1]
     elif target == "branch":
         if target_ref is None:
             raise AutoreviewError("branch target requires a base ref")
-        sources = [git(repo, "diff", "--name-only", f"{target_ref}...HEAD")]
-    else:
-        sources = [git(repo, "show", "--name-only", "--format=", commit_ref)]
-    return {line.strip() for source in sources for line in source.splitlines() if line.strip()}
+        base_revision = git(repo, "rev-parse", f"{target_ref}^{{commit}}").strip()
+        head_revision = current_head(repo)
+        return set(
+            git_paths(
+                repo,
+                "branch-diff",
+                "diff",
+                "--name-only",
+                "-z",
+                f"{base_revision}...{head_revision}",
+            )
+        )
+    commit_revision = git(repo, "rev-parse", f"{commit_ref}^{{commit}}").strip()
+    return set(
+        git_paths(
+            repo,
+            "commit-diff",
+            "show",
+            "--name-only",
+            "-z",
+            "--format=",
+            commit_revision,
+        )
+    )
 
 
 def sha256_text(value: str) -> str:
@@ -582,9 +1261,25 @@ def load_json_file(path: str, label: str) -> dict[str, Any]:
 
 def validate_evidence(value: dict[str, Any]) -> dict[str, Any]:
     try:
-        return protocol.validate_evidence(value)
+        evidence = protocol.validate_evidence(value)
     except protocol.ProtocolError as exc:
         raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
+    report = evidence["report"]
+    if not isinstance(report, dict) or "review_input" not in report:
+        raise AutoreviewError(
+            "AutoReview evidence predates verifiable review_input completeness",
+            code="review-input-evidence-unsupported",
+            recovery="start-new-full-lineage",
+        )
+    status = validate_review_input_status(report["review_input"])
+    if not status["input_complete"]:
+        raise AutoreviewError(
+            "AutoReview evidence records incomplete review input",
+            code="review-input-incomplete",
+            recovery="start-new-full-lineage",
+            review_input=status,
+        )
+    return evidence
 
 
 def load_finding_file(
@@ -630,11 +1325,50 @@ def load_finding_file(
 
 
 def delta_bundle(repo: Path, previous_head: str) -> tuple[str, set[str], dict[str, list[tuple[int, int]]]]:
-    ancestor = run([resolve_command("git", repo), "merge-base", "--is-ancestor", previous_head, "HEAD"], repo, check=False)
+    current_revision = current_head(repo)
+    ancestor = run(
+        [
+            resolve_command("git", repo),
+            "merge-base",
+            "--is-ancestor",
+            previous_head,
+            current_revision,
+        ],
+        repo,
+        check=False,
+    )
     if ancestor.returncode != 0:
         raise AutoreviewError("prior head is not an ancestor of HEAD", code="lineage-invalidated", recovery="start-new-full-lineage")
-    patch = git(repo, "diff", "--patch", "--find-renames", "--unified=0", f"{previous_head}..HEAD")
-    paths = {line.strip() for line in git(repo, "diff", "--name-only", f"{previous_head}..HEAD").splitlines() if line.strip()}
+    diff_range = f"{previous_head}..{current_revision}"
+    numstat = git_review_bytes(
+        repo, "fix-delta", "diff", "--numstat", "-z", diff_range
+    )
+    require_no_binary_changes(
+        "fix-delta",
+        binary_paths(numstat, "fix-delta"),
+    )
+    patch = decode_review_bytes(
+        git_review_bytes(
+            repo,
+            "fix-delta",
+            "diff",
+            "--patch",
+            "--find-renames",
+            "--unified=0",
+            diff_range,
+        ),
+        "fix-delta",
+    )
+    paths = set(
+        git_paths(
+            repo,
+            "fix-delta",
+            "diff",
+            "--name-only",
+            "-z",
+            diff_range,
+        )
+    )
     if not paths:
         raise AutoreviewError("fix verification requires a changed HEAD", code="review-no-progress", recovery="needs-owner")
     ranges: dict[str, list[tuple[int, int]]] = {}
@@ -658,25 +1392,50 @@ def delta_bundle(repo: Path, previous_head: str) -> tuple[str, set[str], dict[st
                         line_count = len(current_file.read_text(errors="replace").splitlines())
                         start = min(start, max(1, line_count))
                 ranges.setdefault(current_path, []).append((start, max(start, start + length - 1)))
-    return bounded(patch), paths, ranges
+    return patch, paths, ranges
 
 
-def load_extra_prompt(args: argparse.Namespace) -> str:
+def load_extra_prompt(args: argparse.Namespace, repo: Path) -> str:
     chunks: list[str] = []
     for value in args.prompt or []:
         chunks.append(value)
-    for path in args.prompt_file or []:
-        chunks.append(Path(path).read_text())
+    for raw_path in args.prompt_file or []:
+        path, relative = validate_repo_input_path(
+            repo,
+            raw_path,
+            label="--prompt-file",
+            source="prompt-file",
+        )
+        chunks.append(
+            f"# Prompt file: {relative}\n"
+            + read_review_text(
+                repo,
+                path,
+                source="prompt-file",
+                display_path=relative,
+            )
+        )
     return "\n\n".join(chunks)
 
 
-def load_datasets(args: argparse.Namespace) -> str:
+def load_datasets(args: argparse.Namespace, repo: Path) -> str:
     chunks: list[str] = []
-    for spec in args.dataset or []:
-        path = Path(spec)
-        if path.is_dir():
-            raise AutoreviewError(f"--dataset must be a file, got directory: {path}")
-        chunks.append(f"# Dataset: {path}\n{read_text(path)}")
+    for raw_path in args.dataset or []:
+        path, relative = validate_repo_input_path(
+            repo,
+            raw_path,
+            label="--dataset",
+            source="dataset",
+        )
+        chunks.append(
+            f"# Dataset: {relative}\n"
+            + read_review_text(
+                repo,
+                path,
+                source="dataset",
+                display_path=relative,
+            )
+        )
     return "\n\n".join(chunks)
 
 
@@ -762,22 +1521,15 @@ def build_verification_prompt(
     ).strip()
 
 
-def configured_codex_model() -> str | None:
+def review_reasoning_effort(review_profile: str) -> str:
     try:
-        import tomllib
-    except ModuleNotFoundError:
-        return None
-    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-    config_path = codex_home / "config.toml"
-    try:
-        with config_path.open("rb") as handle:
-            config = tomllib.load(handle)
-    except OSError:
-        return None
-    except tomllib.TOMLDecodeError:
-        return None
-    model = config.get("model")
-    return model if isinstance(model, str) and model.strip() else None
+        return REVIEW_REASONING_EFFORTS[review_profile]
+    except KeyError as exc:
+        raise AutoreviewError(
+            "review_profile must be standard or high-risk",
+            code="review-profile-invalid",
+            recovery="derive-review-profile",
+        ) from exc
 
 
 def write_json_temp(data: dict[str, Any]) -> Path:
@@ -835,12 +1587,18 @@ def read_review_output(path: Path) -> tuple[str, dict[str, Any]]:
 def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[str, Any] | None = None) -> str:
     ensure_review_environment()
     codex_bin = resolve_command(args.codex_bin, repo)
-    model = getattr(args, "_resolved_model", None) or args.model or configured_codex_model()
-    cmd = [codex_bin, "--ask-for-approval", "never"]
+    reasoning_effort = review_reasoning_effort(args.review_profile)
+    cmd = [
+        codex_bin,
+        "--ask-for-approval",
+        "never",
+        "--model",
+        REVIEW_MODEL,
+        "--config",
+        f'model_reasoning_effort="{reasoning_effort}"',
+    ]
     if args.web_search:
         cmd.append("--search")
-    if model:
-        cmd.extend(["--model", model])
     cmd.extend(
         [
             "exec",
@@ -1226,6 +1984,7 @@ def run_validated_model(
                 recovery="needs-owner",
             ) from first
         repair_prompt = prompt + build_repair_appendix(first)
+        require_complete_prompt(repair_prompt)
         validate_identity(prompt, schema)
         prepare_repair(first, prompt, repair_prompt)
         args._pending_invalid_output = None
@@ -1392,6 +2151,15 @@ def human_report(report: dict[str, Any]) -> str:
     outcome_text = "patch is correct" if report["review_outcome"] == "pass" else "patch is incorrect"
     lines.append(f"overall: {outcome_text} ({report['review_confidence']})")
     lines.append(report["review_explanation"])
+    input_status = report.get("review_input")
+    if isinstance(input_status, dict):
+        complete = input_status.get("input_complete") is True
+        omissions = input_status.get("omissions")
+        omission_count = len(omissions) if isinstance(omissions, list) else 0
+        lines.append(
+            f"review input: {'complete' if complete else 'incomplete'} "
+            f"({omission_count} omissions)"
+        )
     return "\n".join(lines)
 
 
@@ -1431,7 +2199,8 @@ def doctor(args: argparse.Namespace) -> int:
         "git": git_info,
         "gh": {**gh_info, "optional": True, "purpose": "PR base detection"},
         "codex": codex_info,
-        "configured_model": configured_codex_model(),
+        "review_model": REVIEW_MODEL,
+        "review_reasoning_efforts": REVIEW_REASONING_EFFORTS,
         "environment": environment,
         "recovery": (
             "reroute-to-capable-root"
@@ -1453,6 +2222,8 @@ def doctor(args: argparse.Namespace) -> int:
         print(f"repo: {payload['repo_root'] or 'not inside a git repository'}")
         print(f"git: {git_info.get('path') or 'missing'}")
         print(f"codex: {codex_info.get('path') or 'missing'}")
+        print(f"review model: {REVIEW_MODEL}")
+        print("review reasoning: standard=high, high-risk=xhigh")
         print(f"structured output: {'yes' if structured_flags else 'no'}")
         print(f"ok: {'yes' if payload['ok'] else 'no'}")
         if missing:
@@ -1474,22 +2245,39 @@ def command_info(name: str, repo: Path | None) -> dict[str, Any]:
     }
 
 
-def build_review(args: argparse.Namespace) -> tuple[Path, str, str | None, set[str], str, str]:
+def build_review(
+    args: argparse.Namespace,
+) -> tuple[Path, str, str | None, set[str], str, str, dict[str, Any]]:
     repo = repo_root()
     target, target_ref = choose_target(repo, args.mode, args.base)
     if target == "local":
-        bundle = local_bundle(repo)
+        bundle, changed = local_review_snapshot(repo)
     elif target == "branch":
         if target_ref is None:
             raise AutoreviewError("branch target requires a base ref")
-        bundle = branch_bundle(repo, target_ref)
+        bundle, changed = branch_review_snapshot(repo, target_ref)
     else:
-        bundle = commit_bundle(repo, args.commit)
-    changed = changed_paths(repo, target, target_ref, args.commit)
+        bundle, changed = commit_review_snapshot(repo, args.commit)
     if not changed:
         raise AutoreviewError("review target has no changed files")
-    prompt = build_prompt(repo, target, target_ref, bundle, load_extra_prompt(args), load_datasets(args))
-    return repo, target, target_ref, changed, prompt, sha256_text(bundle)
+    prompt = build_prompt(
+        repo,
+        target,
+        target_ref,
+        bundle,
+        load_extra_prompt(args, repo),
+        load_datasets(args, repo),
+    )
+    require_complete_prompt(prompt)
+    return (
+        repo,
+        target,
+        target_ref,
+        changed,
+        prompt,
+        sha256_text(bundle),
+        review_input_status(),
+    )
 
 
 def run_review(args: argparse.Namespace) -> int:
@@ -1501,7 +2289,15 @@ def run_review(args: argparse.Namespace) -> int:
         raise AutoreviewError("full review does not accept prior evidence or a finding file")
     if args.review_phase == "terminal-full" and (not args.prior_evidence or not args.evidence_output or args.finding_file):
         raise AutoreviewError("terminal-full requires --prior-evidence and --evidence-output only")
-    repo, target, target_ref, changed, prompt, target_fingerprint = build_review(args)
+    (
+        repo,
+        target,
+        target_ref,
+        changed,
+        prompt,
+        target_fingerprint,
+        input_status,
+    ) = build_review(args)
     if args.evidence_output and (target != "branch" or target_ref is None):
         raise AutoreviewError("evidence chains require branch mode")
     prior: dict[str, Any] | None = None
@@ -1521,6 +2317,7 @@ def run_review(args: argparse.Namespace) -> int:
             "base": target_ref,
             "changed_files": sorted(changed),
             "prompt_characters": len(prompt),
+            "review_input": input_status,
         }
         if args.output:
             Path(args.output).write_text(prompt)
@@ -1536,7 +2333,10 @@ def run_review(args: argparse.Namespace) -> int:
 
     import time
     started = time.monotonic()
-    report = run_validated_model(args, repo, prompt, SCHEMA, changed=changed)
+    report = attach_review_input(
+        run_validated_model(args, repo, prompt, SCHEMA, changed=changed),
+        input_status,
+    )
     elapsed = int(time.monotonic() - started)
     if args.json_output:
         Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
@@ -1583,10 +2383,19 @@ def run_fix_verification(args: argparse.Namespace) -> int:
     delta, delta_paths, ranges = delta_bundle(repo, prior["target"]["head_sha"])
     if not delta_paths.issubset(set(prior["target"]["review_scope"])):
         raise AutoreviewError("fix delta expands the reviewed path set", code="lineage-invalidated", recovery="start-new-full-lineage")
-    prompt = build_verification_prompt(repo, delta, accepted, load_extra_prompt(args), load_datasets(args))
+    prompt = build_verification_prompt(
+        repo,
+        delta,
+        accepted,
+        load_extra_prompt(args, repo),
+        load_datasets(args, repo),
+    )
+    require_complete_prompt(prompt)
+    input_status = review_input_status()
     if args.dry_run:
         payload = {"ok": True, "dry_run": True, "review_phase": "fix-verification", "finding_source": source,
-                   "changed_files": sorted(delta_paths), "prompt_characters": len(prompt)}
+                   "changed_files": sorted(delta_paths), "prompt_characters": len(prompt),
+                   "review_input": input_status}
         if args.output:
             Path(args.output).write_text(prompt)
         print(json.dumps(payload, indent=2, sort_keys=True) if args.json else f"autoreview dry run: fix-verification\nchanged files: {len(delta_paths)}\nprompt characters: {len(prompt)}")
@@ -1594,13 +2403,16 @@ def run_fix_verification(args: argparse.Namespace) -> int:
     import time
     started = time.monotonic()
     accepted_ids = {row["finding_id"] for row in accepted}
-    report = run_validated_model(
-        args,
-        repo,
-        prompt,
-        VERIFICATION_SCHEMA,
-        changed=delta_paths,
-        verification=(accepted_ids, ranges),
+    report = attach_review_input(
+        run_validated_model(
+            args,
+            repo,
+            prompt,
+            VERIFICATION_SCHEMA,
+            changed=delta_paths,
+            verification=(accepted_ids, ranges),
+        ),
+        input_status,
     )
     elapsed = int(time.monotonic() - started)
     if args.json_output:
@@ -1614,7 +2426,18 @@ def run_fix_verification(args: argparse.Namespace) -> int:
         target_override=getattr(args, "_managed_target", None),
     )
     Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
-    rendered = human_report({key: report[key] for key in ("findings", "review_outcome", "review_explanation", "review_confidence")})
+    rendered = human_report(
+        {
+            key: report[key]
+            for key in (
+                "findings",
+                "review_outcome",
+                "review_explanation",
+                "review_confidence",
+                "review_input",
+            )
+        }
+    )
     if args.output:
         Path(args.output).write_text(rendered + "\n")
     print(json.dumps(report, indent=2, sort_keys=True) if args.json else rendered)
@@ -1636,12 +2459,15 @@ def run_disposition(args: argparse.Namespace) -> int:
     source, accepted, rejected = load_finding_file(args.finding_file, prior, require_accepted=False)
     if source != "autoreview" or accepted or not rejected:
         raise AutoreviewError("disposition accepts only a rejection-only AutoReview finding file")
-    report = {
-        "findings": [],
-        "review_outcome": "pass",
-        "review_explanation": "Every prior finding was consciously rejected with a reason.",
-        "review_confidence": 1.0,
-    }
+    report = attach_review_input(
+        {
+            "findings": [],
+            "review_outcome": "pass",
+            "review_explanation": "Every prior finding was consciously rejected with a reason.",
+            "review_confidence": 1.0,
+        },
+        prior["report"]["review_input"],
+    )
     evidence = make_evidence(
         phase="disposition", repo=repo, base_ref=base_ref,
         bundle_fingerprint=prior["target"]["phase_input_fingerprint"], changed=changed,
@@ -1766,17 +2592,30 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="full",
         help="Review phase. Incremental phases require evidence files.",
     )
+    parser.add_argument(
+        "--review-profile",
+        choices=sorted(REVIEW_REASONING_EFFORTS),
+        default="standard",
+        help="Derived review profile. Selects high reasoning for standard and xhigh for high-risk.",
+    )
     parser.add_argument("--mode", choices=["auto", "local", "branch", "commit"], default="auto")
     parser.add_argument(
         "--base",
         help="Base ref for branch review. If omitted, branch mode tries gh PR base detection before fallback.",
     )
     parser.add_argument("--commit", default="HEAD", help="Commit ref for commit review.")
-    parser.add_argument("--model", help="Codex model to pass to codex exec.")
     parser.add_argument("--codex-bin", default=os.environ.get("CODEX_BIN", "codex"), help="Codex executable path or name.")
     parser.add_argument("--prompt", action="append", help="Additional review instruction text.")
-    parser.add_argument("--prompt-file", action="append", help="File containing additional review instructions.")
-    parser.add_argument("--dataset", action="append", help="Evidence file to include in the review prompt.")
+    parser.add_argument(
+        "--prompt-file",
+        action="append",
+        help="Repo-relative, non-symlink UTF-8 file containing additional review instructions.",
+    )
+    parser.add_argument(
+        "--dataset",
+        action="append",
+        help="Repo-relative, non-symlink UTF-8 evidence file to include in the review prompt.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Build the review prompt without calling Codex.")
     parser.add_argument("--output", help="Write human report output, or dry-run prompt, to a file.")
     parser.add_argument("--json-output", help="Write the validated structured review JSON to a file.")
@@ -2226,7 +3065,6 @@ def run_operation_command(raw: list[str]) -> int:
                 review_args._managed_prior = request["prior_evidence"]
                 review_args._managed_obligation = request["hosted_obligation"]
                 review_args._managed_target = packet["target"]
-                review_args._resolved_model = configured_codex_model()
                 launches = 0
                 def started(pid: int) -> None:
                     nonlocal launches
@@ -2339,7 +3177,6 @@ def main(argv: list[str] | None = None) -> int:
         )
         launched = False
         model_launch_count = 0
-        args._resolved_model = args.model or configured_codex_model()
         finding_fingerprint = (
             hashlib.sha256(Path(args.finding_file).read_bytes()).hexdigest()
             if args.finding_file
@@ -2411,7 +3248,9 @@ def main(argv: list[str] | None = None) -> int:
                     "prompt_fingerprint": sha256_text(prompt),
                     "schema_fingerprint": protocol.fingerprint(schema),
                     "finding_fingerprint": finding_fingerprint,
-                    "model": args._resolved_model,
+                    "model": REVIEW_MODEL,
+                    "review_profile": args.review_profile,
+                    "reasoning_effort": review_reasoning_effort(args.review_profile),
                     "web_search": args.web_search,
                 }
             )
@@ -2535,17 +3374,16 @@ def main(argv: list[str] | None = None) -> int:
             raise
     except AutoreviewError as exc:
         if args.json:
+            payload = {
+                "ok": False,
+                "error": str(exc),
+                "error_code": exc.code,
+                "recovery": exc.recovery,
+            }
+            if exc.review_input is not None:
+                payload["review_input"] = exc.review_input
             print(
-                json.dumps(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "error_code": exc.code,
-                        "recovery": exc.recovery,
-                    },
-                    indent=2,
-                    sort_keys=True,
-                ),
+                json.dumps(payload, indent=2, sort_keys=True),
                 file=sys.stderr,
             )
         else:

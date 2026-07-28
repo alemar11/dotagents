@@ -130,6 +130,11 @@ Canonical planning vocabulary and GitHub label mappings live in
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.
 
+### Delegated Model Registry
+
+- Keep this registry of skills that explicitly select a delegated model: `autoreview` -> `gpt-5.6-sol` (`high` standard, `xhigh` high-risk); `implement-feature` -> `gpt-5.6-sol` (`medium` routine, `high` complex, `xhigh` risky/cross-system). Exclude delegations that inherit the parent or host default or are provider-managed. (Codex learning)
+- Whenever a skill adds, removes, or changes an explicit delegated model or reasoning-effort policy, update this registry in the same change; use it as the audit list when a pinned model generation is upgraded or retired. (Codex learning)
+
 ### Repo-local Plugins
 
 - Keep repo-local plugin registration centralized in `.agents/plugins/marketplace.json`; do not add a plugin without wiring it there in the same rollout.

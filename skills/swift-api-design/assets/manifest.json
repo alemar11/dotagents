@@ -1,8 +1,8 @@
 {
   "repo": "swiftlang/swift-org-website",
   "ref": "main",
-  "resolved_commit": "98c8e1d477bc65cf8a63bc0e9f5348377b768906",
+  "resolved_commit": "36dc7c5558a1a7abda4261b9f80b964566d078e6",
   "source_subpath": "documentation/api-design-guidelines/index.md",
-  "downloaded_at": "2026-07-02T13:47:58.566870+00:00",
+  "downloaded_at": "2026-07-28T08:10:19.806373+00:00",
   "official_base_url": "https://www.swift.org/documentation/api-design-guidelines/"
 }

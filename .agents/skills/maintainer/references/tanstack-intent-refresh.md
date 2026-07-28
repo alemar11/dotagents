@@ -75,7 +75,7 @@ surfaces when they exist.
    - `https://tanstack.com/intent/registry/%40tanstack__react-start`
    - `https://tanstack.com/intent/registry/%40tanstack__start-client-core`
    - `https://tanstack.com/intent/registry/%40tanstack__start-server-core`
-   - `https://tanstack.com/intent/registry/%40tanstack__cli`
+   - `https://tanstack.com/intent/registry/%2540tanstack%252Fcli`
    - Use package pages and their skill pages to capture the current skill tree,
      current wording, and any version notes surfaced in the page content.
 3. TanStack Intent docs:

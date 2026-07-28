@@ -63,14 +63,26 @@ or final-response boundary alone is not a rerun reason.
 
 Running the helper sends the selected review bundle to a separate ephemeral
 Codex engine execution. Local mode sends Git status, staged and unstaged diffs,
-and every non-ignored untracked file. For untracked files, a NUL byte replaces
-the contents with an omission marker; all other bytes are decoded as text with
-replacement characters. Branch and commit modes send the selected diff and
-stat. Any `--prompt`, `--prompt-file`, or `--dataset` content is also sent.
+and every non-ignored untracked text file. Branch and commit modes send the
+selected diff and stat. Any `--prompt`, `--prompt-file`, or `--dataset` content
+is also sent. Prompt and dataset files must be repo-relative regular UTF-8
+files opened component-by-component from a pinned repository descriptor without
+absolute paths, parent traversal, or symlinks. Local mode requires two
+consecutive input captures to match. AutoReview does not truncate review input:
+binary, unreadable, non-UTF-8, oversized, or concurrently changing input fails
+before that prompt is sent to Codex and is reported as incomplete.
 Under `review_profile=high-risk`, the one native `codex review` sends the same
 selected repository target through the Codex engine. `read-only` prohibits
 mutation; it does not mean offline. `--no-web-search` disables reviewer web
-search, not the Codex engine transfer.
+search, not the Codex engine transfer. The reviewer remains repository-aware
+and may inspect readable unchanged repository files.
+
+AutoReview must not ask a separate prose confirmation such as "Do you
+explicitly approve sending this patch and review prompt?" The disclosure above
+is a runtime description, not an authorization protocol. Use approval UI only
+when the host runtime itself requires it. A skill cannot waive that host gate;
+if the host denies execution, report the host-level blocker and stop instead of
+turning the denial into another manual-consent loop.
 
 ## Canonical Closeout Sequence
 
@@ -100,6 +112,12 @@ search, not the Codex engine transfer.
 ## Runtime Surface
 
 - The supported runtime entrypoint is `scripts/autoreview` inside this skill.
+- AutoReview always runs `gpt-5.6-sol`. It ignores user model and reasoning
+  defaults and accepts no alternate model.
+- Pass the derived `review_profile` to the helper. It maps
+  `review_profile=standard` to `model_reasoning_effort=high` and
+  `review_profile=high-risk` to `model_reasoning_effort=xhigh`. No lower,
+  `max`, or `ultra` effort is part of this bounded review contract.
 - If your current working directory is the skill root, run
   `scripts/autoreview --help`.
 - If invoking from another repo, resolve the installed skill root first and run
@@ -137,6 +155,20 @@ The validated JSON result uses canonical option values:
 `review_explanation`, `review_confidence`, finding prose, and code locations
 remain separate data. Human output may explain the result as "patch is correct"
 or "patch is incorrect", but callers must branch on `review_outcome`.
+Helper-owned `review_input` contains `input_complete` and `omissions`.
+Successful review and dry-run results always use `input_complete=true` with an
+empty omission list. AutoReview never launches an initial or repair model call
+with input already known to be incomplete. Under `--json`, the structured error
+uses `input_complete=false` and records each rejected or omitted source, path,
+and canonical reason. Callers must not treat an incomplete input error as clean
+review evidence.
+
+Each omission uses:
+
+- `source=branch-diff|commit-diff|dataset|fix-delta|prompt-file|review-prompt|staged-diff|unstaged-diff|untracked-file`
+- `reason=binary|changed-during-read|non-utf8|size-limit|symlink|unreadable|unsafe-path`
+- `path=<repo-relative-or-rejected-path>|null`; aggregate prompt omissions use
+  `null`
 
 For committed branch fix loops, the evidence-chain contract additionally uses
 `review_phase=full|fix-verification|disposition|terminal-full` and terminal state
@@ -147,9 +179,9 @@ values or their strict finding-intake file.
 
 ## Closeout Entry Modes
 
-- When fresh review is needed for dirty local work: `scripts/autoreview --mode local`
-- When fresh review is needed for a PR, merge, or branch handoff: `scripts/autoreview --mode branch --base origin/main`
-- When fresh review is needed for one exact commit: `scripts/autoreview --mode commit --commit HEAD`
+- When fresh review is needed for dirty local work: `scripts/autoreview --review-profile <derived-profile> --mode local`
+- When fresh review is needed for a PR, merge, or branch handoff: `scripts/autoreview --review-profile <derived-profile> --mode branch --base origin/main`
+- When fresh review is needed for one exact commit: `scripts/autoreview --review-profile <derived-profile> --mode commit --commit HEAD`
 
 ## Workflow
 
@@ -158,9 +190,9 @@ values or their strict finding-intake file.
 2. Format first if formatting can move line numbers. Formatting that changes the
    patch invalidates earlier evidence.
 3. Pick the target:
-   - Dirty local work: `scripts/autoreview --mode local`
-   - Branch or PR work: `scripts/autoreview --mode branch --base origin/main`
-   - Already committed work: `scripts/autoreview --mode commit --commit HEAD`
+   - Dirty local work: `scripts/autoreview --review-profile <derived-profile> --mode local`
+   - Branch or PR work: `scripts/autoreview --review-profile <derived-profile> --mode branch --base origin/main`
+   - Already committed work: `scripts/autoreview --review-profile <derived-profile> --mode commit --commit HEAD`
    - If `--base` is omitted for branch review, the helper tries optional
      `gh pr view` base detection and then falls back to the default base.
 4. Treat review output as advisory. Verify every finding by reading the real
@@ -181,9 +213,10 @@ values or their strict finding-intake file.
 ## Helper Commands
 
 ```bash
-scripts/autoreview --mode local
-scripts/autoreview --mode branch --base origin/main
-scripts/autoreview --mode commit --commit HEAD
+scripts/autoreview --review-profile standard --mode local
+scripts/autoreview --review-profile standard --mode branch --base origin/main
+scripts/autoreview --review-profile standard --mode commit --commit HEAD
+scripts/autoreview --review-profile high-risk --mode branch --base origin/main
 scripts/autoreview --json doctor
 scripts/autoreview --json findings template --finding-source codex-review --output /tmp/autoreview-finding-draft.json
 scripts/autoreview --json findings prepare --input /tmp/autoreview-finding-draft.json --output /tmp/autoreview-findings.json
@@ -191,12 +224,17 @@ scripts/autoreview --json findings prepare --input /tmp/autoreview-finding-draft
 
 Useful options:
 
-- `--prompt` or `--prompt-file`: add review context.
-- `--dataset`: attach a small evidence file to the review prompt.
+- `--prompt`: add inline review context.
+- `--prompt-file`: add review context from a repo-relative, non-symlink UTF-8
+  regular file.
+- `--dataset`: attach a repo-relative, non-symlink UTF-8 regular evidence file
+  to the review prompt.
 - `--base`: set the branch review base explicitly. If omitted, branch mode
   tries `gh pr view --json baseRefName --jq .baseRefName` when `gh` is
   available, then falls back to the default base.
-- `--model`: pass an explicit Codex model.
+- `--review-profile`: pass AutoReview's derived `standard|high-risk` result.
+  The helper selects Sol with `high|xhigh` reasoning from that result; this is
+  not a user preference or a free-form model control.
 - `--dry-run`: build the target bundle and prompt without calling Codex.
 - `--json-output`: write the validated structured report to a file.
 - `--review-phase`, `--prior-evidence`, `--finding-file`, and
@@ -214,8 +252,10 @@ Useful options:
 
 The helper prints `autoreview clean: no accepted/actionable findings reported`
 when Codex returns a valid clean report. It exits nonzero when accepted findings
-remain, when the structured report is invalid, or when the review target cannot
-be resolved.
+remain, when review input is incomplete, when the structured report is invalid,
+or when the review target cannot be resolved. The aggregate review prompt is
+bounded at 512,000 UTF-8 bytes and fails rather than truncating when that limit
+is exceeded.
 Long Codex reviews emit `review still running: codex elapsed=<seconds>s
 pid=<pid>` to stderr while the review subprocess is still active.
 
@@ -229,12 +269,15 @@ Under `--json`, environment failures preserve the human `error` and add stable
 Include:
 
 - the derived `review_profile` and the evidence-backed risk boundary;
+- the fixed `gpt-5.6-sol` model and derived `high|xhigh` reasoning effort;
 - the review command used, or the prior command and result reused;
 - for `high-risk`, the one native Codex review selector and confirmation that
   it inspected the same candidate HEAD;
 - when reusing evidence, proof that the effective patch and scope are unchanged;
 - tests or proof run after any accepted finding was fixed;
 - findings accepted or rejected, with a brief reason;
+- confirmation that `review_input.input_complete=true` and no input was
+  omitted;
 - the clean result from the final helper run, or why a remaining finding was
   consciously rejected.
 

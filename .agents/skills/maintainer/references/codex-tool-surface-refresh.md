@@ -8,10 +8,11 @@ keeps `$implement-feature` current.
 
 Review only Codex worker and thread orchestration surfaces:
 
-- subagent creation, roles, model inheritance, wait/send/resume/close lifecycle,
-  and UI visibility;
-- Codex App task creation, project/worktree targets, task read/write,
-  title, archive, handoff, fork, pin, and listing behavior;
+- subagent creation, roles, model inheritance, wait/message/follow-up/
+  interruption lifecycle, listing, and UI visibility;
+- Codex App project discovery, task creation, project/worktree targets, task
+  read/write/wait, title, archive, handoff status, fork, pin, and listing
+  behavior;
 - `implement-feature` App task requirements and managed-worktree behavior.
 
 Do not use this task to redesign generic orchestration behavior, add new
@@ -21,19 +22,22 @@ workers to a live task, or update unrelated skills.
 
 1. Inspect the currently exposed tool surface before editing:
    - search the available tool registry for `spawn_agent`, `wait_agent`,
-     `send_input`, `resume_agent`, `close_agent`, `create_thread`,
-     `read_thread`, `send_message_to_thread`, `set_thread_title`,
-     `set_thread_archived`, `handoff_thread`, `fork_thread`, `list_threads`,
+     `send_message`, `followup_task`, `interrupt_agent`, `list_agents`,
+     `create_thread`, `list_projects`, `read_thread`, `wait_threads`,
+     `send_message_to_thread`, `set_thread_title`, `set_thread_archived`,
+     `handoff_thread`, `get_handoff_status`, `fork_thread`, `list_threads`,
      and `set_thread_pinned`;
    - record the exact callable namespaces and names;
    - note whether each surface is a subagent surface, visible Codex App task
      surface, or unavailable in the current runtime.
 2. Compare the discovered surface against:
    - `skills/implement-feature/SKILL.md`;
-   - `skills/implement-feature/references/worker.md`;
+   - `skills/implement-feature/references/root-bootstrap.md`;
+   - `skills/implement-feature/references/worker-execution.md`;
+   - `skills/implement-feature/references/codex-task-orchestration.md`;
    - `skills/implement-feature/references/run-state.md`;
-   - `skills/implement-feature/references/gates.md` only when tool changes
-     affect authorization, proof, or closeout behavior.
+   - `skills/implement-feature/references/final-verification.md` only when tool
+     changes affect authorization, proof, or closeout behavior.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?
    - What creates a separate visible Codex App thread?

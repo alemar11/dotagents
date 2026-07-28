@@ -1,5 +1,5 @@
 interface:
   display_name: "OKF"
-  short_description: "Write, scaffold, and validate Open Knowledge Format markdown bundles."
+  short_description: "Write, scaffold, and validate OKF markdown bundles."
   brand_color: "#5B8C00"
-  default_prompt: "Use $okf to write, scaffold, inspect, or validate Open Knowledge Format markdown bundles. Follow the bundled official OKF spec, distinguish spec-conformant validation from reference-agent-compatible validation, preserve unknown frontmatter fields, and use the shipped okf CLI when deterministic validation or scaffolding is needed."
+  default_prompt: "Use $okf to write, scaffold, inspect, or validate Open Knowledge Format v0.2 markdown bundles. Follow the bundled official spec, preserve unknown frontmatter fields, use provenance, trust, lifecycle, and attestation fields only as defined there, and use the shipped okf CLI when deterministic validation or scaffolding is needed."

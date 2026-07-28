@@ -41,7 +41,7 @@ Do not switch source repositories unless the official OKF project moves.
 5. Review fast-path references only if the spec changed:
    - `skills/okf/references/README.md`
    - `skills/okf/references/writing-okf.md`
-   - `skills/okf/references/validation-modes.md`
+   - `skills/okf/references/validation.md`
    - `skills/okf/references/examples.md`
 
 ## Validation
@@ -50,4 +50,9 @@ Do not switch source repositories unless the official OKF project moves.
 - `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py --check-stale`
 - `python3 .agents/skills/maintainer/scripts/okf_spec_check.py`
 - `python3 -m unittest discover -s skills/okf/tests`
-- `git diff --check`
+- `git diff --check -- . ':(exclude)skills/okf/assets/spec.md'`
+
+Also inspect raw `git diff --check`. If it reports whitespace copied verbatim
+from `skills/okf/assets/spec.md`, accept that asset-only output only after
+`okf_spec_check.py` proves the bundled content hash matches the manifest. Do not
+normalize the official asset independently.

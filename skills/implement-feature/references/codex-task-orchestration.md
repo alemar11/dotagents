@@ -62,11 +62,14 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    or durable state.
 2. For each claimed assignment allowed by path and dependency serialization,
    create one visible Codex worker task with `environment=worktree` in the
-   selected local Git project in the ChatGPT App. Do not impose a numeric worker
-   limit. The ChatGPT App creates the worktree and assigns it to the task; root
-   never runs `git worktree add`. The successful creation observation records
-   the literal task state `active` or `idle`; both mean that the exact task
-   binding exists, not that implementation progress has begun.
+   selected local Git project in the ChatGPT App. Pass
+   `model=gpt-5.6-sol` and the assignment's resolved
+   `thinking=medium|high|xhigh` from `task-model-policy.md`. Do not impose a
+   numeric worker limit. The ChatGPT App creates the worktree and assigns it to
+   the task; root never runs `git worktree add`. The successful creation
+   observation records the literal task state `active` or `idle`; both mean
+   that the exact task binding exists, not that implementation progress has
+   begun.
 3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
@@ -189,3 +192,6 @@ the immediate response and independently read the exact task conversation,
 then finish the recorded operation. Controller follow-ups are not replayable;
 an unresolved follow-up remains unresolved rather than being resent under
 another operation. Store no message body, hash, or worker technical state.
+Omit `model` and `thinking` from every `send_message_to_thread` call so the
+worker keeps the exact profile selected at creation; never override or
+reclassify it during follow-up.

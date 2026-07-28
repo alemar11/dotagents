@@ -83,6 +83,9 @@ question during the run.
    `references/root-bootstrap.md`. Validate current durable sources,
    dependencies, repository identities, allowed paths, acceptance, validation,
    delivery type, and exact repository-to-worker-project mapping before state.
+   Resolve each worker's fixed model and adaptive thinking level through
+   `references/task-model-policy.md`, verify destination-host support, and
+   disclose every resolved profile before startup authorization.
    Resolve the current controller task's exact local saved Codex-project binding
    as controller identity only; a later UI-primary change does not alter it.
    The bound project may be multi-folder, need not be affected, and grants no
@@ -163,8 +166,8 @@ own Feature Spec claim; independent assignments continue.
 ## Reference Routing
 
 - Always load `references/options.md`, `references/feature-spec-contract.md`,
-  `references/root-bootstrap.md`, and `references/codex-task-orchestration.md` before
-  startup mutation.
+  `references/root-bootstrap.md`, `references/task-model-policy.md`, and
+  `references/codex-task-orchestration.md` before startup mutation.
 - Workers load `references/worker-execution.md` and `references/tracker-checklists.md`.
 - Load `references/claim-waits-and-recovery.md` for claim waits, compaction,
   interrupted root or worker tasks, title, message, or archive changes, or

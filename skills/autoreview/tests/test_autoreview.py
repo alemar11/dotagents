@@ -73,7 +73,23 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertIn("AutoReview owns the derived `review_profile` result", policy)
         self.assertIn("`standard`: run the structured AutoReview path only", policy)
         self.assertIn(
+            "`gpt-5.6-sol` with `model_reasoning_effort=high`",
+            policy,
+        )
+        self.assertIn(
             "`high-risk`: run structured AutoReview plus one native `codex review`",
+            policy,
+        )
+        self.assertIn(
+            "`gpt-5.6-sol` with `model_reasoning_effort=xhigh` for both lenses",
+            policy,
+        )
+        self.assertIn(
+            "codex --model gpt-5.6-sol --config 'model_reasoning_effort=\"xhigh\"' review --base",
+            policy,
+        )
+        self.assertIn(
+            "AutoReview must not use a lower effort, `max`, `ultra`, or an alternate model",
             policy,
         )
         self.assertIn("Run native `codex review` at most once per lineage", policy)
@@ -95,9 +111,9 @@ class AutoreviewContractTests(unittest.TestCase):
         for disclosed_content in (
             "Git status",
             "staged and unstaged diffs",
-            "non-ignored untracked file",
-            "a NUL byte replaces the contents with an omission marker",
-            "all other bytes are decoded as text with replacement characters",
+            "non-ignored untracked text file",
+            "repo-relative regular UTF-8 files",
+            "input fails before that prompt is sent to Codex and is reported as incomplete",
             "--prompt-file",
             "--dataset",
         ):
@@ -107,16 +123,353 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertNotIn("same disclosed review authorization", normalized_skill)
         self.assertNotIn("single grant", normalized_skill)
         self.assertIn(
+            "AutoReview must not ask a separate prose confirmation",
+            normalized_skill,
+        )
+        self.assertIn(
+            "report the host-level blocker and stop instead of turning the denial into another manual-consent loop",
+            normalized_skill,
+        )
+        self.assertIn(
             "--no-web-search` disables reviewer web search, not the Codex engine transfer",
             normalized_skill,
         )
+        self.assertIn("reviewer remains repository-aware", normalized_skill)
 
     def test_version(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 4.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 5.0.0")
+
+    def test_prompt_and_dataset_files_are_contained_regular_repo_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            repo.mkdir()
+            (repo / "review.md").write_text("Review context.\n", encoding="utf-8")
+            args = cli.argparse.Namespace(prompt=[], prompt_file=["review.md"], dataset=["review.md"])
+
+            self.assertIn("Review context.", cli.load_extra_prompt(args, repo))
+            self.assertIn("Review context.", cli.load_datasets(args, repo))
+
+            outside = root / "outside.md"
+            outside.write_text("outside\n", encoding="utf-8")
+            linked = repo / "linked.md"
+            linked.symlink_to(outside)
+            outside_dir = root / "outside-dir"
+            outside_dir.mkdir()
+            (outside_dir / "nested.md").write_text("outside\n", encoding="utf-8")
+            linked_dir = repo / "linked-dir"
+            linked_dir.symlink_to(outside_dir, target_is_directory=True)
+            unsafe_paths = [
+                str(outside),
+                "../outside.md",
+                "linked.md",
+                "linked-dir/nested.md",
+            ]
+            for unsafe_path in unsafe_paths:
+                with self.subTest(path=unsafe_path):
+                    args.prompt_file = [unsafe_path]
+                    with self.assertRaises(cli.AutoreviewError) as raised:
+                        cli.load_extra_prompt(args, repo)
+                    self.assertEqual(raised.exception.code, "review-input-path-invalid")
+                    self.assertFalse(raised.exception.review_input["input_complete"])
+                    self.assertEqual(len(raised.exception.review_input["omissions"]), 1)
+
+    def test_prompt_and_dataset_files_are_complete_utf8_text(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            large = repo / "large.txt"
+            large.write_text("a" * 45_000 + "\nTAIL\n", encoding="utf-8")
+            args = cli.argparse.Namespace(prompt=[], prompt_file=[], dataset=["large.txt"])
+
+            rendered = cli.load_datasets(args, repo)
+            self.assertIn("TAIL", rendered)
+            self.assertNotIn("[truncated", rendered)
+
+            cases = {
+                "binary.dat": (b"prefix\0suffix", "binary"),
+                "invalid.txt": (b"\xff", "non-utf8"),
+                "oversized.txt": (
+                    b"x" * (cli.MAX_REVIEW_PROMPT_BYTES + 1),
+                    "size-limit",
+                ),
+            }
+            for name, (content, reason) in cases.items():
+                with self.subTest(name=name):
+                    (repo / name).write_bytes(content)
+                    args.dataset = [name]
+                    with self.assertRaises(cli.AutoreviewError) as raised:
+                        cli.load_datasets(args, repo)
+                    status = raised.exception.review_input
+                    self.assertFalse(status["input_complete"])
+                    self.assertEqual(status["omissions"][0]["reason"], reason)
+
+    def test_repo_input_is_opened_relative_to_pinned_directory_descriptors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            nested = repo / "nested"
+            nested.mkdir()
+            (nested / "review.md").write_text("context\n", encoding="utf-8")
+            args = cli.argparse.Namespace(
+                prompt=[],
+                prompt_file=["nested/review.md"],
+                dataset=[],
+            )
+
+            with mock.patch.object(cli.os, "open", wraps=os.open) as opened:
+                self.assertIn("context", cli.load_extra_prompt(args, repo))
+
+            relative_calls = [
+                call
+                for call in opened.call_args_list
+                if call.kwargs.get("dir_fd") is not None
+            ]
+            self.assertEqual(
+                [call.args[0] for call in relative_calls],
+                ["nested", "review.md"],
+            )
+            self.assertTrue(
+                all(call.args[1] & os.O_NOFOLLOW for call in relative_calls)
+            )
+
+    def test_binary_changed_content_fails_before_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            (repo / "base.txt").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "base.txt"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+            (repo / "asset.bin").write_bytes(b"\0binary")
+            subprocess.run(["git", "add", "asset.bin"], cwd=repo, check=True)
+
+            with self.assertRaises(cli.AutoreviewError) as raised:
+                cli.local_bundle(repo)
+
+            self.assertEqual(raised.exception.code, "review-input-incomplete")
+            self.assertEqual(
+                raised.exception.review_input["omissions"],
+                [
+                    {
+                        "source": "staged-diff",
+                        "path": "asset.bin",
+                        "reason": "binary",
+                    }
+                ],
+            )
+
+    def test_repository_attributes_cannot_force_binary_or_non_utf8_diff_text(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            (repo / ".gitattributes").write_text("*.bin diff\n", encoding="utf-8")
+            (repo / "asset.bin").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+
+            for content, reason in ((b"\0binary\n", "binary"), (b"\xff\n", "non-utf8")):
+                with self.subTest(reason=reason):
+                    (repo / "asset.bin").write_bytes(content)
+                    with self.assertRaises(cli.AutoreviewError) as raised:
+                        cli.local_bundle(repo)
+                    omission = raised.exception.review_input["omissions"][0]
+                    self.assertEqual(omission["source"], "unstaged-diff")
+                    self.assertEqual(omission["reason"], reason)
+
+    def test_local_snapshot_supports_unquoted_unicode_and_control_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            (repo / "base.txt").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "base.txt"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+            names = {"café.txt", "line\nbreak.txt", "tab\tname.txt"}
+            for name in names:
+                (repo / name).write_text(f"content for {name!r}\n", encoding="utf-8")
+
+            bundle, changed = cli.local_review_snapshot(repo)
+
+            self.assertEqual(changed, names)
+            for name in names:
+                self.assertIn(name, bundle)
+
+    def test_local_snapshot_rejects_concurrent_changes(self) -> None:
+        stable = {
+            "bundle": "bundle",
+            "changed": {"app.py"},
+            "fingerprints": {
+                "review-prompt": "a",
+                "staged-diff": "b",
+                "unstaged-diff": "c",
+                "untracked-file": "d",
+            },
+        }
+        changed = {
+            **stable,
+            "fingerprints": {
+                **stable["fingerprints"],
+                "unstaged-diff": "different",
+            },
+        }
+
+        with mock.patch.object(
+            cli,
+            "collect_local_snapshot",
+            side_effect=[stable, changed],
+        ):
+            with self.assertRaises(cli.AutoreviewError) as raised:
+                cli.local_review_snapshot(Path.cwd())
+
+        self.assertEqual(
+            raised.exception.review_input["omissions"],
+            [
+                {
+                    "source": "unstaged-diff",
+                    "path": None,
+                    "reason": "changed-during-read",
+                }
+            ],
+        )
+
+    def test_git_input_failure_is_source_specific_incomplete_input(self) -> None:
+        failed = subprocess.CompletedProcess(
+            ["git", "diff"],
+            1,
+            stdout=b"",
+            stderr=b"permission denied",
+        )
+        with mock.patch.object(cli, "run_bytes", return_value=failed):
+            with self.assertRaises(cli.AutoreviewError) as raised:
+                cli.git_review_bytes(Path.cwd(), "unstaged-diff", "diff")
+
+        self.assertEqual(
+            raised.exception.review_input["omissions"],
+            [
+                {
+                    "source": "unstaged-diff",
+                    "path": None,
+                    "reason": "unreadable",
+                }
+            ],
+        )
+
+    def test_review_input_metadata_is_helper_owned_and_human_visible(self) -> None:
+        engine_report = {
+            "findings": [],
+            "review_outcome": "pass",
+            "review_explanation": "Clean.",
+            "review_confidence": 1.0,
+        }
+
+        report = cli.attach_review_input(engine_report)
+
+        self.assertEqual(
+            report["review_input"],
+            {"input_complete": True, "omissions": []},
+        )
+        self.assertIn("review input: complete (0 omissions)", cli.human_report(report))
+        with self.assertRaisesRegex(cli.AutoreviewError, "helper-owned"):
+            cli.attach_review_input(report)
+        incomplete = cli.review_input_status(
+            [
+                cli.input_omission(
+                    source="dataset",
+                    path="fixtures/data.bin",
+                    reason="binary",
+                )
+            ]
+        )
+        with self.assertRaisesRegex(cli.AutoreviewError, "cannot be attached"):
+            cli.attach_review_input(engine_report, incomplete)
+        with self.assertRaisesRegex(cli.AutoreviewError, "invalid fields"):
+            cli.attach_review_input(engine_report, {})
+
+    def test_run_review_adds_complete_input_metadata_to_structured_output(self) -> None:
+        args = cli.parse_args(["--json"])
+        engine_report = {
+            "findings": [],
+            "review_outcome": "pass",
+            "review_explanation": "Clean.",
+            "review_confidence": 1.0,
+        }
+        build_result = (
+            Path.cwd(),
+            "local",
+            None,
+            {"app.py"},
+            "review prompt",
+            "f" * 64,
+            cli.review_input_status(),
+        )
+        stdout = io.StringIO()
+        with mock.patch.object(cli, "build_review", return_value=build_result):
+            with mock.patch.object(cli, "run_validated_model", return_value=engine_report):
+                with contextlib.redirect_stdout(stdout):
+                    code = cli.run_review(args)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(
+            payload["review_input"],
+            {"input_complete": True, "omissions": []},
+        )
+
+    def test_oversized_aggregate_input_fails_with_structured_metadata(self) -> None:
+        with self.assertRaises(cli.AutoreviewError) as raised:
+            cli.require_complete_prompt("é" * (cli.MAX_REVIEW_PROMPT_BYTES // 2 + 1))
+
+        self.assertEqual(raised.exception.code, "review-input-too-large")
+        self.assertEqual(
+            raised.exception.review_input,
+            {
+                "input_complete": False,
+                "omissions": [
+                    {
+                        "source": "review-prompt",
+                        "path": None,
+                        "reason": "size-limit",
+                    }
+                ],
+            },
+        )
+
+    def test_repair_prompt_cannot_exceed_aggregate_input_limit(self) -> None:
+        args = cli.argparse.Namespace(
+            _prepare_invalid_output_repair=lambda *_: None,
+            _start_invalid_output_repair=lambda *_: None,
+            _validate_invalid_output_repair=lambda *_: None,
+        )
+        invalid = cli.ReviewOutputError(
+            "invalid",
+            classification="schema-parse",
+            validator_code="schema-invalid",
+            violated_rule="invalid response",
+        )
+        with mock.patch.object(cli, "run_codex", return_value="{}") as run_codex:
+            with mock.patch.object(cli, "validate_model_response", side_effect=invalid):
+                with self.assertRaises(cli.AutoreviewError) as raised:
+                    cli.run_validated_model(
+                        args,
+                        Path.cwd(),
+                        "x" * cli.MAX_REVIEW_PROMPT_BYTES,
+                        cli.SCHEMA,
+                        changed={"app.py"},
+                    )
+
+        self.assertEqual(run_codex.call_count, 1)
+        self.assertEqual(raised.exception.code, "review-input-too-large")
+        self.assertEqual(
+            raised.exception.review_input["omissions"][0]["reason"],
+            "size-limit",
+        )
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -185,13 +538,33 @@ class AutoreviewContractTests(unittest.TestCase):
 
     def test_incremental_command_surface_is_canonical(self) -> None:
         args = cli.parse_args([
+            "--review-profile", "high-risk",
             "--review-phase", "fix-verification",
             "--prior-evidence", "prior.json",
             "--finding-file", "findings.json",
             "--evidence-output", "next.json",
         ])
+        self.assertEqual(args.review_profile, "high-risk")
         self.assertEqual(args.review_phase, "fix-verification")
         self.assertEqual(cli.REVIEW_PHASES, {"full", "fix-verification", "disposition", "terminal-full"})
+
+    def test_review_profile_owns_fixed_sol_reasoning_policy(self) -> None:
+        self.assertEqual(cli.REVIEW_MODEL, "gpt-5.6-sol")
+        self.assertEqual(
+            cli.REVIEW_REASONING_EFFORTS,
+            {"standard": "high", "high-risk": "xhigh"},
+        )
+        self.assertEqual(cli.review_reasoning_effort("standard"), "high")
+        self.assertEqual(cli.review_reasoning_effort("high-risk"), "xhigh")
+        self.assertEqual(cli.parse_args([]).review_profile, "standard")
+        with self.assertRaises(cli.AutoreviewError) as raised:
+            cli.review_reasoning_effort("medium")
+        self.assertEqual(raised.exception.code, "review-profile-invalid")
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                cli.parse_args(["--review-profile", "low"])
+            with self.assertRaises(SystemExit):
+                cli.parse_args(["--model", "gpt-5.6-terra"])
 
     def test_evidence_fingerprint_detects_tampering(self) -> None:
         review_target_key = cli.protocol.make_review_target_key(
@@ -219,12 +592,23 @@ class AutoreviewContractTests(unittest.TestCase):
             "counts": {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1},
             "finding_state": {"open": [], "resolved": [], "rejected": []},
             "hosted_obligation_id": None,
-            "report": {"findings": [], "review_outcome": "pass", "review_explanation": "Clean.", "review_confidence": 1.0},
+            "report": {
+                "findings": [],
+                "review_outcome": "pass",
+                "review_explanation": "Clean.",
+                "review_confidence": 1.0,
+                "review_input": {"input_complete": True, "omissions": []},
+            },
             "terminal_state": "terminal-clean",
             "metrics": {"prompt_characters": 10, "elapsed_seconds": 1},
         }
         evidence["evidence_fingerprint"] = cli.protocol.evidence_fingerprint(evidence)
         self.assertEqual(cli.validate_evidence(evidence), evidence)
+        legacy = json.loads(json.dumps(evidence))
+        del legacy["report"]["review_input"]
+        legacy["evidence_fingerprint"] = cli.protocol.evidence_fingerprint(legacy)
+        with self.assertRaisesRegex(cli.AutoreviewError, "predates"):
+            cli.validate_evidence(legacy)
         evidence["terminal_state"] = "fix-required"
         with self.assertRaisesRegex(cli.AutoreviewError, "fingerprint mismatch"):
             cli.validate_evidence(evidence)
@@ -409,6 +793,18 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertEqual(finding["properties"]["priority"]["enum"], [0, 1, 2, 3])
         self.assertIn("test-gap", finding["properties"]["finding_category"]["enum"])
         self.assertNotIn("category", finding["properties"])
+        self.assertEqual(
+            cli.REVIEW_INPUT_OMISSION_REASONS,
+            {
+                "binary",
+                "changed-during-read",
+                "non-utf8",
+                "size-limit",
+                "symlink",
+                "unreadable",
+                "unsafe-path",
+            },
+        )
 
     def test_canonical_report_validates_and_renders_human_labels(self) -> None:
         report = {
@@ -491,10 +887,61 @@ class AutoreviewContractTests(unittest.TestCase):
             self.assertEqual(status["probe"], "unverified-missing-directory")
             self.assertFalse(path.exists())
 
+    def test_run_codex_pins_sol_and_profile_reasoning_before_ignoring_user_config(self) -> None:
+        for review_profile, reasoning_effort in (
+            ("standard", "high"),
+            ("high-risk", "xhigh"),
+        ):
+            with self.subTest(review_profile=review_profile):
+                args = cli.argparse.Namespace(
+                    codex_bin="codex",
+                    review_profile=review_profile,
+                    web_search=False,
+                    heartbeat_seconds=1,
+                )
+                completed = subprocess.CompletedProcess(
+                    ["codex"],
+                    0,
+                    stdout="",
+                    stderr="",
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    with mock.patch.object(cli, "ensure_review_environment"):
+                        with mock.patch.object(
+                            cli,
+                            "resolve_command",
+                            return_value="codex",
+                        ):
+                            with mock.patch.object(
+                                cli,
+                                "run_with_heartbeat",
+                                return_value=completed,
+                            ) as launched:
+                                cli.run_codex(args, Path(directory), "review")
+
+                command = launched.call_args.args[0]
+                self.assertEqual(
+                    command[:7],
+                    [
+                        "codex",
+                        "--ask-for-approval",
+                        "never",
+                        "--model",
+                        "gpt-5.6-sol",
+                        "--config",
+                        f'model_reasoning_effort="{reasoning_effort}"',
+                    ],
+                )
+                self.assertIn("--ignore-user-config", command)
+                self.assertLess(
+                    command.index("--config"),
+                    command.index("exec"),
+                )
+
     def test_run_codex_cleans_temp_files_when_execution_raises(self) -> None:
         args = cli.argparse.Namespace(
             codex_bin="codex",
-            model=None,
+            review_profile="standard",
             web_search=False,
             heartbeat_seconds=1,
         )
@@ -502,14 +949,13 @@ class AutoreviewContractTests(unittest.TestCase):
             with mock.patch.object(cli.tempfile, "tempdir", directory):
                 with mock.patch.object(cli, "ensure_review_environment"):
                     with mock.patch.object(cli, "resolve_command", return_value="codex"):
-                        with mock.patch.object(cli, "configured_codex_model", return_value=None):
-                            with mock.patch.object(
-                                cli,
-                                "run_with_heartbeat",
-                                side_effect=OSError("launch failed"),
-                            ):
-                                with self.assertRaises(cli.AutoreviewError) as raised:
-                                    cli.run_codex(args, Path(directory), "review")
+                        with mock.patch.object(
+                            cli,
+                            "run_with_heartbeat",
+                            side_effect=OSError("launch failed"),
+                        ):
+                            with self.assertRaises(cli.AutoreviewError) as raised:
+                                cli.run_codex(args, Path(directory), "review")
 
             self.assertEqual(list(Path(directory).iterdir()), [])
 
@@ -518,7 +964,7 @@ class AutoreviewContractTests(unittest.TestCase):
     def test_run_codex_cleans_temp_files_when_interrupted(self) -> None:
         args = cli.argparse.Namespace(
             codex_bin="codex",
-            model=None,
+            review_profile="standard",
             web_search=False,
             heartbeat_seconds=1,
         )
@@ -526,21 +972,20 @@ class AutoreviewContractTests(unittest.TestCase):
             with mock.patch.object(cli.tempfile, "tempdir", directory):
                 with mock.patch.object(cli, "ensure_review_environment"):
                     with mock.patch.object(cli, "resolve_command", return_value="codex"):
-                        with mock.patch.object(cli, "configured_codex_model", return_value=None):
-                            with mock.patch.object(
-                                cli,
-                                "run_with_heartbeat",
-                                side_effect=KeyboardInterrupt,
-                            ):
-                                with self.assertRaises(KeyboardInterrupt):
-                                    cli.run_codex(args, Path(directory), "review")
+                        with mock.patch.object(
+                            cli,
+                            "run_with_heartbeat",
+                            side_effect=KeyboardInterrupt,
+                        ):
+                            with self.assertRaises(KeyboardInterrupt):
+                                cli.run_codex(args, Path(directory), "review")
 
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_interrupt_preserves_cleanup_failure_as_note(self) -> None:
         args = cli.argparse.Namespace(
             codex_bin="codex",
-            model=None,
+            review_profile="standard",
             web_search=False,
             heartbeat_seconds=1,
         )
@@ -548,19 +993,18 @@ class AutoreviewContractTests(unittest.TestCase):
             with mock.patch.object(cli.tempfile, "tempdir", directory):
                 with mock.patch.object(cli, "ensure_review_environment"):
                     with mock.patch.object(cli, "resolve_command", return_value="codex"):
-                        with mock.patch.object(cli, "configured_codex_model", return_value=None):
+                        with mock.patch.object(
+                            cli,
+                            "run_with_heartbeat",
+                            side_effect=KeyboardInterrupt,
+                        ):
                             with mock.patch.object(
-                                cli,
-                                "run_with_heartbeat",
-                                side_effect=KeyboardInterrupt,
+                                cli.Path,
+                                "unlink",
+                                side_effect=PermissionError("ACL denied cleanup"),
                             ):
-                                with mock.patch.object(
-                                    cli.Path,
-                                    "unlink",
-                                    side_effect=PermissionError("ACL denied cleanup"),
-                                ):
-                                    with self.assertRaises(KeyboardInterrupt) as raised:
-                                        cli.run_codex(args, Path(directory), "review")
+                                with self.assertRaises(KeyboardInterrupt) as raised:
+                                    cli.run_codex(args, Path(directory), "review")
 
         notes = getattr(raised.exception, "__notes__", [])
         self.assertTrue(any("ACL denied cleanup" in note for note in notes))
@@ -641,6 +1085,36 @@ class AutoreviewContractTests(unittest.TestCase):
         secret = os.environ.get("OPENAI_API_KEY")
         if secret:
             self.assertNotIn(secret, payload["error"])
+
+    def test_json_input_error_records_omissions_without_model_launch(self) -> None:
+        stderr = io.StringIO()
+        error = cli.incomplete_review_input(
+            "dataset is binary",
+            [
+                cli.input_omission(
+                    source="dataset",
+                    path="fixtures/data.bin",
+                    reason="binary",
+                )
+            ],
+        )
+        with mock.patch.object(cli, "build_review", side_effect=error):
+            with mock.patch.object(
+                cli,
+                "run_validated_model",
+                side_effect=AssertionError("model must not launch"),
+            ) as model:
+                with contextlib.redirect_stderr(stderr):
+                    code = cli.main(["--json"])
+
+        self.assertEqual(code, 2)
+        self.assertFalse(model.called)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["review_input"]["input_complete"])
+        self.assertEqual(
+            payload["review_input"]["omissions"][0]["path"],
+            "fixtures/data.bin",
+        )
 
     def test_fake_model_launch_is_counted_only_after_popen_and_cannot_relaunch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

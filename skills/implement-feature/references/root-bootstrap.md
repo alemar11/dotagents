@@ -45,7 +45,12 @@ Root is a lightweight control plane. Before mutation:
    Contract assigns each component either to that proof owner or to the peer
    that owns the component. Do not require access to worktrees that do not
    exist yet.
-8. Resolve the startup fields from `options.md`. If every mapping in step 4
+8. Load `task-model-policy.md`, resolve exactly one worker profile per
+   implementation-eligible Feature Spec, and verify destination-host support
+   for the canonical model and every allowed thinking value. Include each
+   resolved profile and reason in the startup disclosure, but do not write it
+   to the run manifest or SQLite.
+9. Resolve the startup fields from `options.md`. If every mapping in step 4
    already exists, resolve only `visible_app_task_permission`. If mappings are
    missing, list the exact repository roots in the standard question and
    resolve both `missing_project_action` and
@@ -55,7 +60,7 @@ Root is a lightweight control plane. Before mutation:
    saved-project preflight. With `stop`, denied task permission, unavailable
    Computer Use, a locked host, ambiguous selection, or any mismatched
    readback, stop before run state, claim, task, or worktree creation.
-9. Write a private manifest containing only coordination identity:
+10. Write a private manifest containing only coordination identity:
 
 ```json
 {
@@ -155,10 +160,11 @@ default PR base such as `main` as a head-branch collision: only the
 implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
-`environment=worktree`. The ChatGPT App creates the worktree and assigns
+`environment=worktree`, `model=gpt-5.6-sol`, and the assignment's resolved
+`thinking=medium|high|xhigh`. The ChatGPT App creates the worktree and assigns
 it to that task. Root verifies the task, checkout directory, and Git common
 directory; it never runs `git worktree add`. SQLite keeps only checkout identity
-needed for coordination, not the worker's technical contents.
+needed for coordination, not the worker's technical contents or task profile.
 The operation always targets the assignment's recorded repo-specific
 `project_id`, never the multi-folder controller project. If task readback does
 not resolve to that project and repository identity, reconcile or fail the

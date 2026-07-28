@@ -1,5 +1,5 @@
 interface:
   display_name: "Auto Review"
-  short_description: "Run bounded review with a high-risk second lens"
+  short_description: "Run bounded Sol review at high or xhigh effort"
   brand_color: "#2B6F6C"
-  default_prompt: "Use $autoreview to derive the review profile, run bounded structured closeout review, add one native Codex review only for high-risk changes on the same HEAD, and verify committed fixes without redundant reruns."
+  default_prompt: "Use $autoreview to derive the review profile, run gpt-5.6-sol at high effort for standard review or xhigh for high-risk review, add one native Codex review only for high-risk changes on the same HEAD, and verify committed fixes without redundant reruns."

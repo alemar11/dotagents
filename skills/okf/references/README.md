@@ -12,9 +12,10 @@ Use this page first after the `okf` skill loads.
 
 - `writing-okf.md`: authoring concept documents, indexes, logs, links, and
   frontmatter.
-- `validation-modes.md`: choosing between OKF spec conformance and stricter
-  reference-agent compatibility.
-- `examples.md`: compact concept, index, and log examples.
+- `validation.md`: OKF v0.2 conformance, parser limits, strict-link checks, and
+  machine-readable CLI output.
+- `examples.md`: compact concept, provenance/trust, computation, index, and log
+  examples.
 
 ## Core Shape
 

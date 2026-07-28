@@ -19,7 +19,7 @@ SCRIPT_PATH = SKILL_DIR / "scripts" / "okf"
 REQUIRED_REFERENCE_FILES = [
     "README.md",
     "writing-okf.md",
-    "validation-modes.md",
+    "validation.md",
     "examples.md",
 ]
 MANIFEST_KEYS = {
@@ -33,6 +33,8 @@ MANIFEST_KEYS = {
     "official_tree_url",
 }
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+SPEC_VERSION_RE = re.compile(r"(?m)^\*\*Version ([0-9]+\.[0-9]+)\*\*$")
+CLI_SPEC_VERSION_RE = re.compile(r'(?m)^SPEC_VERSION = "([0-9]+\.[0-9]+)"$')
 
 
 def load_json(path: Path) -> dict:
@@ -97,6 +99,24 @@ def main() -> int:
         for key in ["resolved_commit", "content_sha256", "spec_version", "downloaded_at"]:
             if not manifest.get(key):
                 errors.append(f"Manifest missing required value for {key!r}.")
+        if SPEC_PATH.exists():
+            spec_match = SPEC_VERSION_RE.search(SPEC_PATH.read_text(encoding="utf-8"))
+            if not spec_match:
+                errors.append("Bundled spec does not declare a recognizable version.")
+            elif manifest.get("spec_version") != spec_match.group(1):
+                errors.append(
+                    "Manifest spec_version does not match the bundled spec: "
+                    f"expected {spec_match.group(1)!r}, got {manifest.get('spec_version')!r}"
+                )
+        if SCRIPT_PATH.exists():
+            cli_match = CLI_SPEC_VERSION_RE.search(SCRIPT_PATH.read_text(encoding="utf-8"))
+            if not cli_match:
+                errors.append("OKF CLI does not declare SPEC_VERSION.")
+            elif manifest.get("spec_version") != cli_match.group(1):
+                errors.append(
+                    "OKF CLI SPEC_VERSION does not match the manifest: "
+                    f"expected {manifest.get('spec_version')!r}, got {cli_match.group(1)!r}"
+                )
         if SPEC_PATH.exists() and manifest.get("content_sha256"):
             import hashlib
 

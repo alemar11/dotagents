@@ -13,7 +13,11 @@ expected worker count, ChatGPT-created worktrees, GitHub publication when
 applicable, tracker mutation, validation, AutoReview, and the AutoReview-owned
 native Codex review only when the derived profile is `high-risk`, plus the exact
 terminal boundary: `pr-ready-for-merge-but-not-merged` or
-`local-branch-ready`.
+`local-branch-ready`. For every worker, also disclose the fixed
+`gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
+`high` for complex work, or `xhigh` for risky or cross-system work. An
+affirmative `visible_app_task_permission=granted` answer explicitly requests
+those exact task profiles.
 
 When no project is missing, ask once whether to start those visible tasks.
 Resolve the answer directly to `visible_app_task_permission`.

@@ -39,6 +39,54 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("`missing_project_action`", options)
         self.assertIn("`create-projects`, `stop`", options)
 
+    def test_given_worker_creation_when_model_policy_resolves_then_sol_effort_is_adaptive_and_stable(self) -> None:
+        """The worker model and bounded effort values are machine-facing task fields."""
+        policy_raw = self.text("references/task-model-policy.md")
+        policy = self.normalized(policy_raw)
+        skill = self.normalized(self.text("SKILL.md"))
+        options = self.normalized(self.text("references/options.md"))
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        orchestration = self.normalized(
+            self.text("references/codex-task-orchestration.md")
+        )
+
+        def table_values(field: str) -> list[str]:
+            row = next(
+                line
+                for line in policy_raw.splitlines()
+                if line.startswith(f"| `{field}` |")
+            )
+            return re.findall(r"`([^`]+)`", row)[1:]
+
+        self.assertEqual(table_values("model"), ["gpt-5.6-sol"])
+        self.assertEqual(table_values("thinking_default"), ["medium"])
+        self.assertEqual(
+            table_values("thinking_allowed"),
+            ["medium", "high", "xhigh"],
+        )
+        for excluded in ("none", "minimal", "low", "max", "ultra"):
+            self.assertIn(f"`{excluded}`", policy_raw)
+
+        self.assertIn("Select `xhigh` for risky or cross-system work", policy)
+        self.assertIn("Select `high` for complex work", policy)
+        self.assertIn("Select `medium` for routine work", policy)
+        self.assertIn("Issue count, changed-file count, or path count alone", policy)
+        self.assertIn("`planning-required`", policy)
+        self.assertIn("destination-host support", skill)
+        self.assertIn("explicitly requests those exact task profiles", options)
+        self.assertIn("do not write it to the run manifest or SQLite", bootstrap)
+        self.assertIn("`model=gpt-5.6-sol`", orchestration)
+        self.assertIn("`thinking=medium|high|xhigh`", orchestration)
+        self.assertIn("Omit `model` and `thinking`", orchestration)
+        self.assertIn("`send_message_to_thread`", orchestration)
+        runtime = self.text("scripts/run-state")
+        for retired_state_field in (
+            '"task_model"',
+            '"task_thinking"',
+            '"thinking_reason"',
+        ):
+            self.assertNotIn(retired_state_field, runtime)
+
     def test_given_missing_saved_projects_when_preflight_runs_then_setup_is_explicit_and_pre_state(self) -> None:
         """Given a missing project mapping, preflight asks once or stops before operational state."""
         skill = self.normalized(self.text("SKILL.md"))

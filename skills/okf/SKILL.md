@@ -20,15 +20,17 @@ This skill uses:
 
 1. Read `references/README.md` for the current routing map.
 2. Use `references/writing-okf.md` when creating or editing OKF markdown.
-3. Choose the validation mode:
-   - `spec`: OKF v0.1 conformance; only `type` is hard-required.
-   - `reference-agent`: stricter compatibility with the official reference
-     agent; requires `type`, `title`, `description`, and `timestamp`.
-4. For deterministic checks, run:
-   - `<okf-skill-root>/scripts/okf doctor`
-   - `<okf-skill-root>/scripts/okf validate <bundle> --mode spec`
-   - `<okf-skill-root>/scripts/okf validate <bundle> --mode reference-agent`
-5. When creating a new concept file, prefer:
+3. Author OKF v0.2. Use `generated.at` instead of the retired `timestamp`
+   field, and record provenance in `sources` instead of a body
+   `# Citations` list.
+4. For deterministic checks, run
+   `<okf-skill-root>/scripts/okf validate <bundle>`. Use
+   `<okf-skill-root>/scripts/okf --json validate <bundle>` when another
+   tool will consume the result.
+5. For runtime diagnostics, run
+   `<okf-skill-root>/scripts/okf --json doctor`.
+6. When creating a new concept file, prefer:
+
    - one concept per non-reserved `.md` file
    - bundle-relative concept IDs such as `tables/orders`
    - absolute bundle-root links such as `/tables/customers.md`
@@ -53,6 +55,11 @@ This skill uses:
 - Treat broken cross-links as warnings unless the user asks for strict link
   validation.
 - Keep `index.md` and `log.md` reserved; do not use them for concepts.
+- Treat provenance, trust, lifecycle, and computation families as optional;
+  their absence never makes a concept nonconformant.
+- For `type: Attested Computation`, follow the exact contract in
+  `assets/spec.md` and use a `# Computation` body section when the
+  computation is inline.
 - Keep runtime usage separate from spec refresh mechanics.
 
 ## References
@@ -60,15 +67,29 @@ This skill uses:
 - Read `references/README.md` first for the local reference map.
 - Read `references/writing-okf.md` when authoring concepts, indexes, logs, and
   cross-links.
-- Read `references/validation-modes.md` when choosing `spec` versus
-  `reference-agent` compatibility.
+- Read `references/validation.md` for the conformance and CLI validation
+  contract.
 - Read `references/examples.md` for compact examples.
-- Read `assets/spec.md` when exact official wording matters.
+- Read `assets/spec.md` when exact official wording matters or when authoring
+  an Attested Computation.
 
 ## Output Shape
 
 When producing OKF content for a user, include:
+
 - the intended bundle tree or changed concept path
 - the frontmatter and markdown body
-- the validation mode used
+- the OKF version targeted and validation command used
 - remaining warnings, especially omitted recommended fields or broken links
+
+## CLI Maintenance
+
+- The shipped artifact is `scripts/okf`; normal runtime must not depend on
+  files outside this skill package or require network access.
+- `VERSION` in `scripts/okf` is the CLI version source of truth.
+- Use semantic versioning: major for incompatible commands, options, output,
+  or validation contracts; minor for backward-compatible capabilities; patch
+  for compatible fixes.
+- Validate CLI changes with `python3 -m unittest discover -s tests`, plus the
+  shipped `--help`, `--version`, `--json doctor`, and a safe scaffold/validate
+  fixture.
