@@ -21,8 +21,8 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
-CLI_VERSION = "4.0.0"
-RUNTIME_CONTRACT_VERSION = "4.0.0"
+CLI_VERSION = "4.1.0"
+RUNTIME_CONTRACT_VERSION = "4.1.0"
 DATABASE_SCHEMA_VERSION = 3
 HISTORICAL_RUNTIME_FIXTURES = {
     "2.0.0": {
@@ -2990,19 +2990,20 @@ class RunStateScenarios(unittest.TestCase):
         self.assertTrue(all(row["active"] == 1 for row in shown["spec_claims"]))
         self.assertEqual([row["state"] for row in shown["assignments"]], ["active"] * 3)
 
-    def test_given_three_live_workers_when_fourth_creation_begins_then_capacity_blocks(self) -> None:
-        """Given three live workers, when root tries a fourth, then the generic coordinator serializes it."""
+    def test_given_three_live_workers_when_fourth_is_created_then_no_numeric_cap_blocks_it(self) -> None:
+        """Given three live workers, a fourth disjoint assignment can create and bootstrap its worker."""
         self.start("four", assignment_count=4)
         for number in (1, 2, 3):
             self.create_worker("four", number)
-        error = self.begin_operation(
-            "four", "create-worker", "spec-04",
-            expected=4,
+        self.create_worker("four", 4)
+        shown = self.invoke("run", "show", "--run-id", "four")
+        self.assertEqual(
+            [row["state"] for row in shown["assignments"]],
+            ["active"] * 4,
         )
-        self.assertEqual(error["error"]["code"], "worker-capacity-reached")
 
-    def test_given_one_worker_is_parked_for_peers_when_fourth_creation_begins_then_slot_is_reused(self) -> None:
-        """Given three created peers, input-ready parking preserves repair access without blocking the next assignment."""
+    def test_given_one_worker_is_parked_for_peers_when_another_worker_starts_then_repair_access_is_preserved(self) -> None:
+        """Input-ready parking preserves peer repair access while another assignment starts."""
         identity = self.local_identity(self.common_a)
         manifest = self.manifest(
             "parked-peer",

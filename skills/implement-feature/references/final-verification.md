@@ -87,8 +87,7 @@ replace any member's assignment, claim, review, tracker, or delivery proof.
 
 An ordinary worker may first be recorded as `peer-input-ready`; its task and
 claim stay available while its exact HEAD becomes available to dependent peers
-and its execution slot becomes free.
-Build that observation with
+and the worker parks for later peer repair. Build that observation with
 `ready-observation create --readiness-mode peer-input`, then consume it with
 plain `assignment ready`; the consumer derives and revalidates the retained
 claim mutation from the payload. Both stages must use the same authoritative

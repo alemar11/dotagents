@@ -1,18 +1,20 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. Release `4.0.0` is a CLI/runtime hard cut over
-database schema `3`: the controller's saved project is explicit control-plane
-identity, each affected repository maps bijectively to its own saved project,
-and assignments inherit that normalized binding. There are no command aliases
-or compatibility flags.
+uses the shipped artifact. Release `4.1.0` is a compatible CLI/runtime expansion
+over database schema `3`: worker creation no longer has a fixed numeric ceiling,
+while path and dependency serialization remain controller invariants. The
+controller's saved project remains explicit control-plane identity, each
+affected repository maps bijectively to its own saved project, and assignments
+inherit that normalized binding. There are no command aliases or compatibility
+flags.
 
 Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `4.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `4.0.0` | Coordination semantics required by an active run |
+| CLI | `4.1.0` | User-facing commands and executable behavior |
+| Runtime contract | `4.1.0` | Coordination semantics required by an active run |
 | Database schema | integer `3` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -175,7 +177,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="3.0.0"`, `runtime_contract_version="4.0.0"`, and the
+`schema_version="3.0.0"`, `runtime_contract_version="4.1.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -396,19 +398,19 @@ constraint.
 `run start` acquires free assignment claims independently. Waiting is tracked
 per assignment, so a conflict never prevents sibling claims from starting.
 Worker creation and bootstrap require an active run and that assignment's
-active claim. A root owns only one unfinished run, and at most three workers may
-be live.
+active claim. A root owns only one unfinished run, and the coordinator imposes
+no numeric live-worker limit.
 
 `assignment ready` validates delivery-specific typed evidence and atomically
 records normal Git facts. With `readiness_mode=terminal` it releases that
 assignment's claim. With `readiness_mode=peer-input` it instead records the
 current HEAD for dependent peers, retains the task and claim, and parks the
-worker so another assignment can use the execution slot. Combined ready
-evidence must reproduce the current exact prerequisite HEAD vector; drift
-fails closed. `assignment abort` releases one claim only before bootstrap
-authority. A durable-contract block retains only the affected claim. `run
-finish` completes aggregate run state after assignment-level release; claim
-release never proves upstream merge or combined behavior.
+worker for later peer repair. Combined ready evidence must reproduce the current
+exact prerequisite HEAD vector; drift fails closed. `assignment abort` releases
+one claim only before bootstrap authority. A durable-contract block retains only
+the affected claim. `run finish` completes aggregate run state after
+assignment-level release; claim release never proves upstream merge or combined
+behavior.
 
 `assignment resume` is the same-root CAS transition for a recovered
 `blocked-durable-contract` or `blocked-app-capability` assignment. It restores
@@ -480,7 +482,7 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `4.0.0`;
+or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `4.1.0`;
 `DATABASE_SCHEMA_VERSION` remains integer `3`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, Python
@@ -514,7 +516,7 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schemas 1 and 2 are the only recognized rebuild sources for release 4.0.0.
+Schemas 1 and 2 are the only recognized rebuild sources for release 4.1.0.
 Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
 Therefore:
 
@@ -526,8 +528,8 @@ Therefore:
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
-original artifact. The 4.0.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 4.0.0 preparation only after authoritative schema-1
+original artifact. The 4.1.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 4.1.0 preparation only after authoritative schema-1
 state reports zero owners.
 
 Schema 2 does persist exact per-run pins. With active schema-2 owners,

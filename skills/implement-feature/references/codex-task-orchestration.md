@@ -60,13 +60,13 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    assignment count, including waiting or blocked assignments. Never update the
    root title as assignments progress. The title is UI evidence, never identity
    or durable state.
-2. For each claimed, path-disjoint assignment up to three,
+2. For each claimed assignment allowed by path and dependency serialization,
    create one visible Codex worker task with `environment=worktree` in the
-   selected local Git project in the ChatGPT App. The ChatGPT App creates the
-   worktree and assigns it to the task; root never runs `git worktree add`.
-   The successful creation observation records the literal task state
-   `active` or `idle`; both mean that the exact task binding exists, not that
-   implementation progress has begun.
+   selected local Git project in the ChatGPT App. Do not impose a numeric worker
+   limit. The ChatGPT App creates the worktree and assigns it to the task; root
+   never runs `git worktree add`. The successful creation observation records
+   the literal task state `active` or `idle`; both mean that the exact task
+   binding exists, not that implementation progress has begun.
 3. Independently verify the stable task ID, checkout directory, and Git common
    directory, then set and verify `🛠️ <Feature Spec title>`.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
@@ -90,16 +90,15 @@ hash.
 
 ## Scheduling And Monitoring
 
-At most three workers may be executing. A worker recorded as
-`peer-input-ready` is parked: its visible task and claim remain available for
-direct peer follow-up, but it frees an execution slot. A proof owner that wakes
-a parked peer with mismatch evidence pauses its own affected proof until that
-peer returns a replacement HEAD, so collaboration does not manufacture an
-unbounded execution wave. Inside one root, same-repository Specs run
-concurrently only when paths are disjoint and no dependency orders them.
-Missing path evidence conflicts. Different roots may own distinct Specs and
-head branches in one repository; delivery verification exposes later conflicts.
-A delivery-ready worker releases its claim and frees a slot.
+Do not impose a numeric worker limit. A worker recorded as `peer-input-ready`
+is parked: its visible task and claim remain available for direct peer
+follow-up. A proof owner that wakes a parked peer with mismatch evidence pauses
+its own affected proof until that peer returns a replacement HEAD. Inside one
+root, same-repository Specs run concurrently only when paths are disjoint and
+no dependency orders them. Missing path evidence conflicts. Different roots
+may own distinct Specs and head branches in one repository; delivery
+verification exposes later conflicts. A delivery-ready worker releases its
+claim.
 
 There is no dedicated integration worker or reserved integration slot. Root may
 create ordinary peer workers before their prerequisite HEADs are stable so they

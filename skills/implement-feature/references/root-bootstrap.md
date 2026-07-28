@@ -61,7 +61,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "3.0.0",
-  "runtime_contract_version": "4.0.0",
+  "runtime_contract_version": "4.1.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -148,10 +148,11 @@ unambiguous repository-scoped Spec path remains local even when the repository
 identity is `github:owner/repository`.
 
 When at least one assignment acquires its claim, set and verify the immutable
-root title once and schedule up to three disjoint claimed assignments. When
-every assignment waits, create no worker, worktree, branch, or provider
-mutation. Never use a default PR base such as `main` as a head-branch collision:
-only the implementation head branch is exclusive.
+root title once and schedule every claimed assignment allowed by path and
+dependency serialization, without a numeric worker cap. When every assignment
+waits, create no worker, worktree, branch, or provider mutation. Never use a
+default PR base such as `main` as a head-branch collision: only the
+implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
 `environment=worktree`. The ChatGPT App creates the worktree and assigns

@@ -99,8 +99,8 @@ question during the run.
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `4.0.0` implements runtime
-   contract `4.0.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `4.1.0` implements runtime
+   contract `4.1.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
    schema integer `3` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
@@ -122,11 +122,11 @@ question during the run.
    repository. Keep a conflicting assignment in its bounded Spec wait without
    blocking claims already acquired by peer assignments.
 4. When at least one assignment owns its claim, set and verify the immutable
-   root title once, then schedule up to three path-disjoint Feature Specs; serialize
-   overlap inside this root. Dependency-related peers may start before their
-   input HEADs stabilize so they can collaborate, but final proof must bind the
-   exact prerequisite revisions. Never create a worker for an
-   assignment whose Spec or head branch claim is waiting.
+   root title once, then schedule every claimed Feature Spec allowed by path and
+   dependency serialization, with no numeric worker cap. Dependency-related
+   peers may start before their input HEADs stabilize so they can collaborate,
+   but final proof must bind the exact prerequisite revisions. Never create a
+   worker for an assignment whose Spec or head branch claim is waiting.
 5. For each worker, follow `references/codex-task-orchestration.md` and send
    the full assignment under the generated `bootstrap_id`, including canonical
    `review_owner=worker|root`. Persist the initial owner atomically on

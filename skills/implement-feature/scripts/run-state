@@ -18,14 +18,13 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "4.0.0"
-RUNTIME_CONTRACT_VERSION = "4.0.0"
+CLI_VERSION = "4.1.0"
+RUNTIME_CONTRACT_VERSION = "4.1.0"
 DATABASE_SCHEMA_VERSION = 3
 REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
-MAX_LIVE_WORKERS = 3
 MAX_UNCHANGED_WAIT_SWEEPS = 3
 
 PROTOCOLS = {
@@ -2474,10 +2473,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if action == "create-worker":
             if assignment["state"] != "planned":
                 raise StateError("invalid-assignment-transition", "worker creation requires a planned assignment", 4)
-            live = connection.execute("SELECT COUNT(*) FROM assignments WHERE run_id=? AND state IN ('worker-created','active')", (run["run_id"],)).fetchone()[0]
-            pending = connection.execute("SELECT COUNT(*) FROM app_operations WHERE run_id=? AND action='create-worker' AND status IN ('pending','unknown')", (run["run_id"],)).fetchone()[0]
-            if live + pending >= MAX_LIVE_WORKERS:
-                raise StateError("worker-capacity-reached", "at most three live workers are allowed", 4)
         elif action == "set-worker-title" and assignment["state"] != "worker-created":
             raise StateError("invalid-assignment-transition", "title readback requires a created worker", 4)
         elif action == "set-review-owner":

@@ -157,12 +157,12 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         )
 
     def test_given_same_repo_assignments_when_paths_overlap_then_root_serializes_them(self) -> None:
-        """Given overlap in one repository, when scheduling, then root serializes while disjoint work may reach three."""
-        skill = self.text("SKILL.md")
-        orchestration = self.text("references/codex-task-orchestration.md")
-        self.assertIn("schedule up to three path-disjoint", skill)
+        """Given overlap in one repository, root serializes conflicts without numerically capping disjoint work."""
+        skill = self.normalized(self.text("SKILL.md"))
+        orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
+        self.assertIn("schedule every claimed Feature Spec allowed by path and dependency serialization", skill)
         self.assertIn("overlapping paths or issue dependencies serialize", self.text("references/feature-spec-contract.md"))
-        self.assertIn("At most three workers may be executing", orchestration)
+        self.assertIn("Do not impose a numeric worker limit", orchestration)
         self.assertIn("`peer-input-ready` is parked", orchestration)
 
     def test_given_root_assignments_when_title_is_set_then_it_is_exact_and_immutable(self) -> None:
@@ -194,11 +194,11 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             self.assertNotIn(retired_action, runtime)
 
     def test_given_schema_three_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
-        """Given the breaking protocol cut, old state is rebuilt at one unversioned canonical path."""
+        """Given the current runtime, schema-three state stays at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "4.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.0.0"', source)
+        self.assertIn('CLI_VERSION = "4.1.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.1.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
         self.assertIn('"schema": "implement-feature/run-manifest"', source)
         self.assertIn('"schema_version": "3.0.0"', source)
@@ -318,8 +318,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "4.0.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.0.0"', source)
+        self.assertIn('CLI_VERSION = "4.1.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.1.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
         self.assertIn("command_capabilities", source)
         self.assertIn("runtime_artifact_sha256", source)
