@@ -35,6 +35,9 @@ Apply all of these gates before continuing:
 - Record whether the PR lookup returns zero or one open PR. Stop if it returns
   more than one or if its head branch/repository does not match the verified
   push target.
+- When one PR exists, record its `isDraft` value. Updating its branch, title, or
+  body must preserve that exact value; Yeet never changes an existing PR
+  between draft and ready.
 
 After preflight and scope verification, reuse a suitable existing commit or run
 the complete `$gitstack:git-commit` workflow with
@@ -65,6 +68,26 @@ Run `publish open` only when the post-push lookup still returns no PR. It sends
 title and body through JSON stdin, verifies exact UTF-8 byte fingerprints and
 the returned PR target, and performs one exact-head read-back after an
 ambiguous response. Do not retry it blindly.
+
+When the post-push lookup returns an existing PR, do not run `publish open
+--draft` and do not invoke any draft-state lifecycle mutation. Require its
+post-update `isDraft` value to equal the pre-push value. An existing ready PR
+therefore remains ready while its branch and optional title/body are updated.
+
+After the post-push lookup returns the exact existing PR or `publish open`
+returns the exact newly created PR, require the PR head to equal the full
+published commit SHA. Then invoke `$gitstack:github-review-threads` for the
+exact repository and PR with `review_operation=request`,
+`mutation_mode=apply`, `provider=codex`, that full head SHA, and a fresh
+Yeet-owned request key for this logical publish invocation. Preserve the key
+for reconciliation and persist the complete typed request receipt. This step
+is required for both new and existing PR paths. It must use the typed request
+operation, not a plain discussion comment.
+
+Do not wait by default. If the user or a composing caller also requested
+monitoring, invoke `$gitstack:github-review-threads` again with
+`review_operation=wait`, the persisted complete receipt, and the caller-owned
+bounded duration. Keep the request and wait as separate operations.
 
 ## No Publishable Local Work
 
@@ -103,7 +126,11 @@ gh pr view <number> --repo <owner/repo> \
 ```
 
 Verify `headRefName` and the head repository still match the preflight before
-editing. Never silently retarget a PR.
+editing. Never silently retarget a PR or change its `isDraft` value. If
+`isDraft=false`, keep the PR ready; if `isDraft=true`, keep it draft. After the
+normal push updates this PR, verify its full head SHA and unchanged draft state,
+then perform the same required typed current-head Codex review request
+described in `Publish New Work`.
 
 ## Safe Retry
 
@@ -115,6 +142,10 @@ editing. Never silently retarget a PR.
 - If `publish open` reports an ambiguous write, preserve its read-back evidence
   and stop. It already performed the only automatic exact-head read-back; do
   not issue another create attempt.
+- If the typed Codex review request fails after a confirmed push or PR
+  creation, preserve and report the successful publish evidence and the exact
+  review-request failure separately. Do not repeat the push, PR creation, or
+  review request blindly.
 - On any changed branch, remote, upstream, authentication, or PR state, stop and
   rerun the full preflight rather than continuing from stale assumptions.
 
@@ -126,9 +157,11 @@ Return:
 - commit hash
 - PR URL
 - whether the PR is draft or ready
+- current-head Codex review request status and typed receipt identity
 - validation performed before publishing
 
-If CI fails or review comments need follow-up, route to `$gitstack:github-actions`
-or `$gitstack:github-review-threads` after the publish step. Supply the exact
-repository and PR plus one `review_operation`; add `mutation_mode=apply` only
-for an authorized reply, request, review submission, or resolution.
+If CI fails or review comments need follow-up, route to
+`$gitstack:github-actions` or `$gitstack:github-review-threads` after the
+publish and required review-request steps. Supply the exact repository and PR
+plus one `review_operation`; add `mutation_mode=apply` only for an authorized
+reply, request, review submission, or resolution.

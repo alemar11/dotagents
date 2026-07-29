@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Publish local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, and open or update a draft pull request.
+description: Publish local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review.
 ---
 
 # Yeet
@@ -34,7 +34,8 @@ Prefer the shortest publish path that matches the state in front of you:
 - If a good local commit already exists, reuse it instead of reopening commit
   authoring.
 - If the branch already has a PR, update that PR instead of treating the run as
-  a fresh publish.
+  a fresh publish. Preserve its current draft or ready state, then request a
+  Codex review for the newly published head.
 - If there is no publishable local change, stop early and route issue-only
   follow-up to `$gitstack:github-issues`.
 
@@ -55,18 +56,28 @@ Prefer the shortest publish path that matches the state in front of you:
    normal push to the verified upstream, or `git push -u origin HEAD` only when
    no upstream exists. Never infer permission to force-push.
 5. Re-check for an existing PR after push. Open a draft PR only when none
-   exists; otherwise update the existing PR. After an ambiguous create failure,
-   look up the PR again before retrying so a successful first request cannot
-   create a duplicate.
-6. Return branch, PR URL, commit hash, and verification performed.
-7. When the calling workflow requires an automated-review publication gate,
-   hand it to `$gitstack:github-review-threads` with the exact repository and
-   PR, configured provider, and published head SHA. Use one operation per
-   invocation: `review_operation=request` with `mutation_mode=apply`, a full
-   head SHA, and a caller-supplied request key for an authorized typed request,
-   then `review_operation=wait` with the persisted complete receipt for the
-   bounded read-only wait. Do not duplicate provider detection or polling inside
-   Yeet.
+   exists; otherwise update the existing PR without changing its `isDraft`
+   value. In particular, a ready PR must remain ready; never call a draft
+   conversion or the draft-only creation path for an existing PR. After an
+   ambiguous create failure, look up the PR again before retrying so a
+   successful first request cannot create a duplicate.
+6. For both a newly created PR and an existing PR, hand a current-head Codex
+   review request to `$gitstack:github-review-threads` with the exact repository
+   and PR, `provider=codex`, and the full published head SHA. Use
+   `review_operation=request` with `mutation_mode=apply` and a fresh
+   Yeet-owned request key for this logical publish invocation; preserve that
+   key for reconciliation, then persist the complete typed request receipt.
+   This request is part of Yeet's authorized publish flow; do not require a
+   separate caller gate. Do not substitute an untyped PR comment.
+7. Use one operation per invocation. Run
+   `review_operation=wait` with the persisted complete receipt only when the
+   user or composing caller also requested bounded review monitoring. Do not
+   duplicate provider detection or polling inside Yeet.
+8. Return branch, PR URL, commit hash, Codex review request status and receipt
+   identity, and verification performed. If the review request fails after the
+   push or PR mutation succeeded, preserve and report the successful publish
+   evidence separately; do not repeat the push, PR creation, or review request
+   blindly.
 
 ## References
 

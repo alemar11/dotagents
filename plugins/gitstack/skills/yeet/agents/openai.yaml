@@ -1,5 +1,5 @@
 interface:
   display_name: "Yeet"
-  short_description: "Commit, push, and open or update a draft PR"
+  short_description: "Commit, push, open or update a PR, and request review"
   brand_color: "#EA580C"
-  default_prompt: "Use $gitstack:yeet to confirm the intended local changes, commit them, push the branch, and open or update a draft pull request."
+  default_prompt: "Use $gitstack:yeet to confirm the intended local changes, commit them, push the branch, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review."

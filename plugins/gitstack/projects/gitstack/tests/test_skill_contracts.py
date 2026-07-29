@@ -131,6 +131,43 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("never substitutes a newer comment", review_threads)
         self.assertIn("There is no direct legacy fallback", read("skills/github-review-threads/references/workflows.md"))
 
+    def test_yeet_always_requests_current_head_codex_review_for_new_and_existing_prs(self) -> None:
+        skill = read("skills/yeet/SKILL.md")
+        workflow_steps = {
+            int(number): " ".join(body.split())
+            for number, body in re.findall(
+                r"(?ms)^([0-9]+)\. (.*?)(?=^[0-9]+\. |\Z)",
+                section(skill, "Workflow"),
+            )
+        }
+        workflows = read("skills/yeet/references/workflows.md")
+        publish = section(workflows, "Publish New Work")
+        existing = section(workflows, "Existing PR")
+        publish_normalized = " ".join(publish.split())
+        existing_normalized = " ".join(existing.split())
+        metadata = read("skills/yeet/agents/openai.yaml")
+
+        self.assertEqual(sorted(workflow_steps), list(range(1, 9)))
+        self.assertIn("existing PR", workflow_steps[5])
+        self.assertIn("newly created PR", workflow_steps[6])
+        self.assertIn("existing PR", workflow_steps[6])
+        self.assertIn("review_operation=request", workflow_steps[6])
+        self.assertIn("mutation_mode=apply", workflow_steps[6])
+        self.assertIn("provider=codex", workflow_steps[6])
+        self.assertIn("full published head SHA", workflow_steps[6])
+        self.assertIn("complete typed request receipt", workflow_steps[6])
+        self.assertIn("review_operation=wait", workflow_steps[7])
+        self.assertIn("only when", workflow_steps[7])
+        self.assertIn("review_operation=request", publish)
+        self.assertIn("review_operation=wait", publish)
+        self.assertIn("review request", existing)
+        self.assertIn("without changing its `isDraft` value", workflow_steps[5])
+        self.assertIn("ready PR must remain ready", workflow_steps[5])
+        self.assertIn("post-update `isDraft` value", publish_normalized)
+        self.assertIn("do not run `publish open --draft`", publish_normalized)
+        self.assertIn("If `isDraft=false`, keep the PR ready", existing_normalized)
+        self.assertIn("request a current-head Codex review", metadata)
+
     def test_review_wait_duration_is_caller_owned(self) -> None:
         paths = (
             "skills/github-review-threads/SKILL.md",
