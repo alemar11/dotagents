@@ -3,7 +3,7 @@ name: implement-feature
 description: Implement durable Feature Specs in collaborating visible Codex tasks in the ChatGPT App and deliver reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
 ---
 
-# Implement Feature
+# Implement Feature Spec
 
 ## Fixed Contract
 

@@ -3,7 +3,7 @@ name: plan-feature
 description: Manually converge feature intent or a durable Feature Spec into a complete Feature Spec bundle with hardened agent-ready implementation issues.
 ---
 
-# Plan Feature
+# Plan Feature Spec
 
 ## Purpose And Invocation
 
