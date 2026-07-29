@@ -23,7 +23,7 @@ def _find_open_pr(repo: str, branch: str, root: Path) -> dict[str, Any] | None:
         [
             "gh", "pr", "list", "--repo", repo, "--state", "open",
             "--head", f"{owner}:{branch}", "--limit", "2", "--json",
-            "number,url,state,isDraft,headRefName,headRepositoryOwner,headRepository",
+            "number,url,state,isDraft,headRefName,headRepositoryOwner,headRepository,baseRefName",
         ],
         root,
     )

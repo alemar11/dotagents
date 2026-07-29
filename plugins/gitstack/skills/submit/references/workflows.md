@@ -15,7 +15,7 @@ gh repo view --json nameWithOwner,defaultBranchRef,url
 git config --get "branch.<branch>.remote"
 git config --get "branch.<branch>.merge"
 gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
-  --json number,title,url,isDraft,headRefName,headRepositoryOwner
+  --json number,title,url,isDraft,headRefName,headRepositoryOwner,baseRefName
 ```
 
 Apply all of these gates before continuing:
@@ -39,6 +39,70 @@ Apply all of these gates before continuing:
   body must preserve that exact value; Submit never changes an existing PR
   between draft and ready.
 
+### Closing Issue References
+
+Before committing or mutating a PR, build `closing_issue_refs` from exact
+evidence that the PR fully resolves each issue:
+
+- explicit issue refs supplied by the user or composing caller;
+- exact GitHub implementation-issue refs in the accepted execution contract or
+  tracker state for this change;
+- valid closing references already present in an existing PR description.
+
+Do not derive a closing ref from a bare number, branch name, commit subject,
+parent Feature Spec, related issue, dependency, or issue whose accepted scope
+is only partially satisfied. A parent issue is closable only when this PR
+itself satisfies that parent's complete accepted scope. Plain mentions and
+phrases such as `Related to #12` are tracking context, not
+`closing_issue_refs`.
+
+Normalize each candidate to `<owner>/<repository>#<number>`, deduplicate the
+set, and verify every exact issue:
+
+```bash
+gh issue view <number> --repo <owner/repository> \
+  --json number,state,title,url
+```
+
+Stop if a candidate is missing, resolves to another repository or number, is a
+pull request rather than an issue, or has conflicting ownership or completion
+evidence. Preserve a valid existing closing reference even when its issue is
+already closed; it remains part of the PR's tracking history. Do not add a new
+closing reference for an already-closed issue unless the explicit or accepted
+execution evidence still identifies it as resolved by this PR.
+
+When the verified set is nonempty, require the PR base to equal the current
+`defaultBranchRef.name`. GitHub interprets closing keywords only for PRs
+targeting the default branch. Stop on a non-default existing PR and request
+explicit retargeting authority; Submit never silently retargets it.
+
+Render one line per issue under this exact PR-description section:
+
+```markdown
+## Issues
+
+Closes #10
+Closes #123
+Closes octo-org/octo-repo#100
+```
+
+Use repository-local shorthand only when the issue and PR share the same
+repository. Use `Closes <owner>/<repository>#<number>` for every cross-repository
+issue. Each issue gets its own complete `Closes` line; do not render one keyword
+followed by a comma-separated list.
+
+For a new PR, preserve the repository PR template and append `## Issues` when
+it has no issue-link section. If a template already owns an issue-link section,
+place the canonical lines there without duplicating the heading. For an
+existing PR, read its complete body, preserve unrelated template and author
+content byte-for-byte where possible, union its valid closing refs with the
+new verified set, and update only the issue-link section. Stop instead of
+silently deleting, changing, or duplicating a conflicting closing reference.
+
+When the verified set is empty, omit `## Issues`; do not emit `Closes none`, a
+blank placeholder, or a guessed ref. Record `closing_issue_refs=[]` in the
+closeout.
+
 After preflight and scope verification, reuse a suitable existing commit or run
 the complete `$gitstack:git-commit` workflow with
 `commit_operation=commit-only`, even when the
@@ -60,14 +124,19 @@ git push -u origin HEAD          # only when the preflight found no upstream
 gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
   --json number,title,url,isDraft,headRefName,headRepositoryOwner
 <plugin-root>/scripts/gitstack --json repo snapshot
-<plugin-root>/scripts/gitstack --json publish open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --draft --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json publish open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --base <default-branch> --draft --expected-worktree-fingerprint <sha256>
 ```
 
 Use explicit pathspecs for staging. Run only one of the two push commands. Run
-Run `publish open` only when the post-push lookup still returns no PR. It sends
+`publish open` only when the post-push lookup still returns no PR. It sends
 title and body through JSON stdin, verifies exact UTF-8 byte fingerprints and
 the returned PR target, and performs one exact-head read-back after an
 ambiguous response. Do not retry it blindly.
+
+Before `publish open`, require the body file to contain the complete canonical
+`## Issues` section whenever `closing_issue_refs` is nonempty. After creation,
+read back the PR description and require every expected `Closes` line exactly
+once. The base read-back must still equal the current default branch.
 
 When the post-push lookup returns an existing PR, do not run `publish open
 --draft` and do not invoke any draft-state lifecycle mutation. Require its
@@ -116,9 +185,9 @@ Close out by saying explicitly:
 
 ## Existing PR
 
-Read the existing PR, then use the structured GitHub connector for title/body
-edits. GitStack does not expose `publish edit`, and `gh pr edit` requires the
-free-form title in argv.
+Read the existing PR including its body and base, then use the structured
+GitHub connector for title/body edits. GitStack does not expose `publish edit`,
+and `gh pr edit` requires the free-form title in argv.
 
 ```bash
 gh pr view <number> --repo <owner/repo> \
@@ -126,11 +195,15 @@ gh pr view <number> --repo <owner/repo> \
 ```
 
 Verify `headRefName` and the head repository still match the preflight before
-editing. Never silently retarget a PR or change its `isDraft` value. If
-`isDraft=false`, keep the PR ready; if `isDraft=true`, keep it draft. After the
-normal push updates this PR, verify its full head SHA and unchanged draft state,
-then perform the same required typed current-head Codex review request
-described in `Publish New Work`.
+editing. Never silently retarget a PR or change its `isDraft` value. When
+`closing_issue_refs` is nonempty, require `baseRefName` to equal the current
+default branch, merge the canonical issue lines into the existing body, and
+read back every expected line exactly once. Preserve every previously valid
+closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
+keep it draft. After the normal push updates this PR, verify its full head SHA,
+unchanged draft state, unchanged base, and complete issue linkage, then perform
+the same required typed current-head Codex review request described in
+`Publish New Work`.
 
 ## Safe Retry
 
@@ -157,6 +230,8 @@ Return:
 - commit hash
 - PR URL
 - whether the PR is draft or ready
+- PR base and current default branch
+- canonical `closing_issue_refs` and exact PR-body read-back
 - current-head Codex review request status and typed receipt identity
 - validation performed before publishing
 

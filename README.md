@@ -34,7 +34,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
 | `gitstack:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `gitstack:submit` | Confirm scope, commit, push, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review. |
+| `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
 
 ## Reusable Skills
 

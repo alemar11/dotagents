@@ -19,8 +19,10 @@ def read(relative: str) -> str:
 def section(text: str, heading: str) -> str:
     start = text.index(f"## {heading}")
     remainder = text[start + len(f"## {heading}") :]
-    end = remainder.find("\n## ")
-    return remainder if end == -1 else remainder[:end]
+    for match in re.finditer(r"(?m)^## ", remainder):
+        if remainder[: match.start()].count("```") % 2 == 0:
+            return remainder[: match.start()]
+    return remainder
 
 
 class GitStackSkillContractTests(unittest.TestCase):
@@ -147,26 +149,51 @@ class GitStackSkillContractTests(unittest.TestCase):
         existing_normalized = " ".join(existing.split())
         metadata = read("skills/submit/agents/openai.yaml")
 
-        self.assertEqual(sorted(workflow_steps), list(range(1, 9)))
-        self.assertIn("existing PR", workflow_steps[5])
-        self.assertIn("newly created PR", workflow_steps[6])
+        self.assertEqual(sorted(workflow_steps), list(range(1, 10)))
         self.assertIn("existing PR", workflow_steps[6])
-        self.assertIn("review_operation=request", workflow_steps[6])
-        self.assertIn("mutation_mode=apply", workflow_steps[6])
-        self.assertIn("provider=codex", workflow_steps[6])
-        self.assertIn("full published head SHA", workflow_steps[6])
-        self.assertIn("complete typed request receipt", workflow_steps[6])
-        self.assertIn("review_operation=wait", workflow_steps[7])
-        self.assertIn("only when", workflow_steps[7])
+        self.assertIn("newly created PR", workflow_steps[7])
+        self.assertIn("existing PR", workflow_steps[7])
+        self.assertIn("review_operation=request", workflow_steps[7])
+        self.assertIn("mutation_mode=apply", workflow_steps[7])
+        self.assertIn("provider=codex", workflow_steps[7])
+        self.assertIn("full published head SHA", workflow_steps[7])
+        self.assertIn("complete typed request receipt", workflow_steps[7])
+        self.assertIn("review_operation=wait", workflow_steps[8])
+        self.assertIn("only when", workflow_steps[8])
         self.assertIn("review_operation=request", publish)
         self.assertIn("review_operation=wait", publish)
         self.assertIn("review request", existing)
-        self.assertIn("without changing its `isDraft` value", workflow_steps[5])
-        self.assertIn("ready PR must remain ready", workflow_steps[5])
+        self.assertIn("without changing its `isDraft` value", workflow_steps[6])
+        self.assertIn("ready PR must remain ready", workflow_steps[6])
         self.assertIn("post-update `isDraft` value", publish_normalized)
         self.assertIn("do not run `publish open --draft`", publish_normalized)
         self.assertIn("If `isDraft=false`, keep the PR ready", existing_normalized)
         self.assertIn("request a current-head Codex review", metadata)
+
+    def test_submit_links_every_confirmed_resolved_issue_for_default_branch_closure(self) -> None:
+        skill = read("skills/submit/SKILL.md")
+        workflows = read("skills/submit/references/workflows.md")
+        workflows_normalized = " ".join(workflows.split())
+        existing = " ".join(section(workflows, "Existing PR").split())
+
+        self.assertIn("closing_issue_refs", skill)
+        self.assertIn("Never infer an issue from a bare number", skill)
+        self.assertIn("require the PR base to equal", skill)
+        self.assertIn("Read back the PR body", skill)
+        self.assertIn("## Issues", workflows)
+        self.assertIn("Closes #10", workflows)
+        self.assertIn("Closes #123", workflows)
+        self.assertIn("Closes octo-org/octo-repo#100", workflows)
+        self.assertIn("Each issue gets its own complete `Closes` line", workflows)
+        self.assertIn("current `defaultBranchRef.name`", workflows_normalized)
+        self.assertIn("--base <default-branch>", workflows)
+        self.assertIn(
+            "preserve unrelated template and author content",
+            workflows_normalized,
+        )
+        self.assertIn("closing_issue_refs=[]", workflows)
+        self.assertIn("Preserve every previously valid closing reference", existing)
+        self.assertIn("read back every expected line exactly once", existing)
 
     def test_review_wait_duration_is_caller_owned(self) -> None:
         paths = (

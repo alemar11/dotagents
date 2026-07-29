@@ -28,13 +28,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "8.0.0")
+        self.assertEqual(output.strip(), "8.1.0")
 
     def test_json_doctor_shape(self) -> None:
         code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "8.0.0")
+        self.assertEqual(payload["version"], "8.1.0")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
 
     def test_json_argument_error(self) -> None:
@@ -276,6 +276,22 @@ class CliContractTests(unittest.TestCase):
             with self.assertRaises(GitStackError) as raised:
                 _find_open_pr("owner/repo", "feature", Path("/tmp/repo"))
         self.assertEqual(raised.exception.code, "pull_request_mismatch")
+
+    def test_open_pr_lookup_preserves_base_branch_for_closing_issue_gate(self) -> None:
+        payload = json.dumps([
+            {
+                "number": 7, "url": "https://github.com/owner/repo/pull/7",
+                "title": "PR", "state": "OPEN", "isDraft": True,
+                "headRefName": "feature", "baseRefName": "main",
+                "headRepositoryOwner": {"login": "owner"},
+                "headRepository": {"name": "repo"},
+            }
+        ])
+        with mock.patch("gitstack.publish.checked", return_value=Result(0, payload, "")):
+            result = _find_open_pr("owner/repo", "feature", Path("/tmp/repo"))
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result["baseRefName"], "main")
 
     def test_open_pr_lookup_rejects_ambiguous_matches(self) -> None:
         payload = json.dumps([{"number": 1}, {"number": 2}])
