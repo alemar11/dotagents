@@ -6,6 +6,14 @@ read the current Feature Spec and complete issue set from GitHub or local
 Markdown. Compare their stable sections directly; do not compare a stored
 packet, checksum, or text hash.
 
+Worker mutation follows the complete canonical mutable execution set in
+`feature-spec-contract.md`, including implementation approach, safer rewrites,
+additional or equivalent tests, compatible clarifications, concrete in-scope
+fixes, checkbox markers, progress, evidence, and status text. It also includes
+the canonical local active-to-`issues/done/` completion move. The stable-source
+mutation ownership table in that reference forbids both root and worker from
+editing stable fields. GitStack access does not grant planning authority.
+
 For each issue:
 
 1. Implement and validate the current accepted contract.

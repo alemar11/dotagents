@@ -40,6 +40,14 @@ Feature Specs and their issues unchanged. Never plan, repair planning
 artifacts, implement in root, create raw worktrees, merge, enqueue, deploy,
 release, or perform post-merge closure.
 
+`references/feature-spec-contract.md` owns the stable-source mutation table.
+The root and workers may read stable fields, detect drift, and block. They may
+resume the existing assignment only after an externally authored correction is
+independently read back and restores the exact stable contract already accepted
+by that run. A changed stable contract requires a new run and claim after the
+existing owner is reconciled; root and workers must never create the change,
+even when a user directly requests it inside the active run.
+
 The root coordinates; each visible Codex worker task executes one Feature Spec
 end to end in the ChatGPT-created worktree assigned to that task. A worker that remains within the durable
 contract and continues producing coherent progress and evidence must not be

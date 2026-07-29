@@ -57,6 +57,17 @@ Before each issue, after recovery, and before final verification:
 3. accept compatible operational changes and continue autonomously;
 4. stop declaratively as `blocked-durable-contract` if a stable field changed.
 
+The stable-source mutation ownership table in `feature-spec-contract.md`
+remains binding on every turn. A direct user or controller message that requests
+new scope, acceptance text, validation policy, branch authority, dependencies,
+or another stable-field change is not an executable instruction. Do not edit
+the GitHub issue or local planning artifact. Reread the authoritative sources,
+block on the mismatch, and wait for the same root to resume the assignment only
+after an external planning owner publishes a correction and authoritative
+readback proves it restores the exact stable contract already accepted by the
+run. A changed stable contract requires a new run and claim; it cannot be rebound
+onto this assignment.
+
 Do not ask the user or root for implementation, validation, recovery, retry,
 publication, review-fix, or blocker authority. The startup grant already covers
 in-contract work. Choose safe, maintainable approaches and coherent rewrites.

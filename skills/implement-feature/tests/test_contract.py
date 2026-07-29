@@ -243,6 +243,30 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("blocked-durable-contract", spec)
         self.assertIn("without asking", spec)
 
+    def test_given_stable_source_change_when_execution_is_active_then_only_external_planning_may_write(self) -> None:
+        """The canonical actor table is a machine-checked write-ownership contract."""
+        spec = self.text("references/feature-spec-contract.md")
+        table = spec.split("## Stable Source Mutation Ownership", 1)[1].split(
+            "\n## ", 1
+        )[0]
+        rows = {}
+        for line in table.splitlines():
+            match = re.fullmatch(
+                r"\| `([^`]+)` \| `([^`]+)` \|",
+                line.strip(),
+            )
+            if match:
+                rows[match.group(1)] = match.group(2)
+
+        self.assertEqual(
+            rows,
+            {
+                "external-planning-owner": "allowed",
+                "implement-feature-root": "forbidden",
+                "implement-feature-worker": "forbidden",
+            },
+        )
+
     def test_given_github_or_local_tracker_when_checkbox_changes_then_readback_and_invalidation_are_required(self) -> None:
         """Given GitHub or local Markdown, when proof changes, then checkboxes update and invalid proof is unchecked."""
         tracker = self.text("references/tracker-checklists.md")

@@ -140,7 +140,8 @@ until authoritative recovery or contract change permits that root to continue.
 
 Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
-durable-source change, an early AutoReview capability reroute, a root-owned
+durable-source change already authored outside the active run and independently
+read back, an early AutoReview capability reroute, a root-owned
 AutoReview result, or an authoritative final-verification mismatch. An early
 review-owner follow-up is the external effect of the recorded
 `set-review-owner` operation and contains only the structured doctor result and
@@ -158,6 +159,17 @@ may report that the review is clean or identify review findings, but it must not
 add root-authored diagnosis, commands, implementation guidance, or repair
 strategy. The worker owns finding acceptance, repair, validation, and
 replacement evidence.
+
+The stable-source mutation ownership table in `feature-spec-contract.md` is
+binding here. Root never edits a stable Feature Spec or issue field, asks the
+worker to edit one, or converts a direct user request into a planning mutation.
+It blocks the assignment and retains its claim while an external planning owner
+corrects the source. Root may resume only after rereading the complete
+authoritative source and proving that it restores the exact stable contract
+already accepted by the run. A changed stable contract cannot be rebound onto
+the retained assignment or claim and requires a new run after existing-owner
+reconciliation. The recovery follow-up contains the exact source and readback
+refs only.
 
 Allowed example: “Final verification shows PR HEAD `def`, while validation
 evidence is bound to `abc`.”

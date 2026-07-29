@@ -83,7 +83,13 @@ binds the exact run, assignment, current run revision, blocked reason, matching
 recovered state, and authoritative readback ref. Durable-contract recovery
 likewise supplies the exact durable-source reread ref. The resume transition
 stores that evidence on the retained claim; it must not rely only on controller
-judgment.
+judgment. That source correction must have been published by the
+`external-planning-owner` defined in `feature-spec-contract.md`; root and worker
+must not create or repair the stable planning change they later use for resume.
+Resume is valid only when the reread restores the exact stable contract already
+accepted by the run. A changed stable contract cannot be rebound onto the
+retained assignment or claim and requires a new run after existing-owner
+reconciliation.
 
 ## Terminal Owner Reconciliation
 

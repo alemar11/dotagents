@@ -17,6 +17,38 @@ Each selected Spec must establish stable fields for:
 - literal validation commands plus material retry or attempt budget and required
   terminal result.
 
+## Stable Source Mutation Ownership
+
+This table is the canonical execution-time write contract for the stable fields
+above:
+
+| actor | stable_field_write |
+| --- | --- |
+| `external-planning-owner` | `allowed` |
+| `implement-feature-root` | `forbidden` |
+| `implement-feature-worker` | `forbidden` |
+
+`external-planning-owner` means a human tracker owner or a separately invoked
+planning workflow operating outside the active `$implement-feature` run. A
+direct user message to the active root or worker does not change that actor's
+role and does not grant planning authority.
+
+When a stable field must change, the root and worker stop as
+`blocked-durable-contract` and report the exact conflicting source and field.
+They must not edit the GitHub issue, local planning artifact, or stable section,
+including through GitStack. The same root retains the run and claim while the
+assignment is blocked. After an external planning owner publishes a correction,
+the root rereads the complete authoritative Spec and issue graph and records the
+exact durable-source readback. It may resume the existing assignment through the
+normal recovery transition only when that readback restores the exact stable
+contract already accepted by the run. Any changed stable contract—including
+repository or source identity, delivery type, target branch, allowed paths,
+dependencies, acceptance, safety, or material validation constraints—cannot be
+rebound onto the retained assignment or claim; it requires a new run and claim
+after the existing owner is reconciled through the normal terminal lifecycle.
+The recovery follow-up carries source identity and readback evidence only; it
+does not draft, reinterpret, or prescribe the planning change.
+
 An external dependency must satisfy its stable dependency contract before the
 dependent proof can become final. Ordinary peer tasks may start earlier and
 collaborate while the prerequisite implementation is still converging. Final
@@ -101,7 +133,8 @@ operational changes when the stable fields above remain intact:
 - implementation approach or internal technical design;
 - safer or simpler rewrites;
 - additional or equivalent tests;
-- compatible clarifications;
+- compatible clarifications in explicitly mutable execution sections that do
+  not reinterpret a stable field;
 - progress, evidence, and status text;
 - checkbox markers whose underlying acceptance text, count, and order did not
   change.
