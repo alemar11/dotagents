@@ -4,13 +4,38 @@ Root is a lightweight control plane. Before mutation:
 
 1. Read and validate the complete current Feature Spec frontier through
    `feature-spec-contract.md`.
-2. Read the current Codex task and `list_projects`. Require the controller task
-   to be anchored to one local saved Codex project on the current host and
-   record its exact `controller_project_id`; also read its current primary
-   folder. The controller project may be multi-folder or unrelated to the
-   feature. It is UI/control-plane identity and read-only coordination context
-   only: its primary-folder Git defaults never expand scope or grant an
-   implementation claim, branch, worker, or PR.
+2. Read the current Codex task and `list_projects`. When task readback reports a
+   non-null `projectId`, require it to identify one local saved Codex project on
+   the task's current host and record that exact `controller_project_id`; also
+   read its reported primary path. This direct binding may be multi-folder or
+   unrelated to the feature.
+
+   When task readback omits `projectId`, use the compatibility fallback only if
+   all of these authoritative facts hold:
+
+   - task readback reports a local current host and an absolute `cwd`;
+   - `cwd` resolves to an existing non-symlink directory and is exactly the Git
+     worktree root reported by `git rev-parse --show-toplevel`;
+   - exactly one `list_projects` entry is local, belongs to that same host,
+     reports `isGitRepository=true`, and has a real path exactly equal to the
+     real `cwd`;
+   - independently resolving the candidate path's absolute Git common directory
+     succeeds and exactly matches the current task repository's absolute Git
+     common directory; and
+   - no second exact-path candidate, parent-path substitution, remote or
+     cross-host candidate, non-Git candidate, missing path, symlink alias, or
+     Git-common-directory mismatch remains.
+
+   Record that unique candidate's project ID as `controller_project_id`. A
+   singular `list_projects.path` is only a reported project path; because the
+   current ChatGPT App metadata does not expose the complete folder set or folder
+   count, do not claim that this fallback proves a single-folder project. The
+   candidate may be a one-folder project or the primary path of a multi-folder
+   workspace. Both are safe as controller identity because the controller
+   project is UI/control-plane identity and read-only coordination context only:
+   its Git defaults never expand scope or grant an implementation claim,
+   branch, worker, or PR. Zero, multiple, or unverifiable candidates stop before
+   state.
 3. Resolve each affected repository's canonical identity. Use
    `github:owner/repository` for GitHub repositories. For local-only repositories,
    resolve `git rev-parse --path-format=absolute --git-common-dir`, stat that
@@ -20,14 +45,17 @@ Root is a lightweight control plane. Before mutation:
    repository must map bijectively to one separate local saved Git project on
    the current host whose reported primary folder is exactly that repository
    root and whose independently resolved Git common directory matches the
-   canonical repository identity. When the controller project is multi-folder,
-   exclude its project ID from worker mapping even when an affected repository
-   is its primary folder. Its primary and secondary folder memberships are
-   context only and never satisfy the worker-project requirement. The same
-   repository may appear in multiple multi-folder projects without becoming
-   multiple repository identities or execution targets. Reject remote, non-Git,
-   duplicate eligible repo-project, parent-path, and ambiguous worker mappings
-   before state; a broad or multi-folder project is never a substitute.
+   canonical repository identity. Resolve this eligibility independently even
+   when step 2 used the same project ID as controller identity: exact-path
+   controller resolution is not worker-project evidence. When the controller
+   project is multi-folder, exclude its project ID from worker mapping even when
+   an affected repository is its primary folder. Its primary and secondary
+   folder memberships are context only and never satisfy the worker-project
+   requirement. The same repository may appear in multiple multi-folder
+   projects without becoming multiple repository identities or execution
+   targets. Reject remote, non-Git, duplicate eligible repo-project,
+   parent-path, and ambiguous worker mappings before state; a broad or
+   multi-folder project is never a substitute.
 5. Read `tracker_backend` and exact `delivery_type` from each stable contract.
    Check branches and required dependency proof, calculate allowed-path overlap,
    derive worker order, and disclose startup scope. Repository identity never
@@ -135,6 +163,11 @@ before writing the manifest or calling `scripts/run-state`. Project creation is
 not worker recovery and task permission alone never authorizes it. Do not create
 a broader parent project as a diagnostic step. A failed or partial project
 setup is reported exactly and never converted into an active run.
+
+On recovery, reread the controller task and projects. A direct binding must
+still identify the recorded controller project. An omitted `projectId` must
+reproduce every step-2 fallback predicate and resolve the same recorded project
+ID; otherwise stop rather than replacing the controller identity.
 
 One root task may own only one unfinished run. A second run from that task
 starts only after the first is terminal.

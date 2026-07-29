@@ -148,6 +148,76 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("always targets the assignment's recorded repo-specific `project_id`", bootstrap)
         self.assertIn("do not satisfy this worker-project requirement", options)
 
+    def test_given_controller_project_id_when_present_then_primary_folder_workspace_remains_supported(self) -> None:
+        """An explicit controller binding remains valid even when its saved project is multi-folder."""
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        self.assertIn(
+            "When task readback reports a non-null `projectId`",
+            bootstrap,
+        )
+        self.assertIn(
+            "This direct binding may be multi-folder or unrelated to the feature",
+            bootstrap,
+        )
+
+    def test_given_missing_controller_project_id_when_exact_project_is_unique_then_controller_only_fallback_is_bounded(self) -> None:
+        """The compatibility fallback has an explicit fail-closed evidence boundary."""
+        skill = self.normalized(self.text("SKILL.md"))
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        for required_evidence in (
+            "task readback reports a local current host and an absolute `cwd`",
+            "exactly the Git worktree root reported by `git rev-parse --show-toplevel`",
+            "exactly one `list_projects` entry is local",
+            "reports `isGitRepository=true`",
+            "real path exactly equal to the real `cwd`",
+            "exactly matches the current task repository's absolute Git common directory",
+        ):
+            self.assertIn(required_evidence, bootstrap)
+        for rejected_candidate in (
+            "second exact-path candidate",
+            "parent-path substitution",
+            "remote or cross-host candidate",
+            "non-Git candidate",
+            "symlink alias",
+            "Git-common-directory mismatch",
+        ):
+            self.assertIn(rejected_candidate, bootstrap)
+        self.assertIn("bounded exact-path compatibility identity", skill)
+        self.assertIn("Zero, multiple, or unverifiable candidates stop before state", bootstrap)
+
+    def test_given_exact_path_fallback_when_app_omits_folder_count_then_no_single_folder_claim_or_worker_bypass_occurs(self) -> None:
+        """A singular project path is not treated as proof of the project's folder cardinality."""
+        skill = self.normalized(self.text("SKILL.md"))
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        self.assertIn(
+            "current ChatGPT App metadata does not expose the complete folder set or folder count",
+            bootstrap,
+        )
+        self.assertIn(
+            "do not claim that this fallback proves a single-folder project",
+            bootstrap,
+        )
+        self.assertIn(
+            "The candidate may be a one-folder project or the primary path of a multi-folder workspace",
+            bootstrap,
+        )
+        self.assertIn(
+            "exact-path controller resolution is not worker-project evidence",
+            bootstrap,
+        )
+        self.assertIn(
+            "never makes that project eligible as a worker target",
+            skill,
+        )
+
+    def test_given_controller_fallback_when_recovering_then_same_identity_must_revalidate(self) -> None:
+        """Recovery cannot silently replace an inferred controller identity."""
+        bootstrap = self.normalized(self.text("references/root-bootstrap.md"))
+        self.assertIn(
+            "reproduce every step-2 fallback predicate and resolve the same recorded project ID",
+            bootstrap,
+        )
+
     def test_given_authorized_project_setup_when_computer_use_selects_then_exact_paths_are_required(self) -> None:
         """Given create-projects authority, Computer Use may create only exact verified Git roots."""
         options = self.normalized(self.text("references/options.md"))

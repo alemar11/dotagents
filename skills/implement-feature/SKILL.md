@@ -59,6 +59,17 @@ defaults grant the root no implementation authority. When the controller
 project is multi-folder, treat every attached folder as read-only coordination
 context and never use that controller project as a worker target.
 
+Current Codex task readback may omit `projectId` for a compatibility workspace
+even though its `cwd` is the exact reported path of one saved local Git project.
+In that case, resolve a controller-only project identity only through the
+bounded exact-path fallback in `references/root-bootstrap.md`. The current
+`list_projects` surface reports one project path but not the complete folder set,
+so the fallback does not prove or require that the saved project is
+single-folder. It may therefore identify either a one-folder project or a
+multi-folder project's primary path, both of which are valid controller
+contexts. It never makes that project eligible as a worker target or replaces
+the independent worker-project preflight.
+
 When the controller project is multi-folder, every worker still runs in the
 separate saved Git project associated with its assigned repository. That worker
 project's reported primary folder must be the exact repository root and its
@@ -116,12 +127,13 @@ more Feature Specs. A discovery-only request never enters this flow.
    Resolve each worker's fixed model and adaptive thinking level through
    `references/task-model-policy.md`, verify destination-host support, and
    disclose every resolved profile before startup authorization.
-   Resolve the current controller task's exact local saved Codex-project binding
-   as controller identity only; a later UI-primary change does not alter it.
-   The bound project may be multi-folder, need not be affected, and grants no
-   implementation authority. Require every affected repository to map to its
-   own exact repo-specific saved Git project. For each multi-repository set, run
-   read-only
+   Resolve the current controller task's direct local saved Codex-project
+   binding or its bounded exact-path compatibility identity as controller
+   identity only; a later UI-primary change does not alter it. The resolved
+   project may be multi-folder, need not be affected, and grants no
+   implementation authority. Require every affected repository to map
+   independently to its own exact repo-specific saved Git project. For each
+   multi-repository set, run read-only
    `scripts/run-state --json feature-spec-set validate --input <absolute-file>`
    over ephemeral complete member-body snapshots and retain its exact
    `manifest_feature_set`, including each validated local member's decoded
