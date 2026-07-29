@@ -14,7 +14,7 @@ Never include developer-machine absolute paths.
 | `source_spec_ref` | [durable path or hosted ref; proposed refs are valid only in write_mode=propose] |
 | `feature_slug` | [authoritative lowercase feature slug] |
 | `affected_repositories` | [canonical repo slugs or current-repository] |
-| `allowed_paths` | [repo-relative or repo-qualified paths for this slice] |
+| `allowed_paths` | [smallest complete safe repo-relative or repo-qualified envelope for this slice] |
 | `target_branch_name` | [one valid branch shared by all affected repositories inside this Feature Spec] |
 | `delivery_type` | [github-pr or local-branch, copied exactly from the owning Feature Spec] |
 | `dependency_ids` | [earlier generated issue IDs or none] |

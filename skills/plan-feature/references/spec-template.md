@@ -59,7 +59,8 @@ for a standalone Spec.]
 ## Product / Repository Scope
 
 - Affected repositories: [canonical repo slugs or current repository].
-- Allowed paths: [repo-relative or repo-qualified scope].
+- Allowed paths: [smallest complete safe repo-relative or repo-qualified
+  envelope, preferring stable directory or subsystem prefixes].
 - Spec target branch: [valid branch shared by this Spec's generated issues].
 - [For monorepos, include the selected planning scope and optional scoped contexts.]
 - [For multi-repository work, state each repository's role and cross-repo

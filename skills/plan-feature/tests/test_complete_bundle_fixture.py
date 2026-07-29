@@ -109,6 +109,29 @@ class CompleteBundleFixtureTests(unittest.TestCase):
             )
             self.assertEqual(1, issue.count("## Execution Contract"))
 
+    def test_allowed_path_scope_contract_uses_complete_envelopes_and_exact_exceptions(self) -> None:
+        spec_phase = read("references/spec-phase.md")
+        contract = section(
+            spec_phase,
+            "#### Allowed Path Scope Contract",
+            "### 3. Gate An Existing Source Or Draft",
+        )
+        rows: dict[str, str] = {}
+        for line in contract.splitlines():
+            match = re.fullmatch(r"\| `([^`]+)` \| `([^`]+)` \|", line.strip())
+            if match:
+                rows[match.group(1)] = match.group(2)
+
+        self.assertEqual(
+            {
+                "feature-owned-work": "complete-safe-prefixes",
+                "exact-file-boundary": "exact-path",
+                "local-tracker-lifecycle": "exact-active-and-done-paths",
+                "unrelated-pre-existing-failure": "excluded",
+            },
+            rows,
+        )
+
     def test_delivery_type_is_stable_across_spec_and_issues(self) -> None:
         identity = section(self.spec, "## Planning Identity", "## Problem")
         self.assertIn("Delivery type: `github-pr`", identity)

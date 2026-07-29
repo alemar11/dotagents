@@ -180,10 +180,15 @@ For one affected Git repository, use `current-repository` when no repo slug is
 needed. For multi-repository work, list the exact canonical repository
 identities.
 
-Set `allowed_paths` to the smallest safe repo-relative or repo-qualified scope.
-Include shared contracts or integration fixtures only when the slice owns
-them. Reject overlapping scopes that could make independent execution unsafe,
-or add an explicit dependency between the affected issues.
+Apply the canonical allowed-path scope table in `spec-phase.md` to each slice.
+Project the Feature Spec's complete safe envelope down to the smallest complete
+scope that can implement and validate the issue outcome. Include owned shared
+contracts, adapters, configuration, tests, fixtures, generated-contract inputs,
+and technical documentation whenever they are reasonably required. Do not
+reduce the scope to guessed file names or omit foreseeable supporting paths
+merely to manufacture disjoint execution. Reject genuine overlapping scopes
+that could make independent execution unsafe, or add an explicit dependency
+between the affected issues.
 
 For every local Markdown issue, derive its exact active path and matching
 `done/` destination from the owning tracker subtree. Add the tracker-owning

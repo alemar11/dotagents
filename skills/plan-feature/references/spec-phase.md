@@ -226,6 +226,35 @@ is known and every hosted body is final; then write the local bodies with
 qualified final refs and verify the hosted and local artifacts as one connected
 set. Never persist a local body that points to a staging identity.
 
+#### Allowed Path Scope Contract
+
+Use this canonical table when defining Feature Spec and implementation-issue
+`allowed_paths`:
+
+| scope_case | allowed_path_rule |
+| --- | --- |
+| `feature-owned-work` | `complete-safe-prefixes` |
+| `exact-file-boundary` | `exact-path` |
+| `local-tracker-lifecycle` | `exact-active-and-done-paths` |
+| `unrelated-pre-existing-failure` | `excluded` |
+
+`complete-safe-prefixes` means the smallest complete and reasonably predictable
+repo-relative or repo-qualified envelope needed to implement, integrate, test,
+validate, and document the accepted outcome. Prefer stable directory or
+subsystem prefixes over guessed file lists. Include foreseeable supporting
+tests, fixtures, adapters, configuration, generated-contract inputs, and
+technical documentation when the accepted requirements or validation can
+reasonably need them. Use `exact-path` only when one file is genuinely the
+complete safe boundary.
+
+Do not widen to a repository-wide wildcard without evidence that the repository
+is small or the accepted change is genuinely cross-cutting. Exclude unrelated
+pre-existing failures merely encountered by a broad validation command; give
+those failures an evidence-backed baseline or failure policy, or block planning
+when the required terminal result cannot remain truthful. Never narrow a
+complete envelope merely to make issue scopes appear disjoint or increase
+parallel scheduling.
+
 ### 3. Gate An Existing Source Or Draft
 
 Use user conversation, clarification output, existing issues or documents,

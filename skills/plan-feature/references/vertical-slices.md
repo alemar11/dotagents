@@ -29,7 +29,8 @@ capability with its own acceptance and validation.
 For each candidate issue:
 
 1. Name one observable outcome.
-2. Identify the smallest repository and path scope that can deliver it.
+2. Identify the smallest complete repository and path scope that can implement,
+   integrate, validate, and document it.
 3. Include all layers needed for that outcome.
 4. Define specific acceptance criteria.
 5. Name preferred validation and a realistic fallback.
@@ -123,7 +124,9 @@ contracts do not create unsafe concurrent edits. When overlap exists:
 - add a dependency when ordered ownership is necessary.
 
 Do not introduce a selectable scheduling field. Independence is derived from
-the graph and actual path scope by the eventual orchestrator.
+the graph and actual path scope by the eventual orchestrator. Never narrow an
+otherwise complete safe path envelope merely to make slices appear independent;
+combine or order the affected outcomes instead.
 
 ## Structural Graph Compression Gate
 
