@@ -1,9 +1,9 @@
 ---
-name: yeet
-description: Publish local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review.
+name: submit
+description: Submit local work for review. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review.
 ---
 
-# Yeet
+# Submit
 
 ## Role
 
@@ -27,7 +27,7 @@ hygiene such as creating, commenting on, labeling, or closing issues, do not run
 the full publish flow. Route that work to `$gitstack:github-issues`, perform the
 authorized GitHub issue operation with resolved `mutation_mode=apply|dry-run`,
 the exact repository and issue target, and one canonical `issue_operation`, and
-state that full `yeet` was not applicable.
+state that full `submit` was not applicable.
 
 Prefer the shortest publish path that matches the state in front of you:
 
@@ -48,7 +48,7 @@ Prefer the shortest publish path that matches the state in front of you:
 2. Inspect worktree state and confirm the intended scope when it is mixed.
 3. Reuse the current commit when it already represents the intended scope.
    Otherwise create one through `$gitstack:git-commit` with
-   `commit_operation=commit-only`; Yeet retains ownership of push. Do not
+   `commit_operation=commit-only`; Submit retains ownership of push. Do not
    override Git Commit's `commit_kind` selection: it defaults to `regular` and
    may select a targeted fixup only from the explicit request or
    target-repository instructions with an exact target.
@@ -65,14 +65,14 @@ Prefer the shortest publish path that matches the state in front of you:
    review request to `$gitstack:github-review-threads` with the exact repository
    and PR, `provider=codex`, and the full published head SHA. Use
    `review_operation=request` with `mutation_mode=apply` and a fresh
-   Yeet-owned request key for this logical publish invocation; preserve that
+   Submit-owned request key for this logical publish invocation; preserve that
    key for reconciliation, then persist the complete typed request receipt.
-   This request is part of Yeet's authorized publish flow; do not require a
+   This request is part of Submit's authorized publish flow; do not require a
    separate caller gate. Do not substitute an untyped PR comment.
 7. Use one operation per invocation. Run
    `review_operation=wait` with the persisted complete receipt only when the
    user or composing caller also requested bounded review monitoring. Do not
-   duplicate provider detection or polling inside Yeet.
+   duplicate provider detection or polling inside Submit.
 8. Return branch, PR URL, commit hash, Codex review request status and receipt
    identity, and verification performed. If the review request fails after the
    push or PR mutation succeeded, preserve and report the successful publish

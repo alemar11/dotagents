@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Create or push Git commits with explicit staging. Use for regular commits, targeted fixups, amend-fixups, push-only requests, or commit-and-push; use $gitstack:yeet when the user also wants a pull request.
+description: Create or push Git commits with explicit staging. Use for regular commits, targeted fixups, amend-fixups, push-only requests, or commit-and-push; use $gitstack:submit when the user also wants a pull request.
 ---
 
 # Git Commit
@@ -40,7 +40,7 @@ outside the current history, subject-ambiguous, or does not own the change.
 Never amend the target in place and never autosquash fixup commits.
 
 If the user asks for a PR, draft PR, branch publication, or "publish", use
-`$gitstack:yeet` instead. `commit_operation=push-only` never creates a commit;
+`$gitstack:submit` instead. `commit_operation=push-only` never creates a commit;
 `commit_operation=commit-and-push` does both operations. When the user
 explicitly authorizes direct-to-main issue closure, use issue-closing commit
 trailers such as `Closes #123` only after staging the intended paths and
@@ -62,7 +62,7 @@ Use this skill for short or implicit commit-authoring asks such as:
 - `fixup and push <commit>`
 - `amend fixup <commit>`
 
-If the request expands into branch publication or PR creation, route to `$gitstack:yeet`
+If the request expands into branch publication or PR creation, route to `$gitstack:submit`
 instead of stretching this skill.
 
 ## Observable Command Baseline

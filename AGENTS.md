@@ -293,7 +293,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 
 ### GitStack Plugin
 
-- Keep GitStack as the sole repo-owned package for local Git and GitHub runtime workflows; do not maintain duplicate standalone `git-commit`, `github-*`, or `yeet` packages.
+- Keep GitStack as the sole repo-owned package for local Git and GitHub runtime workflows; do not maintain duplicate standalone `git-commit`, `github-*`, or `submit` packages.
 - Keep GitStack runtime self-contained: it must not locate, import, or execute another skill for authorization or state. Composing workflows may validate their own lifecycle state before invoking GitStack, while GitStack owns its exact operation start journal, provider transport, one-use markers, and reconciliation evidence. (Codex learning)
 - Keep bundled skills provider-primitive and workflow-agnostic: caller-specific planning, orchestration, project-memory, queue-state, issue-body, and label-taxonomy policy belongs in the composing skill.
 - Prefer the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps or same-target fallback, and direct `git` for local repository state and mutation.
@@ -301,7 +301,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep GitHub issue lifecycle mechanics in `$gitstack:github-issues`, review-thread mechanics in `$gitstack:github-review-threads`, and stars/list mechanics in `$gitstack:github-stars`.
 - Keep GitStack's shared invocation registry limited to caller inputs. Derived provider states and review judgments belong to their owning result contracts. Omit mutation mode for pure reads; use it only to choose apply versus preview for a write-shaped GitHub operation.
 - Keep `$gitstack:github-repository-triage` read-only and responsible for detailed single-repository queue grouping plus comparative scans of multiple explicit repositories. Route evidence-backed issue disposition to `$gitstack:github-investigation` and all issue lifecycle mutations to `$gitstack:github-issues`.
-- Keep `$gitstack:yeet` as publish orchestration over `$gitstack:git-commit` and focused GitStack GitHub workflows rather than duplicating their behavior.
+- Keep `$gitstack:submit` as publish orchestration over `$gitstack:git-commit` and focused GitStack GitHub workflows rather than duplicating their behavior.
 
 ### Implement Feature Skill
 

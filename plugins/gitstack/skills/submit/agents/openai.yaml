@@ -1,0 +1,5 @@
+interface:
+  display_name: "Submit"
+  short_description: "Commit, push, open or update a PR, and request review"
+  brand_color: "#EA580C"
+  default_prompt: "Use $gitstack:submit to confirm the intended local changes, commit them, push the branch, open a draft or update an existing pull request without changing its draft state, and request a current-head Codex review."

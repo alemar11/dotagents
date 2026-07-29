@@ -1,6 +1,6 @@
 {
   "name": "gitstack",
-  "version": "7.0.2",
+  "version": "8.0.0",
   "description": "Use focused Git and GitHub workflows to create commits, manage issues and reviews, diagnose Actions failures, publish releases, and open draft pull requests.",
   "author": {
     "name": "alemar11",

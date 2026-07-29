@@ -1,6 +1,6 @@
 [project]
 name = "gitstack-cli"
-version = "7.0.2"
+version = "8.0.0"
 requires-python = ">=3.11"
 description = "Shared GitStack plugin CLI"
 

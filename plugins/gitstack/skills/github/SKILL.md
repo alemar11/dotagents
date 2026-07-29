@@ -30,7 +30,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | Request | Bundled skill |
 | --- | --- |
 | Local staging or commit, optionally push without PR | `$gitstack:git-commit` |
-| Publish local work as a branch and draft PR | `$gitstack:yeet` |
+| Publish local work as a branch and draft PR | `$gitstack:submit` |
 | Issue and PR queue triage for one or more repositories | `$gitstack:github-repository-triage` |
 | GitHub issue lifecycle and relationships | `$gitstack:github-issues` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$gitstack:github-investigation` |

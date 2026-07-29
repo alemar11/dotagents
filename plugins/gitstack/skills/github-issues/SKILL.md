@@ -103,7 +103,7 @@ This skill only handles GitHub Issues.
 - Use `$gitstack:github-review-threads` for PR review-thread context or replies.
 - Use `$gitstack:github-actions` for Actions, checks, and failing PR logs.
 - Use `$gitstack:github-releases` for tags, GitHub Releases, notes, and assets.
-- Use `$gitstack:yeet` for publishing local work as a branch and draft PR.
+- Use `$gitstack:submit` for publishing local work as a branch and draft PR.
 
 ## References
 

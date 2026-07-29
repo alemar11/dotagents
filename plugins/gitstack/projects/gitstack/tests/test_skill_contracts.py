@@ -35,7 +35,7 @@ class GitStackSkillContractTests(unittest.TestCase):
             "github-repository-triage",
             "github-review-threads",
             "github-stars",
-            "yeet",
+            "submit",
         }
         skills_root = PLUGIN_ROOT / "skills"
         actual = {path.name for path in skills_root.iterdir() if path.is_dir()}
@@ -65,7 +65,7 @@ class GitStackSkillContractTests(unittest.TestCase):
             "skills/github-releases/references/workflows.md",
             "skills/github-review-threads/references/workflows.md",
             "skills/github-review-threads/references/script-summary.md",
-            "skills/yeet/references/workflows.md",
+            "skills/submit/references/workflows.md",
         ):
             text = read(relative)
             fences = re.findall(r"```(?:bash|sh)\n(.*?)```", text, flags=re.DOTALL)
@@ -93,8 +93,8 @@ class GitStackSkillContractTests(unittest.TestCase):
             "skills/github-repository-triage/SKILL.md",
             "skills/github-repository-triage/references/workflows.md",
             "skills/github-investigation/SKILL.md",
-            "skills/yeet/SKILL.md",
-            "skills/yeet/references/workflows.md",
+            "skills/submit/SKILL.md",
+            "skills/submit/references/workflows.md",
         )
 
         for relative in paths:
@@ -108,8 +108,8 @@ class GitStackSkillContractTests(unittest.TestCase):
         routes = {
             "skills/github-repository-triage/references/workflows.md": "review_operation=reply",
             "skills/github-investigation/SKILL.md": "review_operation=check|wait",
-            "skills/yeet/SKILL.md": "review_operation=request",
-            "skills/yeet/references/workflows.md": "`review_operation`",
+            "skills/submit/SKILL.md": "review_operation=request",
+            "skills/submit/references/workflows.md": "`review_operation`",
         }
 
         for relative, operation in routes.items():
@@ -119,9 +119,9 @@ class GitStackSkillContractTests(unittest.TestCase):
                 normalized = " ".join(text.lower().split()).replace(",", "")
                 self.assertRegex(normalized, r"exact (repository and pr|pr)")
 
-        yeet = read("skills/yeet/SKILL.md")
-        self.assertIn("review_operation=wait", yeet)
-        self.assertIn("one operation per", yeet)
+        submit = read("skills/submit/SKILL.md")
+        self.assertIn("review_operation=wait", submit)
+        self.assertIn("one operation per", submit)
 
         review_threads = read("skills/github-review-threads/SKILL.md")
         self.assertIn("reviews request", review_threads)
@@ -131,8 +131,8 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("never substitutes a newer comment", review_threads)
         self.assertIn("There is no direct legacy fallback", read("skills/github-review-threads/references/workflows.md"))
 
-    def test_yeet_always_requests_current_head_codex_review_for_new_and_existing_prs(self) -> None:
-        skill = read("skills/yeet/SKILL.md")
+    def test_submit_always_requests_current_head_codex_review_for_new_and_existing_prs(self) -> None:
+        skill = read("skills/submit/SKILL.md")
         workflow_steps = {
             int(number): " ".join(body.split())
             for number, body in re.findall(
@@ -140,12 +140,12 @@ class GitStackSkillContractTests(unittest.TestCase):
                 section(skill, "Workflow"),
             )
         }
-        workflows = read("skills/yeet/references/workflows.md")
+        workflows = read("skills/submit/references/workflows.md")
         publish = section(workflows, "Publish New Work")
         existing = section(workflows, "Existing PR")
         publish_normalized = " ".join(publish.split())
         existing_normalized = " ".join(existing.split())
-        metadata = read("skills/yeet/agents/openai.yaml")
+        metadata = read("skills/submit/agents/openai.yaml")
 
         self.assertEqual(sorted(workflow_steps), list(range(1, 9)))
         self.assertIn("existing PR", workflow_steps[5])
@@ -233,9 +233,9 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("never infer fixup from feedback alone", metadata)
         self.assertIn("never autosquash", metadata)
 
-        yeet = " ".join(read("skills/yeet/SKILL.md").split())
-        self.assertIn("Do not override Git Commit's `commit_kind` selection", yeet)
-        self.assertIn("target-repository instructions with an exact target", yeet)
+        submit = " ".join(read("skills/submit/SKILL.md").split())
+        self.assertIn("Do not override Git Commit's `commit_kind` selection", submit)
+        self.assertIn("target-repository instructions with an exact target", submit)
 
     def test_amend_fixup_editor_preserves_git_generated_target_matcher(self) -> None:
         helper = PLUGIN_ROOT / "skills/git-commit/scripts/replace-amend-fixup-message"

@@ -1,4 +1,4 @@
-# Yeet Workflows
+# Submit Workflows
 
 ## Publish New Work
 
@@ -36,16 +36,16 @@ Apply all of these gates before continuing:
   more than one or if its head branch/repository does not match the verified
   push target.
 - When one PR exists, record its `isDraft` value. Updating its branch, title, or
-  body must preserve that exact value; Yeet never changes an existing PR
+  body must preserve that exact value; Submit never changes an existing PR
   between draft and ready.
 
 After preflight and scope verification, reuse a suitable existing commit or run
 the complete `$gitstack:git-commit` workflow with
 `commit_operation=commit-only`, even when the
 overall user request includes publishing. Do not stage or commit directly in
-Yeet: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
+Submit: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the
-delegated `$gitstack:git-commit` call push; Yeet retains sole ownership of push after its
+delegated `$gitstack:git-commit` call push; Submit retains sole ownership of push after its
 second publish preflight. Do not force `commit_kind=regular`: let Git Commit
 apply its canonical default and honor an explicit or target-repository fixup
 requirement only with an exact target.
@@ -79,7 +79,7 @@ returns the exact newly created PR, require the PR head to equal the full
 published commit SHA. Then invoke `$gitstack:github-review-threads` for the
 exact repository and PR with `review_operation=request`,
 `mutation_mode=apply`, `provider=codex`, that full head SHA, and a fresh
-Yeet-owned request key for this logical publish invocation. Preserve the key
+Submit-owned request key for this logical publish invocation. Preserve the key
 for reconciliation and persist the complete typed request receipt. This step
 is required for both new and existing PR paths. It must use the typed request
 operation, not a plain discussion comment.
@@ -91,7 +91,7 @@ bounded duration. Keep the request and wait as separate operations.
 
 ## No Publishable Local Work
 
-Use this branch when the user invokes `yeet` but the task is issue-only hygiene
+Use this branch when the user invokes `submit` but the task is issue-only hygiene
 or the checkout has no intended code/docs changes to publish.
 
 ```bash
@@ -109,7 +109,7 @@ relationships, or closure to `$gitstack:github-issues` with
 
 Close out by saying explicitly:
 
-- full `yeet` was not applicable because there was no publishable local change;
+- full `submit` was not applicable because there was no publishable local change;
 - which GitHub issue mutations were performed;
 - current branch/worktree state;
 - any untracked files intentionally left alone.
