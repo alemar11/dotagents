@@ -1,17 +1,44 @@
 ---
 name: implement-feature
-description: Implement durable Feature Specs in collaborating visible Codex tasks in the ChatGPT App and deliver reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
+description: Discover or implement durable Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
 ---
 
 # Implement Feature Spec
 
+## Request Routing
+
+After explicit invocation, classify the request before loading startup
+references:
+
+- Use `discovery-only` when the user asks only whether Feature Specs exist,
+  which Specs are available, or what could be implemented. Phrases such as
+  "do we have any Spec?", "list available Specs", and "what can we implement?"
+  remain discovery even when they contain the word "implement".
+- Enter the execution flow only when the user explicitly directs the skill to
+  start, implement, or resume one or more Feature Specs.
+
+For `discovery-only`:
+
+1. Resolve only the configured tracker backend needed to locate authoritative
+   Feature Specs, then query that tracker. Do not load or validate execution
+   contracts, issue graphs, repository-to-project mappings, branches, worker
+   profiles, runtime capabilities, run state, or startup authorization.
+2. Return the candidate Feature Spec references, links when available, and
+   brief tracker summaries. Include child issue references only when the
+   tracker exposes them without execution preflight.
+3. State that this was discovery only and that execution eligibility and
+   startup preflight were not evaluated.
+4. Stop. Do not invoke `scripts/run-state`, create or modify run state, acquire
+   claims, ask for startup authorization, create tasks or worktrees, or mutate
+   repositories or trackers.
+
 ## Fixed Contract
 
 Use this skill only after explicit `$implement-feature` invocation in the
-ChatGPT App in Codex mode. Consume complete execution-ready Feature Specs and their
-issues unchanged. Never plan, repair planning artifacts, implement in root,
-create raw worktrees, merge, enqueue, deploy, release, or perform post-merge
-closure.
+ChatGPT App in Codex mode. For execution, consume complete execution-ready
+Feature Specs and their issues unchanged. Never plan, repair planning
+artifacts, implement in root, create raw worktrees, merge, enqueue, deploy,
+release, or perform post-merge closure.
 
 The root coordinates; each visible Codex worker task executes one Feature Spec
 end to end in the ChatGPT-created worktree assigned to that task. A worker that remains within the durable
@@ -78,6 +105,9 @@ Never ask another authority, recovery, validation, blocker, or continuation
 question during the run.
 
 ## Controller Flow
+
+This flow applies only after the user explicitly directs execution of one or
+more Feature Specs. A discovery-only request never enters this flow.
 
 1. Load `references/feature-spec-contract.md` and
    `references/root-bootstrap.md`. Validate current durable sources,

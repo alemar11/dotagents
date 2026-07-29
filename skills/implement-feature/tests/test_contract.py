@@ -24,6 +24,40 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def normalized(contents: str) -> str:
         return " ".join(contents.split())
 
+    def test_given_discovery_only_request_when_routed_then_startup_is_not_entered(self) -> None:
+        """The top-level route structurally separates tracker discovery from execution startup."""
+        skill = self.text("SKILL.md")
+        discovery = skill.split("## Request Routing", 1)[1].split(
+            "## Fixed Contract", 1
+        )[0]
+        normalized_discovery = self.normalized(discovery)
+        controller = skill.split("## Controller Flow", 1)[1].split(
+            "## Reference Routing", 1
+        )[0]
+
+        self.assertLess(
+            skill.index("## Request Routing"),
+            skill.index("## Controller Flow"),
+        )
+        for example in (
+            "do we have any Spec?",
+            "list available Specs",
+            "what can we implement?",
+        ):
+            self.assertIn(example, discovery)
+        self.assertIn(
+            "execution eligibility and startup preflight were not evaluated",
+            normalized_discovery,
+        )
+        self.assertIn("Do not invoke `scripts/run-state`", discovery)
+        self.assertIn("or mutate repositories or trackers", normalized_discovery)
+        self.assertNotIn("scripts/run-state --json", discovery)
+        self.assertNotIn("references/", discovery)
+        self.assertIn(
+            "A discovery-only request never enters this flow",
+            controller,
+        )
+
     def test_given_startup_when_authorization_is_resolved_then_it_is_the_only_user_interaction(self) -> None:
         """Given startup, when required fields are granted, then no later authority question is allowed."""
         options_raw = self.text("references/options.md")
