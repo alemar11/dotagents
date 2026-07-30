@@ -6,6 +6,7 @@ The behavior-affecting startup fields are:
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories have no separate repo-specific saved Git project, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
 | `visible_app_task_permission` | `granted`, `denied` | Permit the disclosed visible Codex worker tasks and ChatGPT-created worktrees for this run. |
+| `scope_repair_task_permission` | `granted`, `denied` | For a selected GitHub-backed assignment, permit a separate visible Plan Feature task only when an active worker later needs a monotonic `allowed_paths` repair. Omit when every selected assignment uses local tracking. |
 
 After validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
@@ -19,8 +20,11 @@ terminal boundary: `pr-ready-for-merge-but-not-merged` or
 affirmative `visible_app_task_permission=granted` answer explicitly requests
 those exact task profiles.
 
-When no project is missing, ask once whether to start those visible tasks.
-Resolve the answer directly to `visible_app_task_permission`.
+When no project is missing, ask once whether to start those visible tasks and,
+when any selected assignment is GitHub-backed, whether root may create the
+disclosed separate Plan Feature repair task after a valid path-scope miss.
+Resolve the answer directly to `visible_app_task_permission` and, when
+applicable, `scope_repair_task_permission`.
 
 When projects are missing, use this standard question in the same startup
 authorization interaction:
@@ -39,10 +43,15 @@ authorization interaction:
 
 Resolve an affirmative answer to
 `missing_project_action=create-projects` and
-`visible_app_task_permission=granted`. Resolve a negative answer to
+`visible_app_task_permission=granted` plus, when applicable,
+`scope_repair_task_permission=granted`. Resolve a negative answer to
 `missing_project_action=stop` and
-`visible_app_task_permission=denied`. Emit and persist only these canonical
-values in ephemeral controller state; never persist either as repository
+`visible_app_task_permission=denied` plus, when applicable,
+`scope_repair_task_permission=denied`. A user may explicitly grant worker tasks
+while denying planner repair tasks; normalize that answer to
+`visible_app_task_permission=granted` and
+`scope_repair_task_permission=denied`. Emit and persist only these canonical
+values in ephemeral controller state; never persist them as repository
 configuration.
 
 `create-projects` authorizes only the exact paths listed in the question.
@@ -61,9 +70,15 @@ publication, review fixes, tracker checkboxes, recovery, and final evidence. It
 does not authorize merge, deployment, release, post-merge closure, or work
 outside the durable contract.
 
+`scope_repair_task_permission=granted` authorizes only the bounded, separate
+planner task described in `scope-repair-orchestration.md`; it grants no planning
+authority to root or workers. `denied` leaves a later scope request
+declaratively blocked and does not trigger another user question.
+
 After the startup interaction grants the required fields, do not ask another
 user question. Validation authority,
 recovery choices, operational clarifications, blockers, retries within the
 durable budget, and continuation are worker decisions. A stable contract change
-causes a declarative blocked result, not a question. `denied` stops before run
-state, task, worktree, claim, project, or provider mutation.
+causes a declarative blocked result, not a question.
+`visible_app_task_permission=denied` stops before run state, task, worktree,
+claim, project, or provider mutation.

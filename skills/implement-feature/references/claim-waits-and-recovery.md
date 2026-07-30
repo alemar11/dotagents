@@ -91,6 +91,14 @@ accepted by the run. A changed stable contract cannot be rebound onto the
 retained assignment or claim and requires a new run after existing-owner
 reconciliation.
 
+An assignment in `blocked-scope-repair` does not use `assignment resume`.
+Recover the recorded planner-task and scope-revision operations through
+`scope-repair-orchestration.md`. Root retains the Feature Spec claim and the
+original worker task, and the contract generation changes only after verified
+delivery of the exact scope revision. A local-tracker assignment remains
+blocked with `local-scope-repair-transport-unavailable`; never work around that
+boundary by sharing or copying between managed checkouts.
+
 ## Terminal Owner Reconciliation
 
 Before blocking a waiting Spec after recovery, read the exact owner root and

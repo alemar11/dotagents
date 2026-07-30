@@ -79,10 +79,12 @@ Root is a lightweight control plane. Before mutation:
    resolved profile and reason in the startup disclosure, but do not write it
    to the run manifest or SQLite.
 9. Resolve the startup fields from `options.md`. If every mapping in step 4
-   already exists, resolve only `visible_app_task_permission`. If mappings are
+   already exists, resolve `visible_app_task_permission` and, when at least one
+   assignment is GitHub-backed, `scope_repair_task_permission`. If mappings are
    missing, list the exact repository roots in the standard question and
    resolve both `missing_project_action` and
-   `visible_app_task_permission` in the one startup authorization interaction.
+   `visible_app_task_permission` and the conditionally applicable
+   `scope_repair_task_permission` in the one startup authorization interaction.
    With `create-projects`, use Computer Use only for those exact roots, verify
    each selected path before confirmation, then rerun the complete read-only
    saved-project preflight. With `stop`, denied task permission, unavailable
@@ -94,7 +96,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "3.0.0",
-  "runtime_contract_version": "4.1.0",
+  "runtime_contract_version": "5.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -112,7 +114,7 @@ Root is a lightweight control plane. Before mutation:
       "repository_identity": "github:owner/repository",
       "tracker_backend": "github",
       "delivery_type": "github-pr",
-      "title": "🛠️ Exact Feature Spec title",
+      "title": "🛠️ Woker · Exact Feature Spec title",
       "target_branch_name": "feature/example",
       "prerequisite_assignment_ids": []
     }
@@ -120,6 +122,10 @@ Root is a lightweight control plane. Before mutation:
   "feature_sets": []
 }
 ```
+
+Each assignment `title` is the complete canonical worker-task title
+`🛠️ Woker · <Feature Spec title>`; the runtime rejects a bare or differently
+prefixed title.
 
 The Feature Spec Set validator input has the exact protocol
 `schema="implement-feature/feature-spec-set-input"` and

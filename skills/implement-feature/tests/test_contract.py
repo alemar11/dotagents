@@ -70,6 +70,10 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             len(re.findall(r"^\| `visible_app_task_permission` \|", options_raw, re.MULTILINE)),
             1,
         )
+        self.assertEqual(
+            len(re.findall(r"^\| `scope_repair_task_permission` \|", options_raw, re.MULTILINE)),
+            1,
+        )
         self.assertIn("`missing_project_action`", options)
         self.assertIn("`create-projects`, `stop`", options)
 
@@ -344,12 +348,18 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
     def test_given_root_assignments_when_title_is_set_then_it_is_exact_and_immutable(self) -> None:
         """Given one or many Specs, when root is titled, then its static total is exact UI evidence."""
         orchestration = self.normalized(self.text("references/codex-task-orchestration.md"))
-        self.assertIn("`🤖 Feature Orchestrator`", orchestration)
-        self.assertIn("`🤖 Feature Orchestrator · N Features`", orchestration)
+        self.assertIn("`🤖 Orchestrator · 1 Feature`", orchestration)
+        self.assertIn("`🤖 Orchestrator · N Features`", orchestration)
+        self.assertIn("`🛠️ Woker · <Feature Spec title>`", orchestration)
+        self.assertIn(
+            "`🧭 Scope Repair · <Feature Spec title>`",
+            self.text("references/scope-repair-orchestration.md"),
+        )
         self.assertIn("including waiting or blocked assignments", orchestration)
         self.assertIn("Never update the root title as assignments progress", orchestration)
         self.assertIn("The title is UI evidence, never identity or durable state", orchestration)
         self.assertNotIn("👨🏻‍💻", orchestration)
+        self.assertNotIn("Feature Orchestrator", orchestration)
         self.assertNotIn("Multi-Feature Orchestrator", orchestration)
         self.assertNotIn("R/N", orchestration)
 
@@ -369,13 +379,13 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             self.assertNotIn(retired_action, source)
             self.assertNotIn(retired_action, runtime)
 
-    def test_given_schema_three_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
-        """Given the current runtime, schema-three state stays at one unversioned canonical path."""
+    def test_given_schema_four_lineage_when_runtime_is_inspected_then_versions_and_claim_domain_are_explicit(self) -> None:
+        """Given the current runtime, schema-four state stays at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "4.1.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.1.0"', source)
-        self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
+        self.assertIn('CLI_VERSION = "4.2.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "5.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 4", source)
         self.assertIn('"schema": "implement-feature/run-manifest"', source)
         self.assertIn('"schema_version": "3.0.0"', source)
         self.assertIn(
@@ -383,6 +393,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
             source,
         )
         self.assertIn("SCHEMA_TWO_COLUMNS", source)
+        self.assertIn("SCHEMA_THREE_COLUMNS", source)
         self.assertIn("run_repositories", source)
         self.assertIn('"feature_id"', source)
         self.assertIn("feature-spec-set validate", state)
@@ -494,9 +505,9 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "4.1.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "4.1.0"', source)
-        self.assertIn("DATABASE_SCHEMA_VERSION = 3", source)
+        self.assertIn('CLI_VERSION = "4.2.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "5.0.0"', source)
+        self.assertIn("DATABASE_SCHEMA_VERSION = 4", source)
         self.assertIn("command_capabilities", source)
         self.assertIn("runtime_artifact_sha256", source)
         self.assertIn("BEGIN IMMEDIATE", source)
@@ -528,6 +539,26 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("stale-operation-launch", source)
         self.assertIn("SINGLE_USE_ACTIONS", source)
         self.assertIn("send-worker-message", source)
+
+    def test_given_worker_path_miss_when_scope_repair_runs_then_planner_and_runtime_ownership_are_bounded(self) -> None:
+        """Plan Feature edits the durable envelope; root resumes the same worker generation."""
+        skill = self.normalized(self.text("SKILL.md"))
+        scope = self.normalized(
+            self.text("references/scope-repair-orchestration.md")
+        )
+        state = self.text("scripts/run-state")
+        options = self.text("references/options.md")
+        self.assertIn("separate Plan Feature task", scope)
+        self.assertIn("Root, not the planner task, restarts the worker", scope)
+        self.assertIn("not a persisted file claim", scope)
+        self.assertIn("local-scope-repair-transport-unavailable", scope)
+        self.assertIn("one automatic repair", scope)
+        self.assertIn("scope_repair_task_permission", options)
+        self.assertIn("scope-block", state)
+        self.assertIn("send-scope-revision", state)
+        self.assertIn("contract_generation", state)
+        self.assertIn("scope_revision_id", state)
+        self.assertIn("scope-repair-orchestration.md", skill)
 
     def test_given_runtime_docs_when_references_are_routed_then_every_reference_is_reachable(self) -> None:
         """Given progressive disclosure, when routes are inspected, then every reference is linked by SKILL."""

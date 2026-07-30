@@ -1,9 +1,10 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. Release `4.1.0` is a compatible CLI/runtime expansion
-over database schema `3`: worker creation no longer has a fixed numeric ceiling,
-while path and dependency serialization remain controller invariants. The
+uses the shipped artifact. CLI release `4.2.0` implements the breaking runtime
+contract `5.0.0` over database schema `4`. It adds externally owned scope repair
+and contract generations while path and dependency serialization remain
+controller invariants; it does not add per-file claims. The
 controller's saved project remains explicit control-plane identity, each
 affected repository maps bijectively to its own saved project, and assignments
 inherit that normalized binding. There are no command aliases or compatibility
@@ -13,9 +14,9 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `4.1.0` | User-facing commands and executable behavior |
-| Runtime contract | `4.1.0` | Coordination semantics required by an active run |
-| Database schema | integer `3` | Exact SQLite tables, columns, indexes, and constraints |
+| CLI | `4.2.0` | User-facing commands and executable behavior |
+| Runtime contract | `5.0.0` | Coordination semantics required by an active run |
+| Database schema | integer `4` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -27,7 +28,8 @@ machine-readable registry for these identities and protocols:
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
 | Run manifest | `implement-feature/run-manifest` | `3.0.0` |
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `1.0.0` |
-| Codex task-operation observation | `implement-feature/app-operation-observation` | `2.0.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `2.1.0` |
+| Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` | `2.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `2.0.0` |
 | Assignment-resume observation | `implement-feature/assignment-resume-observation` | `2.0.0` |
@@ -61,8 +63,8 @@ CREATE TABLE runtime_metadata (
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=3, target_schema_version=NULL)`. The integer stored here is not
-the CLI, runtime-contract, or JSON protocol version. Schema number `3` does not
+`(schema_version=4, target_schema_version=NULL)`. The integer stored here is not
+the CLI, runtime-contract, or JSON protocol version. Schema number `4` does not
 authorize an alternate shape: every table, column, index, and constraint must match
 exactly or the CLI returns `invalid-state-schema` without deleting or rewriting
 the DB. `PRAGMA user_version` is not application state and is never read or
@@ -82,7 +84,9 @@ task-operation reconciliation facts. It may retain durable source refs, linked
 `feature_id` membership, tracker backend, delivery type, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
 identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
-normal Git head/base/ancestry facts, and PR/provider refs only when applicable.
+normal Git head/base/ancestry facts, contract generation, opaque scope repair
+identity and authoritative repair readback, and PR/provider refs only when
+applicable.
 
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
@@ -154,6 +158,24 @@ scripts/run-state --json assignment block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json assignment capability-block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
+scripts/run-state --json assignment scope-block \
+  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
+scripts/run-state --json app-operation begin \
+  --run-id RUN --expected-revision N \
+  --action create-scope-repair-task --subject-id ASSIGNMENT
+scripts/run-state --json assignment scope-repair-observation template
+scripts/run-state --json assignment scope-repair-observation create \
+  --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
+  --repair-outcome applied \
+  --implementation-issue-ref owner/repository#43 \
+  --planning-thread-id PLANNER_THREAD \
+  --planning-result-ref PLANNER_RESULT \
+  --authoritative-readback-ref SOURCE_READBACK \
+  --output /absolute/new-scope-repair-observation.json
+scripts/run-state --json app-operation begin \
+  --run-id RUN --expected-revision N \
+  --action send-scope-revision --subject-id ASSIGNMENT \
+  --scope-repair-observation /absolute/scope-repair-observation.json
 scripts/run-state --json assignment resume \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
   --observation /absolute/assignment-resume-observation.json
@@ -177,7 +199,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="3.0.0"`, `runtime_contract_version="4.1.0"`, and the
+`schema_version="3.0.0"`, `runtime_contract_version="5.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -210,8 +232,9 @@ remainder may be resolved inside the separately verified owning repository.
 
 ## Observation Builders
 
-`app-operation observation template` and
-`assignment ready-observation template` return descriptors: protocol
+`app-operation observation template`, `assignment scope-repair-observation
+template`, and `assignment ready-observation template` return descriptors:
+protocol
 constants, required fields, optional fields, and the closed-key rule. They are
 not payload placeholders and cannot be passed to `finish` or `ready`.
 
@@ -233,13 +256,21 @@ consumer of an assignment-resume observation. Each revalidates the complete
 payload inside its write transaction; successful builder output does not
 reserve or advance state.
 
+The scope-repair builder requires a `blocked-scope-repair` assignment and the
+successful recorded planner task. It derives run, assignment, current contract
+generation, repair ID, and source Spec ref. The caller supplies the exact
+`repair_outcome=applied|no-op`, implementation issue, planner task, planner
+result, and authoritative complete-source readback. `send-scope-revision begin`
+is its sole consumer.
+
 The app-operation builder accepts only the action/status fields described by
 its descriptor through `--receipt-ref`, `--readback-ref`, `--thread-id`,
 `--project-id`, `--checkout-path`, `--git-common-dir`, `--observed-title`,
 and `--observed-state`. It also requires `--launch-count` copied from the
 authorizing `begin` or `replay` result; it does not derive the launch
 generation. A stale count is rejected before any observation file is written.
-The builder derives `bootstrap_id`.
+The builder derives `bootstrap_id`; for `send-scope-revision` it derives
+`scope_revision_id` and `contract_generation`.
 
 For a successful `create-worker`, `observed_state` is the literal Codex task
 state and accepts `active` or `idle`; both prove that the exact created task is
@@ -248,6 +279,7 @@ present and bound to its project/worktree. For the worker-to-root
 `archive-worker`, it accepts `archived` or
 `completed`. The template exposes these closed values under
 `field_constraints`, so callers do not infer them from the UI label.
+`create-scope-repair-task` likewise accepts only `active|idle`.
 
 Both ready-observation commands require
 `--readiness-mode terminal|peer-input`; the selected value is stored in the
@@ -274,6 +306,13 @@ operation. Every begin or replay result reports that original owner,
 so a later worker-to-root reroute cannot rewrite the already delivered
 envelope. Every result authorizes only its reported generation.
 
+`create-scope-repair-task` binds the assignment's current repair ID and contract
+generation and returns the exact expected planner title
+`🧭 Scope Repair · <Feature Spec title>`. `send-scope-revision` consumes the
+verified scope-repair observation, stores the next generation, and derives a stable
+`scope_revision_id` from the operation ID and target generation. Replays keep
+all three identities unchanged.
+
 An app-operation observation uses the named app-operation protocol and carries
 exactly its `operation_id`, current `launch_count`, and
 `status: unknown|succeeded|failed` plus permitted evidence. `finish` rejects a
@@ -287,18 +326,22 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | Action | Additional fields |
 | --- | --- |
 | `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
+| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`, `observed_title` |
 | `set-worker-title` | `thread_id`, `observed_title` |
 | `set-review-owner` | `thread_id`, `observed_state` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
+| `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
 | `set-root-title` | `observed_title` |
 | `archive-worker` | `thread_id`, `observed_state` |
 
 Unknown or failed observations may carry only the authoritative action subset
 actually observed. A bootstrap observation always identifies the derived
-`bootstrap_id`; `failed` requires authoritative `readback_ref`, while `unknown`
-may omit it until readback exists. Never invent reconciliation references or
-classify an immediate tool error alone as proof that an effect did not happen.
+`bootstrap_id`; a scope-revision observation always identifies the derived
+revision ID and contract generation. `failed` requires authoritative
+`readback_ref`, while `unknown` may omit it until readback exists. Never invent
+reconciliation references or classify an immediate tool error alone as proof
+that an effect did not happen.
 
 Finishing the same observation for the same launch generation again is
 idempotent: it leaves the revision unchanged, reports `already_applied=true`,
@@ -321,24 +364,26 @@ generation. Its action-specific gates are:
 | Action | Replay gate |
 | --- | --- |
 | `send-bootstrap` | Prior generation is `unknown` or `failed` with `readback_ref`; the same `bootstrap_id` is preserved and worker deduplication contains ambiguity |
+| `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
+| `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
 | `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `set-review-owner` | Prior generation is `failed` and `readback_ref` authoritatively proves the owner follow-up was not delivered; success permits the single worker-to-root reroute |
 | `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
 | `send-worker-message` | Never replayable |
 
-Only bootstrap has exactly-once effect end to end: its transport call may be
-repeated while the worker accepts the stable logical `bootstrap_id` once by the
-rules in `worker-execution.md`. Replayed non-bootstrap operations depend on
+Bootstrap and scope revision have exactly-once logical effect end to end: their
+transport calls may be repeated while the worker accepts the stable logical
+identity once by the rules in `worker-execution.md`. Other replayed operations depend on
 authoritative proof that the preceding generation had no effect; they do not
 claim downstream deduplication.
 
 `set-root-title` has one logical `operation_id` for each run; an authorized
 failed/no-effect replay is another launch generation of that same operation.
 Its expected title is derived from the immutable assignment count:
-`🤖 Feature Orchestrator` for one assignment and
-`🤖 Feature Orchestrator · N Features` for two or more.
+`🤖 Orchestrator · 1 Feature` for one assignment and
+`🤖 Orchestrator · N Features` for two or more.
 
 ## Delivery-Ready Observation
 
@@ -412,6 +457,16 @@ the affected claim. `run finish` completes aggregate run state after
 assignment-level release; claim release never proves upstream merge or combined
 behavior.
 
+`assignment scope-block` retains the worker and claim, records
+`blocked-scope-repair`, and creates one opaque repair ID at
+`contract_generation=1`. GitHub planning may proceed through the separate
+planner operation. Local planning returns
+`local-scope-repair-transport-unavailable` and remains blocked. A successful
+`send-scope-revision` restores the exact pre-block state and atomically advances
+to generation `2`; any later `scope-block` returns `full-replan-required`.
+Overlap checks remain root-owned and are deliberately not stored as file
+claims.
+
 `assignment resume` is the same-root CAS transition for a recovered
 `blocked-durable-contract` or `blocked-app-capability` assignment. It restores
 the exact prior `active` or `peer-input-ready` state and requires the retained
@@ -482,8 +537,9 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` and `RUNTIME_CONTRACT_VERSION` remain `4.1.0`;
-`DATABASE_SCHEMA_VERSION` remains integer `3`; each protocol entry remains at
+or build output. `CLI_VERSION` remains `4.2.0`,
+`RUNTIME_CONTRACT_VERSION` remains `5.0.0`;
+`DATABASE_SCHEMA_VERSION` remains integer `4`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, Python
 compilation, unit/contract tests, and an isolated lifecycle fixture after
@@ -516,7 +572,7 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schemas 1 and 2 are the only recognized rebuild sources for release 4.1.0.
+Schemas 1, 2, and 3 are the recognized rebuild sources for release 4.2.0.
 Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
 Therefore:
 
@@ -524,16 +580,16 @@ Therefore:
   preparation fails closed with the legacy runtime identity unresolved; a
   caller-supplied executable cannot manufacture the missing per-run proof;
 - with zero schema-1 owners, preparation begins one exclusive transaction,
-  rechecks zero, drops every application object, creates exact schema 3 and its
+  rechecks zero, drops every application object, creates exact schema 4 and its
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
-original artifact. The 4.1.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 4.1.0 preparation only after authoritative schema-1
+original artifact. The 5.0.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 4.2.0 preparation only after authoritative schema-1
 state reports zero owners.
 
-Schema 2 does persist exact per-run pins. With active schema-2 owners,
-`state prepare` first writes database-schema integer `3` to
+Schemas 2 and 3 persist exact per-run pins. With active owners on either
+schema, `state prepare` first writes database-schema integer `4` to
 `target_schema_version` transactionally while preserving the old schema. A
 non-NULL target fences every new run. Pass each distinct required executable
 with a repeated absolute

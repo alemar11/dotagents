@@ -21,9 +21,9 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
-CLI_VERSION = "4.1.0"
-RUNTIME_CONTRACT_VERSION = "4.1.0"
-DATABASE_SCHEMA_VERSION = 3
+CLI_VERSION = "4.2.0"
+RUNTIME_CONTRACT_VERSION = "5.0.0"
+DATABASE_SCHEMA_VERSION = 4
 HISTORICAL_RUNTIME_FIXTURES = {
     "2.0.0": {
         "commit": "52991ddca22cf358503a7572b5716dadbed4ccd4",
@@ -51,7 +51,11 @@ PROTOCOLS = {
     },
     "operation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "2.0.0",
+        "schema_version": "2.1.0",
+    },
+    "scope_repair": {
+        "schema": "implement-feature/scope-repair-observation",
+        "schema_version": "1.0.0",
     },
     "ready": {
         "schema": "implement-feature/delivery-ready-observation",
@@ -142,6 +146,26 @@ class RunStateScenarios(unittest.TestCase):
                         "2026-01-01T00:00:00Z",
                     ),
                 )
+            connection.commit()
+        finally:
+            connection.close()
+        self.database.chmod(0o600)
+        del namespace
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            gc.collect()
+
+    def replace_with_drained_schema_three(self) -> None:
+        """Replace current state with an exact empty schema-3 database."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            namespace = runpy.run_path(str(TOOL), run_name="schema_three_fixture")
+        self.database.unlink()
+        self.database.with_name(f"{self.database.name}-wal").unlink(missing_ok=True)
+        self.database.with_name(f"{self.database.name}-shm").unlink(missing_ok=True)
+        connection = sqlite3.connect(self.database)
+        try:
+            namespace["create_schema"](connection, schema_version=3)
             connection.commit()
         finally:
             connection.close()
@@ -405,7 +429,7 @@ class RunStateScenarios(unittest.TestCase):
                     "repository_identity": identity,
                     "tracker_backend": assignment_tracker,
                     "delivery_type": assignment_delivery,
-                    "title": f"🛠️ Feature {index + 1}",
+                    "title": f"🛠️ Woker · Feature {index + 1}",
                     "target_branch_name": f"feature/example-{index + 1}",
                     "prerequisite_assignment_ids": [],
                 }
@@ -469,6 +493,7 @@ class RunStateScenarios(unittest.TestCase):
         *,
         expected: int = 0,
         review_owner: str | None = None,
+        scope_repair_observation: Path | None = None,
     ) -> dict[str, object]:
         args = [
             "app-operation", "begin", "--run-id", run_id,
@@ -477,6 +502,10 @@ class RunStateScenarios(unittest.TestCase):
         ]
         if review_owner is not None:
             args.extend(("--review-owner", review_owner))
+        if scope_repair_observation is not None:
+            args.extend(
+                ("--scope-repair-observation", str(scope_repair_observation))
+            )
         return self.invoke(*args, expected=expected)
 
     def operation_observation(
@@ -549,7 +578,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.operation(
             run_id, f"title-{run_id}-{number}", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": f"🛠️ Feature {number}"},
+            {"thread_id": thread, "observed_title": f"🛠️ Woker · Feature {number}"},
         )
         self.operation(
             run_id, f"bootstrap-{run_id}-{number}", "send-bootstrap", assignment,
@@ -672,7 +701,7 @@ class RunStateScenarios(unittest.TestCase):
         )
 
     def test_given_fresh_user_when_doctor_runs_then_it_is_read_only(self) -> None:
-        """Given no DB, doctor reports schema 3 without creating cache state."""
+        """Given no DB, doctor reports schema 4 without creating cache state."""
         self.database.unlink()
         result = self.invoke("doctor")
         self.assertEqual(result["cli_version"], CLI_VERSION)
@@ -715,7 +744,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-command-line")
 
     def test_given_fresh_user_when_state_prepares_then_schema_and_metadata_are_created(self) -> None:
-        """Given no DB, explicit preparation creates the fresh schema-3 claim domain."""
+        """Given no DB, explicit preparation creates the fresh schema-4 claim domain."""
         self.database.unlink()
         prepared = self.invoke("state", "prepare")
         self.assertEqual(prepared["state"], "initialized")
@@ -1381,6 +1410,21 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "unsupported-input-protocol")
         self.assertFalse(self.database.exists())
 
+    def test_given_noncanonical_worker_title_when_run_starts_then_manifest_is_rejected(self) -> None:
+        """Worker titles must carry the exact visible-task prefix before state exists."""
+        self.database.unlink()
+        manifest = self.manifest("noncanonical-worker-title")
+        manifest["assignments"][0]["title"] = "🛠️ Feature 1"
+        error = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("noncanonical-worker-title.json", manifest)),
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-input")
+        self.assertFalse(self.database.exists())
+
     def test_given_newer_task_observation_when_reconciled_then_operation_remains_pending(self) -> None:
         """Given a newer task payload, reconciliation rejects it without advancing durable state."""
         self.start("v1-operation")
@@ -1458,7 +1502,7 @@ class RunStateScenarios(unittest.TestCase):
                 )
                 self.operation(
                     run_id, f"title-{run_id}", "set-worker-title", assignment,
-                    {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+                    {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
                 )
                 begun = self.begin_operation(
                     run_id, "send-bootstrap", assignment,
@@ -1524,7 +1568,7 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             "delayed-bootstrap", "title-delayed-bootstrap",
             "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         first_launch = self.begin_operation(
             "delayed-bootstrap", "send-bootstrap", assignment,
@@ -1633,7 +1677,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.operation(
             "replay-guards", "title-replay-guards", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         bootstrap = self.begin_operation(
             "replay-guards", "send-bootstrap", assignment,
@@ -1698,7 +1742,7 @@ class RunStateScenarios(unittest.TestCase):
             values={
                 "receipt_ref": "receipt:idempotent-finish",
                 "readback_ref": "readback:idempotent-finish",
-                "observed_title": "🤖 Feature Orchestrator",
+                "observed_title": "🤖 Orchestrator · 1 Feature",
             },
         )
         observation_path = self.write_json("idempotent-finish.json", observation)
@@ -1747,7 +1791,7 @@ class RunStateScenarios(unittest.TestCase):
             values={
                 "receipt_ref": "receipt:monotonic-observation",
                 "readback_ref": "readback:monotonic-observation",
-                "observed_title": "🤖 Feature Orchestrator",
+                "observed_title": "🤖 Orchestrator · 1 Feature",
             },
         )
         self.invoke(
@@ -1782,7 +1826,7 @@ class RunStateScenarios(unittest.TestCase):
             values={
                 "receipt_ref": "receipt:monotonic-observation",
                 "readback_ref": "readback:substituted",
-                "observed_title": "🤖 Feature Orchestrator",
+                "observed_title": "🤖 Orchestrator · 1 Feature",
             },
         )
         substitution_error = self.invoke(
@@ -1903,7 +1947,7 @@ class RunStateScenarios(unittest.TestCase):
             "--status", "succeeded",
             "--receipt-ref", "receipt:operation-builder",
             "--readback-ref", "readback:operation-builder",
-            "--observed-title", "🤖 Feature Orchestrator",
+            "--observed-title", "🤖 Orchestrator · 1 Feature",
             "--output", str(output),
         )
         self.assertEqual(created["output"], str(output))
@@ -1911,7 +1955,7 @@ class RunStateScenarios(unittest.TestCase):
         payload = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(payload["operation_id"], begun["operation_id"])
         self.assertEqual(payload["launch_count"], begun["launch_count"])
-        self.assertEqual(payload["schema_version"], "2.0.0")
+        self.assertEqual(payload["schema_version"], "2.1.0")
         shown = self.invoke("run", "show", "--run-id", "operation-builder")
         self.assertEqual(str(shown["revision"]), revision)
 
@@ -1925,7 +1969,7 @@ class RunStateScenarios(unittest.TestCase):
             "--status", "succeeded",
             "--receipt-ref", "receipt:operation-builder",
             "--readback-ref", "readback:operation-builder",
-            "--observed-title", "🤖 Feature Orchestrator",
+            "--observed-title", "🤖 Orchestrator · 1 Feature",
             "--output", str(output),
             expected=4,
         )
@@ -1963,7 +2007,7 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             "bootstrap-builder", "title-bootstrap-builder",
             "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         begun = self.begin_operation(
             "bootstrap-builder", "send-bootstrap", assignment,
@@ -1997,7 +2041,7 @@ class RunStateScenarios(unittest.TestCase):
         result = self.operation(
             "single-root-title", "single-root-title-op", "set-root-title",
             "root-single-root-title",
-            {"observed_title": "🤖 Feature Orchestrator"},
+            {"observed_title": "🤖 Orchestrator · 1 Feature"},
         )
         self.assertEqual(result["status"], "succeeded")
 
@@ -2013,7 +2057,7 @@ class RunStateScenarios(unittest.TestCase):
         result = self.operation(
             "multi-root-title", "multi-root-title-op", "set-root-title",
             "root-multi-root-title",
-            {"observed_title": "🤖 Feature Orchestrator · 2 Features"},
+            {"observed_title": "🤖 Orchestrator · 2 Features"},
         )
         self.assertEqual(result["status"], "succeeded")
 
@@ -2029,7 +2073,7 @@ class RunStateScenarios(unittest.TestCase):
             values={
                 "receipt_ref": "receipt:wrong-root-title",
                 "readback_ref": "readback:wrong-root-title",
-                "observed_title": "🤖 Feature Orchestrator · 1 Features",
+                "observed_title": "🤖 Orchestrator · 1 Features",
             },
         )
         error = self.invoke(
@@ -2049,7 +2093,7 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             "repeat-root-title", "repeat-root-title-first", "set-root-title",
             "root-repeat-root-title",
-            {"observed_title": "🤖 Feature Orchestrator"},
+            {"observed_title": "🤖 Orchestrator · 1 Feature"},
         )
         error = self.begin_operation(
             "repeat-root-title", "set-root-title", "root-repeat-root-title",
@@ -2523,6 +2567,267 @@ class RunStateScenarios(unittest.TestCase):
             shown["spec_claims"][0]["recovery_readback_ref"]
         )
 
+    def test_given_github_scope_miss_when_planner_repairs_then_same_worker_advances_generation(self) -> None:
+        """A verified planner result restarts the original worker exactly once."""
+        self.start("scope-repair")
+        self.create_worker("scope-repair")
+        blocked = self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--assignment-id",
+            "spec-01",
+        )
+        self.assertEqual(blocked["state"], "blocked-scope-repair")
+        self.assertEqual(blocked["contract_generation"], 1)
+        self.assertTrue(blocked["planner_task_supported"])
+        repair_id = str(blocked["repair_id"])
+        self.assertRegex(
+            repair_id,
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-"
+            r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        )
+
+        planner_begin = self.begin_operation(
+            "scope-repair",
+            "create-scope-repair-task",
+            "spec-01",
+        )
+        self.assertEqual(
+            planner_begin["expected_title"],
+            "🧭 Scope Repair · Feature 1",
+        )
+        planner_observation = self.operation_observation(
+            planner_begin,
+            status="succeeded",
+            values={
+                "thread_id": "planner-scope-repair",
+                "project_id": "project-1",
+                "observed_state": "active",
+                "observed_title": "🧭 Scope Repair · Feature 1",
+                "receipt_ref": "receipt:scope-planner",
+                "readback_ref": "readback:scope-planner",
+            },
+        )
+        self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--operation-id",
+            str(planner_begin["operation_id"]),
+            "--observation",
+            str(self.write_json("scope-planner.json", planner_observation)),
+        )
+        scope_observation = self.base / "scope-repair-result.json"
+        built = self.invoke(
+            "assignment",
+            "scope-repair-observation",
+            "create",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--assignment-id",
+            "spec-01",
+            "--repair-outcome",
+            "applied",
+            "--implementation-issue-ref",
+            "https://github.com/example/project/issues/2",
+            "--planning-thread-id",
+            "planner-scope-repair",
+            "--planning-result-ref",
+            "github-comment:scope-repair",
+            "--authoritative-readback-ref",
+            "github-readback:scope-repair",
+            "--output",
+            str(scope_observation),
+        )
+        self.assertEqual(built["repair_id"], repair_id)
+        self.assertEqual(built["contract_generation"], 1)
+
+        begun = self.begin_operation(
+            "scope-repair",
+            "send-scope-revision",
+            "spec-01",
+            scope_repair_observation=scope_observation,
+        )
+        self.assertEqual(begun["contract_generation"], 2)
+        unknown = self.operation_observation(
+            begun,
+            status="unknown",
+            values={
+                "thread_id": "thread-scope-repair-1",
+                "scope_revision_id": begun["scope_revision_id"],
+                "contract_generation": begun["contract_generation"],
+                "readback_ref": "conversation:scope-revision-unknown",
+            },
+        )
+        reconciled = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--operation-id",
+            str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("scope-revision-unknown.json", unknown)),
+        )
+        self.assertTrue(reconciled["replay_authorized"])
+        replayed = self.invoke(
+            "app-operation",
+            "replay",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--operation-id",
+            str(begun["operation_id"]),
+        )
+        self.assertEqual(replayed["scope_revision_id"], begun["scope_revision_id"])
+        succeeded = self.operation_observation(
+            replayed,
+            status="succeeded",
+            values={
+                "thread_id": "thread-scope-repair-1",
+                "scope_revision_id": replayed["scope_revision_id"],
+                "contract_generation": replayed["contract_generation"],
+                "receipt_ref": "receipt:scope-revision",
+                "readback_ref": "conversation:scope-revision-accepted",
+            },
+        )
+        self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--operation-id",
+            str(replayed["operation_id"]),
+            "--observation",
+            str(self.write_json("scope-revision-succeeded.json", succeeded)),
+        )
+        shown = self.invoke("run", "show", "--run-id", "scope-repair")
+        assignment = shown["assignments"][0]
+        self.assertEqual(assignment["state"], "active")
+        self.assertEqual(assignment["contract_generation"], 2)
+        self.assertIsNone(assignment["scope_repair_id"])
+        self.assertEqual(
+            assignment["scope_repair_readback_ref"],
+            "github-readback:scope-repair",
+        )
+        self.assertEqual(
+            shown["spec_claims"][0]["recovery_readback_ref"],
+            "github-readback:scope-repair",
+        )
+        second = self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "scope-repair",
+            "--expected-revision",
+            self.revision("scope-repair"),
+            "--assignment-id",
+            "spec-01",
+            expected=4,
+        )
+        self.assertEqual(second["error"]["code"], "full-replan-required")
+
+    def test_given_local_scope_miss_when_blocked_then_transport_limit_is_explicit(self) -> None:
+        """Local planning never shares the managed worker checkout with a planner."""
+        self.start(
+            "local-scope-repair",
+            tracker_backend="local",
+            delivery_type="local-branch",
+        )
+        self.create_worker("local-scope-repair")
+        blocked = self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "local-scope-repair",
+            "--expected-revision",
+            self.revision("local-scope-repair"),
+            "--assignment-id",
+            "spec-01",
+        )
+        self.assertFalse(blocked["planner_task_supported"])
+        self.assertEqual(
+            blocked["blocker"],
+            "local-scope-repair-transport-unavailable",
+        )
+        planner = self.begin_operation(
+            "local-scope-repair",
+            "create-scope-repair-task",
+            "spec-01",
+            expected=4,
+        )
+        self.assertEqual(
+            planner["error"]["code"],
+            "local-scope-repair-transport-unavailable",
+        )
+
+    def test_given_wrong_scope_repair_title_when_read_back_then_operation_remains_pending(self) -> None:
+        """A planner task is accepted only with its canonical Feature Spec-derived title."""
+        self.start("scope-repair-title")
+        self.create_worker("scope-repair-title")
+        self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "scope-repair-title",
+            "--expected-revision",
+            self.revision("scope-repair-title"),
+            "--assignment-id",
+            "spec-01",
+        )
+        begun = self.begin_operation(
+            "scope-repair-title",
+            "create-scope-repair-task",
+            "spec-01",
+        )
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "thread_id": "planner-scope-repair-title",
+                "project_id": "project-1",
+                "observed_state": "active",
+                "observed_title": "🧭 Scope Repair · Wrong Feature",
+                "receipt_ref": "receipt:scope-repair-title",
+                "readback_ref": "readback:scope-repair-title",
+            },
+        )
+        error = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-repair-title",
+            "--expected-revision",
+            self.revision("scope-repair-title"),
+            "--operation-id",
+            str(begun["operation_id"]),
+            "--observation",
+            str(self.write_json("scope-repair-title.json", observation)),
+            expected=4,
+        )
+        self.assertEqual(error["error"]["code"], "scope-repair-planner-drift")
+        operations = self.invoke(
+            "app-operation",
+            "list",
+            "--run-id",
+            "scope-repair-title",
+        )
+        self.assertEqual(operations["operations"][-1]["status"], "pending")
+
     def test_given_bootstrap_when_review_owner_is_not_reconciled_then_authority_is_rejected(self) -> None:
         """Bootstrap begin requires and atomically persists one canonical owner."""
         self.start("review-owner-required")
@@ -2548,7 +2853,7 @@ class RunStateScenarios(unittest.TestCase):
             "spec-01",
             {
                 "thread_id": "thread-review-owner-required-1",
-                "observed_title": "🛠️ Feature 1",
+                "observed_title": "🛠️ Woker · Feature 1",
             },
         )
         missing = self.begin_operation(
@@ -3544,7 +3849,7 @@ class RunStateScenarios(unittest.TestCase):
             values={
                 "receipt_ref": "receipt:root-title-replay",
                 "readback_ref": "readback:root-title-replay",
-                "observed_title": "🤖 Feature Orchestrator",
+                "observed_title": "🤖 Orchestrator · 1 Feature",
             },
         )
         self.invoke(
@@ -3714,7 +4019,7 @@ class RunStateScenarios(unittest.TestCase):
         checkout = self.base / "recover checkout"
         checkout.mkdir()
         self.operation("recover", "create-recover", "create-worker", assignment, {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"})
-        self.operation("recover", "title-recover", "set-worker-title", assignment, {"thread_id": thread, "observed_title": "🛠️ Feature 1"})
+        self.operation("recover", "title-recover", "set-worker-title", assignment, {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"})
         unknown = self.operation(
             "recover", "bootstrap-recover", "send-bootstrap", assignment,
             {"thread_id": thread}, status="unknown",
@@ -3760,7 +4065,7 @@ class RunStateScenarios(unittest.TestCase):
         )
         self.operation(
             "archive-unknown", "title-archive-unknown", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Feature 1"},
+            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         self.operation(
             "archive-unknown", "bootstrap-archive-unknown", "send-bootstrap", assignment,
@@ -3876,8 +4181,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(str(shown["revision"]), revision)
         self.assertEqual(shown["runtime_artifact_sha256"], "0" * 64)
 
-    def test_given_drained_schema_one_when_schema_three_prepares_then_state_is_regenerated_without_carry_forward(self) -> None:
-        """With no legacy owners, schema 3 replaces schema 1 without copying rows."""
+    def test_given_drained_schema_one_when_schema_four_prepares_then_state_is_regenerated_without_carry_forward(self) -> None:
+        """With no legacy owners, schema 4 replaces schema 1 without copying rows."""
         self.replace_with_schema_one()
 
         diagnosis = self.invoke("doctor")
@@ -3899,8 +4204,8 @@ class RunStateScenarios(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
         self.assertFalse(self.database.with_name("run-state.lock").exists())
 
-    def test_given_active_schema_one_when_schema_three_prepares_then_it_fails_closed_without_runtime_identity(self) -> None:
-        """Schema 3 cannot guess exact runtime identity for active schema-1 owners."""
+    def test_given_active_schema_one_when_schema_four_prepares_then_it_fails_closed_without_runtime_identity(self) -> None:
+        """Schema 4 cannot guess exact runtime identity for active schema-1 owners."""
         self.replace_with_schema_one(active=True)
         diagnosis = self.invoke("doctor")
         self.assertEqual(diagnosis["state"], "waiting-for-schema-drain")
@@ -3924,6 +4229,31 @@ class RunStateScenarios(unittest.TestCase):
                     "SELECT schema_version,target_schema_version FROM runtime_metadata"
                 ).fetchone(),
                 (1, None),
+            )
+
+    def test_given_drained_schema_three_when_schema_four_prepares_then_state_is_regenerated(self) -> None:
+        """The consented hard cut recognizes drained schema 3 without carrying rows."""
+        self.replace_with_drained_schema_three()
+
+        diagnosis = self.invoke("doctor")
+        self.assertEqual(diagnosis["state"], "rebuild-ready")
+        self.assertEqual(diagnosis["observed_database_schema_version"], 3)
+        prepared = self.invoke("state", "prepare")
+        self.assertEqual(prepared["state"], "regenerated")
+        self.assertEqual(prepared["previous_schema_version"], 3)
+        self.assertEqual(prepared["database_schema_version"], 4)
+        with sqlite3.connect(self.database) as connection:
+            assignment_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(assignments)")
+            }
+            self.assertIn("contract_generation", assignment_columns)
+            self.assertIn("scope_repair_id", assignment_columns)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT schema_version,target_schema_version FROM runtime_metadata"
+                ).fetchone(),
+                (4, None),
             )
 
     def test_given_active_schema_two_when_exact_runtime_is_retained_then_cutover_waits_for_drain(self) -> None:
@@ -4132,11 +4462,11 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before_bytes)
 
     def test_given_newer_schema_when_old_runtime_prepares_then_it_fails_closed(self) -> None:
-        """A schema-3 runtime never destroys or downgrades a newer database."""
+        """A schema-4 runtime never destroys or downgrades a newer database."""
         self.start("newer-schema")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET schema_version=4 WHERE singleton=1"
+                "UPDATE runtime_metadata SET schema_version=5 WHERE singleton=1"
             )
         before = self.database.read_bytes()
         doctor = self.invoke("doctor", expected=4)
@@ -4146,11 +4476,11 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_future_cutover_fence_when_new_run_starts_then_existing_state_remains_readable(self) -> None:
-        """A later cutover fence keeps schema-3 owners readable but blocks new runs."""
+        """A later cutover fence keeps schema-4 owners readable but blocks new runs."""
         self.start("fenced-owner")
         with sqlite3.connect(self.database) as connection:
             connection.execute(
-                "UPDATE runtime_metadata SET target_schema_version=4 WHERE singleton=1"
+                "UPDATE runtime_metadata SET target_schema_version=5 WHERE singleton=1"
             )
         error = self.invoke(
             "run", "start", "--manifest",
@@ -4191,7 +4521,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(self.database.read_bytes(), before)
 
     def test_given_same_number_schema_with_stale_columns_when_read_then_runtime_rejects_without_deleting_it(self) -> None:
-        """A stale schema-3 database fails closed and remains preserved."""
+        """A stale schema-4 database fails closed and remains preserved."""
         self.start("stale-columns")
         with sqlite3.connect(self.database) as connection:
             connection.execute("ALTER TABLE assignments ADD COLUMN retired_delivery_mode TEXT")
@@ -4199,7 +4529,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_three_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
+    def test_given_schema_four_with_invalid_metadata_when_read_then_runtime_rejects_without_rewriting_it(self) -> None:
         """Given protocol metadata drift, doctor fails closed and preserves the database bytes."""
         self.start("stale-metadata")
         with sqlite3.connect(self.database) as connection:
@@ -4209,7 +4539,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertEqual(self.database.read_bytes(), before)
 
-    def test_given_schema_three_without_claim_index_when_read_then_runtime_rejects_it(self) -> None:
+    def test_given_schema_four_without_claim_index_when_read_then_runtime_rejects_it(self) -> None:
         """Given a missing uniqueness constraint, exact schema validation prevents unsafe coordination."""
         self.start("missing-claim-index")
         with sqlite3.connect(self.database) as connection:
@@ -4218,7 +4548,7 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_three_with_extra_trigger_when_read_then_runtime_rejects_it(self) -> None:
+    def test_given_schema_four_with_extra_trigger_when_read_then_runtime_rejects_it(self) -> None:
         """Given an unexpected state mutation hook, exact schema validation rejects the database."""
         self.start("extra-trigger")
         with sqlite3.connect(self.database) as connection:
@@ -4246,8 +4576,8 @@ class RunStateScenarios(unittest.TestCase):
         self.assertEqual(error["error"]["code"], "invalid-state-schema")
         self.assertTrue(self.database.exists())
 
-    def test_given_schema_three_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
-        """A stale schema-3 constraint is rejected without migration or deletion."""
+    def test_given_schema_four_without_capability_block_state_when_read_then_runtime_fails_closed(self) -> None:
+        """A stale schema-4 constraint is rejected without migration or deletion."""
         self.start("stale-capability-state")
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA writable_schema=ON")

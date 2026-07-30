@@ -36,15 +36,18 @@ For `discovery-only`:
 
 Use this skill only after explicit `$implement-feature` invocation in the
 ChatGPT App in Codex mode. For execution, consume complete execution-ready
-Feature Specs and their issues unchanged. Never plan, repair planning
-artifacts, implement in root, create raw worktrees, merge, enqueue, deploy,
+Feature Specs and their issues unchanged. Never plan or implement in root,
+create raw worktrees, merge, enqueue, deploy,
 release, or perform post-merge closure.
 
 `references/feature-spec-contract.md` owns the stable-source mutation table.
 The root and workers may read stable fields, detect drift, and block. They may
 resume the existing assignment only after an externally authored correction is
 independently read back and restores the exact stable contract already accepted
-by that run. A changed stable contract requires a new run and claim after the
+by that run. The sole mutation exception is a separately owned monotonic
+`allowed_paths` expansion executed through
+`references/scope-repair-orchestration.md`. Any other changed stable contract
+requires a new run and claim after the
 existing owner is reconciled; root and workers must never create the change,
 even when a user directly requests it inside the active run.
 
@@ -117,7 +120,9 @@ Resolve the startup authorization interaction defined in
 repository has no separate saved Git project whose reported primary folder is
 the exact repository root, that same interaction either authorizes creation of
 only the listed projects plus the disclosed worker run, or stops before state.
-Otherwise it resolves only `visible_app_task_permission`. The worker grant
+Otherwise it resolves `visible_app_task_permission` and, when at least one
+selected assignment is GitHub-backed, the separately scoped
+`scope_repair_task_permission`. The worker grant
 covers the selected workers, ChatGPT-created worktrees, normal command
 approvals, validation, publication, review fixes, tracker updates, and recovery.
 Never ask another authority, recovery, validation, blocker, or continuation
@@ -146,20 +151,22 @@ more Feature Specs. A discovery-only request never enters this flow.
    over ephemeral complete member-body snapshots and retain its exact
    `manifest_feature_set`, including each validated local member's decoded
    `repository_relative_spec_path`. Keep those inputs unchanged until
-   `run start` revalidates them. Resolve the one startup authorization interaction
-   only after this read-only preflight.
+   `run start` revalidates them. Resolve the one startup authorization
+   interaction, including the bounded planner-task permission from
+   `references/scope-repair-orchestration.md`, only after this read-only
+   preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `4.1.0` implements runtime
-   contract `4.1.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `4.2.0` implements runtime
+   contract `5.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
-   schema integer `3` is separate from those SemVer identities. Every run pins
+   schema integer `4` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
    schema-1 state with active owners cannot prove those pins and therefore
    stops fail-closed; a drained schema-1 state is atomically dropped and
-   recreated as schema 3 without carrying rows forward. Schema 2 records exact
+   recreated as schema 4 without carrying rows forward. Schemas 2 and 3 record exact
    owner pins: pass every distinct required executable with repeated
    `state prepare --retained-runtime` flags and keep the root open for bounded
    drain sweeps. Never start a worker or another run during a fenced cutover.
@@ -200,6 +207,11 @@ more Feature Specs. A discovery-only request never enters this flow.
    worktree and exposes its own component to the peer that owns combined proof,
    with exact pre/post HEAD evidence. Never create a dedicated integration
    worker or grant cross-worktree access.
+   If a worker reports a required path outside the durable envelope, follow
+   `references/scope-repair-orchestration.md`: retain the original worker and
+   claim, delegate the portable repair to a separate Plan Feature task when
+   authorized and supported, recompute same-root overlap, then send the
+   crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative tracker,
 Codex task, Git, delivery-specific provider, CI, and AutoReview-owned review evidence without editing or
    judging criteria. For local-branch delivery, use `scripts/verify-ready` for
@@ -218,6 +230,8 @@ own Feature Spec claim; independent assignments continue.
 - Always load `references/options.md`, `references/feature-spec-contract.md`,
   `references/root-bootstrap.md`, `references/task-model-policy.md`, and
   `references/codex-task-orchestration.md` before startup mutation.
+- Load `references/scope-repair-orchestration.md` when startup authorization is
+  resolved or a worker reports an out-of-envelope path.
 - Workers load `references/worker-execution.md` and `references/tracker-checklists.md`.
 - Load `references/claim-waits-and-recovery.md` for claim waits, compaction,
   interrupted root or worker tasks, title, message, or archive changes, or

@@ -39,6 +39,8 @@ is relaunched under a new logical identifier. SQLite stores only identity and
 reconciliation references, never prompts, message bodies, or hashes.
 `references/run-state.md` owns the exact operation lifecycle, observation
 protocols, `launch_count`, `receipt_ref`, and `readback_ref` machine fields.
+`create-scope-repair-task` and `send-scope-revision` follow the additional
+identity and generation rules in `scope-repair-orchestration.md`.
 
 If a terminal or reconciled `finish` response is lost, submit the identical
 observation again with the same `launch_count`. The idempotent readback uses
@@ -55,8 +57,8 @@ explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
 1. Set and verify the exact immutable root title once. For one assignment use
-   `🤖 Feature Orchestrator`. For two or more use
-   `🤖 Feature Orchestrator · N Features`, where `N` is the immutable total
+   `🤖 Orchestrator · 1 Feature`. For two or more use
+   `🤖 Orchestrator · N Features`, where `N` is the immutable total
    assignment count, including waiting or blocked assignments. Never update the
    root title as assignments progress. The title is UI evidence, never identity
    or durable state.
@@ -71,7 +73,7 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    that the exact task binding exists, not that implementation progress has
    begun.
 3. Independently verify the stable task ID, checkout directory, and Git common
-   directory, then set and verify `🛠️ <Feature Spec title>`.
+   directory, then set and verify `🛠️ Woker · <Feature Spec title>`.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
    canonical `review_owner=worker|root` into the full envelope with the recorded
    `bootstrap_id`, tracker backend, delivery type, source ref, validated local
@@ -136,12 +138,20 @@ A declaratively blocked response does not call `run finish`. The blocked run
 and its claims remain unfinished and exclusively bound to the same root task
 until authoritative recovery or contract change permits that root to continue.
 
+When a worker reports a valid out-of-envelope path, root follows
+`scope-repair-orchestration.md`. It starts the separate planner task immediately
+when authorized, may monitor an overlapping peer in parallel, and recomputes
+the complete path overlap before restarting the original worker. This does not
+create dynamic per-file claims: the durable envelopes and ordinary scheduling
+gate remain authoritative.
+
 ## Allowed Follow-Up Messages
 
 Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
 durable-source change already authored outside the active run and independently
-read back, an early AutoReview capability reroute, a root-owned
+read back, a reconciled scope revision from
+`scope-repair-orchestration.md`, an early AutoReview capability reroute, a root-owned
 AutoReview result, or an authoritative final-verification mismatch. An early
 review-owner follow-up is the external effect of the recorded
 `set-review-owner` operation and contains only the structured doctor result and
@@ -164,9 +174,11 @@ The stable-source mutation ownership table in `feature-spec-contract.md` is
 binding here. Root never edits a stable Feature Spec or issue field, asks the
 worker to edit one, or converts a direct user request into a planning mutation.
 It blocks the assignment and retains its claim while an external planning owner
-corrects the source. Root may resume only after rereading the complete
-authoritative source and proving that it restores the exact stable contract
-already accepted by the run. A changed stable contract cannot be rebound onto
+corrects the source. Root may resume through `assignment resume` only after
+rereading the complete authoritative source and proving that it restores the
+exact stable contract already accepted by the run. The separate scope-revision
+operation is the sole way to rebind the planner-authored monotonic path
+expansion. Any other changed stable contract cannot be rebound onto
 the retained assignment or claim and requires a new run after existing-owner
 reconciliation. The recovery follow-up contains the exact source and readback
 refs only.

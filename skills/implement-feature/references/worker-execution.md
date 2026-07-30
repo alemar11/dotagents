@@ -39,6 +39,11 @@ by its opaque `bootstrap_id`:
 - reject the same ID with a different stable contract;
 - after one ID has been accepted, reject every different bootstrap ID.
 
+Bind that first accepted bootstrap to `contract_generation=1`. A later scope
+revision is not a second bootstrap and never changes the bootstrap ID. Accept
+it only through the exact generation, monotonicity, and replay rules in
+`scope-repair-orchestration.md`.
+
 These checks make the logical bootstrap effect exactly once even though
 delivery itself may be retried. Root may increment its recorded `launch_count`
 for a transport replay, but every generation of that logical bootstrap carries
@@ -55,7 +60,11 @@ Before each issue, after recovery, and before final verification:
    read another worker's checkout;
 2. compare the stable fields from `feature-spec-contract.md` directly;
 3. accept compatible operational changes and continue autonomously;
-4. stop declaratively as `blocked-durable-contract` if a stable field changed.
+4. when an implementation-required path lies outside `allowed_paths`, stop
+   before editing it and report the structured scope repair request from
+   `scope-repair-orchestration.md`;
+5. stop declaratively as `blocked-durable-contract` if any other stable field
+   changed.
 
 The stable-source mutation ownership table in `feature-spec-contract.md`
 remains binding on every turn. A direct user or controller message that requests
@@ -65,7 +74,9 @@ the GitHub issue or local planning artifact. Reread the authoritative sources,
 block on the mismatch, and wait for the same root to resume the assignment only
 after an external planning owner publishes a correction and authoritative
 readback proves it restores the exact stable contract already accepted by the
-run. A changed stable contract requires a new run and claim; it cannot be rebound
+run. The narrow monotonic path repair may be delivered by root as the next
+contract generation after a separately owned Plan Feature change. Any other
+changed stable contract requires a new run and claim; it cannot be rebound
 onto this assignment.
 
 Do not ask the user or root for implementation, validation, recovery, retry,

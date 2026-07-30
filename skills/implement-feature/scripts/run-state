@@ -12,16 +12,17 @@ import stat
 import subprocess
 import sys
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "4.1.0"
-RUNTIME_CONTRACT_VERSION = "4.1.0"
-DATABASE_SCHEMA_VERSION = 3
-REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2})
+CLI_VERSION = "4.2.0"
+RUNTIME_CONTRACT_VERSION = "5.0.0"
+DATABASE_SCHEMA_VERSION = 4
+REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
@@ -42,7 +43,11 @@ PROTOCOLS = {
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "2.0.0",
+        "schema_version": "2.1.0",
+    },
+    "scope_repair_observation": {
+        "schema": "implement-feature/scope-repair-observation",
+        "schema_version": "1.0.0",
     },
     "delivery_ready_observation": {
         "schema": "implement-feature/delivery-ready-observation",
@@ -99,21 +104,29 @@ OWNED_ID_LIKE_RE = re.compile(
 
 APP_ACTIONS = {
     "create-worker",
+    "create-scope-repair-task",
     "set-worker-title",
     "set-review-owner",
     "send-bootstrap",
+    "send-scope-revision",
     "send-worker-message",
     "set-root-title",
     "archive-worker",
 }
 SINGLE_USE_ACTIONS = {
     "create-worker",
+    "create-scope-repair-task",
     "set-worker-title",
     "send-bootstrap",
+    "send-scope-revision",
     "set-root-title",
     "archive-worker",
 }
-PROTECTED_REPLAY_ACTIONS = SINGLE_USE_ACTIONS | {"set-review-owner"}
+PROTECTED_REPLAY_ACTIONS = SINGLE_USE_ACTIONS | {
+    "create-scope-repair-task",
+    "send-scope-revision",
+    "set-review-owner",
+}
 
 APP_OPERATION_COMMON_FIELDS = {
     "schema",
@@ -131,9 +144,20 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "git_common_dir",
         "observed_state",
     },
+    "create-scope-repair-task": {
+        "thread_id",
+        "project_id",
+        "observed_state",
+        "observed_title",
+    },
     "set-worker-title": {"thread_id", "observed_title"},
     "set-review-owner": {"thread_id", "observed_state"},
     "send-bootstrap": {"thread_id", "bootstrap_id"},
+    "send-scope-revision": {
+        "thread_id",
+        "scope_revision_id",
+        "contract_generation",
+    },
     "send-worker-message": {"thread_id"},
     "set-root-title": {"observed_title"},
     "archive-worker": {"thread_id", "observed_state"},
@@ -187,9 +211,39 @@ def utc_now() -> str:
 
 
 def root_task_title(assignment_count: int) -> str:
-    if assignment_count == 1:
-        return "🤖 Feature Orchestrator"
-    return f"🤖 Feature Orchestrator · {assignment_count} Features"
+    feature_label = "Feature" if assignment_count == 1 else "Features"
+    return f"🤖 Orchestrator · {assignment_count} {feature_label}"
+
+
+WORKER_TASK_TITLE_PREFIX = "🛠️ Woker · "
+SCOPE_REPAIR_TASK_TITLE_PREFIX = "🧭 Scope Repair · "
+
+
+def feature_spec_title_from_worker_task_title(title: str, field: str) -> str:
+    canonical_title = string(title, field, 256)
+    if not canonical_title.startswith(WORKER_TASK_TITLE_PREFIX):
+        raise StateError(
+            "invalid-input",
+            f"{field} must use {WORKER_TASK_TITLE_PREFIX}<Feature Spec title>",
+        )
+    feature_spec_title = canonical_title.removeprefix(WORKER_TASK_TITLE_PREFIX)
+    if (
+        not feature_spec_title.strip()
+        or feature_spec_title != feature_spec_title.strip()
+    ):
+        raise StateError(
+            "invalid-input",
+            f"{field} must contain an exact nonempty Feature Spec title",
+        )
+    return feature_spec_title
+
+
+def scope_repair_task_title(worker_task_title: str) -> str:
+    feature_spec_title = feature_spec_title_from_worker_task_title(
+        worker_task_title,
+        "assignment title",
+    )
+    return f"{SCOPE_REPAIR_TASK_TITLE_PREFIX}{feature_spec_title}"
 
 
 def canonical_json(value: Any) -> str:
@@ -231,6 +285,21 @@ def bootstrap_id_for(operation_id: str) -> str:
     if not operation_id.startswith("op-"):
         raise StateError("invalid-operation-id", "operation_id must use the generated op- form")
     return f"bootstrap-{operation_id[3:]}"
+
+
+def scope_revision_id_for(operation_id: str, contract_generation: int) -> str:
+    if not operation_id.startswith("op-"):
+        raise StateError("invalid-operation-id", "operation_id must use the generated op- form")
+    if contract_generation < 2:
+        raise StateError(
+            "invalid-contract-generation",
+            "scope revisions require contract_generation 2 or greater",
+        )
+    return f"scope-revision-{contract_generation}-{operation_id[3:]}"
+
+
+def new_scope_repair_id() -> str:
+    return str(uuid.uuid4())
 
 
 def cache_root() -> Path:
@@ -371,7 +440,7 @@ SCHEMA_TWO_COLUMNS = {
 }
 
 
-CURRENT_SCHEMA_COLUMNS = {
+SCHEMA_THREE_COLUMNS = {
     **SCHEMA_TWO_COLUMNS,
     "runs": (
         "run_id",
@@ -403,11 +472,27 @@ CURRENT_SCHEMA_COLUMNS = {
 }
 
 
+CURRENT_SCHEMA_COLUMNS = {
+    **SCHEMA_THREE_COLUMNS,
+    "assignments": SCHEMA_THREE_COLUMNS["assignments"] + (
+        "contract_generation",
+        "scope_repair_id",
+        "scope_repair_readback_ref",
+    ),
+    "app_operations": SCHEMA_THREE_COLUMNS["app_operations"] + (
+        "contract_generation",
+        "scope_repair_id",
+    ),
+}
+
+
 def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
     if version == 1:
         return SCHEMA_ONE_COLUMNS
     if version == 2:
         return SCHEMA_TWO_COLUMNS
+    if version == 3:
+        return SCHEMA_THREE_COLUMNS
     if version == DATABASE_SCHEMA_VERSION:
         return CURRENT_SCHEMA_COLUMNS
     raise StateError(
@@ -513,6 +598,10 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
         "'peer-input-ready'" not in assignment_sql
         or "'blocked-app-capability'" not in assignment_sql
         or "'integration-input-ready'" in assignment_sql
+        or (
+            version >= 4
+            and "'blocked-scope-repair'" not in assignment_sql
+        )
     ):
         raise StateError(
             "invalid-state-schema",
@@ -556,7 +645,7 @@ def create_schema(
     *,
     schema_version: int = DATABASE_SCHEMA_VERSION,
 ) -> None:
-    if schema_version not in {1, 2, DATABASE_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, 3, DATABASE_SCHEMA_VERSION}:
         raise StateError(
             "unsupported-state-schema",
             f"cannot create database schema {schema_version}",
@@ -590,6 +679,24 @@ def create_schema(
     assignment_feature_column = (
         "feature_id TEXT,"
         if schema_version >= 3
+        else ""
+    )
+    assignment_scope_repair_columns = (
+        """
+            contract_generation INTEGER NOT NULL DEFAULT 1
+                CHECK(contract_generation >= 1),
+            scope_repair_id TEXT,
+            scope_repair_readback_ref TEXT,
+        """
+        if schema_version >= 4
+        else ""
+    )
+    operation_scope_repair_columns = (
+        """
+            contract_generation INTEGER,
+            scope_repair_id TEXT,
+        """
+        if schema_version >= 4
         else ""
     )
     assignment_repository_foreign_key = (
@@ -658,6 +765,7 @@ def create_schema(
                 'waiting-for-spec', 'planned', 'worker-created', 'active',
                 'peer-input-ready', 'pr-ready', 'local-branch-ready',
                 'blocked-durable-contract', 'blocked-app-capability',
+                {blocked_scope_repair_state}
                 'blocked-by-active-spec', 'preimplementation-aborted',
                 'abandoned', 'abandoned-recovery-required'
             )),
@@ -681,6 +789,7 @@ def create_schema(
             provider_observation_ref TEXT,
             updated_at TEXT NOT NULL,
             {assignment_feature_column}
+            {assignment_scope_repair_columns}
             PRIMARY KEY(run_id, assignment_id),
             UNIQUE(run_id, source_spec_ref),
             UNIQUE(run_id, repository_identity, target_branch_name)
@@ -688,6 +797,12 @@ def create_schema(
         )""".format(
             assignment_project_column=assignment_project_column,
             assignment_feature_column=assignment_feature_column,
+            assignment_scope_repair_columns=assignment_scope_repair_columns,
+            blocked_scope_repair_state=(
+                "'blocked-scope-repair',"
+                if schema_version >= 4
+                else ""
+            ),
             assignment_repository_foreign_key=assignment_repository_foreign_key,
         ),
         """CREATE TABLE spec_claims (
@@ -732,8 +847,11 @@ def create_schema(
             observed_state TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            {operation_scope_repair_columns}
             UNIQUE(run_id, {operation_id_column})
-        )""",
+        )""".format(
+            operation_scope_repair_columns=operation_scope_repair_columns,
+        ),
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
         f"INSERT INTO runtime_metadata(singleton,schema_version,target_schema_version) VALUES (1,{schema_version},NULL)",
     ])
@@ -1491,7 +1609,10 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             "repository_identity": identity,
             "tracker_backend": tracker_backend,
             "delivery_type": delivery_type,
-            "title": string(item["title"], f"assignments[{index}].title", 256),
+            "title": (
+                f"{WORKER_TASK_TITLE_PREFIX}"
+                f"{feature_spec_title_from_worker_task_title(item['title'], f'assignments[{index}].title')}"
+            ),
             "target_branch_name": target_branch,
             "prerequisite_assignment_ids": normalized_prerequisites,
         })
@@ -1755,6 +1876,7 @@ def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
     runnable = {"planned", "worker-created", "active", "peer-input-ready"}
     blockers = {
         "blocked-durable-contract", "blocked-app-capability",
+        "blocked-scope-repair",
         "blocked-by-active-spec", "abandoned-recovery-required", "abandoned",
     }
     if any(state in runnable for state in states):
@@ -2457,10 +2579,25 @@ def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
 def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action: str, subject_id: str) -> str | None:
     if action not in APP_ACTIONS:
         raise StateError("invalid-app-action", f"unsupported Codex task action: {action}")
-    if run["status"] != "active":
+    scope_repair_action = action in {
+        "create-scope-repair-task",
+        "send-scope-revision",
+    }
+    if run["status"] != "active" and not (
+        scope_repair_action and run["status"] == "blocked"
+    ):
         raise StateError("run-not-active", f"Codex task changes require active claimed state, found {run['status']}", 4)
     assignment_id: str | None = None
-    if action in {"create-worker", "set-worker-title", "set-review-owner", "send-bootstrap", "send-worker-message", "archive-worker"}:
+    if action in {
+        "create-worker",
+        "create-scope-repair-task",
+        "set-worker-title",
+        "set-review-owner",
+        "send-bootstrap",
+        "send-scope-revision",
+        "send-worker-message",
+        "archive-worker",
+    }:
         assignment = get_assignment(connection, run["run_id"], subject_id)
         assignment_id = assignment["assignment_id"]
         claim = assignment_claim(connection, run["run_id"], assignment_id)
@@ -2473,6 +2610,19 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if action == "create-worker":
             if assignment["state"] != "planned":
                 raise StateError("invalid-assignment-transition", "worker creation requires a planned assignment", 4)
+        elif action == "create-scope-repair-task":
+            if assignment["state"] != "blocked-scope-repair":
+                raise StateError(
+                    "invalid-assignment-transition",
+                    "planner task creation requires a scope-repair-blocked assignment",
+                    4,
+                )
+            if assignment["tracker_backend"] != "github":
+                raise StateError(
+                    "local-scope-repair-transport-unavailable",
+                    "automatic scope repair is supported only for GitHub-backed planning",
+                    4,
+                )
         elif action == "set-worker-title" and assignment["state"] != "worker-created":
             raise StateError("invalid-assignment-transition", "title readback requires a created worker", 4)
         elif action == "set-review-owner":
@@ -2506,6 +2656,19 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         elif action == "send-bootstrap":
             if assignment["state"] != "worker-created":
                 raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
+        elif action == "send-scope-revision":
+            if assignment["state"] != "blocked-scope-repair":
+                raise StateError(
+                    "invalid-assignment-transition",
+                    "scope revision requires a scope-repair-blocked assignment",
+                    4,
+                )
+            if assignment["tracker_backend"] != "github":
+                raise StateError(
+                    "local-scope-repair-transport-unavailable",
+                    "automatic scope repair is supported only for GitHub-backed planning",
+                    4,
+                )
         elif action == "send-worker-message" and assignment["state"] not in {
             "active", "peer-input-ready"
         }:
@@ -2531,11 +2694,122 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     return assignment_id
 
 
+def validate_scope_repair_observation(
+    connection: sqlite3.Connection,
+    assignment: sqlite3.Row,
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    exact_keys(
+        value,
+        {
+            "schema",
+            "schema_version",
+            "run_id",
+            "assignment_id",
+            "contract_generation",
+            "repair_id",
+            "repair_outcome",
+            "source_spec_ref",
+            "implementation_issue_ref",
+            "planning_thread_id",
+            "planning_result_ref",
+            "authoritative_readback_ref",
+        },
+        "scope repair observation",
+    )
+    require_protocol(value, "scope_repair_observation", "scope repair observation")
+    generation = value["contract_generation"]
+    if (
+        isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+    ):
+        raise StateError(
+            "invalid-scope-repair-observation",
+            "contract_generation must be a positive integer",
+        )
+    normalized = {
+        "run_id": token(value["run_id"], "run_id"),
+        "assignment_id": token(value["assignment_id"], "assignment_id"),
+        "contract_generation": generation,
+        "repair_id": token(value["repair_id"], "repair_id"),
+        "repair_outcome": string(value["repair_outcome"], "repair_outcome", 32),
+        "source_spec_ref": string(value["source_spec_ref"], "source_spec_ref", 4096),
+        "implementation_issue_ref": string(
+            value["implementation_issue_ref"],
+            "implementation_issue_ref",
+            4096,
+        ),
+        "planning_thread_id": string(
+            value["planning_thread_id"],
+            "planning_thread_id",
+            256,
+        ),
+        "planning_result_ref": string(
+            value["planning_result_ref"],
+            "planning_result_ref",
+            2048,
+        ),
+        "authoritative_readback_ref": string(
+            value["authoritative_readback_ref"],
+            "authoritative_readback_ref",
+            2048,
+        ),
+    }
+    if normalized["repair_outcome"] not in {"applied", "no-op"}:
+        raise StateError(
+            "invalid-scope-repair-observation",
+            "repair_outcome must be applied or no-op",
+        )
+    _, implementation_issue_identity = canonical_source_spec_ref(
+        normalized["implementation_issue_ref"],
+        assignment["repository_identity"],
+        assignment["tracker_backend"],
+    )
+    if implementation_issue_identity == assignment["claim_spec_identity"]:
+        raise StateError(
+            "invalid-scope-repair-observation",
+            "implementation_issue_ref must identify a child implementation issue",
+        )
+    if (
+        normalized["run_id"] != assignment["run_id"]
+        or normalized["assignment_id"] != assignment["assignment_id"]
+        or normalized["contract_generation"] != assignment["contract_generation"]
+        or normalized["repair_id"] != assignment["scope_repair_id"]
+        or normalized["source_spec_ref"] != assignment["source_spec_ref"]
+    ):
+        raise StateError(
+            "scope-repair-observation-drift",
+            "scope repair observation does not match the blocked assignment generation",
+            4,
+        )
+    planner = connection.execute(
+        """SELECT thread_id FROM app_operations
+           WHERE run_id=? AND assignment_id=?
+             AND action='create-scope-repair-task'
+             AND scope_repair_id=? AND status='succeeded'
+           ORDER BY sequence DESC LIMIT 1""",
+        (
+            assignment["run_id"],
+            assignment["assignment_id"],
+            assignment["scope_repair_id"],
+        ),
+    ).fetchone()
+    if planner is None or planner["thread_id"] != normalized["planning_thread_id"]:
+        raise StateError(
+            "scope-repair-planner-not-verified",
+            "scope revision requires the successful recorded planner task",
+            4,
+        )
+    return normalized
+
+
 def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     action = string(args.action, "action", 80)
     subject_id = string(args.subject_id, "subject_id", 256)
     review_owner = args.review_owner
+    scope_repair_input = args.scope_repair_observation
     if action == "send-bootstrap":
         if review_owner not in {"worker", "root"}:
             raise StateError(
@@ -2547,11 +2821,39 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
             "invalid-input",
             "--review-owner is valid only for send-bootstrap",
         )
+    if action == "send-scope-revision":
+        if scope_repair_input is None:
+            raise StateError(
+                "invalid-input",
+                "send-scope-revision requires --scope-repair-observation",
+            )
+    elif scope_repair_input is not None:
+        raise StateError(
+            "invalid-input",
+            "--scope-repair-observation is valid only for send-scope-revision",
+        )
     connection = connect(write=True)
     try:
         run = get_run(connection, run_id)
         require_revision(run, args.expected_revision)
         assignment_id = validate_app_begin(connection, run, action, subject_id)
+        assignment = (
+            get_assignment(connection, run_id, assignment_id)
+            if assignment_id is not None
+            else None
+        )
+        scope_observed = (
+            validate_scope_repair_observation(
+                connection,
+                assignment,
+                read_json_file(
+                    scope_repair_input,
+                    "scope repair observation",
+                ),
+            )
+            if action == "send-scope-revision" and assignment is not None
+            else None
+        )
         if action in SINGLE_USE_ACTIONS:
             existing = connection.execute(
                 """SELECT operation_id,status FROM app_operations
@@ -2567,11 +2869,31 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
                 )
         operation_id = new_operation_id()
         now = utc_now()
+        operation_generation = None
+        operation_repair_id = None
+        provider_observation_ref = None
+        if action == "create-scope-repair-task" and assignment is not None:
+            operation_generation = assignment["contract_generation"]
+            operation_repair_id = assignment["scope_repair_id"]
+        elif action == "send-scope-revision" and scope_observed is not None:
+            operation_generation = scope_observed["contract_generation"] + 1
+            operation_repair_id = scope_observed["repair_id"]
+            connection.execute(
+                """UPDATE assignments SET scope_repair_readback_ref=?,updated_at=?
+                   WHERE run_id=? AND assignment_id=?""",
+                (
+                    scope_observed["authoritative_readback_ref"],
+                    now,
+                    run_id,
+                    assignment_id,
+                ),
+            )
         connection.execute(
             """INSERT INTO app_operations(
                    run_id,operation_id,action,subject_id,assignment_id,status,
-                   launch_count,observed_state,created_at,updated_at
-               ) VALUES (?,?,?,?,?,'pending',1,?,?,?)""",
+                   launch_count,observed_state,provider_observation_ref,
+                   created_at,updated_at,contract_generation,scope_repair_id
+               ) VALUES (?,?,?,?,?,'pending',1,?,?,?,?,?,?)""",
             (
                 run_id,
                 operation_id,
@@ -2579,8 +2901,11 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
                 subject_id,
                 assignment_id,
                 review_owner,
+                provider_observation_ref,
                 now,
                 now,
+                operation_generation,
+                operation_repair_id,
             ),
         )
         revision = advance(connection, run)
@@ -2596,6 +2921,17 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
             result["review_owner"] = review_owner
+        elif action == "create-scope-repair-task":
+            result["repair_id"] = operation_repair_id
+            result["contract_generation"] = operation_generation
+            result["expected_title"] = scope_repair_task_title(assignment["title"])
+        elif action == "send-scope-revision":
+            result["repair_id"] = operation_repair_id
+            result["contract_generation"] = operation_generation
+            result["scope_revision_id"] = scope_revision_id_for(
+                operation_id,
+                operation_generation,
+            )
         return result
     except Exception:
         connection.rollback()
@@ -2671,6 +3007,14 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
             "invalid-operation-observation",
             "send-bootstrap observations must carry the recorded bootstrap_id",
         )
+    if operation["action"] == "send-scope-revision" and not {
+        "scope_revision_id",
+        "contract_generation",
+    }.issubset(value):
+        raise StateError(
+            "invalid-operation-observation",
+            "send-scope-revision observations must carry the derived revision identity",
+        )
     normalized: dict[str, Any] = {
         "operation_id": operation["operation_id"],
         "launch_count": operation["launch_count"],
@@ -2679,16 +3023,39 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
     for field in APP_OPERATION_RECONCILIATION_FIELDS & set(value):
         normalized[field] = string(value[field], field, 2048)
     for field in actual_extra - APP_OPERATION_RECONCILIATION_FIELDS:
-        normalized[field] = (
-            absolute_path(value[field], field)
-            if field in {"checkout_path", "git_common_dir"}
-            else string(value[field], field, 4096)
-        )
+        if field in {"checkout_path", "git_common_dir"}:
+            normalized[field] = absolute_path(value[field], field)
+        elif field == "contract_generation":
+            generation = value[field]
+            if (
+                isinstance(generation, bool)
+                or not isinstance(generation, int)
+                or generation < 1
+            ):
+                raise StateError(
+                    "invalid-operation-observation",
+                    "contract_generation must be a positive integer",
+                )
+            normalized[field] = generation
+        else:
+            normalized[field] = string(value[field], field, 4096)
     if operation["action"] == "send-bootstrap" and "bootstrap_id" in normalized:
         if normalized["bootstrap_id"] != bootstrap_id_for(operation["operation_id"]):
             raise StateError(
                 "bootstrap-id-drift",
                 "bootstrap_id differs from the recorded logical bootstrap",
+                4,
+            )
+    if operation["action"] == "send-scope-revision":
+        expected_generation = operation["contract_generation"]
+        if (
+            normalized.get("contract_generation") != expected_generation
+            or normalized.get("scope_revision_id")
+            != scope_revision_id_for(operation["operation_id"], expected_generation)
+        ):
+            raise StateError(
+                "scope-revision-id-drift",
+                "scope revision identity differs from the recorded operation generation",
                 4,
             )
     return normalized
@@ -2703,6 +3070,15 @@ def operation_observation_payload(
 ) -> dict[str, Any]:
     if operation["action"] == "send-bootstrap":
         values = {**values, "bootstrap_id": bootstrap_id_for(operation["operation_id"])}
+    elif operation["action"] == "send-scope-revision":
+        values = {
+            **values,
+            "scope_revision_id": scope_revision_id_for(
+                operation["operation_id"],
+                operation["contract_generation"],
+            ),
+            "contract_generation": operation["contract_generation"],
+        }
     payload: dict[str, Any] = {
         **protocol_fields("app_operation_observation"),
         "operation_id": operation["operation_id"],
@@ -2734,6 +3110,11 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
     if action == "send-bootstrap":
         required_fields.discard("bootstrap_id")
         constants["bootstrap_id"] = "derived-from-operation-id"
+    elif action == "send-scope-revision":
+        required_fields.discard("scope_revision_id")
+        required_fields.discard("contract_generation")
+        constants["scope_revision_id"] = "derived-from-operation-id-and-generation"
+        constants["contract_generation"] = "derived-from-blocked-assignment"
     possible_fields = (
         APP_OPERATION_RECONCILIATION_FIELDS
         | APP_OPERATION_FIELDS_BY_ACTION[action]
@@ -2742,6 +3123,10 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
     optional = sorted(possible_fields - required_fields)
     field_constraints: dict[str, dict[str, list[str]]] = {}
     if status == "succeeded" and action == "create-worker":
+        field_constraints["observed_state"] = {
+            "allowed_values": ["active", "idle"],
+        }
+    elif status == "succeeded" and action == "create-scope-repair-task":
         field_constraints["observed_state"] = {
             "allowed_values": ["active", "idle"],
         }
@@ -2917,6 +3302,46 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 assignment["assignment_id"],
             ),
         )
+    elif action == "create-scope-repair-task":
+        assignment = get_assignment(
+            connection,
+            run["run_id"],
+            operation["assignment_id"],
+        )
+        if (
+            assignment["state"] != "blocked-scope-repair"
+            or operation["scope_repair_id"] != assignment["scope_repair_id"]
+            or operation["contract_generation"] != assignment["contract_generation"]
+            or observed["project_id"] != assignment["project_id"]
+            or observed["observed_state"] not in {"active", "idle"}
+            or observed["observed_title"]
+            != scope_repair_task_title(assignment["title"])
+        ):
+            raise StateError(
+                "scope-repair-planner-drift",
+                "planner task readback differs from the blocked assignment",
+                4,
+            )
+        collision = connection.execute(
+            """SELECT run_id,assignment_id FROM assignments
+               WHERE thread_id=? LIMIT 1""",
+            (observed["thread_id"],),
+        ).fetchone()
+        if collision is None:
+            collision = connection.execute(
+                """SELECT run_id,assignment_id FROM app_operations
+                   WHERE action='create-scope-repair-task'
+                     AND status='succeeded' AND thread_id=?
+                     AND operation_id<>?
+                   LIMIT 1""",
+                (observed["thread_id"], operation["operation_id"]),
+            ).fetchone()
+        if collision:
+            raise StateError(
+                "scope-repair-planner-identity-conflict",
+                "planner task is already bound to another runtime subject",
+                4,
+            )
     elif action == "set-worker-title":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"] or observed["observed_title"] != assignment["title"]:
@@ -2958,6 +3383,71 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         bootstrap_review_owner(operation)
         connection.execute("UPDATE assignments SET state='active',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
         connection.execute("UPDATE runs SET implementation_started=1 WHERE run_id=?", (run["run_id"],))
+    elif action == "send-scope-revision":
+        assignment = get_assignment(
+            connection,
+            run["run_id"],
+            operation["assignment_id"],
+        )
+        if observed["thread_id"] != assignment["thread_id"]:
+            raise StateError(
+                "worker-identity-drift",
+                "scope revision receipt belongs to another worker",
+                4,
+            )
+        if (
+            assignment["state"] != "blocked-scope-repair"
+            or operation["scope_repair_id"] != assignment["scope_repair_id"]
+            or operation["contract_generation"]
+            != assignment["contract_generation"] + 1
+            or observed["contract_generation"] != operation["contract_generation"]
+            or observed["scope_revision_id"]
+            != scope_revision_id_for(
+                operation["operation_id"],
+                operation["contract_generation"],
+            )
+        ):
+            raise StateError(
+                "scope-revision-drift",
+                "scope revision does not match the blocked assignment generation",
+                4,
+            )
+        restored = assignment["blocked_from_state"]
+        if restored not in {"active", "peer-input-ready"}:
+            raise StateError(
+                "invalid-state-schema",
+                "scope-repair-blocked assignment has no valid resume state",
+                4,
+            )
+        if assignment["scope_repair_readback_ref"] is None:
+            raise StateError(
+                "scope-repair-readback-missing",
+                "scope revision requires the authoritative planning readback",
+                4,
+            )
+        connection.execute(
+            """UPDATE assignments
+               SET state=?,blocked_from_state=NULL,
+                   contract_generation=?,scope_repair_id=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (
+                restored,
+                operation["contract_generation"],
+                now,
+                run["run_id"],
+                assignment["assignment_id"],
+            ),
+        )
+        connection.execute(
+            """UPDATE spec_claims SET recovery_readback_ref=?
+               WHERE run_id=? AND assignment_id=?""",
+            (
+                assignment["scope_repair_readback_ref"],
+                run["run_id"],
+                assignment["assignment_id"],
+            ),
+        )
+        recompute_run_status(connection, run["run_id"])
     elif action == "send-worker-message":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:
@@ -2976,7 +3466,7 @@ def app_operation_replay_authorized(
 ) -> bool:
     if not readback_ref or action not in PROTECTED_REPLAY_ACTIONS:
         return False
-    if action == "send-bootstrap":
+    if action in {"send-bootstrap", "send-scope-revision"}:
         return status in {"unknown", "failed"}
     return status == "failed"
 
@@ -3017,6 +3507,12 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         }
         if operation["action"] == "send-bootstrap":
             stored_values["bootstrap_id"] = bootstrap_id_for(operation_id)
+        elif operation["action"] == "send-scope-revision":
+            stored_values["scope_revision_id"] = scope_revision_id_for(
+                operation_id,
+                operation["contract_generation"],
+            )
+            stored_values["contract_generation"] = operation["contract_generation"]
         stored_observation = {
             "operation_id": operation_id,
             "launch_count": operation["launch_count"],
@@ -3128,7 +3624,7 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         ):
             required_status = (
                 "unknown or failed"
-                if action == "send-bootstrap"
+                if action in {"send-bootstrap", "send-scope-revision"}
                 else "failed"
             )
             raise StateError(
@@ -3174,6 +3670,22 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
             result["review_owner"] = authorized_review_owner
+        elif action == "create-scope-repair-task":
+            result["repair_id"] = operation["scope_repair_id"]
+            result["contract_generation"] = operation["contract_generation"]
+            assignment = get_assignment(
+                connection,
+                run_id,
+                operation["assignment_id"],
+            )
+            result["expected_title"] = scope_repair_task_title(assignment["title"])
+        elif action == "send-scope-revision":
+            result["repair_id"] = operation["scope_repair_id"]
+            result["contract_generation"] = operation["contract_generation"]
+            result["scope_revision_id"] = scope_revision_id_for(
+                operation_id,
+                operation["contract_generation"],
+            )
         return result
     except Exception:
         connection.rollback()
@@ -3190,6 +3702,18 @@ def app_operation_projection(
     if value["action"] == "send-bootstrap":
         value["bootstrap_id"] = bootstrap_id_for(value["operation_id"])
         value["review_owner"] = bootstrap_review_owner(row)
+    elif value["action"] == "create-scope-repair-task":
+        assignment = get_assignment(
+            connection,
+            value["run_id"],
+            value["assignment_id"],
+        )
+        value["expected_title"] = scope_repair_task_title(assignment["title"])
+    elif value["action"] == "send-scope-revision":
+        value["scope_revision_id"] = scope_revision_id_for(
+            value["operation_id"],
+            value["contract_generation"],
+        )
     return value
 
 
@@ -3759,6 +4283,149 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
         connection.close()
 
 
+def command_assignment_scope_block(args: argparse.Namespace) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=True)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] not in {"active", "peer-input-ready"}:
+            raise StateError(
+                "invalid-assignment-transition",
+                "scope repair blocking requires an active or peer-input-ready worker",
+                4,
+            )
+        if assignment["contract_generation"] != 1:
+            raise StateError(
+                "full-replan-required",
+                "one automatic scope repair has already been applied to this assignment",
+                4,
+            )
+        repair_id = new_scope_repair_id()
+        connection.execute(
+            """UPDATE assignments
+               SET state='blocked-scope-repair',blocked_from_state=?,
+                   scope_repair_id=?,scope_repair_readback_ref=NULL,updated_at=?
+               WHERE run_id=? AND assignment_id=?""",
+            (
+                assignment["state"],
+                repair_id,
+                utc_now(),
+                run_id,
+                assignment_id,
+            ),
+        )
+        connection.execute(
+            """UPDATE spec_claims SET recovery_readback_ref=NULL
+               WHERE run_id=? AND assignment_id=?""",
+            (run_id, assignment_id),
+        )
+        run_status = recompute_run_status(connection, run_id)
+        revision = advance(connection, run)
+        connection.commit()
+        automated = assignment["tracker_backend"] == "github"
+        return {
+            "run_id": run_id,
+            "revision": revision,
+            "assignment_id": assignment_id,
+            "state": "blocked-scope-repair",
+            "run_status": run_status,
+            "claim_retained": True,
+            "contract_generation": assignment["contract_generation"],
+            "repair_id": repair_id,
+            "planner_task_supported": automated,
+            "blocker": (
+                None
+                if automated
+                else "local-scope-repair-transport-unavailable"
+            ),
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def scope_repair_observation_descriptor() -> dict[str, Any]:
+    return {
+        "observation_kind": "scope-repair",
+        "constants": {
+            **protocol_fields("scope_repair_observation"),
+            "run_id": "read-from-assignment",
+            "assignment_id": "read-from-assignment",
+            "contract_generation": "read-from-assignment",
+            "repair_id": "read-from-assignment",
+            "source_spec_ref": "read-from-assignment",
+        },
+        "required_fields": [
+            "repair_outcome",
+            "implementation_issue_ref",
+            "planning_thread_id",
+            "planning_result_ref",
+            "authoritative_readback_ref",
+        ],
+        "optional_fields": [],
+        "field_constraints": {
+            "repair_outcome": {"allowed_values": ["applied", "no-op"]},
+        },
+        "additional_fields": False,
+    }
+
+
+def command_assignment_scope_repair_observation_template(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    return scope_repair_observation_descriptor()
+
+
+def command_assignment_scope_repair_observation_create(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    run_id = token(args.run_id, "run_id")
+    assignment_id = token(args.assignment_id, "assignment_id")
+    connection = connect(write=False)
+    try:
+        run = get_run(connection, run_id)
+        require_revision(run, args.expected_revision)
+        assignment = get_assignment(connection, run_id, assignment_id)
+        if assignment["state"] != "blocked-scope-repair":
+            raise StateError(
+                "invalid-assignment-transition",
+                "scope repair observation requires a scope-repair-blocked assignment",
+                4,
+            )
+        payload = {
+            **protocol_fields("scope_repair_observation"),
+            "run_id": run_id,
+            "assignment_id": assignment_id,
+            "contract_generation": assignment["contract_generation"],
+            "repair_id": assignment["scope_repair_id"],
+            "repair_outcome": args.repair_outcome,
+            "source_spec_ref": assignment["source_spec_ref"],
+            "implementation_issue_ref": args.implementation_issue_ref,
+            "planning_thread_id": args.planning_thread_id,
+            "planning_result_ref": args.planning_result_ref,
+            "authoritative_readback_ref": args.authoritative_readback_ref,
+        }
+        validate_scope_repair_observation(connection, assignment, payload)
+    finally:
+        connection.close()
+    output = atomic_write_json(args.output, payload)
+    return {
+        "observation_kind": "scope-repair",
+        "run_id": run_id,
+        "assignment_id": assignment_id,
+        "repair_id": payload["repair_id"],
+        "contract_generation": payload["contract_generation"],
+        "output": output,
+        "artifact_written": True,
+        "state_writes_performed": False,
+    }
+
+
 def validate_assignment_resume_observation(value: dict[str, Any]) -> dict[str, Any]:
     exact_keys(
         value,
@@ -4034,6 +4701,7 @@ def command_assignment_recover(args: argparse.Namespace) -> dict[str, Any]:
         if assignment["state"] not in {
             "active", "peer-input-ready",
             "blocked-durable-contract", "blocked-app-capability",
+            "blocked-scope-repair",
         }:
             raise StateError(
                 "invalid-assignment-transition",
@@ -4443,7 +5111,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-3 SQLite coordination for Implement Feature "
+            "Database-schema-4 SQLite coordination for Implement Feature "
             "controllers in the ChatGPT App."
         ),
     )
@@ -4554,6 +5222,7 @@ def build_parser() -> argparse.ArgumentParser:
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
     begin.add_argument("--subject-id", required=True)
     begin.add_argument("--review-owner", choices=("worker", "root"))
+    begin.add_argument("--scope-repair-observation")
     begin.set_defaults(handler=command_app_operation_begin, command_name="app-operation begin")
     op_finish = operation_commands.add_parser("finish", help="record or reconcile the immediate response and independent state inspection")
     op_finish.add_argument("--run-id", required=True)
@@ -4731,6 +5400,64 @@ def build_parser() -> argparse.ArgumentParser:
     capability_block.set_defaults(
         handler=command_assignment_capability_block,
         command_name="assignment capability-block",
+    )
+    scope_block = assignment_commands.add_parser(
+        "scope-block",
+        help="retain a worker and claim while an external allowed-path repair is coordinated",
+    )
+    scope_block.add_argument("--run-id", required=True)
+    scope_block.add_argument("--expected-revision", type=int, required=True)
+    scope_block.add_argument("--assignment-id", required=True)
+    scope_block.set_defaults(
+        handler=command_assignment_scope_block,
+        command_name="assignment scope-block",
+    )
+    scope_repair_observation = assignment_commands.add_parser(
+        "scope-repair-observation",
+        help="describe or build a strict planner-result observation",
+    )
+    scope_repair_observation_commands = scope_repair_observation.add_subparsers(
+        dest="scope_repair_observation_command",
+        required=True,
+    )
+    scope_repair_template = scope_repair_observation_commands.add_parser(
+        "template",
+        help="print the strict scope repair observation contract",
+    )
+    scope_repair_template.set_defaults(
+        handler=command_assignment_scope_repair_observation_template,
+        command_name="assignment scope-repair-observation template",
+    )
+    scope_repair_create = scope_repair_observation_commands.add_parser(
+        "create",
+        help="build one verified scope repair observation without mutating state",
+    )
+    scope_repair_create.add_argument("--run-id", required=True)
+    scope_repair_create.add_argument(
+        "--expected-revision",
+        type=int,
+        required=True,
+    )
+    scope_repair_create.add_argument("--assignment-id", required=True)
+    scope_repair_create.add_argument(
+        "--repair-outcome",
+        choices=("applied", "no-op"),
+        required=True,
+    )
+    scope_repair_create.add_argument(
+        "--implementation-issue-ref",
+        required=True,
+    )
+    scope_repair_create.add_argument("--planning-thread-id", required=True)
+    scope_repair_create.add_argument("--planning-result-ref", required=True)
+    scope_repair_create.add_argument(
+        "--authoritative-readback-ref",
+        required=True,
+    )
+    scope_repair_create.add_argument("--output", required=True)
+    scope_repair_create.set_defaults(
+        handler=command_assignment_scope_repair_observation_create,
+        command_name="assignment scope-repair-observation create",
     )
     resume = assignment_commands.add_parser(
         "resume",

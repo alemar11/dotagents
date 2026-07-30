@@ -33,7 +33,14 @@ planning workflow operating outside the active `$implement-feature` run. A
 direct user message to the active root or worker does not change that actor's
 role and does not grant planning authority.
 
-When a stable field must change, the root and worker stop as
+The only active-run exception is the externally owned monotonic
+`allowed_paths` repair in `scope-repair-orchestration.md`. Root may invoke a
+separate Plan Feature task with the portable request, but root and worker still
+cannot author the change. A successful planner result is rebound onto the same
+assignment only through the crash-safe scope-revision protocol and increments
+its contract generation.
+
+When any other stable field must change, the root and worker stop as
 `blocked-durable-contract` and report the exact conflicting source and field.
 They must not edit the GitHub issue, local planning artifact, or stable section,
 including through GitStack. The same root retains the run and claim while the
@@ -41,9 +48,10 @@ assignment is blocked. After an external planning owner publishes a correction,
 the root rereads the complete authoritative Spec and issue graph and records the
 exact durable-source readback. It may resume the existing assignment through the
 normal recovery transition only when that readback restores the exact stable
-contract already accepted by the run. Any changed stable contract—including
-repository or source identity, delivery type, target branch, allowed paths,
-dependencies, acceptance, safety, or material validation constraints—cannot be
+contract already accepted by the run. Any changed stable contract other than
+that exact monotonic path repair—including repository or source identity,
+delivery type, target branch, non-monotonic allowed paths, dependencies,
+acceptance, safety, or material validation constraints—cannot be
 rebound onto the retained assignment or claim; it requires a new run and claim
 after the existing owner is reconciled through the normal terminal lifecycle.
 The recovery follow-up carries source identity and readback evidence only; it
@@ -139,8 +147,10 @@ operational changes when the stable fields above remain intact:
 - checkbox markers whose underlying acceptance text, count, and order did not
   change.
 
-Stop as `blocked-durable-contract` without asking when outcome, delivery type,
-repository/path/source/branch authority, dependency structure, acceptance text
-or shape, safety, or a material validation budget/terminal result changes.
+For a required out-of-envelope path, stop editing and report the structured
+request from `scope-repair-orchestration.md`. Stop as
+`blocked-durable-contract` without asking when outcome, delivery type,
+repository/source/branch authority, a non-monotonic path change, dependency
+structure, acceptance text or shape, safety, or material validation budget/terminal result changes.
 Compare authoritative stable sections directly. Do not create body, contract,
 result, assignment-packet, or message hashes.
