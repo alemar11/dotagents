@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""Launch a fixed-model Pi coding session from the caller's project."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+from typing import Any, Sequence
+
+
+VERSION = "0.1.0"
+MODEL_PROVIDER = "zai-coding-cn"
+MODEL_ID = "glm-5.2"
+MODEL_SELECTOR = f"{MODEL_PROVIDER}/{MODEL_ID}"
+THINKING_LEVELS = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
+DEFAULT_THINKING_LEVEL = "medium"
+INSTALL_COMMAND = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent"
+SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$")
+
+
+class CliError(Exception):
+    """A stable command-line failure."""
+
+    def __init__(self, code: str, message: str, *, exit_code: int = 2) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+
+
+def emit(payload: dict[str, Any], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, sort_keys=True))
+        return
+
+    if payload.get("command") == "doctor":
+        readiness = "ready" if payload["ready"] else "not ready"
+        print(f"pi-delegate {VERSION}: {readiness}")
+        for check in payload["checks"]:
+            marker = "ok" if check["ok"] else "error"
+            print(f"- {check['name']}: {marker} ({check['detail']})")
+        if payload.get("install_command"):
+            print(f"Install Pi with: {payload['install_command']}")
+        return
+
+    if payload.get("ok"):
+        print(payload["final_response"])
+        return
+
+    print(payload["error"]["message"], file=sys.stderr)
+
+
+def run_process(args: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            list(args),
+            cwd=str(cwd),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as error:
+        raise CliError("process_start_failed", str(error), exit_code=1) from error
+
+
+def find_exact_model(output: str) -> bool:
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] == MODEL_PROVIDER and fields[1] == MODEL_ID:
+            return True
+    return False
+
+
+def collect_doctor(*, cwd: Path) -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+
+    python_path = shutil.which("python3")
+    checks.append(
+        {
+            "name": "python3",
+            "ok": python_path is not None,
+            "detail": python_path or "not found on PATH",
+        }
+    )
+
+    pi_path = shutil.which("pi")
+    checks.append(
+        {
+            "name": "pi",
+            "ok": pi_path is not None,
+            "detail": pi_path or "not found on PATH",
+        }
+    )
+
+    pi_version: str | None = None
+    model_available = False
+    if pi_path is not None:
+        version_result = run_process([pi_path, "--version"], cwd=cwd)
+        pi_version = version_result.stdout.strip() if version_result.returncode == 0 else None
+        checks.append(
+            {
+                "name": "pi_version",
+                "ok": pi_version is not None,
+                "detail": pi_version or "unable to read Pi version",
+            }
+        )
+
+        models_result = run_process(
+            [pi_path, "--offline", "--list-models", MODEL_ID],
+            cwd=cwd,
+        )
+        model_available = models_result.returncode == 0 and find_exact_model(models_result.stdout)
+        model_detail = MODEL_SELECTOR if model_available else f"{MODEL_SELECTOR} is unavailable"
+        if models_result.returncode != 0:
+            model_detail = "Pi could not read its offline model catalog"
+        checks.append(
+            {
+                "name": "model",
+                "ok": model_available,
+                "detail": model_detail,
+            }
+        )
+
+    ready = all(check["ok"] for check in checks)
+    payload: dict[str, Any] = {
+        "schema_version": "1.0.0",
+        "command": "doctor",
+        "ready": ready,
+        "version": VERSION,
+        "project_root": str(cwd),
+        "model": MODEL_SELECTOR,
+        "pi_version": pi_version,
+        "checks": checks,
+    }
+    if pi_path is None:
+        payload["install_command"] = INSTALL_COMMAND
+    if pi_path is not None and not model_available:
+        payload["setup_hint"] = (
+            "Configure the ZAI Coding Plan China provider in Pi; "
+            "the launcher will not fall back to another model."
+        )
+    return payload
+
+
+def validate_session_id(value: str) -> str:
+    if not SESSION_ID_PATTERN.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            "session ID must contain only alphanumeric characters, '-', '_', and '.', "
+            "and start and end with an alphanumeric character"
+        )
+    return value
+
+
+def resolve_task(args: argparse.Namespace) -> str:
+    if args.task is not None and args.task_file is not None:
+        raise CliError(
+            "ambiguous_task",
+            "Provide exactly one of a task argument, --task-file, or stdin.",
+        )
+
+    if args.task is not None:
+        task = args.task
+    elif args.task_file is not None:
+        try:
+            task = args.task_file.read_text(encoding="utf-8")
+        except OSError as error:
+            raise CliError("task_file_error", str(error)) from error
+    else:
+        if sys.stdin.isatty():
+            raise CliError(
+                "missing_task",
+                "Provide a task argument, --task-file, or task text on stdin.",
+            )
+        task = sys.stdin.read()
+
+    task = task.strip()
+    if not task:
+        raise CliError("empty_task", "The delegated task must not be empty.")
+    return task
+
+
+def run_delegation(args: argparse.Namespace, *, cwd: Path) -> tuple[dict[str, Any], int]:
+    doctor = collect_doctor(cwd=cwd)
+    if not doctor["ready"]:
+        return (
+            {
+                "schema_version": "1.0.0",
+                "command": "run",
+                "ok": False,
+                "error": {
+                    "code": "preflight_failed",
+                    "message": "Pi preflight failed. Run --json doctor for details.",
+                },
+                "doctor": doctor,
+            },
+            1,
+        )
+
+    task = resolve_task(args)
+    session_id = args.session_id or f"codex-pi-{uuid.uuid4().hex}"
+    pi_path = next(
+        check["detail"] for check in doctor["checks"] if check["name"] == "pi"
+    )
+    command = [
+        pi_path,
+        "--print",
+        "--model",
+        MODEL_SELECTOR,
+        "--thinking",
+        args.thinking_level,
+        "--session-id",
+        session_id,
+        "--name",
+        args.name,
+        "--no-approve",
+        task,
+    ]
+
+    result = run_process(command, cwd=cwd)
+    if result.stderr:
+        print(result.stderr.rstrip(), file=sys.stderr)
+
+    if result.returncode != 0:
+        return (
+            {
+                "schema_version": "1.0.0",
+                "command": "run",
+                "ok": False,
+                "model": MODEL_SELECTOR,
+                "thinking_level": args.thinking_level,
+                "session_id": session_id,
+                "project_root": str(cwd),
+                "error": {
+                    "code": "pi_failed",
+                    "message": f"Pi exited with status {result.returncode}.",
+                    "exit_code": result.returncode,
+                },
+            },
+            1,
+        )
+
+    return (
+        {
+            "schema_version": "1.0.0",
+            "command": "run",
+            "ok": True,
+            "version": VERSION,
+            "model": MODEL_SELECTOR,
+            "thinking_level": args.thinking_level,
+            "session_id": session_id,
+            "project_root": str(cwd),
+            "final_response": result.stdout.strip(),
+        },
+        0,
+    )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pi-delegate",
+        description=(
+            "Delegate one coding task to Pi in the current project with the fixed "
+            f"{MODEL_SELECTOR} model."
+        ),
+        formatter_class=lambda prog: argparse.HelpFormatter(prog, width=120),
+    )
+    parser.add_argument("--version", action="version", version=f"pi-delegate {VERSION}")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit one stable JSON object on stdout.",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser(
+        "doctor",
+        help="Check Python, Pi, and fixed-model readiness without a model request.",
+    )
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Launch or continue a persistent Pi coding session.",
+    )
+    run_parser.add_argument(
+        "--thinking-level",
+        choices=THINKING_LEVELS,
+        default=DEFAULT_THINKING_LEVEL,
+        help=f"Pi thinking level (default: {DEFAULT_THINKING_LEVEL}).",
+    )
+    run_parser.add_argument(
+        "--session-id",
+        type=validate_session_id,
+        help="Continue an exact project session; a new ID is generated when omitted.",
+    )
+    run_parser.add_argument(
+        "--name",
+        default="Codex Pi delegation",
+        help="Human-readable Pi session name.",
+    )
+    run_parser.add_argument(
+        "--task-file",
+        type=Path,
+        help="Read the delegated task from a UTF-8 file.",
+    )
+    run_parser.add_argument(
+        "task",
+        nargs="?",
+        help="Delegated coding task. Use --task-file or stdin for long prompts.",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    cwd = Path.cwd().resolve()
+
+    try:
+        if args.command == "doctor":
+            payload = collect_doctor(cwd=cwd)
+            emit(payload, as_json=args.json)
+            return 0 if payload["ready"] else 1
+
+        payload, exit_code = run_delegation(args, cwd=cwd)
+        emit(payload, as_json=args.json)
+        return exit_code
+    except CliError as error:
+        payload = {
+            "schema_version": "1.0.0",
+            "command": args.command,
+            "ok": False,
+            "error": {"code": error.code, "message": error.message},
+        }
+        emit(payload, as_json=args.json)
+        return error.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

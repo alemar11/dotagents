@@ -52,6 +52,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
+| `pi-delegate` | Explicitly delegate bounded coding work to Pi with the fixed GLM-5.2 model while Codex verifies the result. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
 | `implement-feature` | Discover available Feature Specs or coordinate visible Codex workers through reviewed GitHub PR or named local-branch delivery. |
@@ -157,7 +158,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/code-review-rules skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/focus-task skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/code-review-rules skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/pi-delegate skills/capture-idea skills/plan-feature skills/implement-feature skills/focus-task skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -194,6 +195,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill plan-harder \
+  --skill pi-delegate \
   --skill capture-idea \
   --skill plan-feature \
   --skill implement-feature \
