@@ -55,6 +55,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
 | `implement-feature` | Discover available Feature Specs or coordinate visible Codex workers through reviewed GitHub PR or named local-branch delivery. |
+| `focus-task` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
@@ -156,7 +157,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/code-review-rules skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/code-review-rules skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/focus-task skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -196,6 +197,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill capture-idea \
   --skill plan-feature \
   --skill implement-feature \
+  --skill focus-task \
   --skill grill-me \
   --skill learn \
   --skill project-memory \
