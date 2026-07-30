@@ -51,6 +51,10 @@ Resolve `write_mode` once:
   `references/issue-phase.md` plus `references/vertical-slices.md` before issue
   work. Load each template only with its owning phase. Those references own
   branch-specific validation, publication, recovery, and reporting detail.
+- Load `references/scope-repair.md` only when a separately invoked Plan Feature
+  task receives its exact structured request. Scope repair remains an internal
+  branch of `existing-source`, never a selectable option or a third source
+  route.
 - Treat tracker routing, issue types, workflow states, and their transports as
   Project Memory facts. Treat the affected repository set as explicit feature
   data. Reject missing, stale, contradictory, or backend-incompatible facts
@@ -75,6 +79,11 @@ Resolve `write_mode` once:
   and material validation policy. Checkbox markers, technical approach,
   equivalent tests, compatible clarifications, progress, and evidence remain
   executor-owned. Compare stable content directly; never fingerprint a body.
+- The sole stable-source mutation exception is `scope-repair.md`: a separately
+  invoked Plan Feature task may add only the smallest evidence-backed monotonic
+  `allowed_paths` envelope to the owning Spec and named issue. It preserves
+  every other stable field and executor-owned update, records an audit, and
+  never consumes or persists Codex runtime identity.
 - Keep `tracker_backend` and `delivery_type` separate. Project Memory owns only
   tracker location. Every implementation-eligible Spec and issue carries the
   stable non-option delivery fact `github-pr` or `local-branch`; support GitHub
@@ -172,6 +181,11 @@ only within each implementation-eligible Feature Spec, and any planning-scope
 identity from accepted input and repository evidence. For multi-repository
 work, generate or preserve one canonical lowercase UUID `feature_id` shared by
 every linked Spec.
+When intake includes `scope_repair_request`, require one durable
+`source_spec_ref` and implementation issue ref, derive ordinary
+`source_route=existing-source`, load `references/scope-repair.md`, and reject
+proposed sources or runtime coordination fields. Do not add a Plan Feature
+option for the repair.
 Resolve one stable `delivery_type` per implementation-eligible Spec without
 adding an option or Project Memory setting. GitHub tracking resolves to its only
 supported delivery, `github-pr`; local tracking requires accepted evidence for
@@ -245,8 +259,9 @@ Do not mutate an Idea merely because an interactive clarification is active.
 Only a terminal run exit waiting for one specific requester answer may
 reconcile that Idea to `needs-info` under `write_mode=apply`.
 
-On the existing-source route, inspect open questions only to validate whether
-the durable source's stable contract can be consumed unchanged. Accept
+On the existing-source route without `scope_repair_request`, inspect open
+questions only to validate whether the durable source's stable contract can be
+consumed unchanged. Accept
 `knowledge_delta` only as
 explicit accepted invocation data or an exact continuation handoff supplied
 separately from the source; never infer it from or write it into the Feature
@@ -255,6 +270,9 @@ reject the delta instead of widening source or issue scope. A persisted delta or
 `## Domain Knowledge Handoff` is incompatible input. If any answer or repair
 would change the source, require a separately authorized Feature Spec update.
 Keep `planning_blockers` separate and capture no durable knowledge in planning.
+With `scope_repair_request`, skip clarification and use only the existing
+contract and supplied portable evidence through `scope-repair.md`. A required
+decision beyond a monotonic path expansion returns `full-replan-required`.
 
 ### 3. Run The Feature Spec Phase
 
@@ -263,8 +281,8 @@ source-contract validation from
 `references/spec-phase.md`, including the exact Feature Dependencies heading
 and columns. On the existing-source route, start from any intake member and
 traverse its `Feature Spec Set` to require the complete connected stable Spec
-set. Return each current body and ref without drafting or publication. If any
-source needs a change or the set is incomplete,
+set. Without `scope_repair_request`, return each current body and ref without
+drafting or publication. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
@@ -287,6 +305,10 @@ downgrade `write_mode`. Route new blockers back through clarification. Always
 pass the optional delta directly to the issue phase without adding it to any
 Feature Spec body.
 
+For `scope_repair_request`, do not enter ordinary drafting or publication.
+Pass the fresh complete bodies and exact request to `scope-repair.md`, which
+owns the only permitted Feature Spec path mutation, audit, recovery, and result.
+
 ### 4. Run The Issue Phase
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
@@ -300,6 +322,10 @@ artifact output, `$plan-harder` passes per missing final issue, race
 revalidation, metadata, dependencies, the Execution Contract, and reporting.
 Existing issues must match the stable graph and body contract; conflicts stop
 the run, while a complete matching applied bundle returns a verified no-op.
+For `scope_repair_request`, bypass ordinary synthesis, graph compression,
+hardening, metadata repair, and issue creation. `scope-repair.md` and the narrow
+branch in `issue-phase.md` may widen only the named issue's `allowed_paths`, then
+must rerun complete-bundle validation.
 
 If `knowledge_delta` is present in a single Spec, reuse or add a final
 closeout issue, exclude it and its own `dependency_ids` while deriving the
@@ -313,7 +339,9 @@ final issue like every other issue.
 
 ### 5. Reconcile Idea Sources
 
-Skip this step when neither selected new-source `source_idea_refs` nor derived
+Skip this step for `scope_repair_request`; an implementation-time path repair
+does not reopen or reconcile Idea planning lifecycle. Otherwise skip this step
+when neither selected new-source `source_idea_refs` nor derived
 existing-source `bound_source_idea_refs` are present. Otherwise load
 `references/idea-source.md`. With `write_mode=apply` and a complete durable
 result, determine cumulative `partial` or `full` coverage separately for every
@@ -349,6 +377,8 @@ the verified cumulative Spec set and coverage result.
 Return:
 
 - resolved `write_mode` and derived `source_route`;
+- when applicable, the exact `scope_repair_result` from
+  `references/scope-repair.md`;
 - Feature Spec ref or proposed ref, title, and target location;
 - planning identity and Project Memory facts used;
 - retained, created, or proposed issue refs in publication order, repaired
@@ -388,6 +418,8 @@ captured.
   normalization, cumulative coverage, Feature Spec projection, outcome records,
   and terminal lifecycle reconciliation.
 - `references/spec-phase.md`: Feature Spec drafting, routing, and publication.
+- `references/scope-repair.md`: separately authorized monotonic allowed-path
+  repair, audit, recovery, and result.
 - `references/spec-template.md`: default Feature Spec shape.
 - `references/issue-phase.md`: issue splitting, hardening, graph validation,
   and publication.

@@ -1,0 +1,142 @@
+{
+  "request": {
+    "repair_id": "019fae9a-38e7-77d2-a73c-e03990cf1f94",
+    "source_spec_ref": "example/project#238",
+    "implementation_issue_ref": "example/project#239",
+    "requested_paths": [
+      "src/components/expression-field.tsx"
+    ],
+    "reason": "The accepted workflow expression requirement reuses the shared expression field.",
+    "contract_evidence_refs": [
+      "example/project#238:AC-03"
+    ],
+    "evidence_refs": [
+      "src/workflow/expression-node.tsx:84"
+    ]
+  },
+  "before": {
+    "spec": {
+      "stable": {
+        "outcome": "Edit workflow expressions",
+        "repositories": [
+          "github:example/project"
+        ],
+        "target_branch_name": "feature/workflow-expressions",
+        "dependencies": [],
+        "acceptance": [
+          "AC-03 shared expressions validate"
+        ],
+        "safety": [
+          "preserve existing workflows"
+        ],
+        "validation": [
+          "npm test"
+        ]
+      },
+      "allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**"
+      ]
+    },
+    "issue": {
+      "stable": {
+        "source_spec_ref": "example/project#238",
+        "repository": "github:example/project",
+        "target_branch_name": "feature/workflow-expressions",
+        "dependency_ids": [],
+        "acceptance": [
+          "The shared expression field validates workflow expressions"
+        ],
+        "validation": [
+          "npm test -- expression-field"
+        ]
+      },
+      "allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**"
+      ]
+    }
+  },
+  "after": {
+    "spec": {
+      "stable": {
+        "outcome": "Edit workflow expressions",
+        "repositories": [
+          "github:example/project"
+        ],
+        "target_branch_name": "feature/workflow-expressions",
+        "dependencies": [],
+        "acceptance": [
+          "AC-03 shared expressions validate"
+        ],
+        "safety": [
+          "preserve existing workflows"
+        ],
+        "validation": [
+          "npm test"
+        ]
+      },
+      "allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**",
+        "src/components/**"
+      ]
+    },
+    "issue": {
+      "stable": {
+        "source_spec_ref": "example/project#238",
+        "repository": "github:example/project",
+        "target_branch_name": "feature/workflow-expressions",
+        "dependency_ids": [],
+        "acceptance": [
+          "The shared expression field validates workflow expressions"
+        ],
+        "validation": [
+          "npm test -- expression-field"
+        ]
+      },
+      "allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**",
+        "src/components/**"
+      ]
+    },
+    "audit": {
+      "repair_id": "019fae9a-38e7-77d2-a73c-e03990cf1f94",
+      "source_spec_ref": "example/project#238",
+      "implementation_issue_ref": "example/project#239",
+      "requested_paths": [
+        "src/components/expression-field.tsx"
+      ],
+      "previous_spec_allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**"
+      ],
+      "authorized_spec_allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**",
+        "src/components/**"
+      ],
+      "previous_issue_allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**"
+      ],
+      "authorized_issue_allowed_paths": [
+        "src/workflow/**",
+        "tests/workflow/**",
+        "src/components/**"
+      ],
+      "reason": "The accepted workflow expression requirement reuses the shared expression field.",
+      "contract_evidence_refs": [
+        "example/project#238:AC-03"
+      ],
+      "evidence_refs": [
+        "src/workflow/expression-node.tsx:84"
+      ],
+      "completed_operations": [
+        "feature-spec-expanded",
+        "implementation-issue-expanded"
+      ]
+    }
+  }
+}

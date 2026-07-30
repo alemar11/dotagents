@@ -33,6 +33,11 @@ deferred domain-memory closeout.
   operational edits; never compare a whole tracker body or compute its digest.
 - Run structural graph compression before freezing IDs or invoking
   `$plan-harder` for missing issues; issue count is report data only.
+- The only stable issue-scope mutation is the separately invoked
+  `scope_repair_request` branch owned by `scope-repair.md`. It may add a
+  monotonic `allowed_paths` envelope to the named durable issue while preserving
+  every other stable field and executor-owned update. It never synthesizes,
+  hardens, renumbers, or changes dependencies.
 
 ## Phase Inputs
 
@@ -70,6 +75,13 @@ lacks a durable owner, omission or any changed delta item blocks; never treat
 that retry as `no-durable-change`.
 
 ## Workflow
+
+When `scope_repair_request` is present, first run the complete source and durable
+state reads below, then delegate the narrow before/after comparison, mutation
+order, audit, recovery, and result to `scope-repair.md`. Rerun verticality,
+overlap, dependency, acceptance coverage, and full-bundle validation after the
+repair. Stop before ordinary slice synthesis, graph compression, hardening,
+metadata repair, or issue creation.
 
 ### 1. Validate The Source Contract
 

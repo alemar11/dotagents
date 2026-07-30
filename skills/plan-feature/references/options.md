@@ -11,7 +11,8 @@ of selectable Plan Feature behavior.
 - Reject retired fields, values, aliases, and partial-flow requests instead of
   translating them. Plan Feature has one convergent planning pipeline.
 - Keep tracker facts, paths, slugs, refs, branches, dependencies, source route,
-  evidence, continuation data, and result state outside the option registry.
+  evidence, continuation data, `scope_repair_request`, and result state outside
+  the option registry.
 
 ## Run Registry
 
