@@ -62,8 +62,16 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """Given startup, when required fields are granted, then no later authority question is allowed."""
         options_raw = self.text("references/options.md")
         options = self.normalized(options_raw)
-        skill = self.text("SKILL.md")
+        skill = self.normalized(self.text("SKILL.md"))
         self.assertIn("same startup authorization interaction", options)
+        self.assertIn(
+            "resolves `visible_app_task_permission=granted`",
+            options,
+        )
+        self.assertIn(
+            "Do not ask for an additional worker-task creation confirmation",
+            skill,
+        )
         self.assertIn("do not ask another user question", options)
         self.assertIn("Never ask another authority, recovery", skill)
         self.assertEqual(

@@ -15,7 +15,10 @@ references:
   "do we have any Spec?", "list available Specs", and "what can we implement?"
   remain discovery even when they contain the word "implement".
 - Enter the execution flow only when the user explicitly directs the skill to
-  start, implement, or resume one or more Feature Specs.
+  start, implement, or resume one or more Feature Specs. That explicit
+  `$implement-feature` execution request authorizes creating the disclosed
+  visible worker tasks and their ChatGPT-created worktrees. Do not ask for an
+  additional worker-task creation confirmation.
 
 For `discovery-only`:
 
@@ -120,8 +123,10 @@ Resolve the startup authorization interaction defined in
 repository has no separate saved Git project whose reported primary folder is
 the exact repository root, that same interaction either authorizes creation of
 only the listed projects plus the disclosed worker run, or stops before state.
-Otherwise it resolves `visible_app_task_permission` and, when at least one
-selected assignment is GitHub-backed, the separately scoped
+The explicit execution request resolves
+`visible_app_task_permission=granted` unless the user explicitly denies worker
+creation. The startup interaction separately resolves missing-project creation
+and, when at least one selected assignment is GitHub-backed,
 `scope_repair_task_permission`. The worker grant
 covers the selected workers, ChatGPT-created worktrees, normal command
 approvals, validation, publication, review fixes, tracker updates, and recovery.

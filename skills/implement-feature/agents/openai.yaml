@@ -2,6 +2,6 @@ interface:
   display_name: "Implement Feature Spec"
   short_description: "Discover Feature Specs or coordinate their end-to-end Codex workers."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $implement-feature to discover available Feature Specs without startup side effects, or explicitly start selected Specs in visible Codex worker tasks and ChatGPT-created worktrees through implementation, validation, current-head review, tracker proof, and the declared GitHub PR or local-branch closeout."
+  default_prompt: "Use $implement-feature to discover available Feature Specs without startup side effects, or explicitly start selected Specs in visible Codex worker tasks and ChatGPT-created worktrees through implementation, validation, current-head review, tracker proof, and the declared GitHub PR or local-branch closeout. Explicit execution authorizes creating those worker tasks and worktrees without another confirmation."
 policy:
   allow_implicit_invocation: false

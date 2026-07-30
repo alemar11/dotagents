@@ -16,15 +16,18 @@ native Codex review only when the derived profile is `high-risk`, plus the exact
 terminal boundary: `pr-ready-for-merge-but-not-merged` or
 `local-branch-ready`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
-`high` for complex work, or `xhigh` for risky or cross-system work. An
-affirmative `visible_app_task_permission=granted` answer explicitly requests
-those exact task profiles.
+`high` for complex work, or `xhigh` for risky or cross-system work. An explicit
+`$implement-feature` request to start, implement, or resume the selected Specs
+explicitly requests those exact task profiles and resolves
+`visible_app_task_permission=granted` without an additional worker-task
+creation question. An explicit denial overrides that grant and stops before
+mutation.
 
-When no project is missing, ask once whether to start those visible tasks and,
-when any selected assignment is GitHub-backed, whether root may create the
-disclosed separate Plan Feature repair task after a valid path-scope miss.
-Resolve the answer directly to `visible_app_task_permission` and, when
-applicable, `scope_repair_task_permission`.
+When no project is missing, ask only when at least one selected assignment is
+GitHub-backed, and only whether root may create the disclosed separate Plan
+Feature repair task after a valid path-scope miss. Resolve that answer directly
+to `scope_repair_task_permission`. When every assignment uses local tracking,
+no startup authorization question remains.
 
 When projects are missing, use this standard question in the same startup
 authorization interaction:
@@ -36,19 +39,20 @@ authorization interaction:
 >
 > - `<repository>` — `<absolute-path>`
 >
-> Do you authorize me to create exactly these persistent projects in the
-> ChatGPT App through Computer Use and then start the disclosed
-> implementation? Project creation is distinct from task creation. Otherwise I
-> will stop without creating run state, claims, tasks, or worktrees.
+> The explicit execution request already authorizes the disclosed worker tasks.
+> [For GitHub-backed assignments: This answer also controls the bounded Plan
+> Feature repair task disclosed above.]
+> Do you also authorize me to create exactly these persistent projects in the
+> ChatGPT App through Computer Use? Project creation is distinct from task creation.
+> Otherwise I will stop without creating run state, claims, tasks, or worktrees.
 
 Resolve an affirmative answer to
 `missing_project_action=create-projects` and
-`visible_app_task_permission=granted` plus, when applicable,
-`scope_repair_task_permission=granted`. Resolve a negative answer to
-`missing_project_action=stop` and
-`visible_app_task_permission=denied` plus, when applicable,
-`scope_repair_task_permission=denied`. A user may explicitly grant worker tasks
-while denying planner repair tasks; normalize that answer to
+when applicable, `scope_repair_task_permission=granted`. Resolve a negative
+answer to `missing_project_action=stop` and, when applicable,
+`scope_repair_task_permission=denied`. Do not change the already resolved
+worker-task permission based on the project answer. A user may explicitly grant
+worker tasks while denying planner repair tasks; normalize that answer to
 `visible_app_task_permission=granted` and
 `scope_repair_task_permission=denied`. Emit and persist only these canonical
 values in ephemeral controller state; never persist them as repository

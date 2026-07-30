@@ -78,13 +78,14 @@ Root is a lightweight control plane. Before mutation:
    for the canonical model and every allowed thinking value. Include each
    resolved profile and reason in the startup disclosure, but do not write it
    to the run manifest or SQLite.
-9. Resolve the startup fields from `options.md`. If every mapping in step 4
-   already exists, resolve `visible_app_task_permission` and, when at least one
-   assignment is GitHub-backed, `scope_repair_task_permission`. If mappings are
-   missing, list the exact repository roots in the standard question and
-   resolve both `missing_project_action` and
-   `visible_app_task_permission` and the conditionally applicable
-   `scope_repair_task_permission` in the one startup authorization interaction.
+9. Resolve the startup fields from `options.md`. The explicit execution request
+   resolves `visible_app_task_permission=granted` unless the user explicitly
+   denies worker creation. If every mapping in step 4 already exists, resolve
+   only the conditionally applicable `scope_repair_task_permission`. If
+   mappings are missing, list the exact repository roots in the standard
+   question and resolve `missing_project_action` plus the conditionally
+   applicable `scope_repair_task_permission` in the one startup authorization
+   interaction.
    With `create-projects`, use Computer Use only for those exact roots, verify
    each selected path before confirmation, then rerun the complete read-only
    saved-project preflight. With `stop`, denied task permission, unavailable
