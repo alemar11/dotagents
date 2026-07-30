@@ -2,6 +2,6 @@ interface:
   display_name: "Pi Delegate"
   short_description: "Explicitly delegate coding work to Pi with GLM-5.2."
   brand_color: "#7E22CE"
-  default_prompt: "Use $pi-delegate to offload this bounded coding task to Pi with the fixed GLM-5.2 model, honor my selected thinking level or use medium by default, then inspect and verify Pi's changes before reporting completion."
+  default_prompt: "Use $pi-delegate to offload this bounded coding task to Pi with the fixed GLM-5.2 model, monitor sanitized progress with the default settings, then inspect and verify Pi's changes before reporting completion."
 policy:
   allow_implicit_invocation: false

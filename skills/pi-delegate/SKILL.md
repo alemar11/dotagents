@@ -1,174 +1,136 @@
 ---
 name: pi-delegate
-description: Delegate coding implementation to Pi with the fixed GLM-5.2 model while Codex remains the controller. Use only when the user explicitly invokes $pi-delegate.
+description: Delegate and monitor bounded coding tasks in Pi with the fixed GLM-5.2 model while Codex remains the controller. Use only when the user explicitly invokes $pi-delegate.
 ---
 
 # Pi Delegate
 
 ## Goal
 
-Offload one bounded coding task to a local Pi session while Codex retains
-control of scope, permissions, verification, and closeout.
+Give Codex a low-ceremony way to offload one bounded coding task to Pi with
+`zai-coding-cn/glm-5.2`, watch its progress, and independently verify the
+result.
 
-Pi may edit files and run project commands. Its response is worker evidence,
-not proof that the task is complete.
+Pi is the implementer. Codex remains responsible for scope, permissions,
+review, validation, and closeout. Pi's response is worker evidence, not proof
+that the task is complete.
 
-## Trigger Rules
+## Trigger
 
 - Use only when the user explicitly invokes `$pi-delegate`.
-- Never invoke this skill implicitly for ordinary coding, debugging, review, or
-  delegation requests.
-- Do not use it for advisory-only work when Codex can answer directly without a
-  coding worker.
+- Do not ask for choices already covered by defaults.
+- Do not use it for advisory-only work that Codex can answer directly.
 
-## Fixed Runtime Contract
+## Default Contract
 
 - Shipped command: `scripts/pi-delegate`
-- Required runtime: `python3` and the `pi` executable
-- Provider and model: always `zai-coding-cn/glm-5.2`
-- Thinking levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or
-  `max`, selected by the user
-- Default thinking level: `medium`
+- Runtime: `python3` plus the local `pi` executable
+- Model: always `zai-coding-cn/glm-5.2`; never fall back
+- Thinking level: `medium` unless the user explicitly selects another canonical
+  Pi level
 - Working directory: the caller's current project or worktree
-- Pi project trust: granted for each run through `--approve`, so applicable
-  project settings, skills, prompts, packages, and extensions may load
-- Session behavior: persistent, with an explicit session ID returned by the
-  command
+- Project trust: `--approve`, so project Pi resources and skills may load
+- Monitoring: sanitized progress plus 30-second heartbeats on stderr
+- Timeout: 30 minutes
+- Final output: one controller-owned result on stdout
 
-Never pass a different provider, model, API key, or Pi configuration directory.
+The launcher performs its readiness checks automatically. Do not run a separate
+doctor step or ask the user about thinking level, timeout, or session selection
+on the normal path.
 
-Read [references/cli-contract.md](references/cli-contract.md) before invoking
-the launcher or diagnosing a launcher failure. It owns the command inputs, JSON
-envelopes, and exit codes.
+Read [references/cli-contract.md](references/cli-contract.md) only when changing
+defaults, resuming a worker, running concurrent delegations, or diagnosing a
+launcher failure.
 
 ## Workflow
 
-### 1. Keep the controller in the current project
+### 1. Build the worker brief
 
-Resolve the absolute path to this skill's shipped `scripts/pi-delegate`
-artifact, but execute it with the current project or worktree as the working
-directory. Do not change into the skill directory before launching Pi.
+Use the current task context to write one self-contained brief with:
 
-Confirm the user's requested scope and delivery authority. Editing files and
-running local project commands are allowed. Commit, push, pull-request,
-deployment, publication, and other external mutations remain prohibited unless
-the user separately authorizes them.
+- the concrete goal and intended scope,
+- relevant repository constraints,
+- permission to edit files and run local project commands,
+- the actual validation to run,
+- no commits, pushes, pull requests, deployments, or unrelated changes,
+- a final report covering files changed, commands run, results, and risks.
 
-The launcher grants Pi project trust with `--approve` so explicitly invoked
-project-local skills and other project resources can load. Use this skill only
-in a trusted project whose Pi settings, packages, prompts, skills, and
-extensions are safe to execute.
+Include relevant context, but do not forward unrelated conversation history,
+credentials, or secrets. Do not stop to ask about details already clear from
+the repository or user request.
 
-### 2. Resolve the thinking level
+Use a UTF-8 task file for multiline, quoted, skill-invoking, or shell-sensitive
+briefs. The launcher reads it and sends the brief to Pi over stdin, so task
+text does not enter Pi's process arguments. This is an internal transport
+detail, not a user-facing ceremony.
 
-Honor an explicit user selection from `off`, `minimal`, `low`, `medium`,
-`high`, `xhigh`, or `max`. Use `medium` when the user does not select a level.
-Do not replace the user's choice based on task complexity, and do not ask about
-reasoning effort when the default is sufficient.
+### 2. Launch and monitor
 
-Record the canonical value as `thinking_level`.
-
-Pi and the fixed model own support and clamping. In Pi 0.82.1,
-`zai-coding-cn/glm-5.2` treats `minimal` as unsupported and clamps it to `low`,
-maps `low`, `medium`, and `high` to the provider's `high` reasoning effort,
-and clamps `xhigh` to `max`. Pass the user's canonical selection unchanged so
-future Pi catalogs can honor it without changing this skill.
-
-### 3. Run the non-mutating preflight
-
-Run:
-
-```bash
-<skill-root>/scripts/pi-delegate --json doctor
-```
-
-The doctor checks `python3`, the `pi` executable, the installed Pi version, and
-the exact fixed model without sending a model request.
-
-If Pi is missing, stop and give the installation command returned by the
-doctor. Do not install Pi automatically. If the model is unavailable, stop and
-ask the user to configure the ZAI Coding Plan China provider; never fall back to
-another provider or model.
-
-### 4. Build one bounded worker task
-
-Give Pi a self-contained task containing:
-
-- the concrete implementation goal,
-- in-scope files or components,
-- relevant repository evidence and constraints,
-- permission to edit files and run local commands,
-- required validation,
-- explicit prohibitions on commits, pushes, pull requests, deployments, and
-  unrelated changes,
-- a request to report changed files, commands run, results, and remaining
-  risks.
-
-Do not forward unrelated conversation history or secrets.
-
-### 5. Launch or continue the Pi session
-
-Start a session:
+Run from the current project or worktree:
 
 ```bash
 <skill-root>/scripts/pi-delegate --json run \
+  --progress \
   --name "<short task name>" \
-  "<bounded worker task>"
+  --task-file <absolute-task-file>
 ```
 
-Omit `--thinking-level` for the `medium` default. When the user selects a
-different level, add `--thinking-level <selected-level>`.
+Keep the process handle and read the sanitized stderr stream until
+`process_finished`. Give the user concise updates for material phase, tool,
+retry, heartbeat, timeout, abort, failure, and completion transitions; do not
+paste raw progress records.
 
-For a long prompt, use `--task-file <path>` or pipe the prompt on stdin instead
-of constructing unsafe shell interpolation.
+The launcher suppresses raw Pi events, model text, tool arguments, tool
+results, and stderr contents. Only safe metadata and the count of suppressed
+diagnostic lines are exposed.
 
-Continue the same worker when a correction or follow-up belongs to the same
-task:
+### 3. Continue only when useful
 
-```bash
-<skill-root>/scripts/pi-delegate --json run \
-  --thinking-level <selected-level> \
-  --session-id <returned-session-id> \
-  "<follow-up task>"
-```
+For a bounded correction, continue the returned session with `--session-id`.
+If the exact ID is unavailable and the latest Pi session in this project is the
+intended worker, use `--resume-last`. Do not ask the user to choose between
+these when the correct continuation is evident.
 
-Do not launch overlapping write-enabled Pi sessions in the same checkout.
+Override `--timeout` or `--thinking-level` only when the user requests it or the
+task clearly cannot use the default. Concurrent runs are allowed when their
+writable scopes do not conflict; distinguish them by stable `run_id`, name,
+project root, and resolved session ID.
 
-### 6. Verify independently
+### 4. Verify independently
 
-After Pi exits:
+After every Pi process exits:
 
-1. Inspect repository status and the complete diff.
-2. Check that changes remain inside the delegated scope.
-3. Run or re-run validation proportionate to the change.
-4. Correct issues directly or continue the same Pi session with a bounded
-   follow-up.
-5. Report what Pi changed, what Codex independently verified, and any remaining
-   uncertainty.
+1. Confirm a terminal result: `completed`, `failed`, `timeout`, or `aborted`.
+2. Inspect repository status and the complete diff.
+3. Attribute changes to the delegated scope and resolve overlap.
+4. Re-run validation proportionate to the change.
+5. Fix issues directly or continue the same Pi session with a narrow follow-up.
+6. Report what Pi changed, what Codex verified, and any remaining uncertainty.
 
-Never claim success from Pi's final response alone.
+Never claim success from Pi's final response alone. A timeout or cancellation
+terminates Pi's complete process tree; inspect partial working-tree changes
+before retrying.
 
 ## Safety
 
-- Pi has no built-in sandbox and runs with the permissions granted to its
-  process. Use it only in a trusted project.
-- `--approve` grants Pi project trust for the run and may load or execute
-  project-local resources. Treat those resources as code, not as a sandbox.
-- The launcher never uses a shell to construct the Pi command.
-- The launcher never installs Pi, stores credentials, or changes Pi
-  configuration.
-- Do not expose credentials in task text or output.
-- Abort on a missing executable, unavailable fixed model, invalid session ID,
-  or nonzero Pi exit.
+- Use only in a trusted project. `--approve` may load and execute project-local
+  Pi settings, packages, prompts, skills, and extensions.
+- Pi has no built-in sandbox and runs with the process's filesystem and command
+  permissions.
+- Commit, push, pull-request, deployment, publication, and other external
+  mutations still require separate user authorization.
+- The launcher never installs Pi, stores credentials, changes Pi configuration,
+  constructs a shell command, or archives raw Pi events.
+- Stop on a missing executable, unavailable fixed model, invalid session,
+  protocol failure, timeout, abort, host kill, or nonzero Pi exit.
 
 ## CLI Maintenance
 
-Normal runtime execution uses `scripts/pi-delegate`. The implementation is the
-direct standard-library Python artifact at that path; there is no maintenance
-project or generated build output.
+Normal runtime execution uses `scripts/pi-delegate`, a direct standard-library
+Python artifact. Its `--version` output is the single CLI version source of
+truth.
 
-`scripts/pi-delegate --version` is the single CLI version source of truth.
-Shipped behavior changes follow semantic versioning: major for breaking command
-or JSON contracts, minor for backward-compatible capabilities, and patch for
+Shipped behavior follows semantic versioning: major for breaking command or
+JSON contracts, minor for backward-compatible capabilities, and patch for
 backward-compatible fixes. Re-run `--help`, `--version`, `--json doctor`, and
 the tests under `tests/` after every CLI change.

@@ -194,7 +194,10 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep `zai-coding-cn/glm-5.2` fixed in its shipped launcher; never fall back to another provider or model when preflight fails.
 - Let the user select any canonical Pi thinking level and default to `medium` when omitted; do not infer a different level from task complexity.
 - Codex remains the controller: Pi may edit files and run local project commands, but Codex must inspect the complete diff and independently validate the result before closeout.
-- Run Pi in the caller's current project or worktree with explicit project trust through `--approve`, so project-local Pi resources and skills can load. Use it only in trusted projects; do not change into the skill root, launch overlapping write-enabled sessions in one checkout, or treat Pi project trust as a sandbox.
+- Run Pi in the caller's current project or worktree with explicit project trust through `--approve`, so project-local Pi resources and skills can load. Use it only in trusted projects; do not change into the skill root or treat Pi project trust as a sandbox.
+- Allow concurrent Pi sessions and require the controller to monitor each sanitized progress stream by stable run ID, resolved session ID, name, and project root through terminal state before integrating the combined diff.
+- Bound every Pi run with the launcher timeout and terminate the complete Pi process tree on timeout or controller cancellation; preserve explicit `completed`, `failed`, `timeout`, and `aborted` terminal evidence.
+- Use task-file transport for multiline, skill-invoking, quoted, or shell-sensitive Pi prompts so literal skill names and syntax reach the launcher unchanged.
 
 ### Grill and Project Memory Composition
 

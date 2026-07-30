@@ -52,7 +52,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `pi-delegate` | Explicitly delegate bounded coding work to Pi with the fixed GLM-5.2 model while Codex verifies the result. |
+| `pi-delegate` | Explicitly delegate and monitor bounded coding work in Pi with the fixed GLM-5.2 model while Codex verifies the result. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
 | `implement-feature` | Discover available Feature Specs or coordinate visible Codex workers through reviewed GitHub PR or named local-branch delivery. |
