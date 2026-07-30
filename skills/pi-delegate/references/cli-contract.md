@@ -17,11 +17,16 @@ scripts/pi-delegate --json run --thinking-level max --session-id <id> "<follow-u
 settings, credentials metadata, and offline model catalog through the installed
 `pi` executable.
 
-`run` executes Pi with its normal coding tools, `--no-approve`, the fixed
+`run` executes Pi with its normal coding tools, `--approve`, the fixed
 `zai-coding-cn/glm-5.2` model, and the selected thinking level. The canonical
 levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
 `medium` is the default when `--thinking-level` is omitted. The launcher passes
 the selection to Pi unchanged and never constructs a shell command.
+
+`--approve` grants project trust for each run. Pi may therefore load
+project-local settings, skills, prompts, packages, and extensions in addition
+to the applicable context files. Invoke the launcher only from a trusted
+project.
 
 ## Task Input
 
@@ -46,7 +51,7 @@ Doctor success:
   "schema_version": "1.0.0",
   "command": "doctor",
   "ready": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "project_root": "/path/to/current-project",
   "model": "zai-coding-cn/glm-5.2",
   "pi_version": "0.82.1",
@@ -66,7 +71,7 @@ Run success:
   "schema_version": "1.0.0",
   "command": "run",
   "ok": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "model": "zai-coding-cn/glm-5.2",
   "thinking_level": "high",
   "session_id": "codex-pi-example",

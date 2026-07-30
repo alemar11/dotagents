@@ -80,7 +80,7 @@ class PiDelegateTests(unittest.TestCase):
     def test_public_help_version_and_manual_only_metadata(self) -> None:
         version = self.invoke("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "pi-delegate 0.1.0")
+        self.assertEqual(version.stdout.strip(), "pi-delegate 0.2.0")
 
         help_result = self.invoke("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
@@ -166,7 +166,8 @@ class PiDelegateTests(unittest.TestCase):
         self.assertEqual(payload["session_id"], "codex-pi-test")
         self.assertEqual(payload["project_root"], str(project.resolve()))
         self.assertEqual(payload["final_response"], "Pi completed the delegated task.")
-        self.assertIn("--no-approve", recorded_args)
+        self.assertIn("--approve", recorded_args)
+        self.assertNotIn("--no-approve", recorded_args)
         self.assertEqual(
             recorded_args[recorded_args.index("--model") + 1],
             "zai-coding-cn/glm-5.2",

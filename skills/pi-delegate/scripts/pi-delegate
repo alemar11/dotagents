@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 MODEL_PROVIDER = "zai-coding-cn"
 MODEL_ID = "glm-5.2"
 MODEL_SELECTOR = f"{MODEL_PROVIDER}/{MODEL_ID}"
@@ -219,7 +219,7 @@ def run_delegation(args: argparse.Namespace, *, cwd: Path) -> tuple[dict[str, An
         session_id,
         "--name",
         args.name,
-        "--no-approve",
+        "--approve",
         task,
     ]
 

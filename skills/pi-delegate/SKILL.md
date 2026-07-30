@@ -30,8 +30,8 @@ not proof that the task is complete.
   `max`, selected by the user
 - Default thinking level: `medium`
 - Working directory: the caller's current project or worktree
-- Pi project resources: ignored through `--no-approve`; applicable
-  `AGENTS.md` context still loads
+- Pi project trust: granted for each run through `--approve`, so applicable
+  project settings, skills, prompts, packages, and extensions may load
 - Session behavior: persistent, with an explicit session ID returned by the
   command
 
@@ -53,6 +53,11 @@ Confirm the user's requested scope and delivery authority. Editing files and
 running local project commands are allowed. Commit, push, pull-request,
 deployment, publication, and other external mutations remain prohibited unless
 the user separately authorizes them.
+
+The launcher grants Pi project trust with `--approve` so explicitly invoked
+project-local skills and other project resources can load. Use this skill only
+in a trusted project whose Pi settings, packages, prompts, skills, and
+extensions are safe to execute.
 
 ### 2. Resolve the thinking level
 
@@ -147,6 +152,8 @@ Never claim success from Pi's final response alone.
 
 - Pi has no built-in sandbox and runs with the permissions granted to its
   process. Use it only in a trusted project.
+- `--approve` grants Pi project trust for the run and may load or execute
+  project-local resources. Treat those resources as code, not as a sandbox.
 - The launcher never uses a shell to construct the Pi command.
 - The launcher never installs Pi, stores credentials, or changes Pi
   configuration.
