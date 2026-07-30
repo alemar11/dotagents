@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch a fixed-model Pi coding session from the caller's project."""
+"""Launch a fixed-model Pi worker session from the caller's project."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 MODEL_PROVIDER = "zai-coding-cn"
 MODEL_ID = "glm-5.2"
 MODEL_SELECTOR = f"{MODEL_PROVIDER}/{MODEL_ID}"
@@ -768,7 +768,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pi-delegate",
         description=(
-            "Delegate one coding task to Pi in the current project with the fixed "
+            "Delegate one bounded task to Pi in the current project with the fixed "
             f"{MODEL_SELECTOR} model."
         ),
         formatter_class=lambda prog: argparse.HelpFormatter(prog, width=120),
@@ -788,7 +788,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser(
         "run",
-        help="Launch or continue a persistent Pi coding session.",
+        help="Launch or continue a persistent Pi worker session.",
     )
     run_parser.add_argument(
         "--thinking-level",
@@ -843,7 +843,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "task",
         nargs="?",
-        help="Delegated coding task. Use --task-file or stdin for long prompts.",
+        help="Delegated task. Use --task-file or stdin for long prompts.",
     )
     return parser
 

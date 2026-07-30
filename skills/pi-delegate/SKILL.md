@@ -1,25 +1,27 @@
 ---
 name: pi-delegate
-description: Delegate and monitor bounded coding tasks in Pi with the fixed GLM-5.2 model while Codex remains the controller. Use only when the user explicitly invokes $pi-delegate.
+description: Delegate and monitor bounded research, investigation, analysis, review, or implementation tasks in Pi with the fixed GLM-5.2 model while Codex remains the controller. Use only when the user explicitly invokes $pi-delegate.
 ---
 
 # Pi Delegate
 
 ## Goal
 
-Give Codex a low-ceremony way to offload one bounded coding task to Pi with
+Give Codex a low-ceremony way to offload one bounded task to Pi with
 `zai-coding-cn/glm-5.2`, watch its progress, and independently verify the
 result.
 
-Pi is the implementer. Codex remains responsible for scope, permissions,
-review, validation, and closeout. Pi's response is worker evidence, not proof
-that the task is complete.
+Pi is the worker. Codex remains responsible for scope, permissions, review,
+validation, and closeout. Pi's response is worker evidence, not proof that the
+task is complete.
 
 ## Trigger
 
 - Use only when the user explicitly invokes `$pi-delegate`.
 - Do not ask for choices already covered by defaults.
-- Do not use it for advisory-only work that Codex can answer directly.
+- Accept bounded research, investigation, analysis, review, implementation, and
+  mixed tasks. Whether Codex could do the work directly is not a reason to
+  refuse an explicit delegation.
 
 ## Default Contract
 
@@ -29,6 +31,7 @@ that the task is complete.
 - Thinking level: `medium` unless the user explicitly selects another canonical
   Pi level
 - Working directory: the caller's current project or worktree
+- Permissions: never broader than the user's request
 - Project trust: `--approve`, so project Pi resources and skills may load
 - Monitoring: sanitized progress plus 30-second heartbeats on stderr
 - Timeout: 30 minutes
@@ -50,10 +53,14 @@ Use the current task context to write one self-contained brief with:
 
 - the concrete goal and intended scope,
 - relevant repository constraints,
-- permission to edit files and run local project commands,
-- the actual validation to run,
+- the granted authority: keep research, investigation, analysis, and review
+  read-only unless the user also requested changes; allow the read-only local
+  commands and public-source access needed for evidence gathering, and permit
+  edits or mutating local commands only for implementation work within scope,
+- the sources, evidence, or validation the worker must return,
 - no commits, pushes, pull requests, deployments, or unrelated changes,
-- a final report covering files changed, commands run, results, and risks.
+- a final report covering sources and findings, or files changed and commands
+  run, plus results, uncertainty, and risks.
 
 Include relevant context, but do not forward unrelated conversation history,
 credentials, or secrets. Do not stop to ask about details already clear from
@@ -92,20 +99,26 @@ intended worker, use `--resume-last`. Do not ask the user to choose between
 these when the correct continuation is evident.
 
 Override `--timeout` or `--thinking-level` only when the user requests it or the
-task clearly cannot use the default. Concurrent runs are allowed when their
-writable scopes do not conflict; distinguish them by stable `run_id`, name,
-project root, and resolved session ID.
+task clearly cannot use the default. Concurrent read-only runs may overlap;
+concurrent runs with write authority require non-conflicting writable scopes.
+Distinguish them by stable `run_id`, name, project root, and resolved session
+ID.
 
 ### 4. Verify independently
 
 After every Pi process exits:
 
 1. Confirm a terminal result: `completed`, `failed`, `timeout`, or `aborted`.
-2. Inspect repository status and the complete diff.
-3. Attribute changes to the delegated scope and resolve overlap.
-4. Re-run validation proportionate to the change.
+2. Inspect repository status and the complete diff, including after read-only
+   tasks, to detect unintended mutations.
+3. For research, investigation, analysis, or review, verify material claims
+   against the cited primary evidence and confirm that the requested mutation
+   boundary was preserved.
+4. For implementation, attribute changes to the delegated scope, resolve
+   overlap, and re-run validation proportionate to the change.
 5. Fix issues directly or continue the same Pi session with a narrow follow-up.
-6. Report what Pi changed, what Codex verified, and any remaining uncertainty.
+6. Report what Pi found or changed, what Codex verified, and any remaining
+   uncertainty.
 
 Never claim success from Pi's final response alone. A timeout or cancellation
 terminates Pi's complete process tree; inspect partial working-tree changes
@@ -116,7 +129,8 @@ before retrying.
 - Use only in a trusted project. `--approve` may load and execute project-local
   Pi settings, packages, prompts, skills, and extensions.
 - Pi has no built-in sandbox and runs with the process's filesystem and command
-  permissions.
+  permissions. A read-only worker brief is an instruction boundary, not a
+  filesystem sandbox, so Codex must check for unintended mutations.
 - Commit, push, pull-request, deployment, publication, and other external
   mutations still require separate user authorization.
 - The launcher never installs Pi, stores credentials, changes Pi configuration,

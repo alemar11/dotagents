@@ -153,13 +153,15 @@ class PiDelegateTests(unittest.TestCase):
     def test_public_help_version_and_manual_only_metadata(self) -> None:
         version = self.invoke("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "pi-delegate 0.3.0")
+        self.assertEqual(version.stdout.strip(), "pi-delegate 0.3.1")
 
         help_result = self.invoke("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
         self.assertIn("doctor", help_result.stdout)
         self.assertIn("run", help_result.stdout)
         self.assertIn("zai-coding-cn/glm-5.2", help_result.stdout)
+        self.assertIn("bounded task", help_result.stdout)
+        self.assertNotIn("coding task", help_result.stdout)
 
         run_help = self.invoke("run", "--help")
         self.assertEqual(run_help.returncode, 0, run_help.stderr)
@@ -171,9 +173,13 @@ class PiDelegateTests(unittest.TestCase):
         self.assertIn("--timeout", run_help.stdout)
         self.assertIn("--resume-last", run_help.stdout)
         self.assertNotIn("--data-scope", run_help.stdout)
+        self.assertIn("Delegated task", run_help.stdout)
+        self.assertNotIn("Delegated coding task", run_help.stdout)
 
         metadata = METADATA.read_text(encoding="utf-8")
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("Delegate bounded tasks", metadata)
+        self.assertNotIn("delegate coding work", metadata)
 
     def test_doctor_reports_missing_pi_without_installing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -286,6 +292,24 @@ class PiDelegateTests(unittest.TestCase):
         self.assertEqual(payload["thinking_level"], "medium")
         self.assertEqual(recorded_args[recorded_args.index("--thinking") + 1], "medium")
         self.assertEqual(recorded["task"], task)
+
+    def test_run_accepts_read_only_research_task_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env, log_path = self.fake_environment(root)
+            task = (
+                "Research firsthand GitHub issues and discussions. Stay read-only, "
+                "cite primary sources, and do not edit files."
+            )
+            result = self.invoke("--json", "run", task, cwd=root, env=env)
+            recorded = json.loads(log_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "completed")
+        self.assertEqual(recorded["task"], task)
+        self.assertNotIn(task, recorded["args"])
 
     def test_run_accepts_every_pi_thinking_level(self) -> None:
         levels = ("off", "minimal", "low", "medium", "high", "xhigh", "max")

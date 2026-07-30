@@ -18,7 +18,7 @@ scripts/pi-delegate --json run --progress --timeout 45m --resume-last --task-fil
 settings, credentials metadata, and offline model catalog through the installed
 `pi` executable.
 
-`run` executes Pi in JSON event-stream mode with its normal coding tools,
+`run` executes Pi in JSON event-stream mode with its normal tools,
 `--approve`, the fixed `zai-coding-cn/glm-5.2` model, and the selected thinking
 level. The canonical levels are `off`, `minimal`, `low`, `medium`, `high`,
 `xhigh`, and `max`. `medium` is the default when `--thinking-level` is omitted.
@@ -137,7 +137,7 @@ Doctor success:
   "schema_version": "1.0.0",
   "command": "doctor",
   "ready": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "project_root": "/path/to/current-project",
   "model": "zai-coding-cn/glm-5.2",
   "pi_version": "0.82.1",
@@ -158,7 +158,7 @@ Run success:
   "command": "run",
   "ok": true,
   "status": "completed",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "model": "zai-coding-cn/glm-5.2",
   "thinking_level": "high",
   "progress_enabled": true,
