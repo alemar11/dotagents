@@ -41,6 +41,15 @@ The launcher performs its readiness checks automatically. Do not run a separate
 doctor step or ask the user about thinking level, timeout, or session selection
 on the normal path.
 
+When a run returns `doctor.checks[].code=state_access_denied`, treat it as a
+host permission blocker, not as a missing model or a task failure. Request
+narrow, host-approved elevated access for Pi's local state directory and retry
+the exact same launcher invocation, task file, session selection, model, and
+thinking level after approval. Do not use `sudo`, change directory permissions,
+redirect Pi state to an arbitrary temporary directory, or fall back to another
+model. If the host cannot provide an approval path or denies it, stop with the
+sanitized blocker and remediation; do not create a replacement session.
+
 Read [references/cli-contract.md](references/cli-contract.md) only when changing
 defaults, resuming a worker, running concurrent delegations, or diagnosing a
 launcher failure.

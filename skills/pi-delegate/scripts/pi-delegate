@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 MODEL_PROVIDER = "zai-coding-cn"
 MODEL_ID = "glm-5.2"
 MODEL_SELECTOR = f"{MODEL_PROVIDER}/{MODEL_ID}"
@@ -532,6 +532,28 @@ def find_exact_model(output: str) -> bool:
     return False
 
 
+def model_catalog_failure(stderr: str) -> tuple[str, str, str]:
+    """Return a sanitized code, detail, and setup hint for a failed model lookup."""
+    state_lock_denied = (
+        re.search(r"\b(?:EACCES|EPERM)\b", stderr) is not None
+        and re.search(r"(?:\.pi[\\/]|(?:settings|trust)\.json\.lock)", stderr)
+        is not None
+    )
+    if state_lock_denied:
+        return (
+            "state_access_denied",
+            "Pi cannot access its local state directory.",
+            "Grant the Pi process access to its user state directory, then rerun; "
+            "the launcher will not fall back to another model.",
+        )
+    return (
+        "catalog_unreadable",
+        "Pi could not read its offline model catalog.",
+        "Check that Pi can read its offline model catalog and that the ZAI Coding "
+        "Plan China provider is configured; the launcher will not fall back to another model.",
+    )
+
+
 def collect_doctor(*, cwd: Path) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -572,15 +594,22 @@ def collect_doctor(*, cwd: Path) -> dict[str, Any]:
         )
         model_available = models_result.returncode == 0 and find_exact_model(models_result.stdout)
         model_detail = MODEL_SELECTOR if model_available else f"{MODEL_SELECTOR} is unavailable"
+        model_code: str | None = None
+        model_setup_hint: str | None = None
         if models_result.returncode != 0:
-            model_detail = "Pi could not read its offline model catalog"
-        checks.append(
-            {
-                "name": "model",
-                "ok": model_available,
-                "detail": model_detail,
-            }
-        )
+            model_code, model_detail, model_setup_hint = model_catalog_failure(
+                models_result.stderr
+            )
+        model_check: dict[str, Any] = {
+            "name": "model",
+            "ok": model_available,
+            "detail": model_detail,
+        }
+        if model_code is not None:
+            model_check["code"] = model_code
+        if model_code == "state_access_denied":
+            model_check["recovery"] = "request-host-access"
+        checks.append(model_check)
 
     ready = all(check["ok"] for check in checks)
     payload: dict[str, Any] = {
@@ -596,10 +625,12 @@ def collect_doctor(*, cwd: Path) -> dict[str, Any]:
     if pi_path is None:
         payload["install_command"] = INSTALL_COMMAND
     if pi_path is not None and not model_available:
-        payload["setup_hint"] = (
+        payload["setup_hint"] = model_setup_hint or (
             "Configure the ZAI Coding Plan China provider in Pi; "
             "the launcher will not fall back to another model."
         )
+        if any(check.get("code") == "state_access_denied" for check in checks):
+            payload["recovery"] = "request-host-access"
     return payload
 
 

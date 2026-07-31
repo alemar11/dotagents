@@ -14,9 +14,17 @@ scripts/pi-delegate --json run --progress --timeout 2h --session-id <id> --task-
 scripts/pi-delegate --json run --progress --timeout 45m --resume-last --task-file <path>
 ```
 
-`doctor` is non-mutating and sends no model request. It may read Pi's user
-settings, credentials metadata, and offline model catalog through the installed
-`pi` executable.
+`doctor` sends no model request. It may read Pi's user settings, credentials
+metadata, and offline model catalog through the installed `pi` executable. Pi
+may create short-lived locks in its user state directory while doing this. If
+the host blocks that access, the `model` check reports
+`code: state_access_denied` with a sanitized remediation hint; it does not
+expose Pi's raw diagnostics. The check also reports
+`recovery: request-host-access`. The controller should request narrow,
+host-approved elevated access and retry the exact same run. Permission denial
+is terminal for that attempt; never use `sudo`, change Pi state-directory
+permissions, redirect Pi state to an arbitrary temporary directory, or fall
+back to another model.
 
 `run` executes Pi in JSON event-stream mode with its normal tools,
 `--approve`, the fixed `zai-coding-cn/glm-5.2` model, and the selected thinking
@@ -137,7 +145,7 @@ Doctor success:
   "schema_version": "1.0.0",
   "command": "doctor",
   "ready": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "project_root": "/path/to/current-project",
   "model": "zai-coding-cn/glm-5.2",
   "pi_version": "0.82.1",
@@ -158,7 +166,7 @@ Run success:
   "command": "run",
   "ok": true,
   "status": "completed",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "model": "zai-coding-cn/glm-5.2",
   "thinking_level": "high",
   "progress_enabled": true,

@@ -40,6 +40,8 @@ class PiDelegateTests(unittest.TestCase):
         root: Path,
         *,
         model_available: bool = True,
+        catalog_exit_code: int = 0,
+        catalog_stderr: str = "",
         run_exit_code: int = 0,
         event_delay: float = 0,
         event_mode: str = "valid",
@@ -69,7 +71,9 @@ class PiDelegateTests(unittest.TestCase):
                 if "--list-models" in args:
                     print("provider model context max-out thinking images")
                     print({model_row!r})
-                    raise SystemExit(0)
+                    if {catalog_stderr!r}:
+                        print({catalog_stderr!r}, file=sys.stderr)
+                    raise SystemExit({catalog_exit_code})
                 task = sys.stdin.read()
                 with open(os.environ["FAKE_PI_LOG"], "w", encoding="utf-8") as handle:
                     json.dump({{"args": args, "task": task}}, handle)
@@ -153,7 +157,7 @@ class PiDelegateTests(unittest.TestCase):
     def test_public_help_version_and_manual_only_metadata(self) -> None:
         version = self.invoke("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "pi-delegate 0.3.1")
+        self.assertEqual(version.stdout.strip(), "pi-delegate 0.3.2")
 
         help_result = self.invoke("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
@@ -219,6 +223,29 @@ class PiDelegateTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertFalse(payload["ready"])
         self.assertIn("setup_hint", payload)
+
+    def test_doctor_reports_denied_pi_state_directory_without_exposing_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env, _ = self.fake_environment(
+                root,
+                catalog_exit_code=1,
+                catalog_stderr=(
+                    "Error: EPERM: operation not permitted, mkdir "
+                    "'/Users/example/.pi/agent/trust.json.lock'"
+                ),
+            )
+            result = self.invoke("--json", "doctor", cwd=root, env=env)
+
+        self.assertEqual(result.returncode, 1)
+        payload = json.loads(result.stdout)
+        model_check = next(check for check in payload["checks"] if check["name"] == "model")
+        self.assertEqual(model_check["code"], "state_access_denied")
+        self.assertEqual(model_check["recovery"], "request-host-access")
+        self.assertEqual(model_check["detail"], "Pi cannot access its local state directory.")
+        self.assertIn("Grant the Pi process access", payload["setup_hint"])
+        self.assertEqual(payload["recovery"], "request-host-access")
+        self.assertNotIn("/Users/example", json.dumps(payload))
 
     def test_run_pins_model_thinking_session_and_current_project(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
