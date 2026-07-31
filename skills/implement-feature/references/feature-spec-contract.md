@@ -48,7 +48,7 @@ exact durable-source readback. It may resume the existing assignment through the
 normal recovery transition only when that readback restores the exact stable
 contract already accepted by the run. Any changed stable contract other than
 that exact monotonic path repair—including repository or source identity,
-delivery type, target branch, non-monotonic allowed paths, dependencies,
+GitHub PR delivery, target branch, non-monotonic allowed paths, dependencies,
 acceptance, safety, or material validation constraints—cannot be
 rebound onto the retained assignment or claim; it requires a new run and claim
 after the existing owner is reconciled through the normal terminal lifecycle.

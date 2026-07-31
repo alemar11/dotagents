@@ -21,8 +21,8 @@ from typing import Any
 
 CLI_VERSION = "6.0.0"
 RUNTIME_CONTRACT_VERSION = "7.0.0"
-DATABASE_SCHEMA_VERSION = 4
-REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
+DATABASE_SCHEMA_VERSION = 5
+REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
@@ -465,7 +465,9 @@ SCHEMA_THREE_COLUMNS = {
 }
 
 
-CURRENT_SCHEMA_COLUMNS = {
+# Schema 4 is retained only as a drained cutover source. The current schema 5
+# has no provider or delivery columns and cannot create local transport state.
+SCHEMA_FOUR_COLUMNS = {
     **SCHEMA_THREE_COLUMNS,
     "assignments": SCHEMA_THREE_COLUMNS["assignments"] + (
         "contract_generation",
@@ -479,6 +481,16 @@ CURRENT_SCHEMA_COLUMNS = {
 }
 
 
+CURRENT_SCHEMA_COLUMNS = {
+    **SCHEMA_FOUR_COLUMNS,
+    "assignments": tuple(
+        column
+        for column in SCHEMA_FOUR_COLUMNS["assignments"]
+        if column not in {"tracker_backend", "delivery_type"}
+    ),
+}
+
+
 def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
     if version == 1:
         return SCHEMA_ONE_COLUMNS
@@ -486,6 +498,8 @@ def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
         return SCHEMA_TWO_COLUMNS
     if version == 3:
         return SCHEMA_THREE_COLUMNS
+    if version == 4:
+        return SCHEMA_FOUR_COLUMNS
     if version == DATABASE_SCHEMA_VERSION:
         return CURRENT_SCHEMA_COLUMNS
     raise StateError(
@@ -638,7 +652,7 @@ def create_schema(
     *,
     schema_version: int = DATABASE_SCHEMA_VERSION,
 ) -> None:
-    if schema_version not in {1, 2, 3, DATABASE_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, 3, 4, DATABASE_SCHEMA_VERSION}:
         raise StateError(
             "unsupported-state-schema",
             f"cannot create database schema {schema_version}",
@@ -700,6 +714,24 @@ def create_schema(
         if schema_version >= 3
         else ""
     )
+    legacy_transport_columns = (
+        """
+            tracker_backend TEXT NOT NULL CHECK(tracker_backend IN ('github','local')),
+            delivery_type TEXT NOT NULL CHECK(delivery_type IN ('github-pr','local-branch')),
+        """
+        if schema_version <= 4
+        else ""
+    )
+    legacy_run_statuses = (
+        "'pr-ready', 'local-branch-ready', 'delivery-ready',"
+        if schema_version <= 4
+        else "'pr-ready',"
+    )
+    legacy_assignment_statuses = (
+        "'peer-input-ready', 'pr-ready', 'local-branch-ready',"
+        if schema_version <= 4
+        else "'peer-input-ready', 'pr-ready',"
+    )
     statements = [
         """CREATE TABLE runtime_metadata (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -717,7 +749,7 @@ def create_schema(
             {runtime_columns}
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
-                'pr-ready', 'local-branch-ready', 'delivery-ready',
+                {legacy_run_statuses}
                 'preimplementation-aborted', 'abandoned'
             )),
             implementation_started INTEGER NOT NULL DEFAULT 0 CHECK(implementation_started IN (0,1)),
@@ -748,15 +780,14 @@ def create_schema(
             source_spec_ref TEXT NOT NULL,
             claim_spec_identity TEXT NOT NULL,
             repository_identity TEXT NOT NULL,
-            tracker_backend TEXT NOT NULL CHECK(tracker_backend IN ('github','local')),
-            delivery_type TEXT NOT NULL CHECK(delivery_type IN ('github-pr','local-branch')),
+            {legacy_transport_columns}
             {assignment_project_column}
             title TEXT NOT NULL,
             target_branch_name TEXT NOT NULL,
             prerequisite_assignment_ids TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN (
                 'waiting-for-spec', 'planned', 'worker-created', 'active',
-                'peer-input-ready', 'pr-ready', 'local-branch-ready',
+                {legacy_assignment_statuses}
                 'blocked-durable-contract', 'blocked-app-capability',
                 {blocked_scope_repair_state}
                 'blocked-by-active-spec', 'preimplementation-aborted',
@@ -788,9 +819,11 @@ def create_schema(
             UNIQUE(run_id, repository_identity, target_branch_name)
             {assignment_repository_foreign_key}
         )""".format(
+            legacy_transport_columns=legacy_transport_columns,
             assignment_project_column=assignment_project_column,
             assignment_feature_column=assignment_feature_column,
             assignment_scope_repair_columns=assignment_scope_repair_columns,
+            legacy_assignment_statuses=legacy_assignment_statuses,
             blocked_scope_repair_state=(
                 "'blocked-scope-repair',"
                 if schema_version >= 4
@@ -1560,10 +1593,6 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             "claim_spec_identity": claim_spec_identity,
             "feature_id": None,
             "repository_identity": identity,
-            # These columns remain internal schema-4 compatibility storage;
-            # GitHub issues and GitHub PRs are the only public transport.
-            "tracker_backend": "github",
-            "delivery_type": "github-pr",
             "title": (
                 f"{WORKER_TASK_TITLE_PREFIX}"
                 f"{feature_spec_title_from_worker_task_title(item['title'], f'assignments[{index}].title')}"
@@ -1898,15 +1927,14 @@ def insert_run(
         connection.execute(
             """INSERT INTO assignments(
                 run_id,assignment_id,source_spec_ref,claim_spec_identity,repository_identity,
-                tracker_backend,delivery_type,title,target_branch_name,
+                title,target_branch_name,
                 prerequisite_assignment_ids,state,waiting_owner_run_id,
                 waiting_owner_assignment_id,waiting_owner_root_task_id,updated_at,
                 feature_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 run["run_id"], assignment["assignment_id"], assignment["source_spec_ref"],
                 assignment["claim_spec_identity"], assignment["repository_identity"],
-                assignment["tracker_backend"], assignment["delivery_type"],
                 assignment["title"], assignment["target_branch_name"],
                 canonical_json(assignment["prerequisite_assignment_ids"]), state,
                 conflict["run_id"] if conflict else None,
@@ -2444,10 +2472,6 @@ def assignment_projection(
     row: sqlite3.Row,
 ) -> dict[str, Any]:
     value = dict(row)
-    # Provider and delivery columns are retained only for schema-4 database
-    # compatibility; they are not part of the GitHub-only public projection.
-    value.pop("tracker_backend", None)
-    value.pop("delivery_type", None)
     value["review_owner"] = canonical_review_owner(
         connection,
         row["run_id"],
@@ -5073,7 +5097,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-4 SQLite coordination for Implement Feature "
+            "Database-schema-5 SQLite coordination for Implement Feature "
             "controllers in the ChatGPT App."
         ),
     )

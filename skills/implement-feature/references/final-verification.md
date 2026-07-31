@@ -61,7 +61,7 @@ already occurred; it does not perform a repository-wide release. No terminal
 result merges.
 
 For a linked multi-repository feature, require exactly one independently
-verified terminal branch or PR for every Feature Spec Set member. Report one
+verified GitHub PR for every Feature Spec Set member. Report one
 exact final vector of
 `feature_id, repository_identity, source_spec_ref, target_branch_name,
 head_sha, pr_url`; every row must come from that member's

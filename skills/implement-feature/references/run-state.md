@@ -2,7 +2,7 @@
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
 uses the shipped artifact. CLI release `6.0.0` implements the breaking runtime
-contract `7.0.0` over database schema `4`. Worker creation now atomically
+contract `7.0.0` over database schema `5`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -18,7 +18,7 @@ Four version domains are deliberately independent:
 | --- | --- | --- |
 | CLI | `6.0.0` | User-facing commands and executable behavior |
 | Runtime contract | `7.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `4` | Exact SQLite tables, columns, indexes, and constraints |
+| Database schema | integer `5` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -65,8 +65,8 @@ CREATE TABLE runtime_metadata (
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=4, target_schema_version=NULL)`. The integer stored here is not
-the CLI, runtime-contract, or JSON protocol version. Schema number `4` does not
+`(schema_version=5, target_schema_version=NULL)`. The integer stored here is not
+the CLI, runtime-contract, or JSON protocol version. Schema number `5` does not
 authorize an alternate shape: every table, column, index, and constraint must match
 exactly or the CLI returns `invalid-state-schema` without deleting or rewriting
 the DB. `PRAGMA user_version` is not application state and is never read or
@@ -83,17 +83,13 @@ SemVer but different bytes is not the retained runtime for that run.
 The schema contains only runtime metadata, runs, normalized run-repository
 bindings, assignments, canonical Feature Spec claims, and typed Codex
 task-operation reconciliation facts. It may retain durable source refs, linked
-`feature_id` membership and fixed GitHub transport, assignment
+`feature_id` membership, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
 identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
 normal Git head/base/ancestry facts, contract generation, opaque scope repair
 identity and authoritative repair readback, and PR/provider refs only when
-applicable.
-
-Schema-4 `tracker_backend` and `delivery_type` columns are retained solely so
-the existing SQLite shape can be read and cut over safely; every new manifest,
-observation, and public projection writes the fixed GitHub values or omits the
-columns entirely.
+applicable. GitHub Issues and GitHub PRs are fixed workflow boundaries, not
+stored provider or delivery selectors.
 
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
@@ -542,7 +538,7 @@ the typed observation required by the operation lifecycle above.
 Keep normal execution on `scripts/run-state`; there is no maintenance project
 or build output. `CLI_VERSION` remains `6.0.0`,
 `RUNTIME_CONTRACT_VERSION` remains `7.0.0`;
-`DATABASE_SCHEMA_VERSION` remains integer `4`; each protocol entry remains at
+`DATABASE_SCHEMA_VERSION` remains integer `5`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python
 compilation and the remaining executable verifier checks after changes.
@@ -579,7 +575,7 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schemas 1, 2, and 3 are the recognized rebuild sources for release 6.0.0.
+Schemas 1, 2, 3, and 4 are the recognized rebuild sources for release 6.0.0.
 Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
 Therefore:
 
@@ -587,7 +583,7 @@ Therefore:
   preparation fails closed with the legacy runtime identity unresolved; a
   caller-supplied executable cannot manufacture the missing per-run proof;
 - with zero schema-1 owners, preparation begins one exclusive transaction,
-  rechecks zero, drops every application object, creates exact schema 4 and its
+  rechecks zero, drops every application object, creates exact schema 5 and its
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
@@ -595,8 +591,8 @@ original artifact. The 7.0.0 runtime does not operate it or promise that such
 an artifact exists. Rerun 6.0.0 preparation only after authoritative schema-1
 state reports zero owners.
 
-Schemas 2 and 3 persist exact per-run pins. With active owners on either
-schema, `state prepare` first writes database-schema integer `4` to
+Schemas 2, 3, and 4 persist exact per-run pins. With active owners on any
+of these schemas, `state prepare` first writes database-schema integer `5` to
 `target_schema_version` transactionally while preserving the old schema. A
 non-NULL target fences every new run. Pass each distinct required executable
 with a repeated absolute
