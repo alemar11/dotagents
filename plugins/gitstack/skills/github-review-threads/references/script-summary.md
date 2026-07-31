@@ -59,7 +59,7 @@ The script does not write configuration files.
 
 Managed orchestration uses the closed operations `request`, `wait`, `warning`,
 `reply`, `resolve`, `reconcile-mutation`, and `reconcile-terminal`. GitStack
-8.1.0 owns the complete `gitstack-review-operation-request:v1` and
+8.1.1 owns the complete `gitstack-review-operation-request:v1` and
 `gitstack-review-operation-result:v1` schemas. `prepare` and both validators are
 read-only. `execute` revalidates the exact controller envelope and atomically
 writes a `gitstack-review-operation-start:v1` receipt to GitStack's own journal

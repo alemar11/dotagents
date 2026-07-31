@@ -8,6 +8,8 @@ This project is maintenance-only source for the plugin-shared `scripts/gitstack`
 - Uses direct `git` for local repository state and `gh` for GitHub operations unavailable through the model-facing connector.
 - The subprocess cannot invoke connector tools or access the GitHub App token.
 - Reads and `doctor` never write config or caches. GitHub writes remain explicit named commands with dry-run support where applicable.
+- Avoid heuristic provider-failure classification based on ad hoc lists of stderr substrings. Prefer structured results, stable typed errors, and fail closed when authentication or network state cannot be proven. (Codex learning)
+- Treat the shipped CLI as production code: keep control flow simple, avoid speculative recovery logic, preserve secret-safe diagnostics, and require executable regression tests plus rebuilt-artifact smoke checks for behavior changes. (Codex learning)
 
 ## Build and test
 

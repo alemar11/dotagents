@@ -5,18 +5,14 @@
 Complete this read-only preflight before staging, committing, or pushing:
 
 ```bash
-git status --short --branch
-git diff --stat
-git diff --staged --name-status
-git symbolic-ref --quiet --short HEAD
-git remote get-url origin
-gh auth status
-gh repo view --json nameWithOwner,defaultBranchRef,url
-git config --get "branch.<branch>.remote"
-git config --get "branch.<branch>.merge"
-gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
-  --json number,title,url,isDraft,headRefName,headRepositoryOwner,baseRefName
+<plugin-root>/scripts/gitstack --json publish preflight --repo <owner/repo>
 ```
+
+The shared command owns the branch, status, origin, upstream, authenticated
+GitHub API, default-branch, and matching open-PR checks. Run the complete
+command with scoped network permission from the outset. Do not replace it with
+an ad hoc group of raw `git` and `gh` commands or run only its authentication
+check in the restricted sandbox.
 
 Apply all of these gates before continuing:
 
@@ -31,7 +27,9 @@ Apply all of these gates before continuing:
   first push may establish `origin/<branch>`. If either is present, require both
   and require exactly `origin` plus `refs/heads/<branch>`; stop on a different
   remote or branch.
-- Require successful `gh auth status` before any push.
+- Require successful `gh auth status` from the network-capable shared preflight
+  before any push. A result from a restricted sandbox is inconclusive and must
+  not be used to diagnose or change credentials.
 - Record whether the PR lookup returns zero or one open PR. Stop if it returns
   more than one or if its head branch/repository does not match the verified
   push target.
