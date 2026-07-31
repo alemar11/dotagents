@@ -107,14 +107,13 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
 - Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-review-rules`, `code-wiki`, `focus-task`, `learn`, `maintainer`, `implement-feature`, `pi-delegate`, and `skill-audit`.
+- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-review-rules`, `code-wiki`, `focus-task`, `learn`, `maintainer`, `implement-feature`, and `skill-audit`.
 - Treat `skill-audit` as Codex-dependent because its live branch requires Codex App task discovery, authoritative task reads, and bounded task waits; historical audits also use Codex memory and session evidence.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
 - Treat `focus-task` as Codex-dependent because it requires the Codex App project-listing, task-creation, and task-title tools to create a compact-context continuation task without forking the caller's complete history.
 - Treat `code-review-rules` as Codex-dependent because its historical evidence branch may inspect Codex session, memory, or task evidence scoped to the current repository; it composes with `$learn` for every approved durable `AGENTS.md` write.
 - Treat `implement-feature` as Codex-dependent and runtime-dependent on `python3` because it runs only in the ChatGPT App in Codex mode: implementation requires `scripts/run-state`, read-only local closeout through `scripts/verify-ready`, explicitly authorized visible Codex tasks, ChatGPT-created worktrees, execution-ready Feature Spec bundles, `$autoreview`, and GitStack workflows. The ChatGPT App owns command execution and approval; GitStack owns Git and GitHub behavior. It has no planning, root/background implementation, raw Git worktree machinery, or merge authority.
-- Treat `pi-delegate` as Codex-dependent and runtime-dependent on `python3` plus the local `pi` executable because Codex remains the controller, launches a trusted Pi subprocess in the current project, and independently verifies its findings or changes. Keep it manual-only and pin every delegated run to `zai-coding-cn/glm-5.2`.
 - Treat `.agents/skills/maintainer` as Codex-dependent because health diagnosis and workflow-family hardening conditionally use `$skill-audit` plus Codex memory/session evidence for portfolio, prompt-quality, overlap, or runtime invocation claims, substantial reshapes require `$skill-creator` or `$plugin-creator`, and non-trivial implementation closeout requires `$autoreview`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its advisory critique and implementation-evaluation workflows can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
@@ -134,7 +133,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 
 ### Delegated Model Registry
 
-- Keep this registry of skills that explicitly select a delegated model: `autoreview` -> `gpt-5.6-sol` (`high` standard, `xhigh` high-risk); `implement-feature` -> `gpt-5.6-sol` (`medium` routine, `high` complex, `xhigh` risky/cross-system); `pi-delegate` -> `zai-coding-cn/glm-5.2` (user-selected Pi thinking level, `medium` default). Exclude delegations that inherit the parent or host default or are provider-managed. (Codex learning)
+- Keep this registry of skills that explicitly select a delegated model: `autoreview` -> `gpt-5.6-sol` (`high` standard, `xhigh` high-risk); `implement-feature` -> `gpt-5.6-sol` (`medium` routine, `high` complex, `xhigh` risky/cross-system). Exclude delegations that inherit the parent or host default or are provider-managed. (Codex learning)
 - Whenever a skill adds, removes, or changes an explicit delegated model or reasoning-effort policy, update this registry in the same change; use it as the audit list when a pinned model generation is upgraded or retired. (Codex learning)
 
 ### Repo-local Plugins
@@ -187,18 +186,6 @@ Canonical planning vocabulary and GitHub label mappings live in
   its issue-hardening caller surface returns a structured result to the
   invoking workflow. It must not create `plans/`, write Markdown plan files, or
   edit repo files as part of its own runtime workflow.
-
-### Pi Delegate Skill
-
-- Keep `pi-delegate` manual-only with `policy.allow_implicit_invocation: false`.
-- Allow explicitly delegated bounded research, investigation, analysis, review, implementation, and mixed tasks; do not reject advisory work merely because Codex could perform it directly. Preserve the user's mutation boundary in the worker brief, independently verify material findings or changes, and inspect the working tree after read-only runs because Pi is not sandboxed.
-- Keep `zai-coding-cn/glm-5.2` fixed in its shipped launcher; never fall back to another provider or model when preflight fails.
-- Let the user select any canonical Pi thinking level and default to `medium` when omitted; do not infer a different level from task complexity.
-- Codex remains the controller: Pi may edit files and run local project commands, but Codex must inspect the complete diff and independently validate the result before closeout.
-- Run Pi in the caller's current project or worktree with explicit project trust through `--approve`, so project-local Pi resources and skills can load. Use it only in trusted projects; do not change into the skill root or treat Pi project trust as a sandbox.
-- Allow concurrent Pi sessions and require the controller to monitor each sanitized progress stream by stable run ID, resolved session ID, name, and project root through terminal state before integrating the combined diff.
-- Bound every Pi run with the launcher timeout and terminate the complete Pi process tree on timeout or controller cancellation; preserve explicit `completed`, `failed`, `timeout`, and `aborted` terminal evidence.
-- Use task-file transport for multiline, skill-invoking, quoted, or shell-sensitive Pi prompts so literal skill names and syntax reach the launcher unchanged.
 
 ### Grill and Project Memory Composition
 
