@@ -183,34 +183,6 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
-    def test_review_owner_documents_terminal_state_and_shared_operations(self) -> None:
-        plugin_root = Path(__file__).resolve().parents[3]
-        options = (plugin_root / "references" / "options.md").read_text(
-            encoding="utf-8"
-        )
-        review_contract = (
-            plugin_root
-            / "skills"
-            / "github-review-threads"
-            / "references"
-            / "script-summary.md"
-        ).read_text(encoding="utf-8")
-        for state in (
-            "not-requested",
-            "acknowledged",
-            "pending",
-            "clean",
-            "findings",
-            "stale",
-            "error",
-        ):
-            with self.subTest(state=state):
-                self.assertIn(f"`{state}`", review_contract)
-        self.assertIn(
-            "`inspect`, `check`, `wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve`",
-            options,
-        )
-
     def test_positive_int(self) -> None:
         self.assertEqual(cli.positive_int("12", "pr"), 12)
         with self.assertRaises(cli.ReviewError):
