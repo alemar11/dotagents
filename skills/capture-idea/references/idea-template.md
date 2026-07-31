@@ -7,10 +7,6 @@ unknowns instead of inventing requirements or decisions.
 ## Canonical Content
 
 ```markdown
-# Idea: <Name>
-
-artifact_marker: idea
-
 ## Summary
 
 <One concise description of the proposal.>
@@ -40,19 +36,9 @@ artifact_marker: idea
 - <Portable conversation, document, issue, or repository evidence.>
 ```
 
-The canonical template above is the dormant default and intentionally omits a
-workflow state. Insert `workflow_state: needs-triage` immediately after the
-artifact marker only when the user explicitly queues this Idea for evaluation.
-The local header metadata region starts after the H1 and ends at the first
-`##` heading. It must contain exactly one
-`artifact_marker: idea`, zero or one workflow-state line, and no `issue_type`
-line. The consumed Project Memory marker and state mappings must use
-`local-header`.
-
-For GitHub, the issue title supplies `# Idea: <Name>`. Render the same seven
-`##` sections in the issue body, but omit local header metadata. Apply the
-configured `idea` marker and optional `needs-triage` state as labels instead.
-Do not set a native Issue Type.
+The issue title supplies `Idea: <Name>`. Render the seven sections in the body.
+Apply the configured `idea` marker and optional `needs-triage` state as labels;
+do not set a native Issue Type.
 
 ## Content Boundaries
 

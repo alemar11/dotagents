@@ -121,7 +121,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$project-memory`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
 - Treat `project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/project-memory/references/session-history.md`, while its core setup and internal domain-modeling flow fall back to repository evidence plus optional localization evidence.
-- Treat `capture-idea` as Codex-aware but portable because `request_user_input` is an optional multi-Idea selection accelerator with a plain-language fallback, while its core local capture contract uses Project Memory routing and its GitHub apply path composes with GitStack.
+- Treat `capture-idea` as Codex-dependent because authoritative Idea reads and writes require `$gitstack:github-issues`; `request_user_input` remains an optional multi-Idea selection accelerator with a plain-language fallback.
 - Treat `plan-feature` as portable and skill-composed because its core and local-tracker workflows require `$project-memory`, `$grill-me-with-context`, and `$plan-harder`; its GitHub tracker backend additionally requires `$gitstack:github-issues`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat GitStack as Codex-dependent because its bundled workflows require the official GitHub connector. Its shared CLI fallback remains runtime-dependent on Python 3.11+, local `git`, and authenticated `gh`.
@@ -215,8 +215,8 @@ Canonical planning vocabulary and GitHub label mappings live in
 ### Capture Idea Skill
 
 - Keep `capture-idea` as the manual-only public surface for preserving tentative proposals before Feature Spec planning; ordinary brainstorming, issue creation, planning, and implementation requests must not auto-select it.
-- Keep `skills/capture-idea/references/options.md` limited to the run-scoped `write_mode` control. Consume tracker backend, tracker owner, artifact-marker mapping, candidate decisions, queue intent, paths, and refs as execution facts or data.
-- Keep one durable Idea per independently plannable proposal and exactly one tracker-owning repository per Idea. GitHub Ideas use the configured `idea` label with native Issue Type unset; local Ideas use `planning/ideas/<idea-slug>.md` with `artifact_marker: idea`, no `issue_type`, and optional explicit `needs-triage` only at capture.
+- Keep `skills/capture-idea/references/options.md` limited to the run-scoped `write_mode` control. Consume tracker owner, artifact-marker mapping, candidate decisions, queue intent, and refs as execution facts or data.
+- Keep one durable GitHub Idea per independently plannable proposal and exactly one tracker-owning repository per Idea. Ideas use the configured `idea` label with native Issue Type unset and optional explicit `needs-triage` only at capture.
 - Keep Capture Idea separate from Feature Spec drafting and domain memory. `$plan-feature` owns durable Idea-source consumption and lifecycle reconciliation; Project Memory owns the marker and state registry; GitStack owns GitHub mutation mechanics.
 
 ### Plan Feature Skill

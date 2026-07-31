@@ -1,7 +1,6 @@
 # GitHub Idea Publishing
 
-Load this reference only when `tracker_backend=github` and
-`write_mode=apply`.
+Load this reference only when `write_mode=apply`.
 
 ## Canonical Hosted Artifact
 
@@ -12,8 +11,7 @@ Each GitHub Idea is an open issue with:
 - the concrete `needs-triage` label only when the user explicitly queued this
   candidate;
 - native GitHub Issue Type unset;
-- the seven canonical body sections from `idea-template.md`, without local
-  header metadata.
+- the seven canonical body sections from `idea-template.md`.
 
 The durable ref is `owner/repository#<number>` or the canonical issue URL. A
 bare `#<number>` is not globally unambiguous and must not be the returned source
@@ -82,4 +80,4 @@ or other operation proven absent; never replay the whole batch.
 
 On partial multi-Idea publication, stop, clean up transient body files, and
 report verified created and reused refs plus the exact missing work. Resume
-from verified hosted state, not from the original local candidate list.
+from verified hosted state, not from the original candidate list.

@@ -44,9 +44,9 @@ focused follow-up before continuing.
 ## Write Barrier
 
 Finish every questionnaire batch and resolve every free-form consequence
-before the first local or GitHub write. Selection answers are not publication
+before the first GitHub write. Selection answers are not publication
 checkpoints. After selection, preflight the complete accepted set for tracker
-owners, duplicate artifacts, names, slugs, paths, labels, and collisions.
+owners, duplicate artifacts, names, slugs, labels, and issue collisions.
 
 An explicit Capture Idea request containing exactly one candidate needs no
 extra confirmation. Also skip this questionnaire when the user already gave
