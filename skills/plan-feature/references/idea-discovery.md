@@ -19,10 +19,7 @@ tracker mutation.
    explicit transport `label` for the marker and every consumed workflow row;
    reject missing or incompatible transport. Read title, body, state, labels,
    native Issue Type, comments, and qualified URL.
-3. For local tracking, inspect only canonical
-   `planning/ideas/<idea-slug>.md` files inside the resolved owning
-   repositories after requiring `local-header` for marker and workflow rows.
-4. Load `idea-source.md` in validation-only mode to validate each candidate's
+3. Load `idea-source.md` in validation-only mode to validate each candidate's
    durable identity, complete outcome-comment history, and canonical prior
    outcomes. Exclude malformed or fully consumed artifacts from ordinary
    selection. Classify an open GitHub Idea with a latest full outcome as

@@ -25,8 +25,8 @@ Accept exactly:
 ```yaml
 scope_repair_request:
   repair_id: <canonical-lowercase-uuid>
-  source_spec_ref: <durable-hosted-or-local-ref>
-  implementation_issue_ref: <durable-hosted-or-local-ref>
+  source_spec_ref: <durable-hosted-ref>
+  implementation_issue_ref: <durable-hosted-ref>
   requested_paths:
     - <portable-repo-relative-or-repo-qualified-path>
   reason: <why-current-scope-cannot-deliver-an-existing-obligation>
@@ -64,12 +64,11 @@ For the named issue:
    proposed issue paths.
 4. Require every requested path to be contained by the proposed issue envelope
    and every implementation path in that issue envelope to be contained by the
-   owning Feature Spec envelope. Local tracker active and `done/` paths remain
-   exact and are not widened.
+   owning Feature Spec envelope.
 5. Compare every other stable field directly and require exact equality.
    Preserve all current executor-owned content. Do not use a whole-body hash.
 6. Rerun bundle completeness, acceptance coverage, issue-graph, verticality,
-   overlap, dependency, and backend validation. A temporary runtime collision
+   overlap, dependency, and GitHub tracker validation. A temporary runtime collision
    does not create a planning dependency. If the overlap represents a real
    output dependency or unsafe independent ownership, return
    `full-replan-required`.
@@ -103,9 +102,7 @@ A wider parent with a still-narrow child remains non-executable. Never reverse
 the first two steps, because that would temporarily authorize an issue outside
 its Feature Spec.
 
-For GitHub, append the audit as a canonical comment on the implementation
-issue. For local tracking, append one entry under `## Planning Repair History`
-in that issue file, creating the section when absent. The record contains only
+Append the audit as a canonical comment on the implementation issue. The record contains only
 `repair_id`, source and issue refs, requested paths, previous and authorized
 envelopes, reason, contract evidence, repository evidence, and completed
 operations. It contains no runtime identity.

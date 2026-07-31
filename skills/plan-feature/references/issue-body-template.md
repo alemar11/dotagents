@@ -1,8 +1,8 @@
 # Issue Body Template
 
-Use this shape unless the tracker has a stronger local template. Evidence and
-paths must be portable: repo-relative, repo-qualified, hosted, or descriptive.
-Never include developer-machine absolute paths.
+Use this shape for GitHub implementation issues. Evidence and paths must be
+portable: repo-relative, repo-qualified, hosted, or descriptive. Never include
+developer-machine absolute paths.
 
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
@@ -11,12 +11,11 @@ Never include developer-machine absolute paths.
 
 | Field | Value |
 | --- | --- |
-| `source_spec_ref` | [durable path or hosted ref; proposed refs are valid only in write_mode=propose] |
+| `source_spec_ref` | [durable hosted ref; proposed refs are valid only in write_mode=propose] |
 | `feature_slug` | [authoritative lowercase feature slug] |
 | `affected_repositories` | [canonical repo slugs or current-repository] |
 | `allowed_paths` | [smallest complete safe repo-relative or repo-qualified envelope for this slice] |
 | `target_branch_name` | [one valid branch shared by all affected repositories inside this Feature Spec] |
-| `delivery_type` | [github-pr or local-branch, copied exactly from the owning Feature Spec] |
 | `dependency_ids` | [earlier generated issue IDs or none] |
 
 ## Goal
@@ -73,8 +72,7 @@ repeating dependency IDs.]
 Before starting this issue, after any recovery or handoff, and before final
 verification, re-read the current Feature Spec and complete current issue set.
 Block declaratively on any change to the goal or Non-Goals, repositories or
-allowed paths, `source_spec_ref`, `target_branch_name`, `delivery_type`,
-dependencies, acceptance
+allowed paths, `source_spec_ref`, `target_branch_name`, dependencies, acceptance
 criterion text/count/order, safety constraints, or material validation
 constraints including attempt budgets and required terminal outcomes. Do not
 ask the user from the worker task merely to resolve that semantic drift.
@@ -83,8 +81,8 @@ The implementing Codex task may update acceptance checkbox markers,
 implementation approach and internal design, safer or simpler rewrites,
 additional or equivalent tests, compatible clarifications, progress, status,
 evidence, and concrete refactors or fixes within accepted scope. It updates this
-issue's checkboxes only after current-head proof, then re-reads the GitHub or
-local artifact before writing. It updates parent Feature Spec checkboxes only
+issue's checkboxes only after current-head proof, then re-reads the GitHub issue
+before writing. It updates parent Feature Spec checkboxes only
 when Spec-level behavior is proven, and restores an unchecked marker whenever
 later evidence invalidates the proof. Root coordination never edits or judges
 individual acceptance criteria. Inside an `## Acceptance Criteria` section,
@@ -105,7 +103,7 @@ prove integrated feature behavior and satisfy the owner-excluded terminal rule
 from `issue-phase.md`. In
 a multi-repository feature, it belongs to an existing implementation member
 whose Feature Dependencies supply the exact peer inputs required for proof;
-its issue dependencies remain local to that member. The payload is only that
+its issue dependencies remain within that member. The payload is only that
 member's repository-owned shard. One exact `canonical_decision_target` owns a
 cross-repository decision; a non-owner shard may carry a qualified backlink but
 not duplicate the record. Every target surface below must resolve to this
@@ -141,22 +139,10 @@ knowledge_delta:
   owns whether completion is represented by a closing reference, explicit
   close operation, or another supported tracker transition; Plan Feature does
   not choose that delivery mechanism.
-- Local tracker: after implementation, integration proof, and any domain
-  closeout succeed, move this file to the `done/` directory of its owning issue
-  subtree:
-  `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
-  Create the `done/` directory on demand. For multi-repository
-  work, require cross-repo integration proof first. The Execution Contract must
-  include the tracker-owning repository plus both the exact active and exact
-  destination paths, and both paths must resolve inside that affected Git
-  repository. Rerun every final gate that the resulting head invalidates.
-  Commit that move on the declared delivery branch. With `local-branch`, it
-  remains local; with `github-pr`, it is included in the published branch and
-  pull request.
 ```
 
-Tracker metadata is rendered by `write_mode` and backend rather than duplicated
-in the base body:
+Tracker metadata is rendered by `write_mode` rather than duplicated in the base
+body:
 
 - GitHub `write_mode=apply`: resolve the mapped task type and
   `ready-for-agent` state transports independently. Require `label` for the
@@ -165,14 +151,11 @@ in the base body:
   insert the exact configured field in the header metadata region after the H1
   and before the first `##` heading before publication; do not invent a key or
   value.
-- Local `write_mode=apply`: insert canonical `issue_type: task` and
-  `workflow_state: ready-for-agent` lines below the H1 title.
 - `write_mode=propose`: leave both lines out of the proposed body and return the
   intended mappings as report metadata. A proposal is never an applied queue
   state.
 
-Do not add a permission, option, or orchestrator-handoff section. Delivery is
-represented only by the canonical `delivery_type` Execution Contract row.
+Do not add a permission, option, or orchestrator-handoff section.
 Derive issues blocked by this issue by scanning other issues'
 `dependency_ids`; keep dependency reasons in Context or implementation prose
 without re-listing IDs.

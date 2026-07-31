@@ -21,13 +21,12 @@ through the caller.
 - Do not invent users, requirements, constraints, or acceptance criteria.
 - Use `references/options.md` for `write_mode`; consume the derived
   `source_route` and do not create another phase-level option.
-- Treat tracker backend and tracker mappings as Project Memory facts. Resolve
-  the canonical `feature` type mapping before rendering
-  or validating a Feature Spec. Local trackers require `local-header`; GitHub
-  requires one supported hosted transport.
+- Treat GitHub routing and tracker mappings as Project Memory facts. Resolve the
+  canonical `feature` type mapping before rendering or validating a Feature
+  Spec. Require one supported GitHub transport.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
-  local or hosted write and return proposed bodies, locations, metadata, and
-  publication order rather than executable commands.
+  write and return proposed bodies, locations, metadata, and publication order
+  rather than executable commands.
 - Do not create hosted-artifact mirrors or temporary planning trees.
 - Load `idea-source.md` when selected new-source `source_idea_refs` or derived
   existing-source `bound_source_idea_refs` are present. Explicit discovery must
@@ -39,12 +38,8 @@ through the caller.
 Receive:
 
 - `write_mode` and the frozen derived `source_route`;
-- one `tracker_backend` and issue-type mapping per affected repository, each
-  with explicit transport plus exact tracker value from that repository's
-  Project Memory;
-- one stable `delivery_type` per implementation-eligible Spec: `github-pr` or
-  `local-branch`; this is accepted execution data, not a Plan Feature option or
-  Project Memory setting;
+- the GitHub issue-type mapping for each affected repository, with explicit
+  transport plus exact tracker value from that repository's Project Memory;
 - planning identity: `feature_slug`, optional `planning_scope`, optional
   canonical lowercase UUID `feature_id`, and `context_files` containing every
   applicable available repository root and matched scoped context used for
@@ -109,8 +104,8 @@ On the new-source route, when `source_idea_refs` are present, run ordinary
 durable-artifact validation through `idea-source.md` before drafting. Read every
 canonical Idea section and planning outcome, validate tracker ownership and
 prior coverage Feature Spec refs, and derive the cumulative covered and
-remaining scope. Reject proposed refs, missing marker mappings, consumed or
-typed GitHub Ideas, malformed local Ideas, and ambiguous repository ownership.
+  remaining scope. Reject proposed refs, missing marker mappings, consumed or
+  typed GitHub Ideas, and ambiguous repository ownership.
 
 On the existing-source route, validate `bound_source_idea_refs` through
 `idea-source.md` without drafting: require the exact complete set from the
@@ -133,17 +128,15 @@ Stop rather than guess when more than one owner remains plausible.
 Choose locations from the explicit affected Git repositories and each
 repository's tracker facts:
 
-| Affected Git repositories | Tracker backend | Feature Spec location |
+| Affected Git repositories | Tracker | Feature Spec location |
 | --- | --- | --- |
-| One | `github` | `Feature Spec: <Feature Name>` issue in that repository. |
-| One | `local` | `planning/features/<feature-slug>/SPEC.md`. |
-| Multiple | Per owning repository | One linked implementation-eligible Feature Spec in every affected repository. |
+| One | GitHub Issues | `Feature Spec: <Feature Name>` issue in that repository. |
+| Multiple | GitHub Issues per owning repository | One linked implementation-eligible Feature Spec in every affected repository. |
 
 One Git repository may contain a monorepo; use `planning_scope`, affected paths,
 and scoped contexts without adding a topology enum. Never synthesize another
-Spec above the repo-owned linked set. Resolve every affected repository's tracker facts
-independently. A GitHub repository gets a repo-owned hosted Feature Spec; a local
-repository gets `planning/features/<feature-slug>/SPEC.md` inside that repository.
+Spec above the repo-owned linked set. Resolve every affected repository's
+GitHub tracker facts independently; each gets a repo-owned hosted Feature Spec.
 
 For multi-repository work:
 
@@ -155,18 +148,11 @@ For multi-repository work:
 2. Produce every repo-owned member to obtain stable durable or proposed refs.
    In proposal mode use `proposed-spec:<feature_id>/<repository_key>` for each
    member.
-   In apply mode, make every multi-repository ref globally unambiguous: use
-   `owner/repository#<number>` or a canonical hosted URL for GitHub and
-   `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`
-   for local Markdown. The shared UUID prevents equal repository names in
-   unrelated sets from colliding. Use those same refs in every member's
-   `Feature Spec Set` and Feature Dependencies; bare `#<number>`, a bare
-   repository key, and bare repo-relative paths are invalid in a
-   multi-repository feature. This qualified local ref is a portable identity,
-   not the physical path: after exact Feature ID and repository-key
-   verification, strip precisely the `<feature-id>--<repository-key>/` prefix
-   to recover `planning/features/<feature-slug>/SPEC.md`, then resolve that
-   remainder only inside the separately verified owning repository root.
+   In apply mode, make every multi-repository ref globally unambiguous with
+   `owner/repository#<number>` or a canonical hosted URL. Use those same refs in
+   every member's `Feature Spec Set` and Feature Dependencies; bare `#<number>`,
+   a bare repository key, and bare repo-relative paths are invalid in a
+   multi-repository feature.
 3. Assign each cross-repository boundary and every bundle-level acceptance or
    proof obligation to one existing implementation member
    that can execute the combined proof within its accepted repository, paths,
@@ -215,16 +201,12 @@ For multi-repository work:
    change requires a separately authorized whole-set update.
 7. Start issue generation only after the complete linked artifact set exists.
 
-Mixed tracker backends are valid because routing is an owning-repository fact,
-not one run-wide choice. Preserve one publication plan ordered by member
-creation, linked-set finalization, then
-generated issues. Proposed refs are inspection-only and never agent-executable.
-In apply mode, place every role, including an all-local bundle, in one
-recoverable publication transaction. Hosted roles use staging when their refs
-are unknown. Keep deterministic local bodies unwritten until every hosted ref
-is known and every hosted body is final; then write the local bodies with
-qualified final refs and verify the hosted and local artifacts as one connected
-set. Never persist a local body that points to a staging identity.
+GitHub routing is fixed for every owning repository. Preserve one publication
+plan ordered by member creation, linked-set finalization, then generated issues.
+Proposed refs are inspection-only and never agent-executable. In apply mode,
+place every role in one recoverable hosted publication transaction and use
+staging when refs are unknown. Never persist an issue that points to a staging
+identity.
 
 #### Allowed Path Scope Contract
 
@@ -235,7 +217,6 @@ Use this canonical table when defining Feature Spec and implementation-issue
 | --- | --- |
 | `feature-owned-work` | `complete-safe-prefixes` |
 | `exact-file-boundary` | `exact-path` |
-| `local-tracker-lifecycle` | `exact-active-and-done-paths` |
 | `unrelated-pre-existing-failure` | `excluded` |
 
 `complete-safe-prefixes` means the smallest complete and reasonably predictable
@@ -342,18 +323,9 @@ scope derives from that Idea, and omit it from unrelated members. Preserve the
 Idea body and keep its refs and transient coverage maps
 out of generated implementation issues.
 
-Render `Delivery type: <delivery_type>` exactly once in `## Planning Identity`
-for every implementation-eligible Feature Spec and copy it into every generated
-issue. It is stable contract data, not a selectable Plan Feature option.
-Support exactly these tracker/delivery combinations: GitHub plus `github-pr`,
-local Markdown plus `local-branch`, and local Markdown plus `github-pr`.
-Repository identity does not choose delivery: a `github:owner/repository`
-identity may still use a local Spec and `local-branch`. On a new source, derive
-delivery only from accepted intent and repository capability; GitHub tracking
-has the sole compatible value `github-pr`, while an ambiguous local tracker in
-a repository capable of either delivery requires clarification. On an existing
-source, require the exact stable line unchanged. Do not persist delivery in
-Project Memory configuration.
+GitHub Issues and pull-request delivery are fixed workflow boundaries. Do not
+render a provider or delivery selector in the Feature Spec; the executor owns
+branch and merge details.
 
 ### 4. Validate Feature Dependencies
 
@@ -367,8 +339,8 @@ For every edge:
 - require a unique durable upstream ref, or a proposed ref only in
   `write_mode=propose`;
 - in a multi-repository applied bundle, require every upstream ref to identify
-  its owning repository through `owner/repository#<number>`, a canonical hosted
-  URL, or `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`;
+  its owning repository through `owner/repository#<number>` or a canonical
+  hosted URL;
 - reject self, duplicate, missing, and ambiguous refs;
 - require a concrete portable reason;
 - normalize upstream-to-downstream edges and validate the reachable Feature
@@ -390,7 +362,7 @@ refs into issue `dependency_ids`.
 
 ### 5. Sanitize And Gate The Body
 
-On the new-source route, replace local filesystem evidence with portable
+On the new-source route, replace machine-local filesystem evidence with portable
 references before return or publication. On the existing-source route, validate
 without modifying the body; any nonportable evidence blocks issue generation
 until a separate explicitly authorized source update lands.
@@ -400,7 +372,7 @@ Portable forms are:
 - current repository: `path/to/file` or `path/to/file:line`;
 - peer repository: `<repo-slug>/<repo-relative-path>`;
 - hosted evidence: URL, issue, PR, or `owner/repo:path`;
-- local-only evidence without a stable identity: a descriptive source label.
+- descriptive source label when no stable identity exists.
 
 Then verify:
 
@@ -413,8 +385,8 @@ Then verify:
 - every materially constrained validation has an explicit prose failure policy
   with its attempt/retry budget, allowed fallback, retained evidence, and
   required terminal outcome;
-- every implementation-eligible Spec carries exactly one supported
-  `Delivery type:` line in Planning Identity;
+- every implementation-eligible Spec uses the fixed GitHub pull-request delivery
+  boundary without adding a provider or delivery field;
 - open questions are empty or proven non-blocking;
 - a present phase-level knowledge delta has explicit portable decisions,
   targets, and evidence, while no Feature Spec body contains `knowledge_delta`
@@ -434,9 +406,7 @@ Then verify:
   the proof-owner task or its peer task; each worker must stay inside its own
   worktree and the proof owner must use peer-exposed component boundaries;
 - the body contains no workflow status field such as `Status: Draft`;
-- an applied local body contains exactly one `issue_type: <configured feature
-  value>` header after the H1 and before `## Source`; GitHub and proposed
-  bodies contain no local header;
+- GitHub and proposed bodies contain no tracker header;
 - every selected Idea ref appears only in the `## Source` section of each
   relevant Feature Spec and nowhere in generated issue contracts;
 - every material selected-Idea element has exactly one candidate destination:
@@ -449,9 +419,7 @@ Withhold the artifact and return blockers when the gate fails.
 
 On the existing-source route, skip body drafting and publication. Resolve the
 configured transport for canonical `feature` metadata before comparing state.
-For a local source, require the exact configured `local-header` value already
-in the immutable body; a missing or conflicting header requires a separately
-authorized source update. For GitHub, use `issue_operation=set-type` only for a
+For GitHub, use `issue_operation=set-type` only for a
 `native-type` mapping, `issue_operation=add-label` for a `label` fallback, or
 the exact `body-field` convention when that convention is already satisfied by
 the immutable source. Under `write_mode=apply`, repair only the missing hosted
@@ -460,8 +428,7 @@ repair. A conflicting native type or mapped fallback blocks. Never invent or
 attempt an unsupported native type operation when GitHub Issue Types are
 disabled. Immediately before reporting or applying a repair, re-read the exact
 source body/ref, current metadata, and mapping row; restart validation or block
-on any drift rather than mutating against a stale immutable source. Local
-Feature Specs have no separate source metadata mutation. Then return the
+on any drift rather than mutating against a stale immutable source. Then return the
 current durable source, including preserved executor-owned checkbox markers,
 after the dependency and body gates pass.
 
@@ -490,16 +457,16 @@ new-source write. If a durable source or partial-publication artifact outside
 the recognized publication transaction appeared or changed after route
 resolution, stop and restart from fresh intake comparison; do not switch routes
 in place, overwrite it, or publish a duplicate. During one recognized
-multi-repository transaction, artifacts created by its own verified hosted or
-local operations are expected and do not trigger this foreign-race guard.
-Immediately before each hosted staging or direct create and each local-file
-create, re-read that exact target plus its source and mapping inputs and prove
-the target remains absent. Use non-overwrite semantics, stop on a foreign or
-ambiguous appearance, and verify each successful create before continuing.
+multi-repository transaction, artifacts created by its own verified hosted
+operations are expected and do not trigger this foreign-race guard.
+Immediately before each hosted staging or direct create, re-read that exact
+target plus its source and mapping inputs and prove the target remains absent.
+Use non-overwrite semantics, stop on a foreign or ambiguous appearance, and
+verify each successful create before continuing.
 
 For any multi-repository apply, use one recoverable publication transaction.
 Hosted roles require staging because final issue numbers are unavailable before
-creation; deterministic local refs are resolved before mutation:
+creation:
 
 1. Before any mutation, validate every role-keyed parameterized final-body
    template and predeclare the complete member, `Feature Spec Set`, and Feature
@@ -508,29 +475,22 @@ creation; deterministic local refs are resolved before mutation:
    each role, exact target, title, complete reconstructable template, allowed
    ref slots, and allowed body-metadata insertion. Materialize final bodies only
    after every ref used by that body is resolved and the optional final-only
-   body metadata is inserted; all-local bodies may therefore be materialized
-   before the first write. Do not compute whole-body tracker digests.
+   body metadata is inserted. Do not compute whole-body tracker digests.
 2. Re-read every target, then immediately re-read and prove exact-target absence
    before each missing predeclared hosted-role create with
    `issue_operation=create`. A hosted staged body contains all final content
    except the predeclared ref substitutions and optional final-only
    `body-field` metadata, plus a unique transaction/role marker and an explicit
-   non-executable staging notice. Do not write local roles while a hosted role
-   remains staged. Do not apply final feature metadata, generate issues, or
+   non-executable staging notice. Do not apply final feature metadata, generate issues, or
    present a staged issue as a Feature Spec.
-3. After every hosted ref is known, combine those refs with deterministic local
-   refs and materialize every final body. Invoke
+3. After every hosted ref is known, materialize every final body. Invoke
    `issue_operation=edit` only to replace the predeclared ref slots, insert the
    exact predeclared final-only `body-field` metadata when configured, remove the
    staging marker and notice, and produce that predeclared final body. Reject every
    other body difference. Verify a body convention as part of that final body;
    apply any native Issue Type or label transport only after the body verifies.
-4. Verify every hosted final body and globally qualified ref, then immediately
-   re-read and prove exact-target absence before each missing predeclared local
-   file create with its exact recorded final body. For
-   an all-local bundle, this is the transaction's first mutation. Verify every
-   local body, mapped metadata value, and cross-link as part of the same
-   connected set before ending the transaction or starting issue generation.
+4. Verify every hosted final body and globally qualified ref before ending the
+   transaction or starting issue generation.
 
 After each transaction mutation, retain the verified role-to-ref map and return
 it in any partial-failure continuation handoff together with every complete
@@ -542,11 +502,9 @@ only when the supplied or reconstructable transaction identity, role map,
 reconstructable templates, allowed ref slots, optional body-metadata slot and
 value, materialized final bodies when available, and current tracker state
 match directly. A digest is insufficient recovery evidence.
-Resume only missing `create`,
-predeclared `edit`, exact local-file create, or metadata operations. This exact
-continuation rule also covers an all-local partial write. A mixed partial/final
-set without sufficient exact recovery evidence blocks; never adopt it as an
-immutable existing-source bundle or create duplicates. Once every Spec is final
+Resume only missing `create`, predeclared `edit`, or metadata operations. A
+partial hosted set without sufficient exact recovery evidence blocks; never
+adopt it as an immutable existing-source bundle or create duplicates. Once every Spec is final
 and verified, a later retry derives the ordinary existing-source route from any
 member and traverses the whole connected set.
 
@@ -559,22 +517,8 @@ member and traverses the whole connected set.
   the final body verifies, and retain the hosted issue number or URL as
   `source_spec_ref`. In multi-repository work, store
   `owner/repository#<number>` or the canonical URL, never a bare issue number.
-- `write_mode=apply`, local: write the ordinary Feature Spec to
-  `planning/features/<feature-slug>/SPEC.md` inside its owning repository and
-  use that path as `source_spec_ref`. Require the Project Memory `feature`
-  mapping to use `local-header`, then insert exactly
-  `issue_type: <configured tracker value>` after the H1 and before `## Source`.
-  Do not add a workflow-state header to a Feature Spec. In a multi-repository feature, use
-  `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md` as the qualified
-  ref while creating the physical file only at
-  `planning/features/<feature-slug>/SPEC.md` inside the owning repository.
-  Treat the qualified prefix as identity metadata, never as a directory, and
-  create the file only as its predeclared transaction operation. On
-  exact continuation, create only missing
-  predeclared local files whose targets and final bodies still match; never
-  overwrite or repair a conflicting file.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
-  location, mapped metadata, and deterministic source identity:
+  repository target, mapped metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   or `proposed-spec:<feature_id>/<repository_key>` for a linked
   multi-repository member.

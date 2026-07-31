@@ -1,14 +1,10 @@
 # Feature Spec Template
 
-Use this shape unless the project already has a stronger local Feature Spec
-format. Keep option selection out of the body; `references/options.md` owns the
-single run choice.
+Use this shape for GitHub Feature Spec issues. Keep option selection out of the
+body; `references/options.md` owns the single run choice.
 
 ```markdown
 # Feature Spec: [Feature Name]
-
-issue_type: [configured local-header feature value; include only in an applied
-local artifact, otherwise omit this line]
 
 ## Source
 
@@ -31,8 +27,6 @@ for a standalone Spec.]
 - Context files: [include every applicable available repository root and
   matched scoped context used for planning; omit roots and routes with no
   context file].
-- Delivery type: [github-pr or local-branch; stable execution fact, never a
-  selectable Plan Feature option].
 
 ## Problem
 
@@ -74,7 +68,7 @@ for a standalone Spec.]
 
 | feature_spec_ref | affected_repository | responsibility |
 | --- | --- | --- |
-| [globally qualified hosted ref, URL, or repository-qualified local path] | [canonical repository identity] | [non-empty implementation responsibility plus every owned ID as an exact inline-code token such as `<repository-key>:ac-<NN>` or `<repository-key>:proof-<lower-kebab-boundary>`] |
+| [globally qualified hosted ref or URL] | [canonical repository identity] | [non-empty implementation responsibility plus every owned ID as an exact inline-code token such as `<repository-key>:ac-<NN>` or `<repository-key>:proof-<lower-kebab-boundary>`] |
 
 ## Feature Dependencies
 
@@ -157,13 +151,6 @@ outside the body after publication verifies. When Project Memory instead maps
 header metadata region after the H1 and before `## Source`; include it in the
 final body and do not invent a key or value. In `write_mode=propose`, omit
 applied metadata from the body and report the intended mapping separately.
-
-For a local `write_mode=apply` publication, require the configured `feature`
-transport to be `local-header` and replace the template placeholder with the
-exact `issue_type: <configured tracker value>` line. Place it immediately after
-the H1 and before `## Source`. Feature Specs do not receive a local workflow
-state header. Proposed bodies omit the applied header and report its intended
-mapping separately.
 
 When Plan Feature receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no

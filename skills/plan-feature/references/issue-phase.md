@@ -15,10 +15,10 @@ deferred domain-memory closeout.
 - Do not perform implementation or domain-memory writes.
 - Use the incoming `write_mode` and derived `source_route`; do not create
   phase-specific choices.
-- Treat tracker routing, issue types, workflow states, and their explicit
+- Treat GitHub routing, issue types, workflow states, and their explicit
   transports as Project Memory facts. Treat affected repository identities as
   explicit intake or validated Feature Spec Set data. Reject missing, unknown,
-  or backend-incompatible transports instead of inferring them.
+  or GitHub-incompatible transports instead of inferring them.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
@@ -26,8 +26,8 @@ deferred domain-memory closeout.
   weaker workflow state.
 - Keep cross-Feature-Spec edges in the Feature Spec. Generated issue
   dependencies are intra-Spec only.
-- Give every issue one Execution Contract table and no duplicate delivery or handoff
-  projection.
+- Give every issue one six-field Execution Contract table and no duplicate
+  handoff projection.
 - Treat generated issues as strong executor-ready starting briefs. Protect the
   stable planning contract directly while preserving compatible executor-owned
   operational edits; never compare a whole tracker body or compute its digest.
@@ -47,9 +47,8 @@ Receive:
 - a durable `source_spec_ref`, or a proposed ref only with
   `write_mode=propose`;
 - the complete Feature Spec body and validated cross-Spec dependency graph;
-- planning identity, affected repositories, allowed paths, shared target
-  branch, and stable `delivery_type`;
-- tracker backend facts for every owning repository;
+- planning identity, affected repositories, allowed paths, and shared target
+  branch;
 - optional shared `feature_id` and the validated identical `Feature Spec Set`
   when multiple repositories are affected;
 - current durable implementation-issue bodies, generated IDs, refs, metadata,
@@ -104,9 +103,7 @@ Read the Feature Spec and verify:
 - every Feature Spec dependency ref resolves and the cross-Spec graph is
   acyclic;
 - every applied multi-repository source and dependency ref is globally
-  unambiguous: `owner/repository#<number>` or a canonical hosted URL for GitHub,
-  and `<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md` for
-  local Markdown;
+  unambiguous: `owner/repository#<number>` or a canonical hosted URL;
 - the complete linked Feature Spec Set exists for multi-repository work;
 - portable evidence contains no developer-machine absolute path;
 - the Feature Spec body contains neither `knowledge_delta` nor
@@ -130,9 +127,9 @@ Feature Spec and every candidate carrying its durable `source_spec_ref`,
 following pagination through the complete result set. If the connector cannot
 prove all-state enumeration and pagination completeness, require GitStack's
 read-only gap fallback to use paginated `gh api` reads. A fixed-limit
-`gh issue list` result is never completeness proof. For local tracking, inspect
-the complete active and `done/` subtrees. If neither backend can prove complete
-state, block before graph synthesis, absence claims, no-op, or proposal output.
+`gh issue list` result is never completeness proof. If GitStack cannot prove
+complete state, block before graph synthesis, absence claims, no-op, or
+proposal output.
 
 Parse every durable candidate's generated ID, title, source ref, Execution
 Contract, stable planning fields, hardening provenance, metadata, and parent
@@ -201,16 +198,6 @@ reduce the scope to guessed file names or omit foreseeable supporting paths
 merely to manufacture disjoint execution. Reject genuine overlapping scopes
 that could make independent execution unsafe, or add an explicit dependency
 between the affected issues.
-
-For every local Markdown issue, derive its exact active path and matching
-`done/` destination from the owning tracker subtree. Add the tracker-owning
-repository to `affected_repositories`, and add both exact paths to
-`allowed_paths`, including in proposal output. The eventual move is therefore
-inside the issue's authorized execution scope; do not replace either path with a
-wildcard. Verify both paths resolve inside that affected Git repository and a
-future executor checkout can expose them. If the tracker artifact lives at a
-non-Git root or outside every affected repository, withhold the issue
-as non-executable; never invent a tracker-owning repository.
 
 All issues use the Feature Spec's shared `target_branch_name`. Repository shape
 is not copied into a selectable issue field.
@@ -334,8 +321,8 @@ text/count/order; safety constraints; and material validation constraints,
 including retry/attempt budgets and required terminal outcome. Compare those
 sections and fields directly; do not compute a whole-body, result, assignment,
 message, or tracker-text digest.
-For issue comparison, source, branch, and delivery identity mean the rendered
-`source_spec_ref`, `target_branch_name`, and `delivery_type`.
+For issue comparison, source and branch identity mean the rendered
+`source_spec_ref` and `target_branch_name`.
 Do not perform a fresh model split merely to recreate comparison prose.
 
 Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
@@ -379,15 +366,14 @@ the repair: `native-type` uses `set-type` and `label` uses `add-label`. A config
 metadata: it must already match, and a missing or different body field is a body
 conflict that blocks convergence until a separately authorized replacement
 lands. Never attempt a native type operation when types are disabled. Unrelated
-repository labels are not Plan Feature metadata. A closed issue or local
-`done/` issue with a contract-equivalent body is valid progressed lifecycle
-state owned by the executor: after any safe GitHub type-only repair, retain it
-without restoring `ready-for-agent` or reopening it. Never repair header
-metadata on a local `done/` issue.
+  repository labels are not Plan Feature metadata. A closed issue with a
+  contract-equivalent body is valid progressed lifecycle state owned by the
+  executor: after any safe GitHub type-only repair, retain it without restoring
+  `ready-for-agent` or reopening it.
 
-An implementation issue already in the `done/` subtree or closed state remains
-part of durable state. It must match the same contract; never create a duplicate
-active issue for it. Partial-publication recovery resumes only missing issue,
+An implementation issue already in a closed state remains part of durable state.
+It must match the same contract; never create a duplicate active issue for it.
+Partial-publication recovery resumes only missing issue,
 mapped metadata, and parent/sub-issue operations after the comparison passes.
 
 ### 7. Harden Every Missing Issue
@@ -416,7 +402,7 @@ criteria remain unchanged."
 Run final verticality, scope-overlap, dependency, validation, and readiness
 gates. If hardening exposes a graph-level defect, discard affected results,
 return to step 5, restabilize the graph and IDs, and re-harden every materially
-changed issue. For an issue-local repair, run another hardening pass on that
+changed issue. For a scope repair, run another hardening pass on that
 issue before output. Never use hardening to rewrite an existing durable issue.
 Supersede earlier briefs and persist only final stable results; pass count is
 derived work, not an option or artifact field.
@@ -431,7 +417,6 @@ Use `references/issue-body-template.md`. Every issue has exactly one
 - `affected_repositories`;
 - `allowed_paths`;
 - `target_branch_name`;
-- `delivery_type`;
 - `dependency_ids`.
 
 Do not add permission, review, PR-count, completion-method,
@@ -455,8 +440,6 @@ An applied issue may receive `ready-for-agent` only when:
   allowed fallback, retained evidence, and required terminal outcome;
 - the Execution Contract contains every required field exactly once;
 - affected repositories and allowed paths are unambiguous;
-- a local issue includes its tracker-owning repository plus its exact active and
-  derived `done/` paths;
 - dependency IDs resolve, point only to strictly earlier generated IDs, and the
   graph is acyclic;
 - named integration gates exist where needed;
@@ -521,22 +504,8 @@ when a delta exists.
   through the matching canonical GitStack operation, verify every mutation,
   and retain the hosted ref separately from its generated ID. Never attempt a
   native type mutation when GitHub Issue Types are disabled.
-- `write_mode=apply`, local: retain exact existing files and write only missing
-  `planning/features/<feature-slug>/issues/<NN>-<slug>.md` in the owning
-  repository. Insert canonical `issue_type: task` and
-  `workflow_state: ready-for-agent` header lines. Preserve generated IDs in
-  filenames and dependency data. Render completion into the matching subtree:
-  issues move to `planning/features/<feature-slug>/issues/done/`. Before output,
-  include the tracker-owning repository and both exact source and destination
-  paths in each issue's Execution Contract.
-  For a contract-equivalent existing active file with only missing canonical
-  `issue_type: task` or `workflow_state: ready-for-agent`, repair exactly those
-  header lines and verify every stable section and all mutable execution
-  content remain unchanged. Never perform
-  this repair on a file in `done/`, restore an executor-owned lifecycle state,
-  or edit a conflicting body.
 - `write_mode=propose`: write nothing. Return retained durable artifacts plus
-  every missing proposed body, intended path or repository, mapped metadata,
+  every missing proposed body, intended repository, mapped metadata,
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
   `proposed-issue:<feature_id>/<repository_key>/<NN>` for an issue owned by a
@@ -552,8 +521,8 @@ use pure read operations with mutation fields omitted to prove current hosted
 state and convergence safety. GitStack does not interpret Plan Feature's tracker
 or write policy.
 
-In multi-repository work, publish each issue through its owning repository's
-configured tracker. Preserve source links to peer Feature Specs and
+In multi-repository work, publish each issue through GitHub in its owning
+repository. Preserve source links to peer Feature Specs and
 cross-repository integration gates. Do not create a separate scheduling
 artifact; the issue graph is authoritative.
 
@@ -561,12 +530,11 @@ Use transient body transport outside repositories for hosted writes and remove
 it after verified mutation. Plan Feature owns only the planning-artifact writes
 performed in this phase.
 
-Immediately before each hosted create or local file create, re-read the exact
-target plus the owning Feature Spec and mapping rows and prove that the frozen
-artifact is still absent. Stop and restart or block if a foreign issue/file,
-source edit, mapping change, or ambiguous mutation result appears; never create
-a duplicate or overwrite a newly created local path. Verify every successful
-create before moving to the next operation.
+Immediately before each hosted create, re-read the exact target plus the owning
+Feature Spec and mapping rows and prove that the frozen artifact is still
+absent. Stop and restart or block if a foreign issue, source edit, mapping
+change, or ambiguous mutation result appears; never create a duplicate. Verify
+every successful create before moving to the next operation.
 
 When no issue, metadata, or relationship operation is missing, perform no
 mutation and report the verified complete bundle as a no-op only after the

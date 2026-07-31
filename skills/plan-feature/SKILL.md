@@ -11,9 +11,9 @@ Use this planning-only skill to converge feature intent or a durable Feature
 Spec into one complete, internally consistent bundle: the Feature Spec set,
 hardened vertical implementation issues, tracker metadata, and relationships.
 A Feature Spec is the durable parent contract for one bounded product or system
-change. The configured tracker may be GitHub or local Markdown. Plan Feature
-produces the same implementation-ready planning contract for either backend and
-does not select the executor's publication or completion transport.
+change. GitHub Issues are the authoritative tracker and pull requests are the
+fixed delivery boundary; Plan Feature does not select executor publication or
+completion behavior.
 
 The public pipeline is:
 
@@ -33,7 +33,7 @@ default-path run registry:
 | --- | --- |
 | `write_mode` | `apply`, `propose` |
 
-Reject every unregistered field or value. Project Memory owns tracker routing,
+Reject every unregistered field or value. Project Memory owns GitHub routing,
 issue types, workflow states, and their transports. Explicit intake or a
 validated linked Feature Spec Set owns the affected repository identities.
 Paths, local-root candidates, slugs, refs, branches, dependencies, and domain
@@ -41,7 +41,7 @@ handoffs are data.
 
 Resolve `write_mode` once:
 
-- `apply`: publish through the configured tracker.
+- `apply`: publish through GitHub.
 - `propose`: perform no writes and return proposed bodies, target locations,
   metadata, and publication order. Do not return executable commands.
 
@@ -55,9 +55,9 @@ Resolve `write_mode` once:
   task receives its exact structured request. Scope repair remains an internal
   branch of `existing-source`, never a selectable option or a third source
   route.
-- Treat tracker routing, issue types, workflow states, and their transports as
+- Treat GitHub routing, issue types, workflow states, and their transports as
   Project Memory facts. Treat the affected repository set as explicit feature
-  data. Reject missing, stale, contradictory, or backend-incompatible facts
+  data. Reject missing, stale, contradictory, or GitHub-incompatible facts
   instead of turning them into Plan Feature options.
 - Keep one run bounded to one feature and derive one `source_route` from intake
   evidence. No durable Spec selects `new-source`; one canonical durable Spec
@@ -84,16 +84,14 @@ Resolve `write_mode` once:
   `allowed_paths` envelope to the owning Spec and named issue. It preserves
   every other stable field and executor-owned update, records an audit, and
   never consumes or persists Codex runtime identity.
-- Keep `tracker_backend` and `delivery_type` separate. Project Memory owns only
-  tracker location. Every implementation-eligible Spec and issue carries the
-  stable non-option delivery fact `github-pr` or `local-branch`; support GitHub
-  tracker plus PR, local tracker plus local branch, and local tracker plus PR.
-  Never infer PR delivery merely from a GitHub repository identity.
+- GitHub Issues and pull-request delivery are fixed workflow boundaries. Do not
+  persist provider or delivery selectors in Project Memory, Feature Specs, or
+  issue contracts.
 - Feature Spec and issue acceptance criteria are independent contracts. Before
   publication, require a transient complete, non-contradictory map from every
   Spec criterion to one or more final issues. Checkbox state never changes
   criterion identity and Plan Feature never edits executor-owned markers.
-- Give every issue one seven-field `## Execution Contract` owned by
+- Give every issue one six-field `## Execution Contract` owned by
   `references/issue-body-template.md`. Keep intra-Spec ordering only in
   `dependency_ids`; keep cross-Spec ordering only in the Spec's mandatory
   `## Feature Dependencies` table.
@@ -103,9 +101,7 @@ Resolve `write_mode` once:
   verified no-op for a complete bundle, and block on duplicates, stale bodies,
   conflicting relationships, or races. Re-read authoritative state immediately
   before proposal, no-op, and mutation.
-- In local Markdown mode, issue scope includes the tracker repository and both
-  the exact active issue path and its derived `done/` path. In every backend,
-  use portable refs and evidence and keep executor transport, task scheduling,
+- Use portable refs and evidence and keep executor transport, task scheduling,
   checkout, review, publication, and merge authority out of planning artifacts.
 - Each implementation-eligible Spec owns a unique
   `(affected_repository, target_branch_name)` pair. Multi-repository features
@@ -138,7 +134,7 @@ Resolve `write_mode` once:
 | `$project-memory` | Tracker routing or an explicitly required Idea marker mapping is missing, stale, or contradictory. | Use only `tracker-routing`; a missing Idea mapping blocks only Idea capture, discovery, or consumption, and Plan Feature never performs domain closeout. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan Feature owns artifact writes. |
-| `$gitstack:github-issues` | The owning tracker backend is GitHub and Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, mapped metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
+| `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, mapped metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
 mutations belong to the selected executor, not Plan Feature. Terminal
@@ -186,11 +182,8 @@ When intake includes `scope_repair_request`, require one durable
 `source_route=existing-source`, load `references/scope-repair.md`, and reject
 proposed sources or runtime coordination fields. Do not add a Plan Feature
 option for the repair.
-Resolve one stable `delivery_type` per implementation-eligible Spec without
-adding an option or Project Memory setting. GitHub tracking resolves to its only
-supported delivery, `github-pr`; local tracking requires accepted evidence for
-`local-branch` or `github-pr`, and repository identity alone is never evidence
-for PR delivery.
+GitHub Issues and pull-request delivery are fixed; no delivery choice is
+resolved or persisted.
 The affected repository set is explicit feature data. Never infer it from the
 current Codex task, the ChatGPT App primary project or saved-project list, or
 filesystem proximity.
@@ -286,8 +279,7 @@ drafting or publication. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
-- `write_mode`, derived `source_route`, Project Memory facts, and stable
-  `delivery_type` data;
+- `write_mode`, derived `source_route`, and Project Memory facts;
 - planning identity and repository scope;
 - source-ref state and cross-Spec dependency rows;
 - optional validated `source_idea_refs`, normalized Idea evidence, prior
@@ -298,7 +290,7 @@ require a separately authorized update. On the new-source route, load
   reconstructable templates, slots, selected Idea/prior-outcome refs, and
   completed plus missing operations;
 
-Require a durable local or hosted `source_spec_ref` for `write_mode=apply`, or
+Require a durable hosted `source_spec_ref` for `write_mode=apply`, or
 a deterministic proposed ref and publication-order note for
 `write_mode=propose`. Never persist a delta marker in the Spec or silently
 downgrade `write_mode`. Route new blockers back through clarification. Always
@@ -365,11 +357,11 @@ failure by reconciling it to `needs-triage` at terminal exit.
 
 Partial coverage writes the canonical cumulative planning-outcome block and
 returns the Idea to `needs-triage`; full coverage writes the canonical
-cumulative block, clears actionable states, and closes the GitHub Idea or marks
-the local Idea consumed. Apply each decision independently and retry only
+cumulative block, clears actionable states, and closes the GitHub Idea. Apply
+each decision independently and retry only
 missing operations after partial source reconciliation. On resume, use the
-reconciliation-only branch and treat a closed GitHub Idea or local full outcome
-as already reconciled only when its complete canonical record exactly matches
+reconciliation-only branch and treat a closed GitHub Idea as already reconciled
+only when its complete canonical record exactly matches
 the verified cumulative Spec set and coverage result.
 
 ### 6. Report Completion
@@ -426,5 +418,3 @@ captured.
 - `references/issue-body-template.md`: generated issue shape and single
   Execution Contract.
 - `references/vertical-slices.md`: slicing and readiness gates.
-- `references/complete-bundle-proposal.md`: non-mutating complete-bundle
-  `write_mode=propose` fixture.

@@ -35,14 +35,8 @@ implementation issue, or another Plan Feature mode.
 ## Durable Identity And Validation
 
 Resolve exactly one tracker-owning repository for every Idea before drafting.
-Use these durable ref shapes:
-
-- GitHub in the current repository: `#<number>`;
-- GitHub across repositories: `owner/repository#<number>` or its canonical
-  hosted URL;
-- local in the current repository: `planning/ideas/<idea-slug>.md`;
-- local across repositories:
-  `<repository-slug>/planning/ideas/<idea-slug>.md`.
+Use the globally qualified GitHub ref shape `owner/repository#<number>` or its
+canonical hosted URL. A bare `#<number>` is not a durable source identity.
 
 For ordinary planning input, verify that a GitHub Idea is open, carries the
 configured `artifact_marker=idea` label, has no native Issue Type, and has at
@@ -51,12 +45,6 @@ other mapped canonical workflow-state label. Require explicit Project Memory
 transport `label` for the marker and every consumed workflow row. Read the
 complete body and the complete comment history, following pagination until
 every marker-bearing planning-outcome comment has been inspected.
-
-For a local Idea, verify the canonical path, an H1 beginning `# Idea:`, exactly
-one `artifact_marker: idea` line in the header metadata region, no `issue_type`
-line, at most one `workflow_state` whose value is `needs-triage` or
-`needs-info`, and the complete canonical Idea body. Require `local-header` for
-the marker and consumed workflow-state rows.
 
 For existing-source continuation, first verify every bound ref appears in the
 stable Spec content and no `- Source Idea:` ref was omitted. Then read each
@@ -103,19 +91,17 @@ material scope, and must not return previously covered scope to
   ignored.
 - Absent an explicitly authorized re-plan, any Idea whose latest canonical
   record is `coverage: full` is consumed and is not valid ordinary planning
-  input. An open GitHub Idea in that state, or a local full-outcome Idea that
-  still carries a workflow state, is reconciliation-pending because state
-  cleanup or closeout did not complete; route it only to reconciliation-only
-  recovery.
+  input. An open GitHub Idea in that state is reconciliation-pending because
+  state cleanup or closeout did not complete; route it only to
+  reconciliation-only recovery.
 - During reconciliation-only recovery for the same already-published planning
   result, accept a closed, marker-valid, untyped GitHub Idea as already
   reconciled only when its complete canonical full outcome exactly matches the
   verified cumulative authoritative refs and scope. Do not reopen it or
   duplicate its outcome.
-- Allow a consumed local Idea as new input only when the user explicitly asks
-  to plan it again. Preserve every prior outcome and append a new result only
-  after the new run succeeds. A closed GitHub Idea requires separately
-  authorized reopening before it can become new planning input.
+- A closed GitHub Idea requires separately authorized reopening before it can
+  become new planning input. Preserve every prior outcome and append a new
+  result only after the new run succeeds.
 
 An authorized re-plan after a full outcome begins a new active planning cycle.
 Preserve earlier records as history, but do not fold their refs or scope into
@@ -211,7 +197,7 @@ still active.
 | Failure before a previously requested answer was supplied | Preserve the Idea's previous state and report the blocker. |
 | Failure after a supplied answer resolved `needs-info` | Keep the Idea open, replace stale `needs-info` with `needs-triage`, and report the technical blocker. |
 | Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, add `needs-triage`, and remove `needs-info`. |
-| Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed or mark the local Idea consumed. |
+| Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed. |
 | `write_mode=propose` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
 
 If requester input resumes planning, remove `needs-info` only as part of the
@@ -240,11 +226,6 @@ covered_scope:
 remaining_scope:
 - <concise residual outcome, or `none` for full coverage>
 ```
-
-For a local Idea, append the same fields under a new
-`### Planning Outcome` subsection inside one append-only
-`## Planning Outcomes` section. Use the same marker immediately after the
-subheading.
 
 Canonicalization rules:
 
@@ -282,7 +263,7 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 2. Require the intended cumulative outcome to match the verified durable Spec
    set and coverage map exactly.
 3. Treat an exact canonical outcome as already written. Retry only missing
-   label, comment, local-record, or close operations.
+   label, comment, or close operations.
 4. Accept an already-closed GitHub Idea only for an exact matching full outcome
    and treat it as complete. Never reopen it during recovery.
 5. When selected Ideas have mixed completion state, skip verified completed
@@ -290,7 +271,7 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 6. Stop on any source-body, marker, outcome, or ref mismatch. Do not draft,
    republish, or rewrite Feature Specs during source-only recovery.
 
-## Backend Mutations
+## GitHub Lifecycle Mutations
 
 Before a GitHub `write_mode=apply` reconciliation that adds a workflow state,
 require its configured transport to be `label`, resolve that exact label, and
@@ -314,13 +295,6 @@ first, reconcile `needs-triage` and `needs-info` second, and close a fully
 covered Idea last. Use `$gitstack:github-issues` for each exact operation,
 verify state after every mutation, and retry only operations proven missing.
 Retain the `idea` marker when closing.
-
-For local `write_mode=apply`, leave every captured section unchanged, create
-`## Planning Outcomes` only when the first durable outcome is ready, and append
-one non-duplicated canonical subsection per successful planning result. Update
-only the optional `workflow_state` header according to the exit table. The Idea
-file stays at its canonical path; a latest canonical full outcome marks it
-consumed.
 
 Apply lifecycle operations only for explicitly selected new-source
 `source_idea_refs` or existing-source `bound_source_idea_refs` proven by the
