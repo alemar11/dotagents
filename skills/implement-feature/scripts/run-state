@@ -21,9 +21,7 @@ from typing import Any
 
 CLI_VERSION = "6.0.0"
 RUNTIME_CONTRACT_VERSION = "7.0.0"
-DATABASE_SCHEMA_VERSION = 5
-REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
-LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
+DATABASE_SCHEMA_VERSION = 6
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_UNCHANGED_WAIT_SWEEPS = 3
@@ -359,22 +357,28 @@ def connect(*, write: bool) -> sqlite3.Connection:
     return connection
 
 
-SCHEMA_ONE_COLUMNS = {
-    "runtime_metadata": ("singleton", "schema_version", "target_schema_version"),
+CURRENT_SCHEMA_COLUMNS = {
+    "runtime_metadata": ("singleton", "schema_version"),
     "runs": (
-        "run_id", "root_task_id", "status", "implementation_started",
-        "revision", "created_at", "updated_at", "finished_at",
+        "run_id", "root_task_id", "controller_project_id",
+        "runtime_contract_version", "runtime_cli_version", "runtime_artifact_sha256",
+        "status", "implementation_started", "revision", "created_at", "updated_at",
+        "finished_at",
+    ),
+    "run_repositories": (
+        "run_id", "repository_identity", "project_id", "git_common_dir",
+        "git_common_dir_device", "git_common_dir_inode",
     ),
     "assignments": (
         "run_id", "assignment_id", "source_spec_ref", "claim_spec_identity",
-        "repository_identity", "tracker_backend", "delivery_type", "project_id",
-        "title", "target_branch_name", "prerequisite_assignment_ids", "state",
-        "blocked_from_state",
+        "repository_identity", "title", "target_branch_name",
+        "prerequisite_assignment_ids", "state", "blocked_from_state",
         "unchanged_wait_sweeps", "waiting_owner_run_id", "waiting_owner_assignment_id",
         "waiting_owner_root_task_id", "thread_id", "checkout_path", "git_common_dir",
         "head_sha", "base_branch_name", "base_sha", "worktree_clean",
-        "base_is_ancestor", "pr_url", "default_branch_name",
-        "provider_observation_ref", "updated_at",
+        "base_is_ancestor", "pr_url", "default_branch_name", "provider_observation_ref",
+        "updated_at", "feature_id", "contract_generation", "scope_repair_id",
+        "scope_repair_readback_ref",
     ),
     "spec_claims": (
         "run_id", "assignment_id", "repository_identity", "claim_spec_identity",
@@ -383,130 +387,13 @@ SCHEMA_ONE_COLUMNS = {
         "release_reason", "recovery_readback_ref",
     ),
     "app_operations": (
-        "sequence", "run_id", "operation_key", "action", "subject_id",
-        "assignment_id", "status", "receipt_ref", "readback_ref", "thread_id",
+        "sequence", "run_id", "operation_id", "action", "subject_id", "assignment_id",
+        "status", "launch_count", "receipt_ref", "readback_ref", "thread_id",
         "project_id", "checkout_path", "git_common_dir", "observed_title",
         "provider_observation_ref", "head_sha", "pr_url", "observed_state",
-        "created_at", "updated_at",
+        "created_at", "updated_at", "contract_generation", "scope_repair_id",
     ),
 }
-
-
-SCHEMA_TWO_COLUMNS = {
-    **SCHEMA_ONE_COLUMNS,
-    "runs": (
-        "run_id",
-        "root_task_id",
-        "runtime_contract_version",
-        "runtime_cli_version",
-        "runtime_artifact_sha256",
-        "status",
-        "implementation_started",
-        "revision",
-        "created_at",
-        "updated_at",
-        "finished_at",
-    ),
-    "app_operations": (
-        "sequence",
-        "run_id",
-        "operation_id",
-        "action",
-        "subject_id",
-        "assignment_id",
-        "status",
-        "launch_count",
-        "receipt_ref",
-        "readback_ref",
-        "thread_id",
-        "project_id",
-        "checkout_path",
-        "git_common_dir",
-        "observed_title",
-        "provider_observation_ref",
-        "head_sha",
-        "pr_url",
-        "observed_state",
-        "created_at",
-        "updated_at",
-    ),
-}
-
-
-SCHEMA_THREE_COLUMNS = {
-    **SCHEMA_TWO_COLUMNS,
-    "runs": (
-        "run_id",
-        "root_task_id",
-        "controller_project_id",
-        "runtime_contract_version",
-        "runtime_cli_version",
-        "runtime_artifact_sha256",
-        "status",
-        "implementation_started",
-        "revision",
-        "created_at",
-        "updated_at",
-        "finished_at",
-    ),
-    "run_repositories": (
-        "run_id",
-        "repository_identity",
-        "project_id",
-        "git_common_dir",
-        "git_common_dir_device",
-        "git_common_dir_inode",
-    ),
-    "assignments": tuple(
-        column
-        for column in SCHEMA_TWO_COLUMNS["assignments"]
-        if column != "project_id"
-    ) + ("feature_id",),
-}
-
-
-# Schema 4 is retained only as a drained cutover source. The current schema 5
-# has no provider or delivery columns and cannot create local transport state.
-SCHEMA_FOUR_COLUMNS = {
-    **SCHEMA_THREE_COLUMNS,
-    "assignments": SCHEMA_THREE_COLUMNS["assignments"] + (
-        "contract_generation",
-        "scope_repair_id",
-        "scope_repair_readback_ref",
-    ),
-    "app_operations": SCHEMA_THREE_COLUMNS["app_operations"] + (
-        "contract_generation",
-        "scope_repair_id",
-    ),
-}
-
-
-CURRENT_SCHEMA_COLUMNS = {
-    **SCHEMA_FOUR_COLUMNS,
-    "assignments": tuple(
-        column
-        for column in SCHEMA_FOUR_COLUMNS["assignments"]
-        if column not in {"tracker_backend", "delivery_type"}
-    ),
-}
-
-
-def expected_schema_columns(version: int) -> dict[str, tuple[str, ...]]:
-    if version == 1:
-        return SCHEMA_ONE_COLUMNS
-    if version == 2:
-        return SCHEMA_TWO_COLUMNS
-    if version == 3:
-        return SCHEMA_THREE_COLUMNS
-    if version == 4:
-        return SCHEMA_FOUR_COLUMNS
-    if version == DATABASE_SCHEMA_VERSION:
-        return CURRENT_SCHEMA_COLUMNS
-    raise StateError(
-        "unsupported-state-schema",
-        f"database schema {version} has no structural definition in this runtime",
-        4,
-    )
 
 
 def normalized_schema_objects(
@@ -523,12 +410,12 @@ def normalized_schema_objects(
     }
 
 
-def expected_schema_objects(version: int) -> dict[tuple[str, str], str]:
+def expected_schema_objects() -> dict[tuple[str, str], str]:
     expected = sqlite3.connect(":memory:", isolation_level=None)
     try:
         expected.row_factory = sqlite3.Row
         expected.execute("PRAGMA foreign_keys = ON")
-        create_schema(expected, schema_version=version)
+        create_schema(expected)
         return normalized_schema_objects(expected)
     finally:
         expected.close()
@@ -556,19 +443,12 @@ def ensure_schema(connection: sqlite3.Connection, *, allow_create: bool) -> bool
             "unversioned or pre-lineage state is not supported",
             4,
         )
-    version, _ = read_runtime_metadata(connection)
-    if version != DATABASE_SCHEMA_VERSION:
-        raise StateError(
-            "unsupported-state-schema",
-            f"runtime database schema {DATABASE_SCHEMA_VERSION} cannot use database schema {version}",
-            4,
-        )
-    validate_schema_shape(connection, version)
+    validate_schema_shape(connection)
     return False
 
 
-def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
-    columns = expected_schema_columns(version)
+def validate_schema_shape(connection: sqlite3.Connection) -> None:
+    columns = CURRENT_SCHEMA_COLUMNS
     expected = set(columns)
     actual = {
         row[0]
@@ -577,7 +457,11 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
         )
     }
     if actual != expected:
-        raise StateError("invalid-state-schema", f"state tables do not match schema {version}", 4)
+        raise StateError(
+            "invalid-state-schema",
+            f"state tables do not match schema {DATABASE_SCHEMA_VERSION}",
+            4,
+        )
     for table, expected_columns in columns.items():
         actual_columns = tuple(
             row[1] for row in connection.execute(f"PRAGMA table_info({table})")
@@ -585,18 +469,10 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
         if actual_columns != expected_columns:
             raise StateError(
                 "invalid-state-schema",
-                f"state table {table} columns do not match schema {version}",
+                f"state table {table} columns do not match schema {DATABASE_SCHEMA_VERSION}",
                 4,
             )
-    metadata_version, target_version = read_runtime_metadata(connection)
-    if metadata_version != version:
-        raise StateError(
-            "invalid-state-schema",
-            f"state metadata does not match schema {version}",
-            4,
-        )
-    if target_version is not None and target_version <= version:
-        raise StateError("invalid-state-schema", "state cutover target is invalid", 4)
+    read_runtime_metadata(connection)
     assignment_sql_row = connection.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='assignments'"
     ).fetchone()
@@ -605,28 +481,25 @@ def validate_schema_shape(connection: sqlite3.Connection, version: int) -> None:
         "'peer-input-ready'" not in assignment_sql
         or "'blocked-app-capability'" not in assignment_sql
         or "'integration-input-ready'" in assignment_sql
-        or (
-            version >= 4
-            and "'blocked-scope-repair'" not in assignment_sql
-        )
+        or "'blocked-scope-repair'" not in assignment_sql
     ):
         raise StateError(
             "invalid-state-schema",
-            f"state table assignments constraints do not match schema {version}",
+            f"state table assignments constraints do not match schema {DATABASE_SCHEMA_VERSION}",
             4,
         )
-    if normalized_schema_objects(connection) != expected_schema_objects(version):
+    if normalized_schema_objects(connection) != expected_schema_objects():
         raise StateError(
             "invalid-state-schema",
-            f"state tables, constraints, or indexes do not match schema {version}",
+            f"state tables, constraints, or indexes do not match schema {DATABASE_SCHEMA_VERSION}",
             4,
         )
 
 
-def read_runtime_metadata(connection: sqlite3.Connection) -> tuple[int, int | None]:
+def read_runtime_metadata(connection: sqlite3.Connection) -> int:
     try:
         rows = connection.execute(
-            "SELECT singleton,schema_version,target_schema_version FROM runtime_metadata"
+            "SELECT singleton,schema_version FROM runtime_metadata"
         ).fetchall()
     except sqlite3.Error as error:
         raise StateError("invalid-state-schema", "runtime metadata is unreadable", 4) from error
@@ -637,119 +510,27 @@ def read_runtime_metadata(connection: sqlite3.Connection) -> tuple[int, int | No
             4,
         )
     version = rows[0]["schema_version"]
-    target = rows[0]["target_schema_version"]
-    if (
-        not isinstance(version, int)
-        or version < 1
-        or (target is not None and (not isinstance(target, int) or target <= version))
-    ):
+    if not isinstance(version, int) or version != DATABASE_SCHEMA_VERSION:
         raise StateError("invalid-state-schema", "runtime metadata values are invalid", 4)
-    return version, target
+    return version
 
 
-def create_schema(
-    connection: sqlite3.Connection,
-    *,
-    schema_version: int = DATABASE_SCHEMA_VERSION,
-) -> None:
-    if schema_version not in {1, 2, 3, 4, DATABASE_SCHEMA_VERSION}:
-        raise StateError(
-            "unsupported-state-schema",
-            f"cannot create database schema {schema_version}",
-            4,
-        )
-    runtime_columns = (
-        ""
-        if schema_version == 1
-        else """
+def create_schema(connection: sqlite3.Connection) -> None:
+    statements = [
+        f"""CREATE TABLE runtime_metadata (
+            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+            schema_version INTEGER NOT NULL CHECK (schema_version = {DATABASE_SCHEMA_VERSION})
+        )""",
+        """CREATE TABLE runs (
+            run_id TEXT PRIMARY KEY,
+            root_task_id TEXT NOT NULL,
+            controller_project_id TEXT NOT NULL,
             runtime_contract_version TEXT NOT NULL,
             runtime_cli_version TEXT NOT NULL,
             runtime_artifact_sha256 TEXT NOT NULL,
-        """
-    )
-    controller_project_column = (
-        "controller_project_id TEXT NOT NULL,"
-        if schema_version >= 3
-        else ""
-    )
-    operation_id_column = "operation_key" if schema_version == 1 else "operation_id"
-    launch_count_column = (
-        ""
-        if schema_version == 1
-        else "launch_count INTEGER NOT NULL CHECK(launch_count >= 1),"
-    )
-    assignment_project_column = (
-        "project_id TEXT NOT NULL,"
-        if schema_version < 3
-        else ""
-    )
-    assignment_feature_column = (
-        "feature_id TEXT,"
-        if schema_version >= 3
-        else ""
-    )
-    assignment_scope_repair_columns = (
-        """
-            contract_generation INTEGER NOT NULL DEFAULT 1
-                CHECK(contract_generation >= 1),
-            scope_repair_id TEXT,
-            scope_repair_readback_ref TEXT,
-        """
-        if schema_version >= 4
-        else ""
-    )
-    operation_scope_repair_columns = (
-        """
-            contract_generation INTEGER,
-            scope_repair_id TEXT,
-        """
-        if schema_version >= 4
-        else ""
-    )
-    assignment_repository_foreign_key = (
-        """,
-            FOREIGN KEY(run_id, repository_identity)
-                REFERENCES run_repositories(run_id, repository_identity)
-                ON DELETE RESTRICT"""
-        if schema_version >= 3
-        else ""
-    )
-    legacy_transport_columns = (
-        """
-            tracker_backend TEXT NOT NULL CHECK(tracker_backend IN ('github','local')),
-            delivery_type TEXT NOT NULL CHECK(delivery_type IN ('github-pr','local-branch')),
-        """
-        if schema_version <= 4
-        else ""
-    )
-    legacy_run_statuses = (
-        "'pr-ready', 'local-branch-ready', 'delivery-ready',"
-        if schema_version <= 4
-        else "'pr-ready',"
-    )
-    legacy_assignment_statuses = (
-        "'peer-input-ready', 'pr-ready', 'local-branch-ready',"
-        if schema_version <= 4
-        else "'peer-input-ready', 'pr-ready',"
-    )
-    statements = [
-        """CREATE TABLE runtime_metadata (
-            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-            schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-            target_schema_version INTEGER,
-            CHECK (
-                target_schema_version IS NULL
-                OR target_schema_version > schema_version
-            )
-        )""",
-        f"""CREATE TABLE runs (
-            run_id TEXT PRIMARY KEY,
-            root_task_id TEXT NOT NULL,
-            {controller_project_column}
-            {runtime_columns}
             status TEXT NOT NULL CHECK(status IN (
                 'waiting-for-spec', 'active', 'blocked',
-                {legacy_run_statuses}
+                'pr-ready',
                 'preimplementation-aborted', 'abandoned'
             )),
             implementation_started INTEGER NOT NULL DEFAULT 0 CHECK(implementation_started IN (0,1)),
@@ -758,38 +539,31 @@ def create_schema(
             updated_at TEXT NOT NULL,
             finished_at TEXT
         )""",
-    ]
-    if schema_version >= 3:
-        statements.append(
-            """CREATE TABLE run_repositories (
-                run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
-                repository_identity TEXT NOT NULL,
-                project_id TEXT NOT NULL,
-                git_common_dir TEXT NOT NULL,
-                git_common_dir_device INTEGER NOT NULL,
-                git_common_dir_inode INTEGER NOT NULL,
-                PRIMARY KEY(run_id, repository_identity),
-                UNIQUE(run_id, project_id),
-                UNIQUE(run_id, git_common_dir_device, git_common_dir_inode)
-            )"""
-        )
-    statements.extend([
+        """CREATE TABLE run_repositories (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            repository_identity TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            git_common_dir TEXT NOT NULL,
+            git_common_dir_device INTEGER NOT NULL,
+            git_common_dir_inode INTEGER NOT NULL,
+            PRIMARY KEY(run_id, repository_identity),
+            UNIQUE(run_id, project_id),
+            UNIQUE(run_id, git_common_dir_device, git_common_dir_inode)
+        )""",
         """CREATE TABLE assignments (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             assignment_id TEXT NOT NULL,
             source_spec_ref TEXT NOT NULL,
             claim_spec_identity TEXT NOT NULL,
             repository_identity TEXT NOT NULL,
-            {legacy_transport_columns}
-            {assignment_project_column}
             title TEXT NOT NULL,
             target_branch_name TEXT NOT NULL,
             prerequisite_assignment_ids TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN (
                 'waiting-for-spec', 'planned', 'worker-created', 'active',
-                {legacy_assignment_statuses}
+                'peer-input-ready', 'pr-ready',
                 'blocked-durable-contract', 'blocked-app-capability',
-                {blocked_scope_repair_state}
+                'blocked-scope-repair',
                 'blocked-by-active-spec', 'preimplementation-aborted',
                 'abandoned', 'abandoned-recovery-required'
             )),
@@ -812,25 +586,18 @@ def create_schema(
             default_branch_name TEXT,
             provider_observation_ref TEXT,
             updated_at TEXT NOT NULL,
-            {assignment_feature_column}
-            {assignment_scope_repair_columns}
+            feature_id TEXT,
+            contract_generation INTEGER NOT NULL DEFAULT 1
+                CHECK(contract_generation >= 1),
+            scope_repair_id TEXT,
+            scope_repair_readback_ref TEXT,
             PRIMARY KEY(run_id, assignment_id),
             UNIQUE(run_id, source_spec_ref),
-            UNIQUE(run_id, repository_identity, target_branch_name)
-            {assignment_repository_foreign_key}
-        )""".format(
-            legacy_transport_columns=legacy_transport_columns,
-            assignment_project_column=assignment_project_column,
-            assignment_feature_column=assignment_feature_column,
-            assignment_scope_repair_columns=assignment_scope_repair_columns,
-            legacy_assignment_statuses=legacy_assignment_statuses,
-            blocked_scope_repair_state=(
-                "'blocked-scope-repair',"
-                if schema_version >= 4
-                else ""
-            ),
-            assignment_repository_foreign_key=assignment_repository_foreign_key,
-        ),
+            UNIQUE(run_id, repository_identity, target_branch_name),
+            FOREIGN KEY(run_id, repository_identity)
+                REFERENCES run_repositories(run_id, repository_identity)
+                ON DELETE RESTRICT
+        )""",
         """CREATE TABLE spec_claims (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             assignment_id TEXT NOT NULL,
@@ -851,15 +618,15 @@ def create_schema(
         )""",
         "CREATE UNIQUE INDEX one_active_spec_owner ON spec_claims(repository_identity,claim_spec_identity) WHERE active=1",
         "CREATE UNIQUE INDEX one_active_head_branch_owner ON spec_claims(repository_identity,target_branch_name) WHERE active=1",
-        f"""CREATE TABLE app_operations (
+        """CREATE TABLE app_operations (
             sequence INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
-            {operation_id_column} TEXT NOT NULL,
+            operation_id TEXT NOT NULL,
             action TEXT NOT NULL,
             subject_id TEXT NOT NULL,
             assignment_id TEXT,
             status TEXT NOT NULL CHECK(status IN ('pending','unknown','succeeded','failed')),
-            {launch_count_column}
+            launch_count INTEGER NOT NULL CHECK(launch_count >= 1),
             receipt_ref TEXT,
             readback_ref TEXT,
             thread_id TEXT,
@@ -873,14 +640,13 @@ def create_schema(
             observed_state TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            {operation_scope_repair_columns}
-            UNIQUE(run_id, {operation_id_column})
-        )""".format(
-            operation_scope_repair_columns=operation_scope_repair_columns,
-        ),
+            contract_generation INTEGER,
+            scope_repair_id TEXT,
+            UNIQUE(run_id, operation_id)
+        )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
-        f"INSERT INTO runtime_metadata(singleton,schema_version,target_schema_version) VALUES (1,{schema_version},NULL)",
-    ])
+        f"INSERT INTO runtime_metadata(singleton,schema_version) VALUES (1,{DATABASE_SCHEMA_VERSION})",
+    ]
     for statement in statements:
         connection.execute(statement)
 
@@ -1961,10 +1727,6 @@ def insert_run(
     return acquired, waiting
 
 
-def database_schema_version(connection: sqlite3.Connection) -> int:
-    return read_runtime_metadata(connection)[0]
-
-
 def active_owner_runs(connection: sqlite3.Connection) -> int:
     return int(
         connection.execute(
@@ -1973,130 +1735,7 @@ def active_owner_runs(connection: sqlite3.Connection) -> int:
     )
 
 
-def validate_rebuild_source(connection: sqlite3.Connection, version: int) -> None:
-    if version not in REBUILDABLE_DATABASE_SCHEMA_VERSIONS:
-        relation = "newer" if version > DATABASE_SCHEMA_VERSION else "unknown"
-        raise StateError(
-            "unsupported-state-schema",
-            f"database schema {version} is {relation} to runtime database schema "
-            f"{DATABASE_SCHEMA_VERSION}; automatic regeneration is forbidden",
-            4,
-        )
-    validate_schema_shape(connection, version)
-
-
-def retained_runtime_identity(path_text: str) -> tuple[str, str, str]:
-    path = Path(path_text)
-    if (
-        not path.is_absolute()
-        or path.is_symlink()
-        or not path.is_file()
-        or not os.access(path, os.X_OK)
-    ):
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime is not an executable regular file: {path}",
-            4,
-        )
-    try:
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        version = subprocess.run(
-            [str(path), "--version"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
-        )
-        capabilities = subprocess.run(
-            [str(path), "--json", "capabilities"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime could not be verified: {path}",
-            4,
-        ) from error
-    if version.returncode != 0 or capabilities.returncode != 0:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime verification failed: {path}",
-            4,
-        )
-    try:
-        payload = json.loads(capabilities.stdout)
-        contract = string(
-            payload["runtime_contract_version"],
-            "runtime_contract_version",
-            64,
-        )
-    except (KeyError, TypeError, json.JSONDecodeError, StateError) as error:
-        raise StateError(
-            "retained-runtime-unavailable",
-            f"retained runtime capabilities are invalid: {path}",
-            4,
-        ) from error
-    return contract, version.stdout.strip(), digest
-
-
-def validate_retained_runtimes(
-    connection: sqlite3.Connection,
-    paths: list[str],
-    schema_version: int,
-) -> None:
-    if schema_version in LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS:
-        raise StateError(
-            "legacy-runtime-identity-unknown",
-            f"database schema {schema_version} active owners do not record exact runtime pins; "
-            "drain them before installing this runtime",
-            4,
-        )
-    required = {
-        (
-            row["runtime_contract_version"],
-            row["runtime_cli_version"],
-            row["runtime_artifact_sha256"],
-        )
-        for row in connection.execute(
-            """SELECT DISTINCT runtime_contract_version,runtime_cli_version,
-                              runtime_artifact_sha256
-               FROM runs
-               WHERE status IN ('waiting-for-spec','active','blocked')"""
-        )
-    }
-    provided = {retained_runtime_identity(path) for path in paths}
-    missing = sorted(required - provided)
-    if missing:
-        raise StateError(
-            "retained-runtime-unavailable",
-            "active owners require retained exact runtimes: "
-            + ", ".join(
-                f"contract={contract},cli={cli},sha256={digest}"
-                for contract, cli, digest in missing
-            ),
-            4,
-        )
-
-
-def recreate_schema_in_place(connection: sqlite3.Connection) -> None:
-    for table in (
-        "app_operations",
-        "spec_claims",
-        "assignments",
-        "run_repositories",
-        "runs",
-        "runtime_metadata",
-    ):
-        connection.execute(f"DROP TABLE IF EXISTS {table}")
-    create_schema(connection)
-
-
-def inspect_state(connection: sqlite3.Connection) -> tuple[int, int | None, int]:
+def inspect_state(connection: sqlite3.Connection) -> int:
     tables = {
         row[0]
         for row in connection.execute(
@@ -2112,15 +1751,11 @@ def inspect_state(connection: sqlite3.Connection) -> tuple[int, int | None, int]
     if "runtime_metadata" not in tables:
         raise StateError(
             "unsupported-state-schema",
-            "unversioned or pre-lineage state cannot be regenerated",
+            "unversioned state is not supported",
             4,
         )
-    version, target = read_runtime_metadata(connection)
-    if version == DATABASE_SCHEMA_VERSION:
-        validate_schema_shape(connection, version)
-    else:
-        validate_rebuild_source(connection, version)
-    return version, target, active_owner_runs(connection)
+    validate_schema_shape(connection)
+    return active_owner_runs(connection)
 
 
 def version_capabilities() -> dict[str, Any]:
@@ -2150,7 +1785,6 @@ def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
             "ready": True,
             "state": "uninitialized",
             "database_path": str(path),
-            "cutover_target_version": None,
             **version_capabilities(),
             "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS,
             "active_owner_runs": 0,
@@ -2159,21 +1793,14 @@ def command_doctor(_: argparse.Namespace) -> dict[str, Any]:
     validate_database(path)
     connection = open_database(path, write=False)
     try:
-        version, target, active = inspect_state(connection)
+        active = inspect_state(connection)
     finally:
         connection.close()
-    if version == DATABASE_SCHEMA_VERSION:
-        state = "initialized" if target is None else "cutover-in-progress"
-        ready = target is None
-    else:
-        state = "rebuild-ready" if active == 0 else "waiting-for-schema-drain"
-        ready = False
     return {
-        "ready": ready,
-        "state": state,
+        "ready": True,
+        "state": "initialized",
         "database_path": str(path),
-        "observed_database_schema_version": version,
-        "cutover_target_version": target,
+        "observed_database_schema_version": DATABASE_SCHEMA_VERSION,
         **version_capabilities(),
         "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS,
         "active_owner_runs": active,
@@ -2209,89 +1836,22 @@ def command_state_prepare(args: argparse.Namespace) -> dict[str, Any]:
                 "state": "initialized",
                 "database_schema_version": DATABASE_SCHEMA_VERSION,
                 "active_owner_runs": 0,
-                "regenerated": True,
                 "writes_performed": True,
             }
-        version, target, active = inspect_state(connection)
-        if version == DATABASE_SCHEMA_VERSION:
-            if target is not None:
-                raise StateError(
-                    "state-cutover-in-progress",
-                    f"runtime database schema {DATABASE_SCHEMA_VERSION} cannot prepare cutover target {target}",
-                    4,
-                )
-            connection.commit()
-            return {
-                "ready": True,
-                "state": "initialized",
-                "database_schema_version": version,
-                "active_owner_runs": active,
-                "regenerated": False,
-                "writes_performed": False,
-            }
-        if active and version in LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS:
-            raise StateError(
-                "legacy-runtime-identity-unknown",
-                f"database schema {version} active owners do not record exact runtime pins; "
-                "drain them before installing this runtime",
-                4,
-            )
-        if active:
-            validate_retained_runtimes(
-                connection,
-                args.retained_runtime,
-                version,
-            )
-        if target is None:
-            connection.execute(
-                "UPDATE runtime_metadata SET target_schema_version=? WHERE singleton=1",
-                (DATABASE_SCHEMA_VERSION,),
-            )
-            target = DATABASE_SCHEMA_VERSION
-        elif target != DATABASE_SCHEMA_VERSION:
-            raise StateError(
-                "state-cutover-in-progress",
-                f"database is fenced for schema {target}, not {DATABASE_SCHEMA_VERSION}",
-                4,
-            )
-        if active:
-            connection.commit()
-            return {
-                "ready": False,
-                "state": "waiting-for-schema-drain",
-                "database_schema_version": version,
-                "active_owner_runs": active,
-                "regenerated": False,
-                "writes_performed": True,
-            }
-        if active_owner_runs(connection) != 0:
-            raise StateError("state-busy", "active owners appeared during schema cutover", 4)
-        recreate_schema_in_place(connection)
+        active = inspect_state(connection)
         connection.commit()
         return {
             "ready": True,
-            "state": "regenerated",
+            "state": "initialized",
             "database_schema_version": DATABASE_SCHEMA_VERSION,
-            "previous_schema_version": version,
-            "active_owner_runs": 0,
-            "regenerated": True,
-            "writes_performed": True,
+            "active_owner_runs": active,
+            "writes_performed": False,
         }
     except Exception:
         connection.rollback()
         raise
     finally:
         connection.close()
-
-
-def require_new_run_allowed(connection: sqlite3.Connection) -> None:
-    _, target = read_runtime_metadata(connection)
-    if target is not None:
-        raise StateError(
-            "state-cutover-in-progress",
-            f"new runs are fenced while schema {target} cutover is pending",
-            4,
-        )
 
 
 def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
@@ -2303,7 +1863,6 @@ def command_run_start(args: argparse.Namespace) -> dict[str, Any]:
     )
     connection = connect(write=True)
     try:
-        require_new_run_allowed(connection)
         if connection.execute("SELECT 1 FROM runs WHERE run_id=?", (run["run_id"],)).fetchone():
             raise StateError("run-already-exists", f"run already exists: {run['run_id']}", 4)
         root_owner = connection.execute(
@@ -5096,7 +4655,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-5 SQLite coordination for Implement Feature "
+            "Database-schema-6 SQLite coordination for Implement Feature "
             "controllers in the ChatGPT App."
         ),
     )
@@ -5136,13 +4695,7 @@ def build_parser() -> argparse.ArgumentParser:
     state_commands = state.add_subparsers(dest="state_command", required=True)
     prepare = state_commands.add_parser(
         "prepare",
-        help="fence new starts and destructively regenerate a recognized older schema after drain",
-    )
-    prepare.add_argument(
-        "--retained-runtime",
-        action="append",
-        default=[],
-        help="absolute executable path for the exact older runtime while owners drain",
+        help="create or validate the current SQLite claim domain",
     )
     prepare.set_defaults(handler=command_state_prepare, command_name="state prepare")
 

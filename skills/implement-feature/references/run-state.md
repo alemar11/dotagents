@@ -2,7 +2,7 @@
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
 uses the shipped artifact. CLI release `6.0.0` implements the breaking runtime
-contract `7.0.0` over database schema `5`. Worker creation now atomically
+contract `7.0.0` over database schema `6`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -18,7 +18,7 @@ Four version domains are deliberately independent:
 | --- | --- | --- |
 | CLI | `6.0.0` | User-facing commands and executable behavior |
 | Runtime contract | `7.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `5` | Exact SQLite tables, columns, indexes, and constraints |
+| Database schema | integer `6` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -49,28 +49,22 @@ All controllers for the same machine user share:
 
 The directory and DB are owner-only. SQLite transactions use a fixed 5000 ms
 busy timeout. There is no filesystem lock. The application-owned,
-single-row `runtime_metadata` table is the sole schema and cutover source of
-truth:
+single-row `runtime_metadata` table is the sole schema source of truth:
 
 ```sql
 CREATE TABLE runtime_metadata (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-    target_schema_version INTEGER,
-    CHECK (
-        target_schema_version IS NULL
-        OR target_schema_version > schema_version
-    )
+    schema_version INTEGER NOT NULL CHECK (schema_version = 6)
 );
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=5, target_schema_version=NULL)`. The integer stored here is not
-the CLI, runtime-contract, or JSON protocol version. Schema number `5` does not
-authorize an alternate shape: every table, column, index, and constraint must match
-exactly or the CLI returns `invalid-state-schema` without deleting or rewriting
-the DB. `PRAGMA user_version` is not application state and is never read or
-written. Local coordination does not span different machines.
+`(schema_version=6)`. The integer stored here is not the CLI, runtime-contract,
+or JSON protocol version. Schema number `6` does not authorize an alternate
+shape: every table, column, index, and constraint must match exactly or the CLI
+returns `invalid-state-schema` without deleting or rewriting the DB. `PRAGMA
+user_version` is not application state and is never read or written. Local
+coordination does not span different machines.
 
 Every run records `runtime_contract_version`, `runtime_cli_version`, and
 `runtime_artifact_sha256`. Commands that mutate or coordinate that run require
@@ -538,7 +532,7 @@ the typed observation required by the operation lifecycle above.
 Keep normal execution on `scripts/run-state`; there is no maintenance project
 or build output. `CLI_VERSION` remains `6.0.0`,
 `RUNTIME_CONTRACT_VERSION` remains `7.0.0`;
-`DATABASE_SCHEMA_VERSION` remains integer `5`; each protocol entry remains at
+`DATABASE_SCHEMA_VERSION` remains integer `6`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python
 compilation and the remaining executable verifier checks after changes.
@@ -557,64 +551,23 @@ Version each domain for its own contract:
 
 Because runs pin the exact CLI version and artifact digest, even a compatible
 new executable does not take over mutation of an already active run. Keep the
-old shipped artifact available until its pinned runs are terminal.
-Retained executables may live under
-`~/.cache/dotagents/skills/implement-feature/runtimes/<cli-version>/<sha256>/run-state`.
-They are rebuildable from the owning Git revision, never replace SQLite as the
-source of run state, and must pass `--version`, `--json capabilities`, and exact
-SHA-256 verification before use with `--retained-runtime`.
+exact shipped artifact available until its pinned runs are terminal; this is
+runtime identity pinning, not database-schema compatibility.
 
 ## Hard-Cut Operations
 
-Changing `DATABASE_SCHEMA_VERSION`, changing SQLite shape, or expanding the
-recognized rebuild-source set requires explicit user consent before code or
-documentation edits. Every approved change is a breaking hard cut. Never add
+Changing `DATABASE_SCHEMA_VERSION` or changing SQLite shape requires explicit
+user consent before code or documentation edits. Every approved change is a
+breaking hard cut. Never add
 `ALTER` upgrades, data-copy migrations, imports, versioned DB filenames, or
 state carry-forward.
 
 At runtime, call read-only `capabilities` and `doctor` first and then
-`state prepare`.
-
-Schemas 1, 2, 3, and 4 are the recognized rebuild sources for release 6.0.0.
-Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
-Therefore:
-
-- with any schema-1 owner in `waiting-for-spec`, `active`, or `blocked`,
-  preparation fails closed with the legacy runtime identity unresolved; a
-  caller-supplied executable cannot manufacture the missing per-run proof;
-- with zero schema-1 owners, preparation begins one exclusive transaction,
-  rechecks zero, drops every application object, creates exact schema 5 and its
-  singleton metadata row, and commits with no row carry-forward.
-
-An active schema-1 run can be terminalized only by its already retained
-original artifact. The 7.0.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 6.0.0 preparation only after authoritative schema-1
-state reports zero owners.
-
-Schemas 2, 3, and 4 persist exact per-run pins. With active owners on any
-of these schemas, `state prepare` first writes database-schema integer `5` to
-`target_schema_version` transactionally while preserving the old schema. A
-non-NULL target fences every new run. Pass each distinct required executable
-with a repeated absolute
-`--retained-runtime /absolute/path/to/old/run-state` flag. Preparation verifies
-each executable's `capabilities`, exact CLI/runtime identity, and SHA-256
-against the active-run pins before returning `waiting-for-schema-drain`.
-Missing required, mismatched, or changed artifacts fail closed and preserve
-the state.
-
-Keep the root turn open and repeat bounded `doctor` and `state prepare` sweeps.
-Do not force-finish, abandon, release, or rewrite claims merely to complete a
-cutover. A CLI version is never inferred from a database schema number.
-
-When the recognized older DB reports zero owners, `state prepare` begins an
-exclusive SQLite transaction and rechecks zero. Inside that same transaction
-it drops all application tables, indexes, and triggers; recreates the complete
-fresh schema including `runtime_metadata`; inserts the new
-`(schema_version=N, target_schema_version=NULL)` singleton; and commits. No
-row, claim, operation, or historical evidence is copied. Any failure rolls
-back the transaction and restores the complete old logical and file state.
-
-An older runtime that encounters a newer schema fails closed and never
-regenerates it. Unknown older versions, unversioned tables, corrupt DBs,
-same-number structural drift, unsafe permissions, and symlinks also fail
-closed without reset.
+`state prepare`. The shipped runtime accepts only schema 6. An empty database
+is initialized with the exact current tables, columns, indexes, constraints,
+and singleton metadata row. An existing database must already match that exact
+shape; any other schema number, historical shape, unversioned table set,
+corruption, unsafe permission, symlink, or same-number structural drift fails
+closed without migration, reset, deletion, or row carry-forward. There is no
+legacy schema registry, target-schema fence, retained-runtime cutover, or
+automatic recovery path for an older database.

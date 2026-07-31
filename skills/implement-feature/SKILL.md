@@ -164,17 +164,13 @@ more Feature Specs. A discovery-only request never enters this flow.
    `scripts/run-state --json state prepare`. CLI `6.0.0` implements runtime
    contract `7.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
-   schema integer `5` is separate from those SemVer identities. Every run pins
-   its exact runtime contract, CLI, and shipped artifact SHA-256. A database
-   schema-1 state with active owners cannot prove those pins and therefore
-   stops fail-closed; a drained schema-1 state is atomically dropped and
-   recreated as schema 5 without carrying rows forward. Schemas 2, 3, and 4
-   record exact owner pins: pass every distinct required executable with repeated
-   `state prepare --retained-runtime` flags and keep the root open for bounded
-   drain sweeps. Never start a worker or another run during a fenced cutover.
-   Unknown, newer, corrupt, unversioned, or same-version-invalid state stops
-   before claims. SQLite transactions and `target_schema_version` fence
-   concurrent CLI work; no filesystem lock is used.
+   schema integer `6` is separate from those SemVer identities. Every run pins
+   its exact runtime contract, CLI, and shipped artifact SHA-256. The runtime
+   accepts only the complete current schema: an empty database is initialized,
+   while any existing non-current, corrupt, unversioned, or structurally
+   invalid state stops fail-closed without migration, reset, or row carry-forward.
+   No historical schema registry, retained-runtime drain, or cutover target is
+   tracked. No filesystem lock is used.
 3. Call `run start` with the manifest plus one repeated
    `--feature-spec-set-input <absolute-file>` per linked set; standalone Specs
    pass none. The CLI revalidates every complete body and requires exact

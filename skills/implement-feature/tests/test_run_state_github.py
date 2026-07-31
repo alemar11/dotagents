@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import runpy
 import sqlite3
 import subprocess
 import tempfile
@@ -174,8 +173,13 @@ class RunStateGitHubScenarios(unittest.TestCase):
         return arguments
 
     def test_current_schema_has_no_retired_transport_storage(self) -> None:
+        prepared = self.invoke("state", "prepare")
         connection = sqlite3.connect(self.database)
         try:
+            metadata_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(runtime_metadata)")
+            }
             assignment_columns = {
                 row[1]
                 for row in connection.execute("PRAGMA table_info(assignments)")
@@ -188,7 +192,9 @@ class RunStateGitHubScenarios(unittest.TestCase):
             ).fetchone()[0]
         finally:
             connection.close()
-        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 5)
+        self.assertEqual(metadata_columns, {"singleton", "schema_version"})
+        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 6)
+        self.assertNotIn("regenerated", prepared)
         self.assertNotIn("tracker_backend", assignment_columns)
         self.assertNotIn("delivery_type", assignment_columns)
         self.assertNotIn("local-branch-ready", run_sql)
@@ -222,22 +228,6 @@ class RunStateGitHubScenarios(unittest.TestCase):
             expected=2,
         )
         self.assertEqual(error["error"]["code"], "invalid-input")
-
-    def test_schema_four_cutover_rebuilds_schema_five_without_rows(self) -> None:
-        namespace = runpy.run_path(str(TOOL), run_name="schema_four_fixture")
-        self.database.unlink()
-        connection = sqlite3.connect(self.database)
-        try:
-            namespace["create_schema"](connection, schema_version=4)
-            connection.commit()
-        finally:
-            connection.close()
-        os.chmod(self.database, 0o600)
-        result = self.invoke("state", "prepare")
-        self.assertEqual(result["state"], "regenerated")
-        self.assertEqual(result["previous_schema_version"], 4)
-        self.assertEqual(result["database_schema_version"], 5)
-        self.assertEqual(result["active_owner_runs"], 0)
 
     def test_pr_ready_builder_requires_github_evidence_and_finish(self) -> None:
         started = self.start("ready-flow")
