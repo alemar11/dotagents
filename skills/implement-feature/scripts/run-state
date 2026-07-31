@@ -1389,7 +1389,10 @@ def directory(value: Any, field: str) -> str:
 
 
 def absolute_path(value: Any, field: str) -> str:
-    path = Path(string(value, field, 4096))
+    path_text = string(value, field, 4096)
+    if "\x00" in path_text:
+        raise StateError("invalid-input", f"{field} must not contain NUL bytes")
+    path = Path(path_text)
     if not path.is_absolute():
         raise StateError("invalid-input", f"{field} must be an absolute path")
     return os.path.normpath(str(path))
@@ -1397,7 +1400,14 @@ def absolute_path(value: Any, field: str) -> str:
 
 def absent_path(value: Any, field: str) -> str:
     path = Path(absolute_path(value, field))
-    return str(path.parent.resolve() / path.name)
+    try:
+        parent = path.parent.resolve()
+    except (OSError, RuntimeError, ValueError) as error:
+        raise StateError(
+            "invalid-input",
+            f"{field} parent cannot be resolved",
+        ) from error
+    return str(parent / path.name)
 
 
 def branch_name(value: Any) -> str:

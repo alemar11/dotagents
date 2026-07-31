@@ -3093,6 +3093,24 @@ class RunStateScenarios(unittest.TestCase):
             "archive-invalid-worker-title.json",
             archive_observation,
         )
+        malformed_observation = {
+            **archive_observation,
+            "checkout_path": "/private/tmp/invalid\x00checkout",
+        }
+        malformed = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--operation-id", str(archive["operation_id"]),
+            "--observation", str(
+                self.write_json(
+                    "archive-invalid-worker-title-malformed.json",
+                    malformed_observation,
+                )
+            ),
+            expected=2,
+        )
+        self.assertEqual(malformed["error"]["code"], "invalid-input")
         still_present = self.invoke(
             "app-operation", "finish",
             "--run-id", "invalid-worker-title",

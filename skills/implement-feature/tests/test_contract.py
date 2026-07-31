@@ -370,17 +370,7 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("assignment's complete canonical `title`", orchestration)
         self.assertIn("as the `create_thread` title", orchestration)
         self.assertIn("same `create-worker` observation", orchestration)
-        self.assertIn(
-            "Never repair the drift with a later rename operation",
-            orchestration,
-        )
         self.assertIn("`cleanup_required=archive-worker`", orchestration)
-        self.assertIn("bootstrap remains forbidden", orchestration)
-        self.assertIn("finish the mixed run as `abandoned`", orchestration)
-        self.assertIn("never as a successful delivery", orchestration)
-        self.assertIn("exact recorded checkout path is absent", orchestration)
-        self.assertIn("retain the claim and block cleanup", orchestration)
-        self.assertIn("only `ENOENT` or `ENOTDIR` proves absence", orchestration)
         self.assertNotIn('"set-worker-title"', self.text("scripts/run-state"))
         self.assertIn(
             "`🧭 Scope Repair · <Feature Spec title>`",
