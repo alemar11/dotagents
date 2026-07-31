@@ -34,12 +34,9 @@ sys.modules[OPERATION_SPEC.name] = owned_operation
 sys.modules.setdefault("autoreview_protocol", protocol)
 OPERATION_SPEC.loader.exec_module(owned_operation)
 
-VERSION = "5.0.0"
+VERSION = "5.1.0"
 
-MAX_REVIEW_PROMPT_BYTES = 512_000
-MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
 INVALID_OUTPUT_PREVIEW_BYTES = 2048
-MAX_REPAIR_APPENDIX_BYTES = 2048
 OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
 REVIEW_MODEL = "gpt-5.6-sol"
 REVIEW_REASONING_EFFORTS = {
@@ -65,7 +62,6 @@ REVIEW_INPUT_OMISSION_REASONS = {
     "binary",
     "changed-during-read",
     "non-utf8",
-    "size-limit",
     "symlink",
     "unreadable",
     "unsafe-path",
@@ -723,20 +719,12 @@ def read_review_text(
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode):
             raise OSError("not a regular file")
-        if opened.st_size > MAX_REVIEW_PROMPT_BYTES:
-            raise incomplete_review_input(
-                f"{source} exceeds the {MAX_REVIEW_PROMPT_BYTES}-byte review input limit: {display_path}",
-                [input_omission(source=source, path=display_path, reason="size-limit")],
-                code="review-input-too-large",
-            )
         chunks: list[bytes] = []
-        remaining = MAX_REVIEW_PROMPT_BYTES + 1
-        while remaining:
-            chunk = os.read(descriptor, remaining)
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
             if not chunk:
                 break
             chunks.append(chunk)
-            remaining -= len(chunk)
         data = b"".join(chunks)
         after = os.fstat(descriptor)
         if (
@@ -755,12 +743,6 @@ def read_review_text(
     finally:
         if descriptor is not None:
             os.close(descriptor)
-    if len(data) > MAX_REVIEW_PROMPT_BYTES:
-        raise incomplete_review_input(
-            f"{source} exceeds the {MAX_REVIEW_PROMPT_BYTES}-byte review input limit: {display_path}",
-            [input_omission(source=source, path=display_path, reason="size-limit")],
-            code="review-input-too-large",
-        )
     if b"\0" in data:
         raise incomplete_review_input(
             f"{source} is binary and cannot be included completely: {display_path}",
@@ -874,17 +856,6 @@ def require_no_binary_changes(source: str, paths: list[str]) -> None:
             input_omission(source=source, path=path, reason="binary")
             for path in paths
         ],
-    )
-
-
-def require_complete_prompt(prompt: str) -> None:
-    size = len(prompt.encode("utf-8"))
-    if size <= MAX_REVIEW_PROMPT_BYTES:
-        return
-    raise incomplete_review_input(
-        f"review input is {size} bytes, exceeding the {MAX_REVIEW_PROMPT_BYTES}-byte aggregate limit",
-        [input_omission(source="review-prompt", path=None, reason="size-limit")],
-        code="review-input-too-large",
     )
 
 
@@ -1560,28 +1531,27 @@ def write_json_temp(data: dict[str, Any]) -> Path:
 def read_review_output(path: Path) -> tuple[str, dict[str, Any]]:
     digest = hashlib.sha256()
     size = 0
-    kept = bytearray()
+    output = bytearray()
     try:
         with path.open("rb") as handle:
             while chunk := handle.read(64 * 1024):
                 digest.update(chunk)
                 size += len(chunk)
-                if len(kept) < MAX_REVIEW_OUTPUT_BYTES:
-                    kept.extend(chunk[: MAX_REVIEW_OUTPUT_BYTES - len(kept)])
+                output.extend(chunk)
     except OSError as exc:
         raise AutoreviewError(
             f"review output is unreadable: {type(exc).__name__}: {exc}",
             code="review-output-unreadable",
             recovery="inspect-error",
         ) from exc
-    preview = bounded_utf8_preview(bytes(kept))
+    raw = bytes(output)
     metadata = {
         "output_fingerprint": digest.hexdigest(),
         "output_size_bytes": size,
-        "output_truncated": size > MAX_REVIEW_OUTPUT_BYTES,
-        "preview": preview,
+        "output_truncated": False,
+        "preview": bounded_utf8_preview(raw),
     }
-    return bytes(kept).decode("utf-8", errors="replace"), metadata
+    return raw.decode("utf-8", errors="replace"), metadata
 
 
 def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[str, Any] | None = None) -> str:
@@ -1892,14 +1862,6 @@ def validate_model_response(
     changed: set[str],
     verification: tuple[set[str], dict[str, list[tuple[int, int]]]] | None = None,
 ) -> dict[str, Any]:
-    metadata = getattr(args, "_last_review_output", {})
-    if metadata.get("output_truncated"):
-        raise ReviewOutputError(
-            f"review output exceeds {MAX_REVIEW_OUTPUT_BYTES} bytes",
-            classification="schema-parse",
-            validator_code="review-output-too-large",
-            violated_rule=f"Reviewer output must not exceed {MAX_REVIEW_OUTPUT_BYTES} bytes.",
-        )
     report = extract_json(text)
     try:
         if verification is None:
@@ -1946,12 +1908,6 @@ def build_repair_appendix(exc: ReviewOutputError) -> str:
         Do not add context, broaden scope, synthesize findings, or repeat an invalid verdict.
         """
     ).rstrip()
-    if len(appendix.encode("utf-8")) > MAX_REPAIR_APPENDIX_BYTES:
-        raise AutoreviewError(
-            "helper-owned repair appendix exceeds its bound",
-            code="repair-appendix-too-large",
-            recovery="needs-owner",
-        )
     return appendix
 
 
@@ -1984,7 +1940,6 @@ def run_validated_model(
                 recovery="needs-owner",
             ) from first
         repair_prompt = prompt + build_repair_appendix(first)
-        require_complete_prompt(repair_prompt)
         validate_identity(prompt, schema)
         prepare_repair(first, prompt, repair_prompt)
         args._pending_invalid_output = None
@@ -2002,7 +1957,7 @@ def run_validated_model(
         except ReviewOutputError as second:
             args._terminal_invalid_output = second
             raise AutoreviewError(
-                "review output remained invalid after one bounded repair launch",
+                "review output remained invalid after the repair launch",
                 code="invalid-output-repair-exhausted",
                 recovery="needs-owner",
             ) from second
@@ -2268,7 +2223,6 @@ def build_review(
         load_extra_prompt(args, repo),
         load_datasets(args, repo),
     )
-    require_complete_prompt(prompt)
     return (
         repo,
         target,
@@ -2390,7 +2344,6 @@ def run_fix_verification(args: argparse.Namespace) -> int:
         load_extra_prompt(args, repo),
         load_datasets(args, repo),
     )
-    require_complete_prompt(prompt)
     input_status = review_input_status()
     if args.dry_run:
         payload = {"ok": True, "dry_run": True, "review_phase": "fix-verification", "finding_source": source,

@@ -30,7 +30,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 5.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 5.1.0")
 
     def test_prompt_and_dataset_files_are_contained_regular_repo_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -71,7 +71,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             large = repo / "large.txt"
-            large.write_text("a" * 45_000 + "\nTAIL\n", encoding="utf-8")
+            large.write_text("a" * 600_000 + "\nTAIL\n", encoding="utf-8")
             args = cli.argparse.Namespace(prompt=[], prompt_file=[], dataset=["large.txt"])
 
             rendered = cli.load_datasets(args, repo)
@@ -81,10 +81,6 @@ class AutoreviewContractTests(unittest.TestCase):
             cases = {
                 "binary.dat": (b"prefix\0suffix", "binary"),
                 "invalid.txt": (b"\xff", "non-utf8"),
-                "oversized.txt": (
-                    b"x" * (cli.MAX_REVIEW_PROMPT_BYTES + 1),
-                    "size-limit",
-                ),
             }
             for name, (content, reason) in cases.items():
                 with self.subTest(name=name):
@@ -311,26 +307,7 @@ class AutoreviewContractTests(unittest.TestCase):
             {"input_complete": True, "omissions": []},
         )
 
-    def test_oversized_aggregate_input_fails_with_structured_metadata(self) -> None:
-        with self.assertRaises(cli.AutoreviewError) as raised:
-            cli.require_complete_prompt("é" * (cli.MAX_REVIEW_PROMPT_BYTES // 2 + 1))
-
-        self.assertEqual(raised.exception.code, "review-input-too-large")
-        self.assertEqual(
-            raised.exception.review_input,
-            {
-                "input_complete": False,
-                "omissions": [
-                    {
-                        "source": "review-prompt",
-                        "path": None,
-                        "reason": "size-limit",
-                    }
-                ],
-            },
-        )
-
-    def test_repair_prompt_cannot_exceed_aggregate_input_limit(self) -> None:
+    def test_large_repair_prompt_is_not_rejected_by_size(self) -> None:
         args = cli.argparse.Namespace(
             _prepare_invalid_output_repair=lambda *_: None,
             _start_invalid_output_repair=lambda *_: None,
@@ -342,23 +319,25 @@ class AutoreviewContractTests(unittest.TestCase):
             validator_code="schema-invalid",
             violated_rule="invalid response",
         )
-        with mock.patch.object(cli, "run_codex", return_value="{}") as run_codex:
-            with mock.patch.object(cli, "validate_model_response", side_effect=invalid):
-                with self.assertRaises(cli.AutoreviewError) as raised:
-                    cli.run_validated_model(
-                        args,
-                        Path.cwd(),
-                        "x" * cli.MAX_REVIEW_PROMPT_BYTES,
-                        cli.SCHEMA,
-                        changed={"app.py"},
-                    )
+        clean = {
+            "findings": [],
+            "review_outcome": "pass",
+            "review_explanation": "Clean.",
+            "review_confidence": 1.0,
+        }
+        with mock.patch.object(cli, "run_codex", side_effect=["invalid", "valid"]) as run_codex:
+            with mock.patch.object(cli, "validate_model_response", side_effect=[invalid, clean]):
+                result = cli.run_validated_model(
+                    args,
+                    Path.cwd(),
+                    "x" * 600_000,
+                    cli.SCHEMA,
+                    changed={"app.py"},
+                )
 
-        self.assertEqual(run_codex.call_count, 1)
-        self.assertEqual(raised.exception.code, "review-input-too-large")
-        self.assertEqual(
-            raised.exception.review_input["omissions"][0]["reason"],
-            "size-limit",
-        )
+        self.assertEqual(result, clean)
+        self.assertEqual(run_codex.call_count, 2)
+        self.assertGreater(len(run_codex.call_args_list[1].args[2]), 600_000)
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -688,7 +667,6 @@ class AutoreviewContractTests(unittest.TestCase):
                 "binary",
                 "changed-during-read",
                 "non-utf8",
-                "size-limit",
                 "symlink",
                 "unreadable",
                 "unsafe-path",
@@ -1314,23 +1292,32 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertEqual(rejected.exception.recovery, "needs-owner")
         self.assertEqual(reviewer.call_count, 1)
 
-    def test_hostile_oversized_and_finding_drift_outputs_are_bounded_or_nonrepairable(self) -> None:
+    def test_large_model_output_is_retained_and_finding_drift_remains_nonrepairable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "output.json"
+            raw = b"{" + b"x" * (128 * 1024 + 1) + b"}"
+            output_path.write_bytes(raw)
+            output, metadata = cli.read_review_output(output_path)
+            self.assertEqual(len(output.encode()), len(raw))
+            self.assertEqual(metadata["output_size_bytes"], len(raw))
+            self.assertFalse(metadata["output_truncated"])
+
         hostile = b"\xff" * 4096
         preview = cli.bounded_utf8_preview(hostile)
         self.assertLessEqual(len(preview.encode()), cli.INVALID_OUTPUT_PREVIEW_BYTES)
         args = cli.parse_args([])
         args._last_review_output = {
             "output_fingerprint": hashlib.sha256(hostile).hexdigest(),
-            "output_size_bytes": cli.MAX_REVIEW_OUTPUT_BYTES + 1,
-            "output_truncated": True,
+            "output_size_bytes": 10_000_000,
+            "output_truncated": False,
             "preview": preview,
         }
-        with self.assertRaises(cli.ReviewOutputError) as oversized:
+        with self.assertRaises(cli.ReviewOutputError) as invalid:
             cli.validate_model_response(args, "{}", changed={"app.py"})
-        self.assertEqual(oversized.exception.validator_code, "review-output-too-large")
-        record = cli.invalid_output_record(args, oversized.exception, "attempt://oversized")
+        self.assertEqual(invalid.exception.validator_code, "review-output-shape-invalid")
+        record = cli.invalid_output_record(args, invalid.exception, "attempt://large-output")
         self.assertEqual(record["output_fingerprint"], hashlib.sha256(hostile).hexdigest())
-        self.assertTrue(record["output_truncated"])
+        self.assertFalse(record["output_truncated"])
 
         drift = {
             "findings": [{

@@ -83,14 +83,14 @@ review-loop redesign. After a successful engine launch returns output that
 fails only schema parsing or a semantic result invariant, a managed invocation
 may make exactly one internal repair launch. It keeps the reservation, target,
 phase, evidence parent, finding set, bundle, model, and web-search policy fixed.
-The helper-owned appendix is at most 2 KiB and states only the validator code,
-violated rule, and instruction to reuse the supplied immutable context.
+The helper-owned appendix states only the validator code, violated rule, and
+instruction to reuse the supplied immutable context.
 
 Transport, timeout, cancellation, cleanup, filesystem, protocol, reservation,
 target, lineage, or finding-identity failures never repair. Valid clean results
 and valid actionable findings never repair. Reviewer output is stream-hashed
-before loading, capped at 128 KiB, and represented in the append-only attempt
-journal by its exact hash, size, classification, validator code, bounded
+before loading and read in full; the append-only attempt journal records its
+exact hash and size plus its classification, validator code, bounded diagnostic
 preview/artifact reference, prompt fingerprints, and `model_launch_count`.
 The evidence schema and logical `counts.model_calls` remain `2.0.0` semantics;
 the external attempt journal is `2.1.0` and counts physical launches.

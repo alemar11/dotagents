@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Explicitly run a bounded Codex-only closeout review, adding one native Codex review only for high-risk changes, reusing clean evidence, and verifying committed fixes incrementally.
+description: Explicitly run a Codex-only closeout review for a repository change, adding one native Codex review for high-risk changes and verifying committed fixes incrementally.
 ---
 
 # Auto Review
@@ -16,30 +16,9 @@ high-risk changes.
 The supported entrypoint is `scripts/autoreview`. AutoReview does not implement
 fixes, mutate the repository, submit or approve pull requests, or own tracker,
 CI, merge, deployment, or release actions. Explicit invocation selects this
-workflow; it does not by itself require launching the helper. Apply the
-freshness contract below first.
-
-## Review Evidence Freshness
-
-Before launching `scripts/autoreview`, find the latest completed Auto Review for
-the intended target in the current task, imported task or session evidence, or a
-trusted caller handoff. Reuse it without another helper invocation only when:
-
-- the result is clean, or every remaining finding was consciously rejected;
-- the repository and effective patch content and scope are unchanged; and
-- the prior command, result, and reviewed target are verifiable.
-
-Staging an unchanged patch, committing exactly that patch, pushing its commit,
-or moving from implementation finalization to commit finalization does not
-invalidate clean review evidence. A local review may cover the resulting commit
-when its full patch is identical. A branch or PR review is reusable only when no
-additional commit or changed path expands the reviewed scope.
-
-Run Auto Review again when changed content or paths alter the effective patch,
-formatting or generated refreshes alter it, an accepted finding fix changes it,
-the branch/base/commit scope expands, the previous result or target cannot be
-verified, or the user explicitly asks to review again. A commit, push, PR, ship,
-or final-response boundary alone is not a rerun reason.
+workflow and launches the helper for the selected target. Prior evidence is
+used only when the caller explicitly requests an incremental phase; it never
+silently suppresses an explicitly requested review.
 
 ## Codex Data Transfer
 
@@ -50,9 +29,10 @@ selected diff and stat. Any `--prompt`, `--prompt-file`, or `--dataset` content
 is also sent. Prompt and dataset files must be repo-relative regular UTF-8
 files opened component-by-component from a pinned repository descriptor without
 absolute paths, parent traversal, or symlinks. Local mode requires two
-consecutive input captures to match. AutoReview does not truncate review input:
-binary, unreadable, non-UTF-8, oversized, or concurrently changing input fails
-before that prompt is sent to Codex and is reported as incomplete.
+consecutive input captures to match. AutoReview sends complete readable review
+input without an application-defined size cap. Binary, unreadable, non-UTF-8,
+or concurrently changing input fails before that prompt is sent to Codex and is
+reported as incomplete.
 Under `review_profile=high-risk`, the one native `codex review` sends the same
 selected repository target through the Codex engine. `read-only` prohibits
 mutation; it does not mean offline. `--no-web-search` disables reviewer web
@@ -71,21 +51,19 @@ turning the denial into another manual-consent loop.
 1. Read [references/review-policy.md](references/review-policy.md), derive
    `review_profile=standard|high-risk`, and finish the coherent candidate HEAD
    before opening a review lineage.
-2. Apply `Review Evidence Freshness`. If clean evidence is reusable, return it
-   to the caller and skip the helper invocation.
-3. Run the focused local tests or proof first.
-4. Run `scripts/autoreview` on the correct target mode. For `high-risk`, also
+2. Run the focused local tests or proof first.
+3. Run `scripts/autoreview` on the correct target mode. For `high-risk`, also
    run the single native Codex review selected by the review policy on the same
    unchanged HEAD.
-5. Verify and aggregate findings from both lenses before accepting fixes.
-6. Fix only the accepted findings in one coherent batch when possible.
-7. Rerun focused tests or proof if code changed.
-8. For committed branch work, read
+4. Verify and aggregate findings from both lenses before accepting fixes.
+5. Fix only the accepted findings in one coherent batch when possible.
+6. Rerun focused tests or proof if code changed.
+7. For committed branch work, read
    [references/evidence-chain.md](references/evidence-chain.md), disposition
    every finding, import native findings with `finding_source=codex-review`, and
    use `review_phase=fix-verification` after accepted fixes. Local or
    exact-commit targets without chain evidence rerun a full review.
-9. Stop on `terminal-clean`, policy-qualified `verification-clean`,
+8. Stop on `terminal-clean`, policy-qualified `verification-clean`,
    `terminal-composite-clean`, or consciously rejected remaining findings.
    Do not run `terminal-full` automatically. Repeated feedback without a
    substantive changed head is `review-no-progress`, not permission for an
@@ -99,7 +77,7 @@ turning the denial into another manual-consent loop.
 - Pass the derived `review_profile` to the helper. It maps
   `review_profile=standard` to `model_reasoning_effort=high` and
   `review_profile=high-risk` to `model_reasoning_effort=xhigh`. No lower,
-  `max`, or `ultra` effort is part of this bounded review contract.
+  `max`, or `ultra` effort is part of this review contract.
 - If your current working directory is the skill root, run
   `scripts/autoreview --help`.
 - If invoking from another repo, resolve the installed skill root first and run
@@ -125,7 +103,7 @@ turning the denial into another manual-consent loop.
 that said the review failed but did not name any actual problem, so the helper
 could not safely use it. The helper never guesses a finding or calls an invalid
 result clean. A composing workflow may journal the ordinary invocation and
-apply its own bounded recovery policy without giving AutoReview access to the
+apply its own recovery policy without giving AutoReview access to the
 caller's state store.
 
 The validated JSON result uses canonical option values:
@@ -148,7 +126,7 @@ review evidence.
 Each omission uses:
 
 - `source=branch-diff|commit-diff|dataset|fix-delta|prompt-file|review-prompt|staged-diff|unstaged-diff|untracked-file`
-- `reason=binary|changed-during-read|non-utf8|size-limit|symlink|unreadable|unsafe-path`
+- `reason=binary|changed-during-read|non-utf8|symlink|unreadable|unsafe-path`
 - `path=<repo-relative-or-rejected-path>|null`; aggregate prompt omissions use
   `null`
 
@@ -161,34 +139,32 @@ values or their strict finding-intake file.
 
 ## Closeout Entry Modes
 
-- When fresh review is needed for dirty local work: `scripts/autoreview --review-profile <derived-profile> --mode local`
-- When fresh review is needed for a PR, merge, or branch handoff: `scripts/autoreview --review-profile <derived-profile> --mode branch --base origin/main`
-- When fresh review is needed for one exact commit: `scripts/autoreview --review-profile <derived-profile> --mode commit --commit HEAD`
+- For dirty local work: `scripts/autoreview --review-profile <derived-profile> --mode local`
+- For a PR, merge, or branch handoff: `scripts/autoreview --review-profile <derived-profile> --mode branch --base origin/main`
+- For one exact commit: `scripts/autoreview --review-profile <derived-profile> --mode commit --commit HEAD`
 
 ## Workflow
 
-1. Apply `Review Evidence Freshness`; skip the helper when clean evidence still
-   covers the unchanged effective patch.
-2. Format first if formatting can move line numbers. Formatting that changes the
+1. Format first if formatting can move line numbers. Formatting that changes the
    patch invalidates earlier evidence.
-3. Pick the target:
+2. Pick the target:
    - Dirty local work: `scripts/autoreview --review-profile <derived-profile> --mode local`
    - Branch or PR work: `scripts/autoreview --review-profile <derived-profile> --mode branch --base origin/main`
    - Already committed work: `scripts/autoreview --review-profile <derived-profile> --mode commit --commit HEAD`
    - If `--base` is omitted for branch review, the helper tries optional
      `gh pr view` base detection and then falls back to the default base.
-4. Treat review output as advisory. Verify every finding by reading the real
+3. Treat review output as advisory. Verify every finding by reading the real
    code path and adjacent files before changing code.
-5. Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes
+4. Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes
    that over-complicate the codebase.
-6. Prefer small fixes at the right ownership boundary. Do not refactor unless it
+5. Prefer small fixes at the right ownership boundary. Do not refactor unless it
    clearly addresses the accepted bug class.
-7. If a review-triggered fix changes a committed branch, rerun focused tests
+6. If a review-triggered fix changes a committed branch, rerun focused tests
    and follow [references/evidence-chain.md](references/evidence-chain.md).
    Fix verification examines only accepted findings and regressions on changed
    delta lines. A base, merge-base, repository, or path-set expansion starts a
    new full-review lineage.
-8. Stop once the review policy accepts the clean evidence and no
+7. Stop once the review policy accepts the clean evidence and no
    accepted/actionable findings remain. Do
    not rerun it only for a later lifecycle boundary or nicer closeout wording.
 
@@ -235,9 +211,8 @@ Useful options:
 The helper prints `autoreview clean: no accepted/actionable findings reported`
 when Codex returns a valid clean report. It exits nonzero when accepted findings
 remain, when review input is incomplete, when the structured report is invalid,
-or when the review target cannot be resolved. The aggregate review prompt is
-bounded at 512,000 UTF-8 bytes and fails rather than truncating when that limit
-is exceeded.
+or when the review target cannot be resolved. It does not truncate the review
+prompt or a valid model response because of an application-defined size limit.
 Long Codex reviews emit `review still running: codex elapsed=<seconds>s
 pid=<pid>` to stderr while the review subprocess is still active.
 
@@ -252,10 +227,9 @@ Include:
 
 - the derived `review_profile` and the evidence-backed risk boundary;
 - the fixed `gpt-5.6-sol` model and derived `high|xhigh` reasoning effort;
-- the review command used, or the prior command and result reused;
+- the review command used and its result;
 - for `high-risk`, the one native Codex review selector and confirmation that
   it inspected the same candidate HEAD;
-- when reusing evidence, proof that the effective patch and scope are unchanged;
 - tests or proof run after any accepted finding was fixed;
 - findings accepted or rejected, with a brief reason;
 - confirmation that `review_input.input_complete=true` and no input was

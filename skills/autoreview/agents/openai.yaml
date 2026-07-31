@@ -1,7 +1,7 @@
 interface:
   display_name: "Auto Review"
-  short_description: "Run an explicit bounded Sol closeout review"
+  short_description: "Run an explicit Sol closeout review"
   brand_color: "#2B6F6C"
-  default_prompt: "Use $autoreview to derive the review profile, run gpt-5.6-sol at high effort for standard review or xhigh for high-risk review, add one native Codex review only for high-risk changes on the same HEAD, and verify committed fixes without redundant reruns."
+  default_prompt: "Use $autoreview to derive the review profile and run gpt-5.6-sol at high effort for standard review or xhigh for high-risk review on every explicit invocation; add one native Codex review for high-risk changes on the same HEAD and verify committed fixes."
 policy:
   allow_implicit_invocation: false
