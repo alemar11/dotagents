@@ -90,6 +90,11 @@ normal Git head/base/ancestry facts, contract generation, opaque scope repair
 identity and authoritative repair readback, and PR/provider refs only when
 applicable.
 
+Schema-4 `tracker_backend` and `delivery_type` columns are retained solely so
+the existing SQLite shape can be read and cut over safely; every new manifest,
+observation, and public projection writes the fixed GitHub values or omits the
+columns entirely.
+
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
 provider payloads, generic request/result JSON, or any text hash. Normal Git
@@ -202,7 +207,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="3.0.0"`, `runtime_contract_version="6.0.0"`, and the
+`schema_version="4.0.0"`, `runtime_contract_version="7.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -535,13 +540,12 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `5.0.0`,
-`RUNTIME_CONTRACT_VERSION` remains `6.0.0`;
+or build output. `CLI_VERSION` remains `6.0.0`,
+`RUNTIME_CONTRACT_VERSION` remains `7.0.0`;
 `DATABASE_SCHEMA_VERSION` remains integer `4`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
-read-only `capabilities`, `doctor`, and `feature-spec-set validate`, Python
-compilation, unit/contract tests, and an isolated lifecycle fixture after
-changes.
+read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python
+compilation and the remaining executable verifier checks after changes.
 
 Version each domain for its own contract:
 
@@ -575,7 +579,7 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schemas 1, 2, and 3 are the recognized rebuild sources for release 5.0.0.
+Schemas 1, 2, and 3 are the recognized rebuild sources for release 6.0.0.
 Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
 Therefore:
 
@@ -587,8 +591,8 @@ Therefore:
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
-original artifact. The 6.0.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 5.0.0 preparation only after authoritative schema-1
+original artifact. The 7.0.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 6.0.0 preparation only after authoritative schema-1
 state reports zero owners.
 
 Schemas 2 and 3 persist exact per-run pins. With active owners on either

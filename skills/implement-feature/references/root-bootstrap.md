@@ -78,11 +78,9 @@ Root is a lightweight control plane. Before mutation:
    to the run manifest or SQLite.
 9. Resolve the startup fields from `options.md`. The explicit execution request
    resolves `visible_app_task_permission=granted` unless the user explicitly
-   denies worker creation. If every mapping in step 4 already exists, resolve
-   only the conditionally applicable `scope_repair_task_permission`. If
-   mappings are missing, list the exact repository roots in the standard
-   question and resolve `missing_project_action` plus the conditionally
-   applicable `scope_repair_task_permission` in the one startup authorization
+   denies worker creation. If mappings are missing, list the exact repository
+   roots in the standard question and resolve `missing_project_action` plus
+   `scope_repair_task_permission` in the one startup authorization
    interaction.
    With `create-projects`, use Computer Use only for those exact roots, verify
    each selected path before confirmation, then rerun the complete read-only
@@ -94,8 +92,8 @@ Root is a lightweight control plane. Before mutation:
 ```json
 {
   "schema": "implement-feature/run-manifest",
-  "schema_version": "3.0.0",
-  "runtime_contract_version": "6.0.0",
+  "schema_version": "4.0.0",
+  "runtime_contract_version": "7.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -126,7 +124,7 @@ prefixed title.
 
 The Feature Spec Set validator input has the exact protocol
 `schema="implement-feature/feature-spec-set-input"` and
-`schema_version="1.0.0"`. Its `members` array contains exact objects with
+`schema_version="2.0.0"`. Its `members` array contains exact objects with
 `source_spec_ref`, `affected_repository`, and `body_file`; each body path is an
 absolute regular non-symlink file containing the complete current member body.
 The command is read-only and emits the canonical member table plus one

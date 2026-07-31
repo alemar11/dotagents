@@ -40,7 +40,7 @@ its contract generation.
 
 When any other stable field must change, the root and worker stop as
 `blocked-durable-contract` and report the exact conflicting source and field.
-They must not edit the GitHub issue, local planning artifact, or stable section,
+They must not edit the GitHub Feature Spec, implementation issue, or stable section,
 including through GitStack. The same root retains the run and claim while the
 assignment is blocked. After an external planning owner publishes a correction,
 the root rereads the complete authoritative Spec and issue graph and records the

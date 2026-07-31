@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Discover or implement durable GitHub-backed Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs. Use only when explicitly invoked.
+description: Discover or implement durable GitHub Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs. Use only when explicitly invoked.
 ---
 
 # Implement Feature Spec
@@ -125,8 +125,7 @@ only the listed projects plus the disclosed worker run, or stops before state.
 The explicit execution request resolves
 `visible_app_task_permission=granted` unless the user explicitly denies worker
 creation. The startup interaction separately resolves missing-project creation
-and, when at least one selected assignment is GitHub-backed,
-`scope_repair_task_permission`. The worker grant
+and `scope_repair_task_permission`. The worker grant
 covers the selected workers, ChatGPT-created worktrees, normal command
 approvals, validation, publication, review fixes, tracker updates, and recovery.
 Never ask another authority, recovery, validation, blocker, or continuation

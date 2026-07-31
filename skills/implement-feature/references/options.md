@@ -10,8 +10,8 @@ The behavior-affecting startup fields are:
 
 After validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
-expected worker count, ChatGPT-created worktrees, GitHub publication when
-applicable, tracker mutation, validation, AutoReview, and the AutoReview-owned
+expected worker count, ChatGPT-created worktrees, GitHub publication, tracker
+mutation, validation, AutoReview, and the AutoReview-owned
 native Codex review only when the derived profile is `high-risk`, plus the exact
 terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
@@ -22,9 +22,8 @@ explicitly requests those exact task profiles and resolves
 creation question. An explicit denial overrides that grant and stops before
 mutation.
 
-When no project is missing, ask only when at least one selected assignment is
-GitHub-backed. Use this exact question so permission cannot be mistaken for an
-immediate task launch:
+When no project is missing, use this exact question so permission cannot be
+mistaken for an immediate task launch:
 
 > May I create one separate visible Plan Feature task later, only if an
 > implementation worker proves that a required path is missing from
@@ -48,20 +47,19 @@ authorization interaction:
 > - `<repository>` — `<absolute-path>`
 >
 > The explicit execution request already authorizes the disclosed worker tasks.
-> [For GitHub-backed assignments: This answer also controls whether I may create
-> one separate visible Plan Feature task later, only if an implementation worker
-> proves that a required path is missing from `allowed_paths`. Granting this
-> permission does not create that task now. No planner task will be created
-> unless a scope miss occurs.]
+> This answer also controls whether I may create one separate visible Plan
+> Feature task later, only if an implementation worker proves that a required
+> path is missing from `allowed_paths`. Granting this permission does not create
+> that task now. No planner task will be created unless a scope miss occurs.
 > Do you also authorize me to create exactly these persistent projects in the
 > ChatGPT App through Computer Use? Project creation is distinct from task creation.
 > Otherwise I will stop without creating run state, claims, tasks, or worktrees.
 
 Resolve an affirmative answer to
 `missing_project_action=create-projects` and
-when applicable, `scope_repair_task_permission=granted`. Resolve a negative
-answer to `missing_project_action=stop` and, when applicable,
-`scope_repair_task_permission=denied`. Do not change the already resolved
+`scope_repair_task_permission=granted`. Resolve a negative answer to
+`missing_project_action=stop` and `scope_repair_task_permission=denied`. Do not
+change the already resolved
 worker-task permission based on the project answer. A user may explicitly grant
 worker tasks while denying planner repair tasks; normalize that answer to
 `visible_app_task_permission=granted` and
