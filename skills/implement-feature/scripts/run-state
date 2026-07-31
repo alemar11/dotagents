@@ -3782,7 +3782,7 @@ def ready_status() -> str:
     return "pr-ready-for-merge"
 
 
-def validate_ready_observation_shape(value: dict[str, Any]) -> str:
+def validate_ready_observation_shape(value: dict[str, Any]) -> None:
     expected_keys = READY_COMMON_FIELDS | READY_GITHUB_FIELDS
     exact_keys(value, expected_keys, "delivery-ready observation")
     require_protocol(
@@ -3801,7 +3801,6 @@ def validate_ready_observation_shape(value: dict[str, Any]) -> str:
             "invalid-ready-observation",
             "readiness_mode must be terminal or peer-input",
         )
-    return "github-pr"
 
 
 def parse_prerequisite_heads(values: list[str]) -> dict[str, str]:
