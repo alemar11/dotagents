@@ -68,25 +68,15 @@ Canonical planning vocabulary and GitHub label mappings live in
 
 ### Testing and Validation
 
-- Measure compaction against always-loaded metadata and representative invoked paths (`SKILL.md` plus every reference required by that path), not total repository lines or text moved between files on the same path. Preserve trigger, workflow-order, safety, mutation, and output semantics with focused contract tests, and forward-test representative paths when static checks cannot prove equivalence. (Codex learning)
-- Keep skill and plugin tests meaningful: validate executable behavior or
-  structural invariants by parsing representative artifacts, fixtures, state,
-  graphs, schemas, or command results. Do not treat the presence of explanatory
-  prose in `SKILL.md`, references, AGENTS.md, or scenario Markdown as behavioral
-  proof. Exact-text assertions are allowed only when the literal text is itself
-  a machine-consumed or externally required contract, such as a field name,
-  marker, command syntax, manifest value, or template delimiter; make that
-  reason evident in the test. A prose scenario is documentation unless a test
-  harness executes its inputs and verifies its outcomes. For model-directed
-  workflows, pair deterministic artifact validators with representative
-  forward runs, and never claim runtime behavior from documentation-presence
-  checks alone. (Codex learning)
-- Never add a test whose only oracle is explanatory prose in a skill's
-  `SKILL.md`, `references/*.md`, plugin documentation, or other guidance
-  Markdown. Parse those files only for machine-consumed or externally required
-  contracts, structural invariants such as metadata, canonical fields/values,
-  links, tables, schemas, templates, or retired-token absence, and state that
-  reason in the test.
+- Evaluate skill changes against their always-loaded metadata and representative
+  usage paths, not against repository size or moved text.
+- Do not add tests for Markdown-only skills or for skills and plugins without
+  executable scripts.
+- When executable scripts exist, tests are optional. Add them only when they
+  protect meaningful behavior or a high-risk invariant; do not use explanatory
+  Markdown prose as the test oracle.
+- Forward-test model-directed behavior only when the risk justifies it and
+  static checks cannot provide enough confidence.
 
 ### Runtime and Maintenance Boundaries
 
@@ -188,10 +178,6 @@ Canonical planning vocabulary and GitHub label mappings live in
 
 - Keep `plan-harder` as the single reusable home for higher-rigor planning support in this repo; do not reintroduce a separate lightweight clarification skill unless that package boundary is intentionally restored. (Codex learning)
 - Keep `plan-harder` runtime workflow, clarification behavior, and output details in `skills/plan-harder/SKILL.md` and its references, not in this `AGENTS.md`.
-- Keep `plan-harder` output-only: its standalone surface returns chat output and
-  its issue-hardening caller surface returns a structured result to the
-  invoking workflow. It must not create `plans/`, write Markdown plan files, or
-  edit repo files as part of its own runtime workflow.
 
 ### Grill and Project Memory Composition
 
@@ -256,7 +242,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Generated implementation issues may be `ready-for-agent` while listing unfinished dependencies; that means the issue is specified enough for the queue, but consumers must wait for dependencies to complete before starting it. Dependencies must be explicit, acyclic, and must not create retain cycles that lock the queue.
 - Cross-Feature-Spec dependencies contain only the upstream durable ref and reason. Peer workers may start before upstream completion, but final dependent or combined proof binds the exact prerequisite delivery evidence and waits for merge only when the durable dependency contract explicitly requires merged input. Intra-Spec issues contain only forward `dependency_ids`; derive reverse edges instead of persisting `blocked_issue_ids` or a parallelization enum. (Codex learning)
 - Generated GitHub issues include lifecycle prose without choosing a completion method: workers update checkboxes and use a supported tracker transition after substantive proof. Do not persist a completion-method option. (Codex learning)
-- The `plan-feature` issue phase owns GitHub issue writes it performs; `$plan-harder` remains output-only and must not write plan files or issues.
+- The `plan-feature` issue phase owns its GitHub issue writes and consumes the transient `$plan-harder` issue-hardening result when building the final issue.
 - Generated implementation issues should include one standard plan-hardening provenance line under `## Implementation Plan` for the final stable `$plan-harder` pass; merge that final result into the appropriate issue sections instead of pasting it wholesale.
 - Never persist `knowledge_delta` or `## Domain Knowledge Handoff` in a Feature Spec. Carry accepted durable decisions as run/phase data and persist repository-owned target shards only on final closeout issues, then require `$project-memory domain-memory` after integrated behavior is proven. Every target surface must be contained by its owner issue's sole Git repository and allowed paths. A cross-repository decision names one canonical `<feature-id>--<repository-key>/<repo-relative-path>` target whose prefix resolves to the declared owning Feature Spec Set member; peer repositories may carry only repo-local context changes and backlinks that copy that exact target, never duplicate canonical records. On the existing-source route, reject explicit knowledge data outside the authorized repository/path scope instead of widening it. In a multi-repository bundle, each combined boundary belongs to an existing linked Spec whose Feature Dependencies identify the exact peer inputs; never create a dedicated integration Spec, issue subtree, branch, or worker. Keep issue dependencies intra-Spec. (Codex learning)
 - Both `plan-feature` phases should read each selected repository's `project-memory/config/issue-tracker.md`, tracker mappings, and applicable context before deciding where its Feature Spec or issues belong.
