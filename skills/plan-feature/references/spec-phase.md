@@ -548,7 +548,7 @@ generated Markdown.
 Return:
 
 - title, feature slug, source ref, and intended or actual location;
-- `write_mode`, derived `source_route`, tracker backends, optional `feature_id`,
+- `write_mode`, derived `source_route`, optional `feature_id`,
   and selected context identity;
 - affected repositories, allowed paths, and each per-Spec target branch;
 - validated Feature Spec dependencies and acyclicity result;
