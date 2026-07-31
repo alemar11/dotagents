@@ -81,8 +81,12 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    normalized-to-different title returns `effect_warning=worker-title-drift`
    with `cleanup_required=archive-worker`. The successful creation receipt and
    worker binding remain recorded so root can archive the pre-bootstrap task,
-   call `assignment abort`, and release only that claim; bootstrap remains
-   forbidden. If no assignment started, finish an all-aborted run as
+   independently prove the exact recorded checkout path is absent, call
+   `assignment abort`, and release only that claim; bootstrap remains forbidden.
+   If the checkout still exists as a file, directory, or symlink, retain the
+   claim and block cleanup. Treat permission, I/O, or any other inspection error
+   as unknown presence and retain the claim; only `ENOENT` or `ENOTDIR` proves
+   absence. If no assignment started, finish an all-aborted run as
    `preimplementation-aborted`. If a sibling already started, wait until every
    sibling is terminal and finish the mixed run as `abandoned`, never as a
    successful delivery. Never repair the drift with a later rename operation.

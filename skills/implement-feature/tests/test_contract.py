@@ -378,6 +378,9 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("bootstrap remains forbidden", orchestration)
         self.assertIn("finish the mixed run as `abandoned`", orchestration)
         self.assertIn("never as a successful delivery", orchestration)
+        self.assertIn("exact recorded checkout path is absent", orchestration)
+        self.assertIn("retain the claim and block cleanup", orchestration)
+        self.assertIn("only `ENOENT` or `ENOTDIR` proves absence", orchestration)
         self.assertNotIn('"set-worker-title"', self.text("scripts/run-state"))
         self.assertIn(
             "`🧭 Scope Repair · <Feature Spec title>`",

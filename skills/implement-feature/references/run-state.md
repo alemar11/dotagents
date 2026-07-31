@@ -280,7 +280,11 @@ that the created task is titled atomically and permits bootstrap. A different
 title still records the truthful successful creation receipt and worker binding,
 but `finish` returns `effect_warning=worker-title-drift` and
 `cleanup_required=archive-worker`; bootstrap is rejected so root can archive
-the pre-bootstrap task and call `assignment abort` to release only its claim.
+the pre-bootstrap task. Successful `archive-worker` readback includes the exact
+recorded `checkout_path` and proves that no file, directory, or symlink remains
+there before `assignment abort` may release only its claim. Only `ENOENT` or
+`ENOTDIR` proves absence; permission, I/O, and every other inspection error
+blocks cleanup and retains the claim.
 When every assignment remains pre-bootstrap, the all-aborted run finishes as
 `preimplementation-aborted`. When a sibling already started, every sibling must
 reach a terminal delivery or abandoned state and the mixed run finishes as
@@ -342,7 +346,7 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
 | `set-root-title` | `observed_title` |
-| `archive-worker` | `thread_id`, `observed_state` |
+| `archive-worker` | `thread_id`, `checkout_path`, `observed_state` |
 
 Unknown or failed observations may carry only the authoritative action subset
 actually observed. A bootstrap observation always identifies the derived

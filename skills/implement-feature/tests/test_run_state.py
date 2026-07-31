@@ -3012,7 +3012,9 @@ class RunStateScenarios(unittest.TestCase):
         begun = self.begin_operation(
             "invalid-worker-title", "create-worker", "spec-01"
         )
-        checkout = self.base / "invalid worker title checkout"
+        checkout_parent = self.base / "invalid worker title parent"
+        checkout_parent.mkdir()
+        checkout = checkout_parent / "checkout"
         checkout.mkdir()
         observation = self.operation_observation(
             begun,
@@ -3071,15 +3073,61 @@ class RunStateScenarios(unittest.TestCase):
             expected=4,
         )
         self.assertEqual(blocked["error"]["code"], "worker-title-not-verified")
-        self.operation(
+        archive = self.begin_operation(
             "invalid-worker-title",
-            "archive-invalid-worker-title",
             "archive-worker",
             "spec-01",
-            {
+        )
+        archive_observation = self.operation_observation(
+            archive,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:archive-invalid-worker-title",
+                "readback_ref": "readback:archive-invalid-worker-title",
                 "thread_id": "thread-invalid-worker-title-1",
+                "checkout_path": str(checkout),
                 "observed_state": "archived",
             },
+        )
+        archive_path = self.write_json(
+            "archive-invalid-worker-title.json",
+            archive_observation,
+        )
+        still_present = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--operation-id", str(archive["operation_id"]),
+            "--observation", str(archive_path),
+            expected=4,
+        )
+        self.assertEqual(
+            still_present["error"]["code"],
+            "worker-checkout-still-present",
+        )
+        checkout.rmdir()
+        checkout_parent.chmod(0)
+        try:
+            inaccessible = self.invoke(
+                "app-operation", "finish",
+                "--run-id", "invalid-worker-title",
+                "--expected-revision", self.revision("invalid-worker-title"),
+                "--operation-id", str(archive["operation_id"]),
+                "--observation", str(archive_path),
+                expected=4,
+            )
+            self.assertEqual(
+                inaccessible["error"]["code"],
+                "worker-checkout-inspection-failed",
+            )
+        finally:
+            checkout_parent.chmod(0o700)
+        self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--operation-id", str(archive["operation_id"]),
+            "--observation", str(archive_path),
         )
         finished = self.invoke(
             "run", "finish",
@@ -3133,6 +3181,7 @@ class RunStateScenarios(unittest.TestCase):
             ),
         )
         self.assertEqual(created["cleanup_required"], "archive-worker")
+        checkout.rmdir()
         self.operation(
             "mixed-title-drift",
             "archive-mixed-title-drift",
@@ -3140,6 +3189,7 @@ class RunStateScenarios(unittest.TestCase):
             "spec-02",
             {
                 "thread_id": "thread-mixed-title-drift-2",
+                "checkout_path": str(checkout),
                 "observed_state": "archived",
             },
         )
@@ -3734,9 +3784,14 @@ class RunStateScenarios(unittest.TestCase):
             "abort", "create-abort", "create-worker", assignment,
             {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"},
         )
+        checkout.rmdir()
         self.operation(
             "abort", "archive-abort", "archive-worker", assignment,
-            {"thread_id": thread, "observed_state": "archived"},
+            {
+                "thread_id": thread,
+                "checkout_path": str(checkout),
+                "observed_state": "archived",
+            },
         )
         result = self.invoke("run", "finish", "--run-id", "abort", "--expected-revision", self.revision("abort"), "--outcome", "preimplementation-aborted")
         self.assertTrue(result["claims_released"])

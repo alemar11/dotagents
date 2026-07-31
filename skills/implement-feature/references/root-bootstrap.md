@@ -213,7 +213,9 @@ never the multi-folder controller project. If task readback does not resolve to
 that project or repository identity, reconcile or fail the operation before
 bootstrap. A title mismatch preserves the successful creation receipt and
 binding, returns `cleanup_required=archive-worker`, forbids bootstrap, and lets
-root archive the pre-bootstrap task before aborting only that assignment. An
+root archive the pre-bootstrap task and prove that its exact recorded checkout
+path is absent before aborting only that assignment and releasing its claim. An
+inspection error never proves absence and retains the claim. An
 all-aborted pre-bootstrap run finishes as `preimplementation-aborted`; if a
 sibling implementation already started, every sibling must become terminal and
 the mixed run finishes as `abandoned`, not as successful delivery.
