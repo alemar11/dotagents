@@ -5,7 +5,6 @@ from pathlib import Path
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = SKILL_ROOT.parents[1]
 
 
 def parse_top_level_yaml_sections(contents: str) -> dict[tuple[str, str], str]:
@@ -60,39 +59,8 @@ def has_crusty_mutation_authorization(contents: str) -> bool:
 
 
 class CrustyContractTests(unittest.TestCase):
-    def test_skill_is_unconditionally_advisory_only(self) -> None:
-        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        skill_normalized = " ".join(skill.split())
-
-        self.assertIn("This skill is advisory-only", skill)
-        self.assertIn("Keep Crusty advisory-only", skill)
-        self.assertIn("That is an identity boundary, not a default", skill)
-        self.assertIn(
-            "do not switch to an implementation workflow", skill_normalized
-        )
-        self.assertIn("requires a separate non-Crusty workflow", skill)
-        self.assertNotIn("advisory " + "by default", skill)
-        self.assertNotIn(
-            "unless the user separately asks for " + "implementation", skill
-        )
-
-    def test_skill_requires_independent_evidence_backed_judgment(self) -> None:
-        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        skill_normalized = " ".join(skill.split())
-
-        self.assertIn("Form an independent judgment", skill)
-        self.assertIn(
-            "Do not adopt the invoker's preferred conclusion, confidence, or framing",
-            skill_normalized,
-        )
-        self.assertIn("treat it as a claim to examine", skill_normalized)
-        self.assertIn("Do not be contrarian for sport", skill)
-        self.assertIn(
-            "Independent judgment does not authorize ignoring the user's stated goals",
-            skill_normalized,
-        )
-
     def test_runtime_docs_do_not_authorize_crusty_mutations(self) -> None:
+        """Exercise the safety detector against docs and adversarial fixtures."""
         runtime_docs = "\n".join(
             path.read_text(encoding="utf-8")
             for path in (
@@ -115,58 +83,18 @@ class CrustyContractTests(unittest.TestCase):
                     )
                 )
 
-    def test_implementation_evaluation_is_explicit_and_feedback_only(self) -> None:
-        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        evaluation = (
-            SKILL_ROOT / "references" / "implementation-evaluation.md"
-        ).read_text(encoding="utf-8")
-        evaluation_normalized = " ".join(evaluation.split())
-
-        self.assertIn(
-            "[implementation-evaluation.md](references/implementation-evaluation.md)",
-            skill,
-        )
-        self.assertIn("instead of steps 3-8", skill)
-        self.assertIn("return its specialized output, and stop", skill)
-        self.assertIn("only when the user explicitly asks Crusty", evaluation)
-        self.assertIn("Crusty's advisory-only boundary applies unchanged", evaluation)
-        self.assertIn(
-            "do not modify the target project or real external state",
-            evaluation_normalized,
-        )
-        self.assertIn(
-            "does not authorize changes or a later implementation phase in the same task",
-            evaluation_normalized,
-        )
-        self.assertIn("inspect the command and its fixtures", evaluation_normalized)
-        self.assertIn("isolated disposable copy", evaluation_normalized)
-        self.assertIn(
-            "shared databases, services, networks, home-directory caches",
-            evaluation_normalized,
-        )
-        self.assertIn(
-            "Do not add the test or perform the fix as Crusty",
-            evaluation_normalized,
-        )
-        self.assertIn("test-gap matrix", evaluation)
-        self.assertIn("instead of the general output shape", evaluation)
-
     def test_user_facing_metadata_presents_crusty_as_an_advisor(self) -> None:
+        """Validate machine-consumed UI metadata, not the skill's prose."""
         metadata = (SKILL_ROOT / "agents" / "openai.yaml").read_text(
             encoding="utf-8"
         )
         metadata_values = parse_top_level_yaml_sections(metadata)
-        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
         short_description = metadata_values[("interface", "short_description")]
         default_prompt = metadata_values[("interface", "default_prompt")]
 
         self.assertGreaterEqual(len(short_description), 25)
         self.assertLessEqual(len(short_description), 64)
-        self.assertIn("Independent advisory-only critique", short_description)
         self.assertIn("$crusty", default_prompt)
-        self.assertIn("do not adopt my preferred conclusion or framing", default_prompt)
-        self.assertIn("local or supplied evidence", default_prompt)
         self.assertIn("without editing project files", default_prompt)
         self.assertEqual(
             metadata_values[("policy", "allow_implicit_invocation")], "false"
@@ -180,16 +108,9 @@ class CrustyContractTests(unittest.TestCase):
                     "policy:\n  nested:\n    allow_implicit_invocation: false",
                 )
             )
-        self.assertIn(
-            "`crusty` | Direct-only independent advisory critique for decisions, "
-            "implementations, architecture, naming, and tradeoffs.",
-            readme,
-        )
-        self.assertIn(
-            "advisory critique and implementation-evaluation workflows", agents
-        )
 
     def test_local_markdown_references_resolve_and_use_lowercase_names(self) -> None:
+        """Validate link targets as a structural documentation invariant."""
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         targets = re.findall(r"\]\((references/[^)]+\.md)\)", skill)
 

@@ -16,9 +16,6 @@ from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "autoreview"
-SKILL_PATH = Path(__file__).resolve().parents[1] / "SKILL.md"
-OPENAI_YAML_PATH = Path(__file__).resolve().parents[1] / "agents" / "openai.yaml"
-REVIEW_POLICY_PATH = Path(__file__).resolve().parents[1] / "references" / "review-policy.md"
 loader = importlib.machinery.SourceFileLoader("autoreview_script", str(SCRIPT_PATH))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -28,114 +25,6 @@ loader.exec_module(cli)
 
 
 class AutoreviewContractTests(unittest.TestCase):
-    def test_skill_reuses_clean_review_for_unchanged_target(self) -> None:
-        skill = SKILL_PATH.read_text(encoding="utf-8")
-        normalized_skill = " ".join(skill.split())
-
-        self.assertIn("## Review Evidence Freshness", skill)
-        self.assertIn("effective patch content and scope are unchanged", normalized_skill)
-        self.assertIn("does not invalidate clean review evidence", normalized_skill)
-        self.assertIn("A local review may cover the resulting commit", normalized_skill)
-        self.assertIn(
-            "A commit, push, PR, ship, or final-response boundary alone is not a rerun reason.",
-            normalized_skill,
-        )
-
-    def test_skill_reruns_only_when_review_freshness_is_invalidated(self) -> None:
-        skill = SKILL_PATH.read_text(encoding="utf-8")
-        normalized_skill = " ".join(skill.split())
-
-        for invalidation in (
-            "changed content or paths alter the effective patch",
-            "formatting or generated refreshes alter it",
-            "an accepted finding fix changes it",
-            "the branch/base/commit scope expands",
-            "the previous result or target cannot be verified",
-            "the user explicitly asks to review again",
-        ):
-            self.assertIn(invalidation, normalized_skill)
-
-    def test_discovery_metadata_promotes_bounded_risk_based_review(self) -> None:
-        skill = SKILL_PATH.read_text(encoding="utf-8")
-        metadata = OPENAI_YAML_PATH.read_text(encoding="utf-8")
-
-        self.assertIn("review_profile=standard|high-risk", skill)
-        self.assertIn("only for high-risk changes", metadata)
-        self.assertIn("without redundant reruns", metadata)
-        self.assertNotIn(
-            'short_description: "Run structured closeout review before final, commit, PR, or ship."',
-            metadata,
-        )
-
-    def test_review_policy_maps_native_codex_review_to_high_risk_only(self) -> None:
-        policy = " ".join(REVIEW_POLICY_PATH.read_text(encoding="utf-8").split())
-
-        self.assertIn("AutoReview owns the derived `review_profile` result", policy)
-        self.assertIn("`standard`: run the structured AutoReview path only", policy)
-        self.assertIn(
-            "`gpt-5.6-sol` with `model_reasoning_effort=high`",
-            policy,
-        )
-        self.assertIn(
-            "`high-risk`: run structured AutoReview plus one native `codex review`",
-            policy,
-        )
-        self.assertIn(
-            "`gpt-5.6-sol` with `model_reasoning_effort=xhigh` for both lenses",
-            policy,
-        )
-        self.assertIn(
-            "codex --model gpt-5.6-sol --config 'model_reasoning_effort=\"xhigh\"' review --base",
-            policy,
-        )
-        self.assertIn(
-            "AutoReview must not use a lower effort, `max`, `ultra`, or an alternate model",
-            policy,
-        )
-        self.assertIn("Run native `codex review` at most once per lineage", policy)
-        self.assertIn(
-            "Current Codex CLI rejects a positional prompt combined with `--base`, `--commit`, or `--uncommitted`",
-            policy,
-        )
-        self.assertIn(
-            "A clean `verification-clean` result is sufficient terminal evidence",
-            policy,
-        )
-        self.assertIn("`terminal-full` is not an automatic closeout phase", policy)
-
-    def test_codex_transfer_scope_is_documented_without_authorization_policy(self) -> None:
-        skill = SKILL_PATH.read_text(encoding="utf-8")
-        normalized_skill = " ".join(skill.split())
-
-        self.assertIn("## Codex Data Transfer", skill)
-        for disclosed_content in (
-            "Git status",
-            "staged and unstaged diffs",
-            "non-ignored untracked text file",
-            "repo-relative regular UTF-8 files",
-            "input fails before that prompt is sent to Codex and is reported as incomplete",
-            "--prompt-file",
-            "--dataset",
-        ):
-            self.assertIn(disclosed_content, normalized_skill)
-        self.assertNotIn("authorizes a calling workflow", normalized_skill)
-        self.assertNotIn("separate authorization question", normalized_skill)
-        self.assertNotIn("same disclosed review authorization", normalized_skill)
-        self.assertNotIn("single grant", normalized_skill)
-        self.assertIn(
-            "AutoReview must not ask a separate prose confirmation",
-            normalized_skill,
-        )
-        self.assertIn(
-            "report the host-level blocker and stop instead of turning the denial into another manual-consent loop",
-            normalized_skill,
-        )
-        self.assertIn(
-            "--no-web-search` disables reviewer web search, not the Codex engine transfer",
-            normalized_skill,
-        )
-        self.assertIn("reviewer remains repository-aware", normalized_skill)
-
     def test_version(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):

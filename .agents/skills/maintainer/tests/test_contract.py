@@ -136,191 +136,27 @@ def option_registry_failures(option_files: list[Path]) -> list[str]:
 
 class MaintainerContractTests(unittest.TestCase):
     def test_package_identity_is_lowercase_and_aligned(self) -> None:
+        """Validate the machine-facing package identity and metadata name."""
         self.assertEqual(SKILL_ROOT.name, "maintainer")
-        skill = read("SKILL.md")
-        self.assertRegex(skill, r"(?m)^name: maintainer$")
-        self.assertIn("display_name: \"Maintainer\"", read("agents/openai.yaml"))
+        self.assertRegex(read("SKILL.md"), r"(?m)^name: maintainer$")
+        self.assertIn('display_name: "Maintainer"', read("agents/openai.yaml"))
 
-    def test_invocation_is_manual_only_and_aligned(self) -> None:
-        skill = " ".join(read("SKILL.md").split())
+    def test_invocation_metadata_is_manual_only(self) -> None:
+        """Validate the machine-consumed implicit-invocation policy."""
         metadata = read("agents/openai.yaml")
-        router = " ".join(read("references/maintenance-router.md").split())
-        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-
-        self.assertIn("This skill is manual-only", skill)
-        self.assertIn("Do not auto-select it for ordinary skill", skill)
         self.assertFalse(root_mapping_boolean(metadata, "policy", "allow_implicit_invocation"))
-        self.assertIn("This router runs only after the user explicitly invokes", router)
-        self.assertIn("must not auto-select this skill", router)
-        self.assertIn("Keep `maintainer` manual-only", agents)
-        self.assertIn("only repo-level maintainer docs may define explicit", agents)
-        self.assertIn("Use `$maintainer` afterward", agents)
-        self.assertIn("only when the user explicitly invokes it", agents)
-        self.assertIn("During an explicit `$maintainer` run", agents)
-        self.assertIn("only when it was explicitly invoked", agents)
-        self.assertIn("Manually audit, maintain, and re-engineer repo skills and plugins", readme)
-        maintainer_routes = [
-            line for line in agents.splitlines() if "$maintainer" in line
-        ]
-        self.assertGreater(len(maintainer_routes), 5)
-        for route in maintainer_routes:
-            self.assertIn("explicit", route.lower())
 
     def test_all_entrypoint_references_exist(self) -> None:
+        """Validate SKILL.md reference paths as a structural invariant."""
         references = set(re.findall(r"references/([a-z0-9_-]+\.md)", read("SKILL.md")))
         self.assertGreater(len(references), 10)
-        missing = sorted(name for name in references if not (SKILL_ROOT / "references" / name).is_file())
+        missing = sorted(
+            name for name in references if not (SKILL_ROOT / "references" / name).is_file()
+        )
         self.assertEqual(missing, [])
 
-    def test_router_and_menu_expose_maintenance_routes(self) -> None:
-        router = read("references/maintenance-router.md")
-        menu = read("references/task-menu.md")
-        for term in ("audit", "workflow-hardening", "package-lifecycle"):
-            self.assertIn(term, router)
-        self.assertIn("`audit` | Skill/repo health", router)
-        self.assertIn("`workflow-hardening` | Sessions, logs, tests", router)
-        self.assertIn("`package-lifecycle` | Merge, rename, move", router)
-        for task in (
-            "audit skill health",
-            "harden workflow family",
-            "migrate or retire package",
-        ):
-            self.assertIn(task, menu)
-
-    def test_generic_maintenance_cannot_expand_strategically(self) -> None:
-        runbook = read("references/run-maintenance.md")
-        router = read("references/maintenance-router.md")
-        for term in ("workflow-family hardening", "package migration/retirement", "substantial reshapes"):
-            self.assertIn(term, runbook)
-        self.assertIn("Do not silently expand generic maintenance", router)
-
-    def test_substantial_reshapes_are_creator_first(self) -> None:
-        lifecycle = read("references/package-lifecycle.md")
-        upgrade = read("references/skill-upgrade.md")
-        for contract in ("$skill-creator", "$plugin-creator"):
-            self.assertIn(contract, lifecycle)
-            self.assertIn(contract, upgrade)
-
-    def test_runtime_evidence_stays_read_only_until_accepted(self) -> None:
-        hardening = read("references/workflow-family-hardening.md")
-        normalized = " ".join(hardening.split())
-        self.assertIn("$skill-audit", hardening)
-        self.assertIn("read-only", hardening)
-        self.assertIn("after the finding is accepted", hardening)
-        self.assertIn("representative raw session", hardening)
-        self.assertIn("reproducible test failure", hardening)
-        self.assertIn("may be sufficient", normalized)
-
-    def test_validation_matrix_covers_runtime_and_package_surfaces(self) -> None:
-        matrix = read("references/validation-matrix.md")
-        for lane in (
-            "Runtime skill contract",
-            "Composed workflow",
-            "Embedded CLI",
-            "Plugin",
-            "Migration or removal",
-            "Non-trivial implementation",
-        ):
-            self.assertIn(lane, matrix)
-        for proof in ("--help", "--version", "--json doctor", "$autoreview"):
-            self.assertIn(proof, matrix)
-        normalized = " ".join(matrix.split())
-        self.assertIn("before/after status", normalized)
-        self.assertIn("reinstall introduced no checkout changes", normalized)
-
-    def test_git_mutations_require_explicit_authorization(self) -> None:
-        checklist = read("references/release-checklist.md")
-        normalized = " ".join(checklist.split())
-        self.assertIn("Resolve commit, push, PR, and other publication authority independently", normalized)
-        self.assertIn("Otherwise stop after validation", normalized)
-        self.assertIn("With explicit commit authority", normalized)
-        self.assertIn("With push-only authority, do not stage or commit", normalized)
-        self.assertIn("Do not infer commit authority from a bare PR request", normalized)
-        self.assertIn("Direct scoped `git` is", normalized)
-        self.assertIn("when GitStack is unavailable", normalized)
-        self.assertIn("authorized paths plus the staged set are clean", normalized)
-        self.assertIn("unrelated pre-existing changes remain unchanged", normalized)
-        self.assertIn("global worktree cleanliness is not required", normalized)
-
-    def test_instruction_density_is_a_pre_mutation_mixed_route_gate(self) -> None:
-        router = read("references/maintenance-router.md")
-        mixed = router.partition("## Mixed Requests")[2].partition("## Task Isolation")[0]
-        density = mixed.index("`instruction-density`")
-        hardening = mixed.index("`workflow-hardening`")
-        lifecycle = mixed.index("`package-lifecycle`")
-        maintain = mixed.index("`maintain`")
-        self.assertLess(density, hardening)
-        self.assertLess(density, lifecycle)
-        self.assertLess(density, maintain)
-        self.assertIn("stop for approval before mutation", mixed)
-
-    def test_health_route_is_holistic_read_only_and_size_is_diagnostic(self) -> None:
-        skill = read("SKILL.md")
-        menu = read("references/task-menu.md")
-        health = read("references/skill-health.md")
-        normalized = " ".join(health.split())
-
-        self.assertIn("references/skill-health.md", skill)
-        self.assertIn("audit skill health", menu)
-        for area in (
-            "structural and policy integrity",
-            "metadata and discovery",
-            "entrypoint size",
-            "reference routing",
-            "representative invoked-path cost",
-            "applicable validation evidence",
-        ):
-            self.assertIn(area, " ".join(menu.split()))
-        self.assertIn("A direct `audit` request is read-only", normalized)
-        for band in ("`normal`", "`review`", "`high-density`", "`over-guideline`"):
-            self.assertIn(band, health)
-        self.assertIn("Size alone is diagnostic and never produces `result=fail`", normalized)
-        self.assertIn("broken active pointers", normalized)
-        self.assertIn("unsafe or behavior-breaking policy contradictions", normalized)
-        self.assertIn("failed required validation", normalized)
-
-    def test_health_escalates_to_skill_audit_only_on_diagnostic_signals(self) -> None:
-        skill = " ".join(read("SKILL.md").split())
-        health = " ".join(read("references/skill-health.md").split())
-
-        self.assertIn("Use `$skill-audit` read-only", skill)
-        self.assertIn("Invoke `$skill-audit` read-only when any of these signals is present", health)
-        for signal in (
-            "entrypoint band is not `normal`",
-            "description or duplicate candidates appear",
-            "instruction sprawl",
-            "writing-quality problems",
-            "runtime behavior",
-            "representative session evidence",
-        ):
-            self.assertIn(signal, health)
-
-    def test_run_maintenance_consumes_only_safe_health_findings(self) -> None:
-        runbook = " ".join(read("references/run-maintenance.md").split())
-        health = " ".join(read("references/skill-health.md").split())
-
-        self.assertIn("Run `skill-health.md` read-only", runbook)
-        self.assertIn("Rerun `skill-health.md`", runbook)
-        self.assertIn("may apply only safe, low-ambiguity findings", health)
-        self.assertIn("defer strategic or behavior-sensitive changes", health)
-
-    def test_router_and_release_checklist_own_shared_behavior(self) -> None:
-        skill = " ".join(read("SKILL.md").split())
-        router = read("references/maintenance-router.md")
-        checklist = read("references/release-checklist.md")
-        references = list((SKILL_ROOT / "references").glob("*.md"))
-
-        self.assertIn("It owns request routing, mixed-route order, task isolation, delegation", skill)
-        self.assertIn("## Delegation", router)
-        self.assertIn("## Final Report", checklist)
-        self.assertIn("Health evidence", checklist)
-        for path in references:
-            text = path.read_text(encoding="utf-8")
-            self.assertNotIn("## Parallel Subagent Pattern", text, path.name)
-            self.assertNotIn("## Reporting Contract", text, path.name)
-
     def test_retired_health_route_has_no_compatibility_alias(self) -> None:
+        """Validate retired-token absence and the replacement file invariant."""
         maintenance_docs = [SKILL_ROOT / "SKILL.md"]
         maintenance_docs.extend((SKILL_ROOT / "references").glob("*.md"))
         combined = "\n".join(path.read_text(encoding="utf-8") for path in maintenance_docs)
@@ -332,22 +168,8 @@ class MaintainerContractTests(unittest.TestCase):
         self.assertFalse((SKILL_ROOT / "references" / retired_reference).exists())
         self.assertTrue((SKILL_ROOT / "references" / "skill-health.md").is_file())
 
-    def test_lifecycle_commit_split_is_authority_gated(self) -> None:
-        lifecycle = " ".join(read("references/package-lifecycle.md").split())
-        self.assertIn("When the user explicitly authorizes commits", lifecycle)
-        self.assertIn("Without commit authority, report the recommended split", lifecycle)
-        self.assertIn("without staging or changing Git history", lifecycle)
-
-    def test_codex_dependencies_are_explicit_and_registered(self) -> None:
-        skill = read("SKILL.md")
-        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        for dependency in ("$skill-audit", "$skill-creator", "$plugin-creator", "$autoreview"):
-            self.assertIn(dependency, skill)
-            self.assertIn(dependency, readme)
-        self.assertIn("`maintainer`", agents.partition("### Codex Dependency Classification")[2])
-
     def test_no_stale_uppercase_identity_remains(self) -> None:
+        """Validate absence of retired package identity tokens."""
         candidates = [REPO_ROOT / "AGENTS.md", REPO_ROOT / "README.md"]
         candidates.extend((REPO_ROOT / ".agents" / "skills").rglob("*"))
         stale_patterns = (
@@ -369,6 +191,7 @@ class MaintainerContractTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_option_registries_use_canonical_field_and_value_syntax(self) -> None:
+        """Validate the parsed field/value registry contract across packages."""
         option_files = sorted(REPO_ROOT.glob("skills/**/references/options.md"))
         option_files.extend(sorted(REPO_ROOT.glob("plugins/**/references/options.md")))
         option_files.append(SKILL_ROOT / "references" / "options.md")
@@ -384,24 +207,7 @@ class MaintainerContractTests(unittest.TestCase):
             SKILL_ROOT / "references/options.md",
         }
         self.assertEqual(expected.difference(option_files), set())
-
         self.assertEqual(option_registry_failures(option_files), [])
-
-    def test_agents_defines_behavior_preserving_compaction_contract(self) -> None:
-        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        normalized = " ".join(agents.split())
-
-        for contract in (
-            "progressive disclosure",
-            "one canonical owner",
-            "explicit read conditions",
-            "decidable from already-loaded content or the target artifact",
-            "representative invoked paths",
-            "focused contract tests",
-        ):
-            self.assertIn(contract, normalized)
-        self.assertIn("not total repository lines or text moved between files", normalized)
-        self.assertIn("trigger, workflow-order, safety, mutation, and output semantics", normalized)
 
     def test_option_registry_validation_rejects_malformed_rows(self) -> None:
         with TemporaryDirectory() as temp:
@@ -557,16 +363,6 @@ After the table.
                         for item in option_registry_failures([fixture])
                     )
                 )
-
-    def test_closeout_separates_result_from_change_state(self) -> None:
-        maintenance_docs = [SKILL_ROOT / "SKILL.md"]
-        maintenance_docs.extend((SKILL_ROOT / "references").glob("*.md"))
-        combined = "\n".join(path.read_text(encoding="utf-8") for path in maintenance_docs)
-
-        self.assertNotIn("PASS (NOOP)", combined)
-        checklist = read("references/release-checklist.md")
-        self.assertIn("- `result`: `pass` or `fail`", checklist)
-        self.assertIn("- `change_state`: `changed` or `no-change`", checklist)
 
 
 if __name__ == "__main__":

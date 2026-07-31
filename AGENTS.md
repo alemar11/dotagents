@@ -81,6 +81,12 @@ Canonical planning vocabulary and GitHub label mappings live in
   workflows, pair deterministic artifact validators with representative
   forward runs, and never claim runtime behavior from documentation-presence
   checks alone. (Codex learning)
+- Never add a test whose only oracle is explanatory prose in a skill's
+  `SKILL.md`, `references/*.md`, plugin documentation, or other guidance
+  Markdown. Parse those files only for machine-consumed or externally required
+  contracts, structural invariants such as metadata, canonical fields/values,
+  links, tables, schemas, templates, or retired-token absence, and state that
+  reason in the test.
 
 ### Runtime and Maintenance Boundaries
 
