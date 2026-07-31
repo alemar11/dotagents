@@ -19,8 +19,8 @@ from typing import Any
 from urllib.parse import quote
 
 
-CLI_VERSION = "4.2.0"
-RUNTIME_CONTRACT_VERSION = "5.0.0"
+CLI_VERSION = "5.0.0"
+RUNTIME_CONTRACT_VERSION = "6.0.0"
 DATABASE_SCHEMA_VERSION = 4
 REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
@@ -43,7 +43,7 @@ PROTOCOLS = {
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "2.1.0",
+        "schema_version": "3.0.0",
     },
     "scope_repair_observation": {
         "schema": "implement-feature/scope-repair-observation",
@@ -105,7 +105,6 @@ OWNED_ID_LIKE_RE = re.compile(
 APP_ACTIONS = {
     "create-worker",
     "create-scope-repair-task",
-    "set-worker-title",
     "set-review-owner",
     "send-bootstrap",
     "send-scope-revision",
@@ -116,7 +115,6 @@ APP_ACTIONS = {
 SINGLE_USE_ACTIONS = {
     "create-worker",
     "create-scope-repair-task",
-    "set-worker-title",
     "send-bootstrap",
     "send-scope-revision",
     "set-root-title",
@@ -142,6 +140,7 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "project_id",
         "checkout_path",
         "git_common_dir",
+        "observed_title",
         "observed_state",
     },
     "create-scope-repair-task": {
@@ -150,7 +149,6 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "observed_state",
         "observed_title",
     },
-    "set-worker-title": {"thread_id", "observed_title"},
     "set-review-owner": {"thread_id", "observed_state"},
     "send-bootstrap": {"thread_id", "bootstrap_id"},
     "send-scope-revision": {
@@ -2591,7 +2589,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     if action in {
         "create-worker",
         "create-scope-repair-task",
-        "set-worker-title",
         "set-review-owner",
         "send-bootstrap",
         "send-scope-revision",
@@ -2623,8 +2620,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                     "automatic scope repair is supported only for GitHub-backed planning",
                     4,
                 )
-        elif action == "set-worker-title" and assignment["state"] != "worker-created":
-            raise StateError("invalid-assignment-transition", "title readback requires a created worker", 4)
         elif action == "set-review-owner":
             if assignment["state"] != "active":
                 raise StateError(
@@ -2656,6 +2651,18 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         elif action == "send-bootstrap":
             if assignment["state"] != "worker-created":
                 raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
+            created = connection.execute(
+                """SELECT observed_title FROM app_operations
+                   WHERE run_id=? AND assignment_id=?
+                     AND action='create-worker' AND status='succeeded'""",
+                (run["run_id"], assignment_id),
+            ).fetchone()
+            if created is None or created["observed_title"] != assignment["title"]:
+                raise StateError(
+                    "worker-title-not-verified",
+                    "bootstrap requires atomic worker creation with verified title readback",
+                    4,
+                )
         elif action == "send-scope-revision":
             if assignment["state"] != "blocked-scope-repair":
                 raise StateError(
@@ -3342,10 +3349,6 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "planner task is already bound to another runtime subject",
                 4,
             )
-    elif action == "set-worker-title":
-        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
-        if observed["thread_id"] != assignment["thread_id"] or observed["observed_title"] != assignment["title"]:
-            raise StateError("worker-title-drift", "worker title readback differs from the assignment", 4)
     elif action == "set-review-owner":
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:
@@ -3377,9 +3380,18 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:
             raise StateError("worker-identity-drift", "bootstrap receipt belongs to another worker", 4)
-        titled = connection.execute("SELECT 1 FROM app_operations WHERE run_id=? AND assignment_id=? AND action='set-worker-title' AND status='succeeded'", (run["run_id"], assignment["assignment_id"])).fetchone()
-        if not titled:
-            raise StateError("worker-title-not-verified", "bootstrap requires verified worker title readback", 4)
+        created = connection.execute(
+            """SELECT observed_title FROM app_operations
+               WHERE run_id=? AND assignment_id=?
+                 AND action='create-worker' AND status='succeeded'""",
+            (run["run_id"], assignment["assignment_id"]),
+        ).fetchone()
+        if created is None or created["observed_title"] != assignment["title"]:
+            raise StateError(
+                "worker-title-not-verified",
+                "bootstrap requires atomic worker creation with verified title readback",
+                4,
+            )
         bootstrap_review_owner(operation)
         connection.execute("UPDATE assignments SET state='active',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
         connection.execute("UPDATE runs SET implementation_started=1 WHERE run_id=?", (run["run_id"],))
@@ -3471,6 +3483,24 @@ def app_operation_replay_authorized(
     return status == "failed"
 
 
+def app_operation_effect_warning(
+    connection: sqlite3.Connection,
+    run: sqlite3.Row,
+    operation: sqlite3.Row,
+    observed: dict[str, Any],
+) -> str | None:
+    if operation["action"] != "create-worker" or observed["status"] != "succeeded":
+        return None
+    assignment = get_assignment(
+        connection,
+        run["run_id"],
+        operation["assignment_id"],
+    )
+    if observed.get("observed_title") != assignment["title"]:
+        return "worker-title-drift"
+    return None
+
+
 def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     operation_id = token(args.operation_id, "operation_id")
@@ -3526,8 +3556,14 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         }
         if terminal_or_reconciled:
             if observed == stored_observation:
+                effect_warning = app_operation_effect_warning(
+                    connection,
+                    run,
+                    operation,
+                    observed,
+                )
                 connection.rollback()
-                return {
+                result = {
                     "run_id": run_id,
                     "revision": run["revision"],
                     "operation_id": operation_id,
@@ -3540,6 +3576,10 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                         operation["readback_ref"],
                     ),
                 }
+                if effect_warning:
+                    result["effect_warning"] = effect_warning
+                    result["cleanup_required"] = "archive-worker"
+                return result
         require_revision(run, args.expected_revision)
         if terminal_or_reconciled:
             if operation["status"] in {"succeeded", "failed"}:
@@ -3558,6 +3598,12 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                     )
         if observed["status"] == "succeeded":
             apply_succeeded_app_effect(connection, run, operation, observed)
+        effect_warning = app_operation_effect_warning(
+            connection,
+            run,
+            operation,
+            observed,
+        )
         values = {field: observed.get(field) for field in (
             "receipt_ref", "readback_ref", "thread_id", "project_id", "checkout_path",
             "git_common_dir", "observed_title", "provider_observation_ref", "head_sha", "pr_url", "observed_state"
@@ -3572,7 +3618,7 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         )
         revision = advance(connection, run)
         connection.commit()
-        return {
+        result = {
             "run_id": run_id,
             "revision": revision,
             "operation_id": operation_id,
@@ -3585,6 +3631,10 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                 observed.get("readback_ref"),
             ),
         }
+        if effect_warning:
+            result["effect_warning"] = effect_warning
+            result["cleanup_required"] = "archive-worker"
+        return result
     except Exception:
         connection.rollback()
         raise
@@ -5061,12 +5111,22 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                 "pr-ready", "local-branch-ready",
                 "preimplementation-aborted", "abandoned",
             }
-            if "abandoned" not in states or any(
+            has_abandoned_assignment = "abandoned" in states
+            has_mixed_preimplementation_abort = (
+                bool(run["implementation_started"])
+                and "preimplementation-aborted" in states
+            )
+            if (
+                not has_abandoned_assignment
+                and not has_mixed_preimplementation_abort
+            ) or any(
                 state not in terminal_states for state in states
             ):
                 raise StateError(
                     "run-incomplete",
-                    "abandoned finish requires every assignment terminal and at least one abandoned",
+                    "abandoned finish requires every assignment terminal and "
+                    "at least one abandoned assignment or a preimplementation "
+                    "abort in a run where sibling implementation started",
                     4,
                 )
             active_claims = connection.execute(

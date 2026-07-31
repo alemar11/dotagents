@@ -164,8 +164,8 @@ more Feature Specs. A discovery-only request never enters this flow.
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `4.2.0` implements runtime
-   contract `5.0.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `5.0.0` implements runtime
+   contract `6.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
    schema integer `4` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
@@ -199,8 +199,9 @@ more Feature Specs. A discovery-only request never enters this flow.
    reroute through the reconciled `set-review-owner` operation after the early
    AutoReview doctor path. A verified,
    worker-accepted bootstrap starts its complete implementation authority;
-   duplicate delivery of that same logical bootstrap has one effect. There is
-   no baseline-only phase or later GO.
+   duplicate delivery of that same logical bootstrap has one effect. The
+   atomic creation prompt is transport-only; there is no baseline-only
+   implementation phase or later GO.
 6. Let the worker follow `references/worker-execution.md` and
    `references/tracker-checklists.md` autonomously. Monitor coarse progress by
    reading the visible tasks. After an interruption, check whether each recorded

@@ -24,10 +24,20 @@ creation question. An explicit denial overrides that grant and stops before
 mutation.
 
 When no project is missing, ask only when at least one selected assignment is
-GitHub-backed, and only whether root may create the disclosed separate Plan
-Feature repair task after a valid path-scope miss. Resolve that answer directly
-to `scope_repair_task_permission`. When every assignment uses local tracking,
-no startup authorization question remains.
+GitHub-backed. Use this exact question so permission cannot be mistaken for an
+immediate task launch:
+
+> May I create one separate visible Plan Feature task later, only if an
+> implementation worker proves that a required path is missing from
+> `allowed_paths`? Granting this permission does not create that task now. No
+> planner task will be created unless a scope miss occurs.
+
+Resolve that answer directly to `scope_repair_task_permission`. After an
+affirmative answer, state exactly: `Planner-task permission recorded; no
+planner task has been created.` After a negative answer, state exactly:
+`Planner-task permission denied; a future scope miss will block without
+creating a planner task.` When every assignment uses local tracking, no startup
+authorization question remains.
 
 When projects are missing, use this standard question in the same startup
 authorization interaction:
@@ -40,8 +50,11 @@ authorization interaction:
 > - `<repository>` — `<absolute-path>`
 >
 > The explicit execution request already authorizes the disclosed worker tasks.
-> [For GitHub-backed assignments: This answer also controls the bounded Plan
-> Feature repair task disclosed above.]
+> [For GitHub-backed assignments: This answer also controls whether I may create
+> one separate visible Plan Feature task later, only if an implementation worker
+> proves that a required path is missing from `allowed_paths`. Granting this
+> permission does not create that task now. No planner task will be created
+> unless a scope miss occurs.]
 > Do you also authorize me to create exactly these persistent projects in the
 > ChatGPT App through Computer Use? Project creation is distinct from task creation.
 > Otherwise I will stop without creating run state, claims, tasks, or worktrees.

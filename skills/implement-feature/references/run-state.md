@@ -1,10 +1,12 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `4.2.0` implements the breaking runtime
-contract `5.0.0` over database schema `4`. It adds externally owned scope repair
-and contract generations while path and dependency serialization remain
-controller invariants; it does not add per-file claims. The
+uses the shipped artifact. CLI release `5.0.0` implements the breaking runtime
+contract `6.0.0` over database schema `4`. Worker creation now atomically
+verifies the final task title and rejects the retired post-creation rename
+operation. Externally owned scope repair and contract generations remain in
+place while path and dependency serialization stay controller invariants; the
+runtime does not add per-file claims. The
 controller's saved project remains explicit control-plane identity, each
 affected repository maps bijectively to its own saved project, and assignments
 inherit that normalized binding. There are no command aliases or compatibility
@@ -14,8 +16,8 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `4.2.0` | User-facing commands and executable behavior |
-| Runtime contract | `5.0.0` | Coordination semantics required by an active run |
+| CLI | `5.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `6.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `4` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -28,7 +30,7 @@ machine-readable registry for these identities and protocols:
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
 | Run manifest | `implement-feature/run-manifest` | `3.0.0` |
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `1.0.0` |
-| Codex task-operation observation | `implement-feature/app-operation-observation` | `2.1.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `3.0.0` |
 | Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` | `2.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `2.0.0` |
@@ -199,7 +201,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="3.0.0"`, `runtime_contract_version="5.0.0"`, and the
+`schema_version="3.0.0"`, `runtime_contract_version="6.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -273,8 +275,16 @@ The builder derives `bootstrap_id`; for `send-scope-revision` it derives
 `scope_revision_id` and `contract_generation`.
 
 For a successful `create-worker`, `observed_state` is the literal Codex task
-state and accepts `active` or `idle`; both prove that the exact created task is
-present and bound to its project/worktree. For the worker-to-root
+state and accepts `active` or `idle`. Exact `observed_title` equality proves
+that the created task is titled atomically and permits bootstrap. A different
+title still records the truthful successful creation receipt and worker binding,
+but `finish` returns `effect_warning=worker-title-drift` and
+`cleanup_required=archive-worker`; bootstrap is rejected so root can archive
+the pre-bootstrap task and call `assignment abort` to release only its claim.
+When every assignment remains pre-bootstrap, the all-aborted run finishes as
+`preimplementation-aborted`. When a sibling already started, every sibling must
+reach a terminal delivery or abandoned state and the mixed run finishes as
+`abandoned`, never as successful delivery. For the worker-to-root
 `set-review-owner` reroute, it accepts only `root`; for a successful
 `archive-worker`, it accepts `archived` or
 `completed`. The template exposes these closed values under
@@ -325,9 +335,8 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 
 | Action | Additional fields |
 | --- | --- |
-| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
+| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_title`, `observed_state` |
 | `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`, `observed_title` |
-| `set-worker-title` | `thread_id`, `observed_title` |
 | `set-review-owner` | `thread_id`, `observed_state` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
 | `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
@@ -367,7 +376,6 @@ generation. Its action-specific gates are:
 | `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
 | `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
-| `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `set-review-owner` | Prior generation is `failed` and `readback_ref` authoritatively proves the owner follow-up was not delivered; success permits the single worker-to-root reroute |
 | `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
@@ -537,8 +545,8 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `4.2.0`,
-`RUNTIME_CONTRACT_VERSION` remains `5.0.0`;
+or build output. `CLI_VERSION` remains `5.0.0`,
+`RUNTIME_CONTRACT_VERSION` remains `6.0.0`;
 `DATABASE_SCHEMA_VERSION` remains integer `4`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, Python
@@ -560,6 +568,11 @@ Version each domain for its own contract:
 Because runs pin the exact CLI version and artifact digest, even a compatible
 new executable does not take over mutation of an already active run. Keep the
 old shipped artifact available until its pinned runs are terminal.
+Retained executables may live under
+`~/.cache/dotagents/skills/implement-feature/runtimes/<cli-version>/<sha256>/run-state`.
+They are rebuildable from the owning Git revision, never replace SQLite as the
+source of run state, and must pass `--version`, `--json capabilities`, and exact
+SHA-256 verification before use with `--retained-runtime`.
 
 ## Hard-Cut Operations
 
@@ -572,7 +585,7 @@ state carry-forward.
 At runtime, call read-only `capabilities` and `doctor` first and then
 `state prepare`.
 
-Schemas 1, 2, and 3 are the recognized rebuild sources for release 4.2.0.
+Schemas 1, 2, and 3 are the recognized rebuild sources for release 5.0.0.
 Schema-1 runs did not record exact runtime-contract, CLI, and artifact pins.
 Therefore:
 
@@ -584,8 +597,8 @@ Therefore:
   singleton metadata row, and commits with no row carry-forward.
 
 An active schema-1 run can be terminalized only by its already retained
-original artifact. The 5.0.0 runtime does not operate it or promise that such
-an artifact exists. Rerun 4.2.0 preparation only after authoritative schema-1
+original artifact. The 6.0.0 runtime does not operate it or promise that such
+an artifact exists. Rerun 5.0.0 preparation only after authoritative schema-1
 state reports zero owners.
 
 Schemas 2 and 3 persist exact per-run pins. With active owners on either

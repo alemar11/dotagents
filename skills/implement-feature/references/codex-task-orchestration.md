@@ -27,7 +27,7 @@ For every such change, root follows one crash-safe sequence:
 Bootstrap may replay after `unknown` or `failed` readback because the worker
 deduplicates its stable `bootstrap_id`; this provides exactly-once bootstrap
 effect, not exactly-once delivery. The protected `create-worker`,
-`set-worker-title`, `set-review-owner`, `set-root-title`, and `archive-worker`
+`set-review-owner`, `set-root-title`, and `archive-worker`
 actions may replay
 only from `failed` with readback that authoritatively proves that launch had no
 effect. A successful `set-review-owner` history permits one initial
@@ -66,14 +66,26 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    create one visible Codex worker task with `environment=worktree` in the
    selected local Git project in the ChatGPT App. Pass
    `model=gpt-5.6-sol` and the assignment's resolved
-   `thinking=medium|high|xhigh` from `task-model-policy.md`. Do not impose a
-   numeric worker limit. The ChatGPT App creates the worktree and assigns it to
-   the task; root never runs `git worktree add`. The successful creation
-   observation records the literal task state `active` or `idle`; both mean
-   that the exact task binding exists, not that implementation progress has
-   begun.
-3. Independently verify the stable task ID, checkout directory, and Git common
-   directory, then set and verify `🛠️ Woker · <Feature Spec title>`.
+   `thinking=medium|high|xhigh` from `task-model-policy.md`, and pass the
+   assignment's complete canonical `title`, exactly
+   `🛠️ Woker · <Feature Spec title>`, as the `create_thread` title. Use
+   this exact no-authority preparation prompt: `This visible task is being
+   prepared as an Implement Feature worker. Do not inspect, edit, branch, test,
+   publish, or mutate anything yet. Wait for the controller's full bootstrap
+   envelope.` Do not impose a numeric worker limit. The ChatGPT App creates the
+   worktree and assigns it to the task; root never runs `git worktree add`.
+3. Independently verify the stable task ID, checkout directory, Git common
+   directory, literal task state `active|idle`, and exact canonical title in the
+   same `create-worker` observation. Both task states mean that the exact task
+   binding exists, not that implementation progress has begun. A missing or
+   normalized-to-different title returns `effect_warning=worker-title-drift`
+   with `cleanup_required=archive-worker`. The successful creation receipt and
+   worker binding remain recorded so root can archive the pre-bootstrap task,
+   call `assignment abort`, and release only that claim; bootstrap remains
+   forbidden. If no assignment started, finish an all-aborted run as
+   `preimplementation-aborted`. If a sibling already started, wait until every
+   sibling is terminal and finish the mixed run as `abandoned`, never as a
+   successful delivery. Never repair the drift with a later rename operation.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
    canonical `review_owner=worker|root` into the full envelope with the recorded
    `bootstrap_id`, tracker backend, delivery type, source ref, validated local
@@ -84,7 +96,8 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    exact task, repository, branch, role, and checkout identity.
 5. Verify the message was delivered to that exact task and that the worker
    accepted the same `bootstrap_id`. This starts complete implementation
-   authority; there is no baseline-only prompt or later GO.
+   authority. The creation prompt is transport-only and grants no implementation
+   authority; there is no baseline-only implementation phase or later GO.
 
 After recovery, read the accepted bootstrap from the task conversation and
 compare its `bootstrap_id` and stable Spec and issue sections with the current

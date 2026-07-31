@@ -74,6 +74,14 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         )
         self.assertIn("do not ask another user question", options)
         self.assertIn("Never ask another authority, recovery", skill)
+        self.assertIn(
+            "Granting this permission does not create that task now",
+            options_raw,
+        )
+        self.assertIn(
+            "Planner-task permission recorded; no planner task has been created.",
+            options,
+        )
         self.assertEqual(
             len(re.findall(r"^\| `visible_app_task_permission` \|", options_raw, re.MULTILINE)),
             1,
@@ -359,6 +367,18 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertIn("`🤖 Orchestrator · 1 Feature`", orchestration)
         self.assertIn("`🤖 Orchestrator · N Features`", orchestration)
         self.assertIn("`🛠️ Woker · <Feature Spec title>`", orchestration)
+        self.assertIn("assignment's complete canonical `title`", orchestration)
+        self.assertIn("as the `create_thread` title", orchestration)
+        self.assertIn("same `create-worker` observation", orchestration)
+        self.assertIn(
+            "Never repair the drift with a later rename operation",
+            orchestration,
+        )
+        self.assertIn("`cleanup_required=archive-worker`", orchestration)
+        self.assertIn("bootstrap remains forbidden", orchestration)
+        self.assertIn("finish the mixed run as `abandoned`", orchestration)
+        self.assertIn("never as a successful delivery", orchestration)
+        self.assertNotIn('"set-worker-title"', self.text("scripts/run-state"))
         self.assertIn(
             "`🧭 Scope Repair · <Feature Spec title>`",
             self.text("references/scope-repair-orchestration.md"),
@@ -391,8 +411,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         """Given the current runtime, schema-four state stays at one unversioned canonical path."""
         source = self.text("scripts/run-state")
         state = self.normalized(self.text("references/run-state.md"))
-        self.assertIn('CLI_VERSION = "4.2.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "5.0.0"', source)
+        self.assertIn('CLI_VERSION = "5.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "6.0.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 4", source)
         self.assertIn('"schema": "implement-feature/run-manifest"', source)
         self.assertIn('"schema_version": "3.0.0"', source)
@@ -513,8 +533,8 @@ class ImplementFeatureContractScenarios(unittest.TestCase):
         self.assertEqual(scripts, ["run-state", "verify-ready"])
         self.assertTrue(os.access(ROOT / "scripts" / "run-state", os.X_OK))
         self.assertTrue(os.access(ROOT / "scripts" / "verify-ready", os.X_OK))
-        self.assertIn('CLI_VERSION = "4.2.0"', source)
-        self.assertIn('RUNTIME_CONTRACT_VERSION = "5.0.0"', source)
+        self.assertIn('CLI_VERSION = "5.0.0"', source)
+        self.assertIn('RUNTIME_CONTRACT_VERSION = "6.0.0"', source)
         self.assertIn("DATABASE_SCHEMA_VERSION = 4", source)
         self.assertIn("command_capabilities", source)
         self.assertIn("runtime_artifact_sha256", source)

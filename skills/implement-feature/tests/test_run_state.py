@@ -21,8 +21,8 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "scripts" / "run-state"
-CLI_VERSION = "4.2.0"
-RUNTIME_CONTRACT_VERSION = "5.0.0"
+CLI_VERSION = "5.0.0"
+RUNTIME_CONTRACT_VERSION = "6.0.0"
 DATABASE_SCHEMA_VERSION = 4
 HISTORICAL_RUNTIME_FIXTURES = {
     "2.0.0": {
@@ -51,7 +51,7 @@ PROTOCOLS = {
     },
     "operation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "2.1.0",
+        "schema_version": "3.0.0",
     },
     "scope_repair": {
         "schema": "implement-feature/scope-repair-observation",
@@ -462,6 +462,13 @@ class RunStateScenarios(unittest.TestCase):
         status: str = "succeeded",
         review_owner: str | None = None,
     ) -> dict[str, object]:
+        extra = dict(extra)
+        if action == "create-worker" and status == "succeeded":
+            worker_number = int(subject.rsplit("-", 1)[1])
+            extra.setdefault(
+                "observed_title",
+                f"🛠️ Woker · Feature {worker_number}",
+            )
         begun = self.begin_operation(
             run_id,
             action,
@@ -575,10 +582,6 @@ class RunStateScenarios(unittest.TestCase):
                 "git_common_dir": str(self.common_a),
                 "observed_state": observed_state,
             },
-        )
-        self.operation(
-            run_id, f"title-{run_id}-{number}", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": f"🛠️ Woker · Feature {number}"},
         )
         self.operation(
             run_id, f"bootstrap-{run_id}-{number}", "send-bootstrap", assignment,
@@ -1437,7 +1440,7 @@ class RunStateScenarios(unittest.TestCase):
         revision = self.revision("v1-operation")
         observation = {
             "schema": PROTOCOLS["operation"]["schema"],
-            "schema_version": "3.0.0",
+            "schema_version": "4.0.0",
             "operation_id": begun["operation_id"],
             "launch_count": begun["launch_count"],
             "status": "succeeded",
@@ -1500,10 +1503,6 @@ class RunStateScenarios(unittest.TestCase):
                         "observed_state": "active",
                     },
                 )
-                self.operation(
-                    run_id, f"title-{run_id}", "set-worker-title", assignment,
-                    {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
-                )
                 begun = self.begin_operation(
                     run_id, "send-bootstrap", assignment,
                     review_owner="worker",
@@ -1562,13 +1561,9 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "active",
             },
-        )
-        self.operation(
-            "delayed-bootstrap", "title-delayed-bootstrap",
-            "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         first_launch = self.begin_operation(
             "delayed-bootstrap", "send-bootstrap", assignment,
@@ -1672,12 +1667,9 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "active",
             },
-        )
-        self.operation(
-            "replay-guards", "title-replay-guards", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         bootstrap = self.begin_operation(
             "replay-guards", "send-bootstrap", assignment,
@@ -1872,6 +1864,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "active",
             },
         )
@@ -1921,6 +1914,10 @@ class RunStateScenarios(unittest.TestCase):
             ],
             ["active", "idle"],
         )
+        self.assertIn(
+            "observed_title",
+            worker_descriptor["required_fields"],
+        )
         owner_descriptor = self.invoke(
             "app-operation", "observation", "template",
             "--action", "set-review-owner", "--status", "succeeded",
@@ -1955,7 +1952,7 @@ class RunStateScenarios(unittest.TestCase):
         payload = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(payload["operation_id"], begun["operation_id"])
         self.assertEqual(payload["launch_count"], begun["launch_count"])
-        self.assertEqual(payload["schema_version"], "2.1.0")
+        self.assertEqual(payload["schema_version"], "3.0.0")
         shown = self.invoke("run", "show", "--run-id", "operation-builder")
         self.assertEqual(str(shown["revision"]), revision)
 
@@ -2003,11 +2000,6 @@ class RunStateScenarios(unittest.TestCase):
                 "git_common_dir": str(self.common_a),
                 "observed_state": "active",
             },
-        )
-        self.operation(
-            "bootstrap-builder", "title-bootstrap-builder",
-            "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         begun = self.begin_operation(
             "bootstrap-builder", "send-bootstrap", assignment,
@@ -2846,16 +2838,6 @@ class RunStateScenarios(unittest.TestCase):
                 "observed_state": "active",
             },
         )
-        self.operation(
-            "review-owner-required",
-            "title-review-owner-required",
-            "set-worker-title",
-            "spec-01",
-            {
-                "thread_id": "thread-review-owner-required-1",
-                "observed_title": "🛠️ Woker · Feature 1",
-            },
-        )
         missing = self.begin_operation(
             "review-owner-required",
             "send-bootstrap",
@@ -3005,6 +2987,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "completed",
             },
         )
@@ -3022,6 +3005,160 @@ class RunStateScenarios(unittest.TestCase):
             expected=4,
         )
         self.assertEqual(error["error"]["code"], "worker-project-drift")
+
+    def test_given_created_task_title_differs_when_observed_then_binding_is_preserved_for_cleanup(self) -> None:
+        """Title drift blocks bootstrap while preserving the created task for archival."""
+        self.start("invalid-worker-title")
+        begun = self.begin_operation(
+            "invalid-worker-title", "create-worker", "spec-01"
+        )
+        checkout = self.base / "invalid worker title checkout"
+        checkout.mkdir()
+        observation = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:invalid-worker-title",
+                "readback_ref": "readback:invalid-worker-title",
+                "thread_id": "thread-invalid-worker-title-1",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_title": "Wait for feature bootstrap",
+                "observed_state": "idle",
+            },
+        )
+        result = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.write_json(
+                    "invalid-worker-title-observation.json",
+                    observation,
+                )
+            ),
+        )
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["effect_warning"], "worker-title-drift")
+        self.assertEqual(result["cleanup_required"], "archive-worker")
+        repeated = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.inputs / "invalid-worker-title-observation.json"
+            ),
+        )
+        self.assertTrue(repeated["already_applied"])
+        self.assertEqual(repeated["effect_warning"], "worker-title-drift")
+        self.assertEqual(repeated["cleanup_required"], "archive-worker")
+        shown = self.invoke(
+            "run", "show", "--run-id", "invalid-worker-title"
+        )
+        self.assertEqual(shown["assignments"][0]["state"], "worker-created")
+        self.assertEqual(
+            shown["assignments"][0]["thread_id"],
+            "thread-invalid-worker-title-1",
+        )
+        blocked = self.begin_operation(
+            "invalid-worker-title",
+            "send-bootstrap",
+            "spec-01",
+            review_owner="worker",
+            expected=4,
+        )
+        self.assertEqual(blocked["error"]["code"], "worker-title-not-verified")
+        self.operation(
+            "invalid-worker-title",
+            "archive-invalid-worker-title",
+            "archive-worker",
+            "spec-01",
+            {
+                "thread_id": "thread-invalid-worker-title-1",
+                "observed_state": "archived",
+            },
+        )
+        finished = self.invoke(
+            "run", "finish",
+            "--run-id", "invalid-worker-title",
+            "--expected-revision", self.revision("invalid-worker-title"),
+            "--outcome", "preimplementation-aborted",
+        )
+        self.assertTrue(finished["claims_released"])
+
+    def test_given_retired_worker_title_action_when_begun_then_it_is_rejected(self) -> None:
+        """New runtimes expose no post-creation worker rename operation."""
+        self.start("retired-worker-title")
+        error = self.begin_operation(
+            "retired-worker-title",
+            "set-worker-title",
+            "spec-01",
+            expected=2,
+        )
+        self.assertEqual(error["error"]["code"], "invalid-command-line")
+
+    def test_given_sibling_started_when_title_drift_is_cleaned_then_run_closes_abandoned(self) -> None:
+        """A mixed started and pre-bootstrap-aborted run has a truthful terminal path."""
+        self.start("mixed-title-drift", assignment_count=2)
+        self.create_worker("mixed-title-drift", 1)
+        begun = self.begin_operation(
+            "mixed-title-drift", "create-worker", "spec-02"
+        )
+        checkout = self.base / "mixed title drift checkout"
+        checkout.mkdir()
+        observed = self.operation_observation(
+            begun,
+            status="succeeded",
+            values={
+                "receipt_ref": "receipt:mixed-title-drift",
+                "readback_ref": "readback:mixed-title-drift",
+                "thread_id": "thread-mixed-title-drift-2",
+                "project_id": "project-1",
+                "checkout_path": str(checkout),
+                "git_common_dir": str(self.common_a),
+                "observed_title": "Wait for feature bootstrap",
+                "observed_state": "idle",
+            },
+        )
+        created = self.invoke(
+            "app-operation", "finish",
+            "--run-id", "mixed-title-drift",
+            "--expected-revision", self.revision("mixed-title-drift"),
+            "--operation-id", str(begun["operation_id"]),
+            "--observation", str(
+                self.write_json("mixed-title-drift.json", observed)
+            ),
+        )
+        self.assertEqual(created["cleanup_required"], "archive-worker")
+        self.operation(
+            "mixed-title-drift",
+            "archive-mixed-title-drift",
+            "archive-worker",
+            "spec-02",
+            {
+                "thread_id": "thread-mixed-title-drift-2",
+                "observed_state": "archived",
+            },
+        )
+        aborted = self.invoke(
+            "assignment", "abort",
+            "--run-id", "mixed-title-drift",
+            "--expected-revision", self.revision("mixed-title-drift"),
+            "--assignment-id", "spec-02",
+        )
+        self.assertTrue(aborted["claim_released"])
+        self.ready_worker("mixed-title-drift", 1)
+        finished = self.invoke(
+            "run", "finish",
+            "--run-id", "mixed-title-drift",
+            "--expected-revision", self.revision("mixed-title-drift"),
+            "--outcome", "abandoned",
+        )
+        self.assertEqual(finished["outcome"], "abandoned")
+        self.assertTrue(finished["claims_released"])
 
     def test_given_two_app_projects_when_runs_are_disjoint_then_they_share_one_database(self) -> None:
         """Given disjoint repositories in separate App projects, when both start, then one per-user DB owns both."""
@@ -3110,6 +3247,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-2",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_b),
+                "observed_title": "🛠️ Woker · Feature 2",
                 "observed_state": "active",
             },
         )
@@ -3420,6 +3558,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "active",
             },
         )
@@ -3454,6 +3593,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(self.base / "checkout alias 1"),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 2",
                 "observed_state": "active",
             },
         )
@@ -3806,6 +3946,7 @@ class RunStateScenarios(unittest.TestCase):
                 "project_id": "project-1",
                 "checkout_path": str(checkout),
                 "git_common_dir": str(self.common_a),
+                "observed_title": "🛠️ Woker · Feature 1",
                 "observed_state": "active",
             },
         )
@@ -4019,7 +4160,6 @@ class RunStateScenarios(unittest.TestCase):
         checkout = self.base / "recover checkout"
         checkout.mkdir()
         self.operation("recover", "create-recover", "create-worker", assignment, {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"})
-        self.operation("recover", "title-recover", "set-worker-title", assignment, {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"})
         unknown = self.operation(
             "recover", "bootstrap-recover", "send-bootstrap", assignment,
             {"thread_id": thread}, status="unknown",
@@ -4062,10 +4202,6 @@ class RunStateScenarios(unittest.TestCase):
         self.operation(
             "archive-unknown", "create-archive-unknown", "create-worker", assignment,
             {"thread_id": thread, "project_id": "project-1", "checkout_path": str(checkout), "git_common_dir": str(self.common_a), "observed_state": "active"},
-        )
-        self.operation(
-            "archive-unknown", "title-archive-unknown", "set-worker-title", assignment,
-            {"thread_id": thread, "observed_title": "🛠️ Woker · Feature 1"},
         )
         self.operation(
             "archive-unknown", "bootstrap-archive-unknown", "send-bootstrap", assignment,

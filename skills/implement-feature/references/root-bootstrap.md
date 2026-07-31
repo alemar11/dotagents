@@ -97,7 +97,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "3.0.0",
-  "runtime_contract_version": "5.0.0",
+  "runtime_contract_version": "6.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -201,14 +201,22 @@ implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
 `environment=worktree`, `model=gpt-5.6-sol`, and the assignment's resolved
-`thinking=medium|high|xhigh`. The ChatGPT App creates the worktree and assigns
-it to that task. Root verifies the task, checkout directory, and Git common
-directory; it never runs `git worktree add`. SQLite keeps only checkout identity
-needed for coordination, not the worker's technical contents or task profile.
-The operation always targets the assignment's recorded repo-specific
-`project_id`, never the multi-folder controller project. If task readback does
-not resolve to that project and repository identity, reconcile or fail the
-operation before bootstrap.
+`thinking=medium|high|xhigh`, plus the assignment's complete canonical title as
+the `create_thread` title. The ChatGPT App creates the worktree and assigns it
+to that task. Root verifies the task, checkout directory, Git common directory,
+literal `active|idle` state, and exact title in the same `create-worker`
+observation; it never runs `git worktree add` or performs a follow-up worker
+rename. SQLite keeps only checkout identity and typed task readback needed for
+coordination, not the worker's technical contents or task profile. The
+operation always targets the assignment's recorded repo-specific `project_id`,
+never the multi-folder controller project. If task readback does not resolve to
+that project or repository identity, reconcile or fail the operation before
+bootstrap. A title mismatch preserves the successful creation receipt and
+binding, returns `cleanup_required=archive-worker`, forbids bootstrap, and lets
+root archive the pre-bootstrap task before aborting only that assignment. An
+all-aborted pre-bootstrap run finishes as `preimplementation-aborted`; if a
+sibling implementation already started, every sibling must become terminal and
+the mixed run finishes as `abandoned`, not as successful delivery.
 
 Each full bootstrap carries the canonical operational field
 `review_owner=worker|root`. Record its initial value atomically with
