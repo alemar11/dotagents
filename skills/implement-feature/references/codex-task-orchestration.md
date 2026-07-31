@@ -92,8 +92,7 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    successful delivery. Never repair the drift with a later rename operation.
 4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
    canonical `review_owner=worker|root` into the full envelope with the recorded
-   `bootstrap_id`, tracker backend, delivery type, source ref, validated local
-   `repository_relative_spec_path` when applicable, Feature ID, repository key,
+   `bootstrap_id`, GitHub Issue source ref, Feature ID, repository key,
    repository, branch, allowed paths, issue graph, acceptance and validation
    budgets, safety,
    worker autonomy, checklist rules, final evidence, and every known peer's
@@ -134,7 +133,7 @@ reads the target conversation so it does not duplicate an already-delivered
 fact. Peer messages may contain compatible interface clarifications, exact HEADs,
 environment wiring, or factual mismatch evidence. They may not change outcome,
 scope, dependencies, acceptance text or order, safety, validation budget, or
-delivery type. Each worker remains solely responsible for repairs in its own
+   GitHub PR delivery. Each worker remains solely responsible for repairs in its own
 repository.
 
 Read visible tasks at bounded intervals for coarse progress. Do not choose

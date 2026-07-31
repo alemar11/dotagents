@@ -36,11 +36,9 @@ Root is a lightweight control plane. Before mutation:
    its Git defaults never expand scope or grant an implementation claim,
    branch, worker, or PR. Zero, multiple, or unverifiable candidates stop before
    state.
-3. Resolve each affected repository's canonical identity. Use
-   `github:owner/repository` for GitHub repositories. For local-only repositories,
-   resolve `git rev-parse --path-format=absolute --git-common-dir`, stat that
-   real directory, and use the exact identity printed by the helper's local
-   identity rule. Linked worktrees therefore share one target.
+3. Resolve each affected repository's canonical GitHub identity as
+   `github:owner/repository` and verify that the saved project points to that
+   repository.
 4. Run the worker-project preflight with `list_projects`. Every affected
    repository must map bijectively to one separate local saved Git project on
    the current host whose reported primary folder is exactly that repository
@@ -56,8 +54,8 @@ Root is a lightweight control plane. Before mutation:
    targets. Reject remote, non-Git, duplicate eligible repo-project,
    parent-path, and ambiguous worker mappings before state; a broad or
    multi-folder project is never a substitute.
-5. Read `tracker_backend` and exact `delivery_type` from each stable contract.
-   Check branches and required dependency proof, calculate allowed-path overlap,
+5. Verify GitHub Issue refs, the fixed GitHub PR delivery, branches, and required
+   dependency proof; calculate allowed-path overlap,
    derive worker order, and disclose startup scope. Repository identity never
    substitutes for either transport fact.
 6. For every multi-repository Feature Spec Set, validate ephemeral snapshots of
@@ -113,8 +111,6 @@ Root is a lightweight control plane. Before mutation:
       "assignment_id": "spec-42",
       "source_spec_ref": "owner/repository#42",
       "repository_identity": "github:owner/repository",
-      "tracker_backend": "github",
-      "delivery_type": "github-pr",
       "title": "🛠️ Woker · Exact Feature Spec title",
       "target_branch_name": "feature/example",
       "prerequisite_assignment_ids": []
@@ -145,14 +141,6 @@ before opening SQLite. Pass one repeated
 for standalone Specs. Delete the ephemeral inputs and body snapshots only after
 `run start` succeeds. Never persist those bodies, their normalized table text,
 responsibilities, criterion text, repository key, or hashes in SQLite.
-
-For a linked local source, the validator requires the exact
-`<feature-id>--<repository-key>/planning/features/<feature-slug>/SPEC.md`
-identity and emits
-`repository_relative_spec_path=planning/features/<feature-slug>/SPEC.md`.
-The qualified prefix is not a directory. Include the validated relative path
-in the owning worker bootstrap, and resolve it only inside that assignment's
-separately verified repository/worktree.
 
 The manifest deliberately omits raw Spec and issue bodies, checklists, allowed
 path text, validation attempts, worker technical state, provider state, and text
@@ -186,11 +174,8 @@ sources; if any changed, replace the snapshots and repeat validation. A
 missing, extra, reordered, validator-invalid, or nonmatching evidence
 projection fails before database access. One transaction claims every free
 canonical Feature Spec and head branch and leaves only conflicting assignments
-in `waiting-for-spec`. With
-`tracker_backend=github`, a GitHub URL and `owner/repository#number` normalize
-to the same claim identity. With `tracker_backend=local`, the globally
-unambiguous repository-scoped Spec path remains local even when the repository
-identity is `github:owner/repository`.
+in `waiting-for-spec`. GitHub issue URLs and `owner/repository#number` normalize
+to the same claim identity.
 
 When at least one assignment acquires its claim, set and verify the immutable
 root title once and schedule every claimed assignment allowed by path and

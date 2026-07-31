@@ -1,8 +1,8 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `5.0.0` implements the breaking runtime
-contract `6.0.0` over database schema `4`. Worker creation now atomically
+uses the shipped artifact. CLI release `6.0.0` implements the breaking runtime
+contract `7.0.0` over database schema `4`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -16,8 +16,8 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `5.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `6.0.0` | Coordination semantics required by an active run |
+| CLI | `6.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `7.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `4` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -28,12 +28,12 @@ machine-readable registry for these identities and protocols:
 | Protocol | `schema` | Version |
 | --- | --- | --- |
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
-| Run manifest | `implement-feature/run-manifest` | `3.0.0` |
-| Feature Spec Set input | `implement-feature/feature-spec-set-input` | `1.0.0` |
+| Run manifest | `implement-feature/run-manifest` | `4.0.0` |
+| Feature Spec Set input | `implement-feature/feature-spec-set-input` | `2.0.0` |
 | Codex task-operation observation | `implement-feature/app-operation-observation` | `3.0.0` |
 | Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
-| Delivery-ready observation | `implement-feature/delivery-ready-observation` | `2.0.0` |
-| Recovery observation | `implement-feature/recovery-observation` | `2.0.0` |
+| Delivery-ready observation | `implement-feature/delivery-ready-observation` | `3.0.0` |
+| Recovery observation | `implement-feature/recovery-observation` | `3.0.0` |
 | Assignment-resume observation | `implement-feature/assignment-resume-observation` | `2.0.0` |
 
 Every payload carries the exact string `schema_version` listed for its
@@ -83,7 +83,7 @@ SemVer but different bytes is not the retained runtime for that run.
 The schema contains only runtime metadata, runs, normalized run-repository
 bindings, assignments, canonical Feature Spec claims, and typed Codex
 task-operation reconciliation facts. It may retain durable source refs, linked
-`feature_id` membership, tracker backend, delivery type, assignment
+`feature_id` membership and fixed GitHub transport, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
 identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
 normal Git head/base/ancestry facts, contract generation, opaque scope repair
@@ -113,7 +113,6 @@ scripts/run-state --json run list --status active
 
 scripts/run-state --json claim find \
   --repository-identity github:owner/repository \
-  --tracker-backend github \
   --source-spec-ref owner/repository#42
 scripts/run-state --json claim reconcile \
   --run-id RUN --assignment-id ASSIGNMENT --expected-revision N \
@@ -140,7 +139,7 @@ scripts/run-state --json app-operation replay \
 scripts/run-state --json app-operation list --run-id RUN
 
 scripts/run-state --json assignment ready-observation template \
-  --delivery-type local-branch --review-profile standard \
+  --review-profile standard \
   --readiness-mode terminal
 scripts/run-state --json assignment ready-observation create \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
@@ -152,6 +151,8 @@ scripts/run-state --json assignment ready-observation create \
   --worktree-clean --base-is-ancestor \
   --validation-head-sha HEAD --autoreview-head-sha HEAD \
   --review-candidate-head-sha CANDIDATE --review-profile standard \
+  --default-branch-name main --pr-url https://github.com/owner/repository/pull/44 \
+  --provider-observation-ref PROVIDER \
   --tracker-readback-ref TRACKER \
   --output /absolute/new-ready-observation.json
 scripts/run-state --json assignment ready \
@@ -227,11 +228,6 @@ projection and a `manifest_feature_set` containing only `feature_id`,
 `source_spec_ref`, `repository_identity`, and `repository_key`. It never
 creates or mutates the database, and neither the bodies, normalized table,
 responsibility text, criterion text, nor hashes enter persistent state.
-For a linked local ref, it also verifies the exact
-`<feature-id>--<repository-key>/` qualifier and emits the transient
-`repository_relative_spec_path` produced by stripping that prefix. Only that
-remainder may be resolved inside the separately verified owning repository.
-
 ## Observation Builders
 
 `app-operation observation template`, `assignment scope-repair-observation
@@ -244,7 +240,7 @@ The corresponding `create` commands are pure builders. They read the named run
 and assignment or operation, verify the expected revision and exact runtime
 pin, derive the protocol constants and designated identity fields, validate all
 caller-supplied independent readback facts, and write one bare protocol
-payload. In particular, the ready builder derives assignment, delivery type,
+payload. In particular, the ready builder derives the fixed GitHub PR transport
 and status while repository, task, checkout, branch, and evidence facts remain
 caller-supplied observations. They never mutate SQLite.
 The output must be an absolute path to a new file in an existing directory. The
@@ -300,8 +296,8 @@ Both ready-observation commands require
 payload. The ready builder accepts repeated
 `--prerequisite-head ASSIGNMENT_ID=GIT_SHA` flags. `high-risk` requires
 `--codex-review-head-sha`; `standard` rejects it and emits JSON `null`.
-`github-pr` requires `--default-branch-name`, `--pr-url`, and
-`--provider-observation-ref`; `local-branch` rejects all three.
+GitHub PR delivery requires `--default-branch-name`, `--pr-url`, and
+`--provider-observation-ref`.
 `peer-input` applies the dependent-assignment validation that the consumer
 later repeats. `assignment ready` has no readiness flag: it derives the
 mutation exclusively from the observation's `readiness_mode`, preventing the
@@ -399,27 +395,23 @@ Its expected title is derived from the immutable assignment count:
 
 ## Delivery-Ready Observation
 
-Ready observations always bind assignment/thread/repository/checkout,
-`delivery_type`, named head and base branches, head/base SHAs, clean worktree,
-base ancestry, current-head validation and AutoReview SHAs, the first coherent
-review-candidate SHA, the derived review profile, its conditional native
-Codex-review SHA, tracker readback, and the exact prerequisite HEAD map.
-`github-pr` additionally requires
-the provider default branch, canonical PR URL, and provider observation ref;
-`local-branch` rejects those fields. Status must be respectively
-`pr-ready-for-merge-but-not-merged` or `local-branch-ready`.
+Ready observations always bind assignment/thread/repository/checkout, named head
+and base branches, head/base SHAs, clean worktree, base ancestry, current-head
+validation and AutoReview SHAs, the first coherent review-candidate SHA, the
+derived review profile, its conditional native Codex-review SHA, GitHub issue
+readback, the GitHub default branch, canonical PR URL, provider observation ref,
+and the exact prerequisite HEAD map. Status is always `pr-ready-for-merge`.
 
 The exact common ready-observation fields are:
 `schema`, `schema_version`, `assignment_id`, `thread_id`, `repository_identity`,
-`delivery_type`, `readiness_mode`, `head_sha`, `head_branch_name`,
+`readiness_mode`, `head_sha`, `head_branch_name`,
 `base_branch_name`,
 `base_sha`, `checkout_path`, `worktree_clean`, `base_is_ancestor`,
 `validation_head_sha`, `autoreview_head_sha`, `review_candidate_head_sha`,
 `review_profile`, `codex_review_head_sha`,
-`tracker_readback_ref`, `prerequisite_heads`, and `status`. `github-pr`
-requires exactly three more fields: `default_branch_name`, `pr_url`, and
-`provider_observation_ref`. `local-branch` forbids those three. No other keys
-are accepted.
+`tracker_readback_ref`, `prerequisite_heads`, and `status`. Every observation
+also requires exactly `default_branch_name`, `pr_url`, and
+`provider_observation_ref`. No other keys are accepted.
 
 `review_profile` is exactly `standard` or `high-risk`, derived by AutoReview.
 For `standard`, `codex_review_head_sha` must be JSON `null`. For `high-risk`,
@@ -430,7 +422,7 @@ final `head_sha`; `review_candidate_head_sha` remains the immutable initial
 candidate linked through AutoReview's evidence chain.
 
 `readiness_mode` is exactly `terminal` or `peer-input`. `terminal` records the
-delivery-specific terminal assignment state and releases its claim.
+GitHub PR terminal assignment state and releases its claim.
 `peer-input` records `peer-input-ready`, retains the worker and claim, and is
 valid only when another assignment depends on that assignment. The builder
 validates the selected mode read-only; `assignment ready` reads it from the
@@ -439,16 +431,12 @@ corresponding mutation without a caller-side mode flag.
 
 ## Claim Identity And Lifecycle
 
-Canonical GitHub repository identity is `github:owner/repository`. Local-only
-identity derives from the resolved Git common-directory real path, device, and
-inode; linked worktrees intentionally share repository identity.
+Canonical repository identity is `github:owner/repository`.
 
 One assignment owns one claim. Its uniqueness key is canonical repository plus
-canonical Feature Spec identity. With `tracker_backend=github`, GitHub
-`owner/repository#number` and the exact issue URL normalize to one identity.
-With `tracker_backend=local`, the globally unambiguous repository-scoped path
-remains local regardless of canonical repository identity. A second uniqueness
-constraint prevents active assignments from sharing one implementation head
+canonical GitHub Feature Spec identity. GitHub `owner/repository#number` and the
+exact issue URL normalize to one identity. A second uniqueness constraint
+prevents active assignments from sharing one implementation head
 branch in the same repository; the PR base branch is not part of that
 constraint.
 
@@ -471,9 +459,8 @@ behavior.
 
 `assignment scope-block` retains the worker and claim, records
 `blocked-scope-repair`, and creates one opaque repair ID at
-`contract_generation=1`. GitHub planning may proceed through the separate
-planner operation. Local planning returns
-`local-scope-repair-transport-unavailable` and remains blocked. A successful
+`contract_generation=1`. GitHub planning proceeds through the separate
+planner operation. A successful
 `send-scope-revision` restores the exact pre-block state and atomically advances
 to generation `2`; any later `scope-block` returns `full-replan-required`.
 Overlap checks remain root-owned and are deliberately not stored as file
@@ -503,12 +490,11 @@ authoritative evidence.
 ```json
 {
   "schema": "implement-feature/recovery-observation",
-  "schema_version": "2.0.0",
+  "schema_version": "3.0.0",
   "owner_run_id": "owner-run",
   "owner_assignment_id": "spec-42",
   "owner_expected_revision": 7,
   "repository_identity": "github:owner/repository",
-  "tracker_backend": "github",
   "source_spec_ref": "owner/repository#42",
   "worker_state": "active",
   "checkout_state": "present",

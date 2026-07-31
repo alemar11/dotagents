@@ -17,11 +17,10 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 
-CLI_VERSION = "5.0.0"
-RUNTIME_CONTRACT_VERSION = "6.0.0"
+CLI_VERSION = "6.0.0"
+RUNTIME_CONTRACT_VERSION = "7.0.0"
 DATABASE_SCHEMA_VERSION = 4
 REBUILDABLE_DATABASE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 LEGACY_SCHEMA_WITHOUT_RUNTIME_PINS = frozenset({1})
@@ -36,11 +35,11 @@ PROTOCOLS = {
     },
     "run_manifest": {
         "schema": "implement-feature/run-manifest",
-        "schema_version": "3.0.0",
+        "schema_version": "4.0.0",
     },
     "feature_spec_set_input": {
         "schema": "implement-feature/feature-spec-set-input",
-        "schema_version": "1.0.0",
+        "schema_version": "2.0.0",
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
@@ -52,11 +51,11 @@ PROTOCOLS = {
     },
     "delivery_ready_observation": {
         "schema": "implement-feature/delivery-ready-observation",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
     },
     "recovery_observation": {
         "schema": "implement-feature/recovery-observation",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
     },
     "assignment_resume_observation": {
         "schema": "implement-feature/assignment-resume-observation",
@@ -79,10 +78,6 @@ GITHUB_SPEC_REF_RE = re.compile(
 GITHUB_SPEC_URL_RE = re.compile(
     r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
     r"([a-z0-9._-]{1,100})/issues/([1-9][0-9]*)$"
-)
-LOCAL_SPEC_REF_RE = re.compile(
-    r"^(?:[a-z0-9][a-z0-9._-]{0,100}/)?planning/features/"
-    r"[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?/SPEC\.md$"
 )
 FEATURE_ID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-"
@@ -167,7 +162,6 @@ READY_COMMON_FIELDS = {
     "assignment_id",
     "thread_id",
     "repository_identity",
-    "delivery_type",
     "readiness_mode",
     "head_sha",
     "head_branch_name",
@@ -1107,20 +1101,9 @@ def parse_member_contract(body: str) -> dict[str, Any]:
 def linked_source_projection(
     source_spec_ref: str,
     affected_repository: str,
-    feature_id: str,
-    repository_key: str,
     *,
     error_code: str,
-) -> str | None:
-    if LOCAL_SPEC_REF_RE.fullmatch(source_spec_ref):
-        prefix = f"{feature_id}--{repository_key}/"
-        if not source_spec_ref.startswith(prefix):
-            raise StateError(
-                error_code,
-                "a linked local source ref must begin with its exact "
-                "Feature ID and repository key",
-            )
-        return source_spec_ref.removeprefix(prefix)
+) -> None:
     github_match = (
         GITHUB_SPEC_REF_RE.fullmatch(source_spec_ref)
         or GITHUB_SPEC_URL_RE.fullmatch(source_spec_ref)
@@ -1128,7 +1111,7 @@ def linked_source_projection(
     if github_match is None:
         raise StateError(
             error_code,
-            "a linked source ref must be a canonical GitHub ref or qualified local ref",
+            "a linked source ref must be a canonical GitHub issue ref or URL",
         )
     owner, repository, _ = github_match.groups()
     if affected_repository != f"github:{owner}/{repository}":
@@ -1187,18 +1170,15 @@ def validate_feature_spec_set_input(raw: dict[str, Any]) -> dict[str, Any]:
         contract = parse_member_contract(
             read_text_file(body_file, f"members[{index}].body_file")
         )
-        repository_relative_spec_path = linked_source_projection(
+        linked_source_projection(
             source_spec_ref,
             affected_repository,
-            contract["feature_id"],
-            contract["repository_key"],
             error_code="invalid-feature-spec-set",
         )
         members.append(
             {
                 "source_spec_ref": source_spec_ref,
                 "affected_repository": affected_repository,
-                "repository_relative_spec_path": repository_relative_spec_path,
                 **contract,
             }
         )
@@ -1310,9 +1290,6 @@ def validate_feature_spec_set_input(raw: dict[str, Any]) -> dict[str, Any]:
                 "source_spec_ref": member["source_spec_ref"],
                 "affected_repository": member["affected_repository"],
                 "repository_key": member["repository_key"],
-                "repository_relative_spec_path": member[
-                    "repository_relative_spec_path"
-                ],
                 "owned_ids": member["owned_ids"],
             }
             for member in sorted(
@@ -1424,53 +1401,34 @@ def branch_name(value: Any) -> str:
     return result
 
 
-def canonical_local_identity(git_common_dir: str) -> str:
-    info = Path(git_common_dir).stat()
-    return f"local:git-common-dir:{info.st_dev}:{info.st_ino}:{quote(git_common_dir, safe='')}"
-
-
 def repository_identity(value: Any, git_common_dir: str) -> str:
     identity = string(value, "repository_identity", 8192)
-    if GITHUB_ID_RE.fullmatch(identity):
-        return identity
-    expected = canonical_local_identity(git_common_dir)
-    if identity != expected:
+    if GITHUB_ID_RE.fullmatch(identity) is None:
         raise StateError(
             "invalid-input",
-            "local repository_identity must equal the canonical Git common-directory identity",
+            "repository_identity must be github:owner/repository",
         )
     return identity
 
 
-def canonical_source_spec_ref(
-    value: Any, identity: str, tracker_backend: str
-) -> tuple[str, str]:
+def canonical_source_spec_ref(value: Any, identity: str) -> tuple[str, str]:
     source_ref = string(value, "source_spec_ref", 4096)
-    if tracker_backend == "github":
-        github_repository = GITHUB_ID_RE.fullmatch(identity)
-        if github_repository is None:
-            raise StateError(
-                "invalid-input",
-                "GitHub tracker requires a github:owner/repository identity",
-            )
-        match = GITHUB_SPEC_REF_RE.fullmatch(source_ref) or GITHUB_SPEC_URL_RE.fullmatch(source_ref)
-        if match is None:
-            raise StateError(
-                "invalid-input",
-                "GitHub source_spec_ref must be owner/repository#number or its canonical issue URL",
-            )
-        owner, repository, number = match.groups()
-        if (owner, repository) != github_repository.groups():
-            raise StateError("invalid-input", "source_spec_ref belongs to another repository")
-        return source_ref, f"github:{owner}/{repository}#{number}"
-    if tracker_backend != "local":
-        raise StateError("invalid-input", "tracker_backend must be github or local")
-    if not LOCAL_SPEC_REF_RE.fullmatch(source_ref) or "//" in source_ref or "/../" in source_ref:
+    github_repository = GITHUB_ID_RE.fullmatch(identity)
+    if github_repository is None:
         raise StateError(
             "invalid-input",
-            "local source_spec_ref must be a canonical repository-scoped Feature Spec path",
+            "GitHub source refs require a github:owner/repository identity",
         )
-    return source_ref, f"local:{source_ref}"
+    match = GITHUB_SPEC_REF_RE.fullmatch(source_ref) or GITHUB_SPEC_URL_RE.fullmatch(source_ref)
+    if match is None:
+        raise StateError(
+            "invalid-input",
+            "source_spec_ref must be owner/repository#number or its canonical GitHub issue URL",
+        )
+    owner, repository, number = match.groups()
+    if (owner, repository) != github_repository.groups():
+        raise StateError("invalid-input", "source_spec_ref belongs to another repository")
+    return source_ref, f"github:{owner}/{repository}#{number}"
 
 
 def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -1560,9 +1518,8 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
     delivery_pairs: set[tuple[str, str]] = set()
     used_identities: set[str] = set()
     keys = {
-        "assignment_id", "source_spec_ref", "repository_identity", "tracker_backend",
-        "delivery_type", "title", "target_branch_name",
-        "prerequisite_assignment_ids",
+        "assignment_id", "source_spec_ref", "repository_identity", "title",
+        "target_branch_name", "prerequisite_assignment_ids",
     }
     for index, item in enumerate(raw["assignments"]):
         if not isinstance(item, dict):
@@ -1572,26 +1529,8 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
         identity = string(item["repository_identity"], f"assignments[{index}].repository_identity", 8192)
         if identity not in identities:
             raise StateError("invalid-input", f"assignments[{index}] uses an undeclared repository")
-        tracker_backend = string(
-            item["tracker_backend"], f"assignments[{index}].tracker_backend", 16
-        )
-        delivery_type = string(
-            item["delivery_type"], f"assignments[{index}].delivery_type", 24
-        )
-        if tracker_backend not in {"github", "local"}:
-            raise StateError("invalid-input", "tracker_backend must be github or local")
-        if delivery_type not in {"github-pr", "local-branch"}:
-            raise StateError("invalid-input", "delivery_type must be github-pr or local-branch")
-        if tracker_backend == "github" and delivery_type != "github-pr":
-            raise StateError(
-                "invalid-input", "GitHub tracker supports only github-pr delivery"
-            )
-        if delivery_type == "github-pr" and GITHUB_ID_RE.fullmatch(identity) is None:
-            raise StateError(
-                "invalid-input", "github-pr delivery requires a github:owner/repository identity"
-            )
         source_spec_ref, claim_spec_identity = canonical_source_spec_ref(
-            item["source_spec_ref"], identity, tracker_backend
+            item["source_spec_ref"], identity
         )
         target_branch = branch_name(item["target_branch_name"])
         pair = (identity, target_branch)
@@ -1621,8 +1560,10 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             "claim_spec_identity": claim_spec_identity,
             "feature_id": None,
             "repository_identity": identity,
-            "tracker_backend": tracker_backend,
-            "delivery_type": delivery_type,
+            # These columns remain internal schema-4 compatibility storage;
+            # GitHub issues and GitHub PRs are the only public transport.
+            "tracker_backend": "github",
+            "delivery_type": "github-pr",
             "title": (
                 f"{WORKER_TASK_TITLE_PREFIX}"
                 f"{feature_spec_title_from_worker_task_title(item['title'], f'assignments[{index}].title')}"
@@ -1757,8 +1698,6 @@ def validate_manifest(raw: dict[str, Any]) -> tuple[dict[str, Any], list[dict[st
             linked_source_projection(
                 member_key[0],
                 member_key[1],
-                feature_id,
-                repository_key,
                 error_code="invalid-input",
             )
             set_members.append(member_key)
@@ -1899,7 +1838,7 @@ def recompute_run_status(connection: sqlite3.Connection, run_id: str) -> str:
         status = "waiting-for-spec"
     elif any(state in blockers for state in states):
         status = "blocked"
-    elif states and all(state in {"pr-ready", "local-branch-ready"} for state in states):
+    elif states and all(state == "pr-ready" for state in states):
         status = "active"
     elif states and all(state == "preimplementation-aborted" for state in states):
         status = "active"
@@ -2505,6 +2444,10 @@ def assignment_projection(
     row: sqlite3.Row,
 ) -> dict[str, Any]:
     value = dict(row)
+    # Provider and delivery columns are retained only for schema-4 database
+    # compatibility; they are not part of the GitHub-only public projection.
+    value.pop("tracker_backend", None)
+    value.pop("delivery_type", None)
     value["review_owner"] = canonical_review_owner(
         connection,
         row["run_id"],
@@ -2573,16 +2516,14 @@ def command_run_list(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
     identity = string(args.repository_identity, "repository_identity", 8192)
-    tracker_backend = string(args.tracker_backend, "tracker_backend", 16)
     _, claim_spec_identity = canonical_source_spec_ref(
-        args.source_spec_ref, identity, tracker_backend
+        args.source_spec_ref, identity
     )
     connection = connect(write=False)
     try:
         owner = active_spec_owner(connection, identity, claim_spec_identity)
         return {
             "repository_identity": identity,
-            "tracker_backend": tracker_backend,
             "claim_spec_identity": claim_spec_identity,
             "owner": owner,
         }
@@ -2628,12 +2569,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 raise StateError(
                     "invalid-assignment-transition",
                     "planner task creation requires a scope-repair-blocked assignment",
-                    4,
-                )
-            if assignment["tracker_backend"] != "github":
-                raise StateError(
-                    "local-scope-repair-transport-unavailable",
-                    "automatic scope repair is supported only for GitHub-backed planning",
                     4,
                 )
         elif action == "set-review-owner":
@@ -2684,12 +2619,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 raise StateError(
                     "invalid-assignment-transition",
                     "scope revision requires a scope-repair-blocked assignment",
-                    4,
-                )
-            if assignment["tracker_backend"] != "github":
-                raise StateError(
-                    "local-scope-repair-transport-unavailable",
-                    "automatic scope repair is supported only for GitHub-backed planning",
                     4,
                 )
         elif action == "send-worker-message" and assignment["state"] not in {
@@ -2787,7 +2716,6 @@ def validate_scope_repair_observation(
     _, implementation_issue_identity = canonical_source_spec_ref(
         normalized["implementation_issue_ref"],
         assignment["repository_identity"],
-        assignment["tracker_backend"],
     )
     if implementation_issue_identity == assignment["claim_spec_identity"]:
         raise StateError(
@@ -3826,44 +3754,30 @@ def command_app_operation_list(args: argparse.Namespace) -> dict[str, Any]:
         connection.close()
 
 
-def ready_status(delivery_type: str) -> str:
-    status = {
-        "github-pr": "pr-ready-for-merge-but-not-merged",
-        "local-branch": "local-branch-ready",
-    }.get(delivery_type)
-    if status is None:
-        raise StateError(
-            "invalid-ready-observation",
-            "delivery_type must be github-pr or local-branch",
-        )
-    return status
+def ready_status() -> str:
+    return "pr-ready-for-merge"
 
 
 def validate_ready_observation_shape(value: dict[str, Any]) -> str:
-    delivery_type = value.get("delivery_type")
-    expected_keys = (
-        READY_COMMON_FIELDS | READY_GITHUB_FIELDS
-        if delivery_type == "github-pr"
-        else READY_COMMON_FIELDS
-    )
+    expected_keys = READY_COMMON_FIELDS | READY_GITHUB_FIELDS
     exact_keys(value, expected_keys, "delivery-ready observation")
     require_protocol(
         value,
         "delivery_ready_observation",
         "delivery-ready observation",
     )
-    expected_status = ready_status(delivery_type)
+    expected_status = ready_status()
     if value["status"] != expected_status:
         raise StateError(
             "invalid-ready-observation",
-            "ready observation status must match delivery_type",
+            "ready observation status must be pr-ready-for-merge",
         )
     if value["readiness_mode"] not in {"terminal", "peer-input"}:
         raise StateError(
             "invalid-ready-observation",
             "readiness_mode must be terminal or peer-input",
         )
-    return delivery_type
+    return "github-pr"
 
 
 def parse_prerequisite_heads(values: list[str]) -> dict[str, str]:
@@ -3886,11 +3800,10 @@ def parse_prerequisite_heads(values: list[str]) -> dict[str, str]:
 
 
 def ready_observation_descriptor(
-    delivery_type: str,
     review_profile: str,
     readiness_mode: str,
 ) -> dict[str, Any]:
-    status = ready_status(delivery_type)
+    status = ready_status()
     if review_profile not in {"standard", "high-risk"}:
         raise StateError(
             "invalid-ready-observation",
@@ -3903,7 +3816,6 @@ def ready_observation_descriptor(
         )
     constants: dict[str, Any] = {
         **protocol_fields("delivery_ready_observation"),
-        "delivery_type": delivery_type,
         "status": status,
         "review_profile": review_profile,
         "readiness_mode": readiness_mode,
@@ -3911,12 +3823,10 @@ def ready_observation_descriptor(
     if review_profile == "standard":
         constants["codex_review_head_sha"] = None
     required = set(READY_COMMON_FIELDS)
-    if delivery_type == "github-pr":
-        required.update(READY_GITHUB_FIELDS)
+    required.update(READY_GITHUB_FIELDS)
     required -= set(constants)
     return {
         "observation_kind": "delivery-ready",
-        "delivery_type": delivery_type,
         "review_profile": review_profile,
         "readiness_mode": readiness_mode,
         "constants": constants,
@@ -3930,7 +3840,6 @@ def command_assignment_ready_observation_template(
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     return ready_observation_descriptor(
-        args.delivery_type,
         args.review_profile,
         args.readiness_mode,
     )
@@ -3965,7 +3874,6 @@ def ready_observation_payload(
         "assignment_id": assignment["assignment_id"],
         "thread_id": args.thread_id,
         "repository_identity": args.repository_identity,
-        "delivery_type": assignment["delivery_type"],
         "readiness_mode": args.readiness_mode,
         "head_sha": args.head_sha,
         "head_branch_name": args.head_branch_name,
@@ -3981,20 +3889,14 @@ def ready_observation_payload(
         "codex_review_head_sha": codex_review_head_sha,
         "tracker_readback_ref": args.tracker_readback_ref,
         "prerequisite_heads": parse_prerequisite_heads(args.prerequisite_head),
-        "status": ready_status(assignment["delivery_type"]),
+        "status": ready_status(),
     }
     github_values = {
         "default_branch_name": args.default_branch_name,
         "pr_url": args.pr_url,
         "provider_observation_ref": args.provider_observation_ref,
     }
-    if assignment["delivery_type"] == "github-pr":
-        payload.update(github_values)
-    elif any(value is not None for value in github_values.values()):
-        raise StateError(
-            "invalid-ready-observation",
-            "local-branch observations do not accept GitHub provider fields",
-        )
+    payload.update(github_values)
     validate_ready_observation_shape(payload)
     return payload
 
@@ -4006,7 +3908,7 @@ def validate_ready_evidence(
     value: dict[str, Any],
 ) -> dict[str, Any]:
     assignment_id = assignment["assignment_id"]
-    delivery_type = validate_ready_observation_shape(value)
+    validate_ready_observation_shape(value)
     readiness_mode = value["readiness_mode"]
     peer_input = readiness_mode == "peer-input"
     if (
@@ -4033,12 +3935,6 @@ def validate_ready_evidence(
                 "peer input readiness requires a dependent assignment",
                 4,
             )
-    if delivery_type != assignment["delivery_type"]:
-        raise StateError(
-            "delivery-type-drift",
-            "ready evidence uses another delivery type",
-            4,
-        )
     if value["repository_identity"] != assignment["repository_identity"]:
         raise StateError(
             "repository-identity-drift",
@@ -4130,38 +4026,36 @@ def validate_ready_evidence(
     pr_url = None
     default_branch = None
     provider_observation_ref = None
-    terminal_state = "local-branch-ready"
-    if delivery_type == "github-pr":
-        default_branch = branch_name(value["default_branch_name"])
-        if base_branch != default_branch:
-            raise StateError(
-                "pull-request-base-drift",
-                "PR base differs from the provider-observed default branch",
-                4,
-            )
-        pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
-        if pull is None:
-            raise StateError(
-                "invalid-ready-observation",
-                "pr_url must be a canonical GitHub pull request URL",
-            )
-        github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
-        if (
-            github_identity is None
-            or (pull.group(1), pull.group(2)) != github_identity.groups()
-        ):
-            raise StateError(
-                "pull-request-repository-drift",
-                "PR belongs to another repository",
-                4,
-            )
-        pr_url = value["pr_url"]
-        provider_observation_ref = string(
-            value["provider_observation_ref"],
-            "provider_observation_ref",
-            2048,
+    default_branch = branch_name(value["default_branch_name"])
+    if base_branch != default_branch:
+        raise StateError(
+            "pull-request-base-drift",
+            "PR base differs from the provider-observed default branch",
+            4,
         )
-        terminal_state = "pr-ready"
+    pull = GITHUB_PULL_RE.fullmatch(string(value["pr_url"], "pr_url", 2048))
+    if pull is None:
+        raise StateError(
+            "invalid-ready-observation",
+            "pr_url must be a canonical GitHub pull request URL",
+        )
+    github_identity = GITHUB_ID_RE.fullmatch(assignment["repository_identity"])
+    if (
+        github_identity is None
+        or (pull.group(1), pull.group(2)) != github_identity.groups()
+    ):
+        raise StateError(
+            "pull-request-repository-drift",
+            "PR belongs to another repository",
+            4,
+        )
+    pr_url = value["pr_url"]
+    provider_observation_ref = string(
+        value["provider_observation_ref"],
+        "provider_observation_ref",
+        2048,
+    )
+    terminal_state = "pr-ready"
     unresolved = connection.execute(
         """SELECT COUNT(*) FROM app_operations
            WHERE run_id=? AND assignment_id=? AND status IN ('pending','unknown')""",
@@ -4174,7 +4068,6 @@ def validate_ready_evidence(
             4,
         )
     return {
-        "delivery_type": delivery_type,
         "readiness_mode": readiness_mode,
         "observed_head": observed_head,
         "base_branch": base_branch,
@@ -4211,7 +4104,6 @@ def command_assignment_ready_observation_create(
     return {
         "observation_kind": "delivery-ready",
         "assignment_id": assignment_id,
-        "delivery_type": assignment["delivery_type"],
         "readiness_mode": payload["readiness_mode"],
         "review_profile": args.review_profile,
         "output": output,
@@ -4222,7 +4114,7 @@ def command_assignment_ready_observation_create(
 
 def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
     value = read_json_file(args.observation, "delivery-ready observation")
-    delivery_type = validate_ready_observation_shape(value)
+    validate_ready_observation_shape(value)
     run_id = token(args.run_id, "run_id")
     assignment_id = token(value["assignment_id"], "assignment_id")
     connection = connect(write=True)
@@ -4284,7 +4176,6 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
             "revision": revision,
             "assignment_id": assignment_id,
             "state": persisted_state,
-            "delivery_type": delivery_type,
             "readiness_mode": evidence["readiness_mode"],
             "claim_released": claim_released,
         }
@@ -4417,7 +4308,6 @@ def command_assignment_scope_block(args: argparse.Namespace) -> dict[str, Any]:
         run_status = recompute_run_status(connection, run_id)
         revision = advance(connection, run)
         connection.commit()
-        automated = assignment["tracker_backend"] == "github"
         return {
             "run_id": run_id,
             "revision": revision,
@@ -4427,12 +4317,8 @@ def command_assignment_scope_block(args: argparse.Namespace) -> dict[str, Any]:
             "claim_retained": True,
             "contract_generation": assignment["contract_generation"],
             "repair_id": repair_id,
-            "planner_task_supported": automated,
-            "blocker": (
-                None
-                if automated
-                else "local-scope-repair-transport-unavailable"
-            ),
+            "planner_task_supported": True,
+            "blocker": None,
         }
     except Exception:
         connection.rollback()
@@ -4719,7 +4605,6 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
             "owner_assignment_id",
             "owner_expected_revision",
             "repository_identity",
-            "tracker_backend",
             "source_spec_ref",
             "worker_state",
             "checkout_state",
@@ -4741,16 +4626,14 @@ def validate_claim_recovery_observation(value: dict[str, Any]) -> dict[str, Any]
     if checkout_state not in {"present", "released", "not-found", "unknown"}:
         raise StateError("invalid-input", "checkout_state is not supported")
     repository = string(value["repository_identity"], "repository_identity", 8192)
-    tracker_backend = string(value["tracker_backend"], "tracker_backend", 16)
     source_spec_ref, claim_identity = canonical_source_spec_ref(
-        value["source_spec_ref"], repository, tracker_backend
+        value["source_spec_ref"], repository
     )
     return {
         "owner_run_id": token(value["owner_run_id"], "owner_run_id"),
         "owner_assignment_id": token(value["owner_assignment_id"], "owner_assignment_id"),
         "owner_expected_revision": value["owner_expected_revision"],
         "repository_identity": repository,
-        "tracker_backend": tracker_backend,
         "source_spec_ref": source_spec_ref,
         "claim_spec_identity": claim_identity,
         "worker_state": worker_state,
@@ -4782,7 +4665,6 @@ def command_assignment_recover(args: argparse.Namespace) -> dict[str, Any]:
             )
         if (
             assignment["repository_identity"] != observed["repository_identity"]
-            or assignment["tracker_backend"] != observed["tracker_backend"]
             or assignment["claim_spec_identity"] != observed["claim_spec_identity"]
         ):
             raise StateError(
@@ -4894,7 +4776,6 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
             raise StateError("assignment-not-waiting", f"assignment is {waiter['state']}", 4)
         if (
             waiter["repository_identity"] != observed["repository_identity"]
-            or waiter["tracker_backend"] != observed["tracker_backend"]
             or waiter["claim_spec_identity"] != observed["claim_spec_identity"]
         ):
             raise StateError("claim-identity-drift", "recovery evidence belongs to another Feature Spec", 4)
@@ -5106,32 +4987,11 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
         if unresolved:
             raise StateError("unresolved-app-operations", "finish requires complete task change reconciliation", 4)
         states = [row[0] for row in connection.execute("SELECT state FROM assignments WHERE run_id=?", (run_id,))]
-        if args.outcome in {"pr-ready", "local-branch-ready", "delivery-ready"}:
-            delivery_rows = list(
-                connection.execute(
-                    "SELECT delivery_type,state FROM assignments WHERE run_id=?",
-                    (run_id,),
-                )
-            )
-            expected_state = {
-                "github-pr": "pr-ready",
-                "local-branch": "local-branch-ready",
-            }
-            if any(
-                row["state"] != expected_state[row["delivery_type"]]
-                for row in delivery_rows
-            ):
-                raise StateError("run-incomplete", "delivery finish requires every assignment ready for its delivery type", 4)
-            delivery_types = {row["delivery_type"] for row in delivery_rows}
-            expected_outcome = (
-                "pr-ready" if delivery_types == {"github-pr"}
-                else "local-branch-ready" if delivery_types == {"local-branch"}
-                else "delivery-ready"
-            )
-            if args.outcome != expected_outcome:
+        if args.outcome == "pr-ready":
+            if any(state != "pr-ready" for state in states):
                 raise StateError(
-                    "delivery-outcome-mismatch",
-                    f"run delivery vector requires outcome {expected_outcome}",
+                    "run-incomplete",
+                    "pr-ready finish requires every assignment to have a ready GitHub PR",
                     4,
                 )
             active_claims = connection.execute(
@@ -5150,7 +5010,7 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                 )
         else:
             terminal_states = {
-                "pr-ready", "local-branch-ready",
+                "pr-ready",
                 "preimplementation-aborted", "abandoned",
             }
             has_abandoned_assignment = "abandoned" in states
@@ -5286,19 +5146,18 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--run-id", required=True)
     show.set_defaults(handler=command_run_show, command_name="run show")
     listing = run_commands.add_parser("list", help="list root runs")
-    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "abandoned", "all"), default="active")
+    listing.add_argument("--status", choices=("waiting-for-spec", "active", "blocked", "pr-ready", "preimplementation-aborted", "abandoned", "all"), default="active")
     listing.set_defaults(handler=command_run_list, command_name="run list")
     finish = run_commands.add_parser("finish", help="close a delivery-ready, preimplementation-aborted, or owner-abandoned run")
     finish.add_argument("--run-id", required=True)
     finish.add_argument("--expected-revision", type=int, required=True)
-    finish.add_argument("--outcome", choices=("pr-ready", "local-branch-ready", "delivery-ready", "preimplementation-aborted", "abandoned"), required=True)
+    finish.add_argument("--outcome", choices=("pr-ready", "preimplementation-aborted", "abandoned"), required=True)
     finish.set_defaults(handler=command_run_finish, command_name="run finish")
 
     claim = commands.add_parser("claim", help="inspect or reconcile canonical Feature Spec ownership")
     claim_commands = claim.add_subparsers(dest="claim_command", required=True)
     find = claim_commands.add_parser("find", help="find the active owner of one canonical Feature Spec")
     find.add_argument("--repository-identity", required=True)
-    find.add_argument("--tracker-backend", choices=("github", "local"), required=True)
     find.add_argument("--source-spec-ref", required=True)
     find.set_defaults(handler=command_claim_find, command_name="claim find")
     reconcile = claim_commands.add_parser("reconcile", help="reconcile a waiting claim from authoritative Codex task inspection")
@@ -5417,11 +5276,6 @@ def build_parser() -> argparse.ArgumentParser:
     ready_template = ready_observation_commands.add_parser(
         "template",
         help="print a descriptor for one delivery and review profile",
-    )
-    ready_template.add_argument(
-        "--delivery-type",
-        choices=("github-pr", "local-branch"),
-        required=True,
     )
     ready_template.add_argument(
         "--review-profile",

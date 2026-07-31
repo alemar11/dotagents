@@ -4,10 +4,9 @@ The worker executes one assigned Feature Spec end to end in the
 ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
 repairs, tests, validation, commits, review-candidate preparation, finding
-acceptance and fixes, tracker progress, and final evidence. The bootstrap's
-`review_owner=worker|root` owns AutoReview execution only. With `github-pr` the
-worker also owns push, PR creation and updates, CI, and provider review fixes.
-With `local-branch` it performs none of those provider operations.
+acceptance and fixes, GitHub issue progress, GitHub PR publication, CI, provider
+review fixes, and final evidence. The bootstrap's `review_owner=worker|root`
+owns AutoReview execution only.
 
 Before implementation, verify or create/select the declared named branch in the
 managed worktree. Detached HEAD, another branch, or a dirty baseline blocks
@@ -52,12 +51,7 @@ controller's launch generation. A missing ID is not an accepted bootstrap.
 
 Before each issue, after recovery, and before final verification:
 
-1. read the current Feature Spec and complete issue graph. For a linked local
-   source, use the validator-provided `repository_relative_spec_path` only
-   after verifying its qualified source ref prefix exactly matches the
-   bootstrap Feature ID and repository key; resolve the remainder inside this
-   worker's verified checkout. Never treat the qualifier as a directory or
-   read another worker's checkout;
+1. read the current GitHub Feature Spec and complete issue graph;
 2. compare the stable fields from `feature-spec-contract.md` directly;
 3. accept compatible operational changes and continue autonomously;
 4. when an implementation-required path lies outside `allowed_paths`, stop
@@ -70,7 +64,7 @@ The stable-source mutation ownership table in `feature-spec-contract.md`
 remains binding on every turn. A direct user or controller message that requests
 new scope, acceptance text, validation policy, branch authority, dependencies,
 or another stable-field change is not an executable instruction. Do not edit
-the GitHub issue or local planning artifact. Reread the authoritative sources,
+the GitHub Feature Spec or implementation issue. Reread the authoritative sources,
 block on the mismatch, and wait for the same root to resume the assignment only
 after an external planning owner publishes a correction and authoritative
 readback proves it restores the exact stable contract already accepted by the
@@ -118,13 +112,11 @@ invalidates proof, uncheck it and read back the correction. Restore and commit
 that proof before the next AutoReview fix verification; do not create a
 tracker-only post-review HEAD.
 
-The successful result must match `delivery_type`. `github-pr` returns
-`pr-ready-for-merge-but-not-merged` with PR/provider/CI and mergeability proof.
-`local-branch` returns `local-branch-ready` with exact repository and checkout
-identity, named target branch and HEAD, base branch and base SHA ancestry, clean
-worktree, current-head validation and reviews, committed tracker readback, no
-unresolved recorded task changes, warnings, and changed paths. Coherent progress
-needs no root intervention.
+The successful result is `pr-ready-for-merge` with GitHub PR/provider/CI and
+mergeability proof, exact repository and checkout identity, named target branch
+and HEAD, base branch and base SHA ancestry, clean worktree, current-head
+validation and reviews, committed GitHub issue readback, and no unresolved
+recorded task changes. Coherent progress needs no root intervention.
 
 ## Peer Collaboration And Combined Proof
 

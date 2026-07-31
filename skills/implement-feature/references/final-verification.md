@@ -1,15 +1,12 @@
 # Final Verification
 
-The worker first reports the terminal observation required by its stable
-`delivery_type`: `pr-ready-for-merge-but-not-merged` or `local-branch-ready`.
+The worker first reports the terminal observation `pr-ready-for-merge`.
 Root then performs read-only verification; it does not edit code, rerun implementation,
 check boxes, uncheck boxes, or judge acceptance criteria.
 
-For `github-pr`, the worker-facing
-`pr-ready-for-merge-but-not-merged` result is also the
-`implement-feature/delivery-ready-observation` `2.0.0` status
-value. It maps to assignment state `pr-ready` and aggregate outcome `pr-ready`;
-all three names describe the same unmerged delivery boundary.
+The worker-facing `pr-ready-for-merge` result is also the
+`implement-feature/delivery-ready-observation` `3.0.0` status value. It maps to
+assignment state `pr-ready` and aggregate outcome `pr-ready`.
 
 Collect the terminal reports and immutable current-head evidence for every
 ready candidate before mutating assignment state. Reuse that snapshot while its
@@ -37,21 +34,8 @@ For each assignment, root rereads:
   that closes its findings on the current HEAD;
 - actionable feedback resolution;
 - committed tracker readback and a clean managed worktree;
-- for `github-pr` only: open non-draft PR identity, provider default-branch
-  base, configured CI, mergeability, conflicts, rules, and approvals;
-- for `local-branch`: absence of push/PR/provider operations and an exact named
-  local branch plus HEAD.
-
-For each `local-branch` candidate, run `scripts/verify-ready --json
-local-branch` once with the managed and original checkout identities, declared
-base and delivery branch/SHAs, repository-relative Feature Spec and completed
-issue paths, and each issue's canonical startup `workflow_state`, passing one
-`--issue path=state` argument for every issue in the graph. Its passing
-snapshot replaces ad hoc shell composition for branch identity, original
-checkout preservation, ancestry, cleanliness, `git diff --check`, tracked
-artifacts, completed-issue placement, final checkboxes, and workflow-state
-preservation. Root still verifies worker task, review, validation, peer, and
-no-provider evidence from their authoritative owners.
+- open non-draft PR identity, provider default-branch base, configured CI,
+  mergeability, conflicts, rules, and approvals.
 
 If authoritative final evidence agrees, use `assignment ready-observation
 create --readiness-mode terminal` to build the private typed payload from that
@@ -71,8 +55,7 @@ evidence. Record `send-worker-message` before sending, then verify both the
 immediate tool response and the exact visible task conversation before marking
 that send complete.
 
-After every assignment is ready, call `run finish` with `pr-ready`,
-`local-branch-ready`, or `delivery-ready` for a mixed vector. Run finish
+After every assignment is ready, call `run finish --outcome pr-ready`. Run finish
 verifies that task operations are reconciled and assignment-level release
 already occurred; it does not perform a repository-wide release. No terminal
 result merges.
@@ -81,7 +64,7 @@ For a linked multi-repository feature, require exactly one independently
 verified terminal branch or PR for every Feature Spec Set member. Report one
 exact final vector of
 `feature_id, repository_identity, source_spec_ref, target_branch_name,
-head_sha, delivery_type, pr_url|null`; every row must come from that member's
+head_sha, pr_url`; every row must come from that member's
 unchanged terminal snapshot. The vector is aggregate evidence only and does not
 replace any member's assignment, claim, review, tracker, or delivery proof.
 
@@ -122,8 +105,8 @@ the owning run without claiming delivery success.
 ## Verification CLI Maintenance
 
 Normal runtime execution stays on `scripts/verify-ready`, whose
-`CLI_VERSION = "1.1.0"` is its SemVer source of truth. It is read-only: neither
-`doctor`, `review-candidate`, nor `local-branch` writes repository or run state.
-Use a minor bump for a compatible new verification command and a patch bump for
-a compatible correction. Re-run `--help`, `--version`, `--json doctor`, the
-review-candidate fixture, and local-branch fixtures after changes.
+`CLI_VERSION = "2.0.0"` is its SemVer source of truth. It is read-only: neither
+`doctor` nor `review-candidate` writes repository or run state. Use a major bump
+for a breaking command removal and a patch bump for a compatible correction.
+Re-run `--help`, `--version`, `--json doctor`, and the review-candidate fixture
+after changes.

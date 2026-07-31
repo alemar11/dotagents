@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Discover or implement durable Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs or named local branches. Use only when explicitly invoked.
+description: Discover or implement durable GitHub-backed Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs. Use only when explicitly invoked.
 ---
 
 # Implement Feature Spec
@@ -22,8 +22,7 @@ references:
 
 For `discovery-only`:
 
-1. Resolve only the configured tracker backend needed to locate authoritative
-   Feature Specs, then query that tracker. Do not load or validate execution
+1. Query GitHub Issues for authoritative Feature Specs. Do not load or validate execution
    contracts, issue graphs, repository-to-project mappings, branches, worker
    profiles, runtime capabilities, run state, or startup authorization.
 2. Return the candidate Feature Spec references, links when available, and
@@ -141,7 +140,7 @@ more Feature Specs. A discovery-only request never enters this flow.
 1. Load `references/feature-spec-contract.md` and
    `references/root-bootstrap.md`. Validate current durable sources,
    dependencies, repository identities, allowed paths, acceptance, validation,
-   delivery type, and exact repository-to-worker-project mapping before state.
+   GitHub PR delivery, and exact repository-to-worker-project mapping before state.
    Resolve each worker's fixed model and adaptive thinking level through
    `references/task-model-policy.md`, verify destination-host support, and
    disclose every resolved profile before startup authorization.
@@ -154,8 +153,7 @@ more Feature Specs. A discovery-only request never enters this flow.
    multi-repository set, run read-only
    `scripts/run-state --json feature-spec-set validate --input <absolute-file>`
    over ephemeral complete member-body snapshots and retain its exact
-   `manifest_feature_set`, including each validated local member's decoded
-   `repository_relative_spec_path`. Keep those inputs unchanged until
+   `manifest_feature_set`. Keep those inputs unchanged until
    `run start` revalidates them. Resolve the one startup authorization
    interaction, including the bounded planner-task permission from
    `references/scope-repair-orchestration.md`, only after this read-only
@@ -164,8 +162,8 @@ more Feature Specs. A discovery-only request never enters this flow.
    path or stop before run state, claim, task, or worktree creation.
 2. Run read-only `scripts/run-state --json capabilities` and
    `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `5.0.0` implements runtime
-   contract `6.0.0` over the permanently unversioned per-user SQLite DB at
+   `scripts/run-state --json state prepare`. CLI `6.0.0` implements runtime
+   contract `7.0.0` over the permanently unversioned per-user SQLite DB at
    `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
    schema integer `4` is separate from those SemVer identities. Every run pins
    its exact runtime contract, CLI, and shipped artifact SHA-256. A database
@@ -218,13 +216,11 @@ more Feature Specs. A discovery-only request never enters this flow.
    claim, delegate the portable repair to a separate Plan Feature task when
    authorized and supported, recompute same-root overlap, then send the
    crash-safe next contract generation.
-7. Apply `references/final-verification.md`. Root rereads authoritative tracker,
-Codex task, Git, delivery-specific provider, CI, and AutoReview-owned review evidence without editing or
-   judging criteria. For local-branch delivery, use `scripts/verify-ready` for
-   the deterministic Git and tracker snapshot instead of composing shell
-   probes. Complete each assignment claim when its root-verified
-   evidence reaches `pr-ready` or `local-branch-ready`, then finish the run only
-   when the whole requested delivery vector is ready.
+7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,
+   Codex task, Git, PR, CI, and AutoReview-owned review evidence without editing or
+   judging criteria. Complete each assignment claim when its root-verified
+   evidence reaches `pr-ready`, then finish the run only
+   when the whole requested GitHub PR vector is ready.
 
 If a worker observes compatible operational change, it adopts it and continues.
 If a stable durable field changes, it records `assignment block` and stops

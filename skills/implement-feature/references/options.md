@@ -6,15 +6,14 @@ The behavior-affecting startup fields are:
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories have no separate repo-specific saved Git project, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
 | `visible_app_task_permission` | `granted`, `denied` | Permit the disclosed visible Codex worker tasks and ChatGPT-created worktrees for this run. |
-| `scope_repair_task_permission` | `granted`, `denied` | For a selected GitHub-backed assignment, permit a separate visible Plan Feature task only when an active worker later needs a monotonic `allowed_paths` repair. Omit when every selected assignment uses local tracking. |
+| `scope_repair_task_permission` | `granted`, `denied` | Permit a separate visible Plan Feature task only when an active worker later needs a monotonic `allowed_paths` repair. |
 
 After validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
 expected worker count, ChatGPT-created worktrees, GitHub publication when
 applicable, tracker mutation, validation, AutoReview, and the AutoReview-owned
 native Codex review only when the derived profile is `high-risk`, plus the exact
-terminal boundary: `pr-ready-for-merge-but-not-merged` or
-`local-branch-ready`. For every worker, also disclose the fixed
+terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
 `high` for complex work, or `xhigh` for risky or cross-system work. An explicit
 `$implement-feature` request to start, implement, or resume the selected Specs
@@ -36,8 +35,7 @@ Resolve that answer directly to `scope_repair_task_permission`. After an
 affirmative answer, state exactly: `Planner-task permission recorded; no
 planner task has been created.` After a negative answer, state exactly:
 `Planner-task permission denied; a future scope miss will block without
-creating a planner task.` When every assignment uses local tracking, no startup
-authorization question remains.
+creating a planner task.`
 
 When projects are missing, use this standard question in the same startup
 authorization interaction:

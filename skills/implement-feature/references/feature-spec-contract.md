@@ -1,15 +1,13 @@
 # Execution-Ready Feature Spec Contract
 
-Read the complete durable Feature Spec and implementation-issue graph before
-startup. Accept GitHub issues or local Markdown. Reject proposals, standalone
-or incomplete Specs, missing issue graphs, planning requests, missing
-`delivery_type`, and every tracker/delivery combination except GitHub plus
-`github-pr`, local Markdown plus `github-pr`, or local Markdown plus
-`local-branch`.
+Read the complete durable GitHub Feature Spec and implementation-issue graph
+before startup. Reject proposals, standalone or incomplete Specs, planning
+requests, and any source or delivery transport other than a GitHub Issue and a
+reviewed GitHub PR.
 
 Each selected Spec must establish stable fields for:
 
-- intended outcome and delivery type;
+- intended outcome and GitHub PR delivery;
 - authorized repository, source, target branch, and allowed paths;
 - ordered issues and dependency edges;
 - acceptance text, criterion count, and criterion order;
@@ -66,20 +64,18 @@ when the durable dependency explicitly requires it. Never use claim release alon
 as dependency or combined proof.
 
 One selected implementation Spec owns one repository, head branch, visible task,
-worktree, worker, delivery result, and claim. `github-pr` additionally owns one
-PR against the observed default branch; `local-branch` owns no push or provider
-artifact. Its claim identity is the canonical repository plus canonical durable
-`source_spec_ref`; an active head branch is also unique within that repository.
+worktree, worker, GitHub PR delivery result, and claim. The PR targets the
+observed default branch. Its claim identity is the canonical repository plus
+canonical durable `source_spec_ref`; an active head branch is also unique within
+that repository.
 Different roots may therefore execute different Specs in the same repository
 through distinct head branches and worktrees. Each root serializes its own
 work: overlapping paths or issue dependencies serialize. Cross-root integration
 conflict is ordinary worker-owned Git and PR evidence, not a controller path
 claim.
 
-Repository identity never selects tracker or delivery transport. A repository
-identified as `github:owner/repository` may validly use a local Markdown
-`source_spec_ref` and `local-branch`; source-ref validation keys from the stable
-`tracker_backend` fact while terminal validation keys from `delivery_type`.
+Repository identity is always `github:owner/repository`, and every
+`source_spec_ref` is the matching GitHub Issue ref or canonical URL.
 
 In a monorepo, one coherent Spec worker normally owns FE, BE, app, and their
 integration in one worktree. In a multi-repository feature, every repo-owned
@@ -113,12 +109,7 @@ revalidate those same current inputs and require exact equality before it opens
 SQLite; proposed refs, validator-invalid bodies, missing or nonmatching
 evidence, and hand-composed fragments are invalid. Root must re-read the
 authoritative sources and replace/revalidate the snapshots if they change
-before startup; the CLI stores no body hash. For a linked local member, the
-validator also verifies
-the exact `<feature-id>--<repository-key>/` qualifier and emits the physical
-`repository_relative_spec_path` obtained by stripping it. The worker resolves
-that remainder only inside its separately verified owning checkout; the
-qualifier is never a directory or repository selector. The Feature Spec Set is the execution
+before startup; the CLI stores no body hash. The Feature Spec Set is the execution
 authority; the saved-project list only proves that each named repository can
 receive a worker. Existing repository workers own the combined boundaries
 named by the plan and communicate directly.
@@ -149,7 +140,7 @@ operational changes when the stable fields above remain intact:
 
 For a required out-of-envelope path, stop editing and report the structured
 request from `scope-repair-orchestration.md`. Stop as
-`blocked-durable-contract` without asking when outcome, delivery type,
+`blocked-durable-contract` without asking when outcome, GitHub PR delivery,
 repository/source/branch authority, a non-monotonic path change, dependency
 structure, acceptance text or shape, safety, or material validation budget/terminal result changes.
 Compare authoritative stable sections directly. Do not create body, contract,

@@ -29,8 +29,8 @@ them before invoking Plan Feature. Never put assignment IDs, task IDs,
 worktrees, generations, claims, or worker state in the planning request.
 
 Root rejects a request when it changes outcome, repository, source, target
-branch, dependencies, acceptance, safety, validation constraints, delivery
-type, or any field other than a monotonic `allowed_paths` expansion. Exactly
+branch, dependencies, acceptance, safety, validation constraints, GitHub PR
+delivery, or any field other than a monotonic `allowed_paths` expansion. Exactly
 one automatic repair is allowed per assignment. A second scope miss returns
 `full-replan-required` and remains blocked.
 
@@ -44,12 +44,7 @@ one automatic repair is allowed per assignment. A second scope miss returns
    conflicts. This is a scheduling check, not a persisted file claim.
 3. If `scope_repair_task_permission=denied`, report the portable request and
    remain blocked. Do not ask another question.
-4. For `tracker_backend=local`, return
-   `local-scope-repair-transport-unavailable` and remain blocked. A separate
-   planner task cannot safely publish a local planning change into an existing
-   managed worker checkout in this rollout. Never share the worker worktree
-   with the planner or copy the planning file across checkouts.
-5. For `tracker_backend=github`, record and execute
+4. Record and execute
    `create-scope-repair-task`. Create one separate visible Codex task in the
    assignment's saved repository project without a worktree. Set and verify its
    exact title as `🧭 Scope Repair · <Feature Spec title>`. Invoke
