@@ -40,7 +40,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 
 | Skill | Purpose |
 | --- | --- |
-| `autoreview` | Run bounded `gpt-5.6-sol` closeout review at high or xhigh effort, adding one native lens only for high-risk changes. |
+| `autoreview` | Explicitly run a bounded `gpt-5.6-sol` closeout review at high or xhigh effort, adding one native lens only for high-risk changes. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `code-review-rules` | Discover, evaluate, and install evidence-backed Codex Code Review rules in the closest applicable `AGENTS.md`. |
 | `crusty` | Direct-only independent advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |

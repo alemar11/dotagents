@@ -1,41 +1,23 @@
 ---
 name: autoreview
-description: Run a bounded Codex-only closeout review, adding one native Codex review only for high-risk changes, reusing clean evidence, and verifying committed fixes incrementally.
+description: Explicitly run a bounded Codex-only closeout review, adding one native Codex review only for high-risk changes, reusing clean evidence, and verifying committed fixes incrementally.
 ---
 
 # Auto Review
 
-Run the shipped Codex-only review helper as a closeout check. This is code
-review, not GitHub PR review submission or approval routing.
+## Scope
 
-## Trigger Cues
+AutoReview is an explicitly invoked, read-only closeout review for a coherent
+repository change. It may be invoked directly by the user or explicitly by a
+composing workflow. It reviews dirty local, branch, or exact-commit targets,
+returns structured findings and evidence, and may add one native Codex lens for
+high-risk changes.
 
-Use this skill when the user asks for or clearly implies:
-
-- `autoreview`
-- `review this before final`
-- `review before commit`
-- `review before PR`
-- `review before ship`
-- `review again after fixes`
-- a final closeout check after non-trivial code edits where an independent
-  bug-finding pass is likely to change the outcome
-
-Do not use this skill for:
-
-- answer-only turns with no file edits
-- exploratory analysis or planning unless the user explicitly asks for review
-- docs-only edits that do not alter runtime behavior, generated commands,
-  install instructions, security posture, or public contracts
-- tiny mechanical fixes such as typo corrections, formatting-only changes,
-  comment-only edits, or metadata-only sync
-- ordinary final responses after focused tests or proof already cover the
-  changed behavior
-- a later commit, push, or finalization turn when verified clean review evidence
-  still covers the unchanged effective patch
-
-Selecting this skill starts the review workflow; it does not by itself require
-launching the helper. Apply the freshness contract below first.
+The supported entrypoint is `scripts/autoreview`. AutoReview does not implement
+fixes, mutate the repository, submit or approve pull requests, or own tracker,
+CI, merge, deployment, or release actions. Explicit invocation selects this
+workflow; it does not by itself require launching the helper. Apply the
+freshness contract below first.
 
 ## Review Evidence Freshness
 
