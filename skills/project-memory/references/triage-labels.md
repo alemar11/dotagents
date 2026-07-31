@@ -8,8 +8,7 @@ position. The generated
 `project-memory/config/triage-labels.md` file is the repository-specific source
 of truth that maps those values to actual GitHub labels, issue types, body
 fields, and workflow labels. Every mapping row includes an explicit transport
-so consumers never infer mutation mechanics from a tracker value. Local
-Markdown persists canonical header values through `local-header`.
+so consumers never infer mutation mechanics from a tracker value.
 
 Consumers such as `$plan-feature` may select or apply these values, but must
 load the Project Memory mapping and must not define a competing registry,
@@ -24,11 +23,8 @@ implementation issue type.
 | --- | --- | --- | --- |
 | `idea` | `label` | `idea` | Tentative proposal saved for possible later planning |
 
-For the GitHub backend, map `artifact_marker: idea` to the `idea` label and
-leave the native GitHub Issue Type unset. For the local backend, persist
-`artifact_marker: idea` in the file's header metadata region with transport
-`local-header`. Marker transport is `label` for GitHub and `local-header` for
-local Markdown; reject every other value.
+Map `artifact_marker: idea` to the `idea` label and leave the native GitHub
+Issue Type unset. Marker transport is `label`; reject every other value.
 
 The repository's `project-memory/config/triage-labels.md` must include this
 artifact-marker mapping before an Idea can be captured or consumed. A missing
@@ -38,24 +34,20 @@ unrelated planning or implementation workflows.
 
 If the active GitHub tracker uses `idea` for a conflicting purpose or requires
 a different label, load [setup-questions.md](setup-questions.md) and use its
-artifact-marker mapping prompt. Local Markdown's canonical mapping and an
-unmodified GitHub `idea` label require no question.
+artifact-marker mapping prompt. An unmodified GitHub `idea` label requires no
+question.
 
 ## Issue Types
 
 Issue type describes what kind of work this is. It should not change often
 during an issue's lifetime.
 
-Choose the tracker-specific values before writing this file. Do not copy the
-GitHub examples into local markdown modes.
+Choose the tracker-specific values before writing this file.
 
-- GitHub backend: use `native-type` when issue types are available, normally
+- Use `native-type` when GitHub issue types are available, normally
   with values `Bug`, `Feature`, and `Task`. When they are disabled, use an
   evidence-backed `label` or `body-field` fallback and record its exact label
   or complete body field in each row.
-- Local backend: use `local-header` with exact values such as
-  `issue_type: bug`, `issue_type: feature`, and `issue_type: task`.
-
 | Canonical type | Transport | Tracker value | Meaning |
 | --- | --- | --- | --- |
 | `bug` | `native-type` | `Bug` | Something is broken or regressed |
@@ -66,17 +58,13 @@ The table above uses the default GitHub native type names. Rewrite both
 `Transport` and `Tracker value` when the tracker uses another supported
 representation. `body-field` requires the complete exact line to render, not a
 field name or value fragment. Reject a missing transport column, a transport
-outside `native-type`, `label`, `body-field`, or `local-header`, and a backend-
-incompatible transport. When customized or conflicting values remain ambiguous
+outside `native-type`, `label`, or `body-field`. When customized or conflicting values remain ambiguous
 after tracker inspection, load [setup-questions.md](setup-questions.md) and use
 its issue-type mapping prompt.
 
-In GitHub issue-tracker mode, use `$gitstack:github-issues` to apply
+Use `$gitstack:github-issues` to apply
 `native-type` through the type operation, `label` through label mutation, or
 `body-field` through the exact authorized final body contract.
-
-In local Markdown mode, require `local-header` and record the exact canonical
-`issue_type:` line near the top of the issue file.
 
 ## Workflow States
 
@@ -92,9 +80,7 @@ information arrives or work becomes ready.
 | `wontfix` | `label` | `wontfix` | Will not be actioned |
 
 When a skill mentions a canonical state, require `label` at the GitHub
-boundary. In local Markdown mode, require `local-header` and record the exact
-canonical `workflow_state:` line near the top of the issue file. Reject missing
-transports, unsupported transports, or backend-incompatible rows;
+boundary. Reject missing transports or unsupported transports;
 workflow-state body fields and native Issue Types are not supported.
 
 `needs-info` is a waiting state, not an agent queue state. When the reporter or
@@ -118,25 +104,3 @@ body-field conventions in the issue-type table; workflow states remain labels.
 When customized or conflicting workflow values remain ambiguous after tracker
 inspection, load [setup-questions.md](setup-questions.md) and use its
 workflow-state mapping prompt.
-
-## Local Markdown Validation
-
-The header metadata region starts after the first H1 title and ends at the
-first `##` heading. For a Plan-generated implementation issue, require exactly
-one `issue_type` and one `workflow_state` line in that region. Reject missing
-fields, unknown aliases, noncanonical values, or conflicting duplicate
-canonical fields.
-
-For an Idea at `planning/ideas/<idea-slug>.md`, require exactly one
-`artifact_marker: idea` line, zero `issue_type` lines, and zero or one
-`workflow_state` line in that region. When present, the Idea workflow state
-must be either `needs-triage` or `needs-info`; duplicate or coexisting Idea
-workflow-state lines are invalid.
-
-Do not add a schema-version field, and never treat similarly named fields in
-issue-body sections as header metadata.
-
-For a Plan-generated issue, keep `source_spec_ref` only in the canonical
-`## Execution Contract` row. Never duplicate it in the header. A
-`source_spec_ref` beginning with `proposed-spec:` is proposal-only and cannot
-receive an applied `workflow_state: ready-for-agent` value.

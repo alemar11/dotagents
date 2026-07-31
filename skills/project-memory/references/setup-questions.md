@@ -15,8 +15,8 @@ Normally ask no questions. When a question is required:
 - ask a follow-up only for a selected custom or split choice that remains
   unresolved.
 
-Do not expose terms such as `memory-owning root`, `scoped route`,
-`tracker_backend`, or `translation memory` in the
+Do not expose terms such as `memory-owning root`, `scoped route`, or
+`translation memory` in the
 user-facing question. Canonical fields and values belong in the resulting
 configuration and completion report, not in the first-time-user prompt.
 
@@ -53,22 +53,6 @@ When the project root is clear but the requested area is not, ask:
 If the user selects a specific area, ask which one: issue tracking and workflow
 labels, Idea labels, project context, localization conventions, or agent
 pointers. Translate the answer to the corresponding `memory_slice` internally.
-
-## Issue Location
-
-Ask only when active GitHub and local-planning evidence conflict. Do not ask
-merely because a GitHub remote exists or an unused planning directory is
-present.
-
-> I found active GitHub issue tracking at `<github-evidence>` and local planning
-> files at `<local-evidence>`. Where should future Feature Specs and
-> implementation issues be stored?
->
-> - GitHub Issues
-> - Local Markdown files
-
-Map the answer internally to `github` or `local`. Recommend the destination
-that owns the current durable planning artifacts when that ownership is clear.
 
 ## Separate Project Contexts
 
@@ -159,9 +143,8 @@ proposals. Show the evidence-backed proposal before requesting correction.
 > - Change the mapping
 
 Map that row internally to canonical `artifact_marker: idea`. If the user
-chooses to change it, ask only for the replacement GitHub label. Local
-Markdown's canonical `idea` marker and an unmodified GitHub `idea` label
-require no question.
+chooses to change it, ask only for the replacement GitHub label. An unmodified
+GitHub `idea` label requires no question.
 
 ## Issue-Type Mapping
 
@@ -183,8 +166,8 @@ Show an evidence-backed proposal before requesting correction.
 Map those rows internally to canonical `bug`, `feature`, and `task`. If the
 user chooses to change the mapping, ask only for the incorrect row or rows and
 record both the concrete mechanism and value. Map GitHub Issue Types to
-`native-type`, GitHub labels to `label`, an exact line near the top of the issue
-body to `body-field`, and local header lines to `local-header`.
+`native-type`, GitHub labels to `label`, and an exact line near the top of the
+issue body to `body-field`.
 
 When GitHub Issue Types are disabled and repository evidence establishes no
 fallback, ask one concrete follow-up before asking for values:
@@ -195,8 +178,8 @@ fallback, ask one concrete follow-up before asking for values:
 > - GitHub labels (Recommended when suitable labels exist)
 > - An exact field near the top of each issue body
 
-Then ask only for the missing labels or complete body lines. Local Markdown's
-canonical mapping and an unmodified GitHub default require no question.
+Then ask only for the missing labels or complete body lines. An unmodified
+GitHub default requires no question.
 
 ## Workflow-State Mapping
 
@@ -221,9 +204,8 @@ correction.
 Map those rows internally to `needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, and `wontfix`. If the user chooses to change the mapping,
 ask only for the incorrect row or rows. Record GitHub workflow states with
-transport `label` and local header lines with `local-header`; do not map workflow
-states to Issue Types or body fields. Canonical local values and an unmodified
-GitHub default require no question.
+transport `label`; do not map workflow states to Issue Types or body fields. An
+unmodified GitHub default requires no question.
 
 ## Questions Setup Must Not Ask
 

@@ -4,13 +4,7 @@ Feature Specs, implementation issues, and captured Ideas for this repo live as
 GitHub issues.
 Use `$gitstack:github-issues` for GitHub issue lifecycle operations.
 
-## Configuration
-
-| Key | Type | Value | Allowed values | Meaning |
-| --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs, implementation issues, and Ideas are routed to GitHub. |
-
-GitHub is the authoritative artifact store in this mode. Project Memory stores
+GitHub is the authoritative artifact store. Project Memory stores
 only tracker routing and conventions; implementation delivery, branch/PR
 strategy, and executor permissions belong to Feature Specs and executing
 workflows.

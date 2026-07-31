@@ -32,7 +32,7 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | Tracker backend plus canonical artifact-marker, issue-type, and workflow-state vocabulary and mappings. |
+| `tracker-routing` | GitHub target plus canonical artifact-marker, issue-type, and workflow-state vocabulary and mappings. |
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -100,29 +100,22 @@ when the selected scope has write authority.
 - Ask only when the target or behavior-affecting value is materially ambiguous
   after repo evidence and documented defaults.
 
-## Structured Configuration
+## Tracker Contract
 
-Behavior-affecting setup uses human-first Markdown tables with
-`lower_snake_case` keys and `lower-kebab-case` values:
-
-| Key | Values | Owner |
-| --- | --- | --- |
-| `tracker_backend` | `github`, `local` | `issue-tracker.md` |
-
+GitHub Issues is the fixed tracker provider. `issue-tracker.md` records the
+resolved GitHub target and human-readable conventions, not a provider option.
 Project Memory does not store implementation delivery targets, branch or PR
 policy, or executor authorization. Those belong to the current Feature Spec or
-the executing workflow. Unknown tracker keys are invalid input; configuration
-must already use this schema before the runtime consumes it.
+the executing workflow.
 
 `references/triage-labels.md` is the sole reusable registry for canonical
 `artifact_marker`, `issue_type`, and `workflow_state` values plus their mapping
 transports. The generated `project-memory/config/triage-labels.md` is the
 repository-specific source of truth for tracker values and transport. Marker
-rows use `label` on GitHub or `local-header` locally; issue types use
-`native-type`, `label`, or `body-field` on GitHub and `local-header` locally;
-workflow states use `label` on GitHub or `local-header` locally. These are
+rows use `label`; issue types use `native-type`, `label`, or `body-field`;
+workflow states use `label`. These are
 mapping data, not run options. Consuming skills must load them, reject missing,
-unknown, or backend-incompatible transports, and must not define parallel enums
+unknown, or GitHub-incompatible transports, and must not define parallel enums
 or aliases.
 The `artifact_marker: idea` mapping is required only for Idea capture and
 Idea-source consumption. If it is absent, stop those Idea-specific operations
@@ -136,8 +129,8 @@ controller ledger for those concerns.
 
 `references/setup-workflow.md` owns the settings editor, canonical table
 validation, draft checklist, pointer block, and completion report.
-When touching `issue-tracker.md`, require `tracker_backend`, preserve useful
-prose, and reject runtime-only or unknown table rows.
+When touching `issue-tracker.md`, preserve useful prose and remove runtime-only
+configuration rows within the authorized scope.
 
 ## Reference Loading Matrix
 
@@ -145,7 +138,7 @@ Load only the selected branch:
 
 | Work | Required references |
 | --- | --- |
-| Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
+| Tracker routing | `issue-tracker-github.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
 | Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`, and `setup-workflow.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md` and `setup-workflow.md`. |
@@ -198,9 +191,8 @@ named targets, and write authority instead of unrelated setup.
 ### 4. Draft And Show The Change
 
 Before writing, show intended files and meaningful before/after values. Follow
-the loading matrix and existing local formats. In custom tracker workflows,
-preserve the described conventions while keeping the structured table limited
-to `tracker_backend`.
+the loading matrix and existing local formats. Preserve repository-specific
+GitHub conventions without adding provider configuration.
 
 ### 5. Write And Verify Authorized Memory
 
@@ -217,9 +209,7 @@ root-context rule; repositories outside that scope remain untouched.
 
 Project Memory setup does not create Feature Spec, Idea, or issue subtrees and
 does not create runtime worker configuration or state. It never creates Idea
-artifacts. Before
-completing a touched `issue-tracker.md`, reject unknown configuration keys
-rather than rewriting or removing them implicitly.
+artifacts.
 
 ### 6. Report
 
@@ -247,7 +237,7 @@ it never counts as captured.
   first-time-user ambiguity prompts and internal answer mapping.
 - `triage-labels.md`: sole reusable canonical artifact-marker,
   issue-type/workflow-state registry and repository mapping template.
-- `issue-tracker-*.md`, `tracker-publishing.md`: tracker artifact, source-ref,
+- `issue-tracker-github.md`, `tracker-publishing.md`: tracker artifact, source-ref,
   publication, and completion contracts.
 - `domain.md`: root/scoped context discovery, routing, and ownership.
 - `domain-modeling.md`: domain setup, inline update, implementation closeout,

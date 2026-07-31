@@ -17,7 +17,7 @@ review:
 - execution context: `fresh-setup`, `existing-project-bootstrap`, or
   `current-project` (derived in the exact
   precedence from `options.md`, not a stored key or option)
-- `tracker_backend`
+- resolved GitHub target as exact `owner/repository` factual routing data
 - `artifact_marker` transport and mapping
 - `issue_type` transport and mapping
 - `workflow_state` transport and mapping
@@ -41,7 +41,7 @@ unless the user explicitly changes them.
 
 Editable sections:
 
-- `issue-tracker`
+- `github-target`
 - `artifact-marker-mapping`
 - `issue-type-mapping`
 - `workflow-state-mapping`
@@ -53,14 +53,16 @@ Editable sections:
 For each selected configuration section, show the current value first, then
 `keep-current` and the relevant alternatives:
 
-- `issue-tracker`: `github` or `local`.
-- `artifact-marker-mapping`: default or custom GitHub `label`, or canonical
-  local `local-header`, for the `idea` marker.
+- `github-target`: the exact resolved `owner/repository`; replacement requires
+  an explicit repository target or one unambiguous GitHub remote and is factual
+  routing data, never a provider choice.
+- `artifact-marker-mapping`: default or custom GitHub `label` for the `idea`
+  marker.
 - `issue-type-mapping`: default GitHub `native-type`, evidence-backed GitHub
-  fallback `label` or exact `body-field`, or canonical local `local-header`,
+  fallback `label` or exact `body-field`,
   with one transport and exact tracker value per canonical type.
-- `workflow-state-mapping`: default or custom GitHub `label`, or canonical local
-  `local-header`, with one transport and exact tracker value per state.
+- `workflow-state-mapping`: default or custom GitHub `label`, with one
+  transport and exact tracker value per state.
 - `domain-memory`: show the current root `CONTEXT.md`, scoped routes, and
   centralized ADR root. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
@@ -84,16 +86,15 @@ prompt.
 
 ## Decision Defaults
 
-- Default to GitHub for code repos with a GitHub remote; default to local
-  markdown when no clear GitHub issue tracker exists.
+- Require one resolved GitHub repository target. When it cannot be resolved,
+  report the prerequisite.
 - For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
   mutation. Resolve `write_mode=propose` and treat it as current-run behavior,
   not durable issue-tracker configuration.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
-- Default the canonical `idea` artifact marker to the GitHub `idea` label or
-  local `artifact_marker: idea`. Ask only when tracker evidence shows that the
-  label is conflicting or customized.
+- Default the canonical `idea` artifact marker to the GitHub `idea` label. Ask
+  only when tracker evidence shows that the label is conflicting or customized.
 - Read root `CONTEXT.md` first when it exists. During authorized domain
   setup/bootstrap, always create or update it at every memory-owning root
   selected by the setup scope. Populate only evidence-backed purpose,
@@ -131,24 +132,22 @@ After direct write authority or separate affirmative confirmation:
 - Create `project-memory/config/` if needed.
 - Write or update the authorized setup files under `project-memory/config/`.
 - In review mode, update only files needed for separately confirmed changes.
-- Require any touched `issue-tracker.md` setup header to use canonical
-  lower-snake-case keys with backticked structured values. Report unknown
-  fields as invalid instead of rewriting them.
-- Keep behavior-affecting setup fields in typed configuration tables with
-  `Key`, `Type`, `Value`, `Allowed values`, and `Meaning` columns before
-  explanatory prose.
-- When tracker-routing or full setup creates or refreshes
+- Keep triage mapping data in the typed mapping tables defined below. The
+  resolved GitHub target in `issue-tracker.md` is factual routing prose, not a
+  selectable behavior field, and is explicitly exempt from configuration-table
+  serialization.
+- When full setup or mapping work creates or refreshes
   `project-memory/config/triage-labels.md`, include the canonical
   `artifact_marker: idea` mapping alongside the issue-type and workflow-state
   mappings. Require each mapping table to contain its canonical identity,
   `Transport`, `Tracker value`, and `Meaning` columns. Reject a missing,
-  unknown, or backend-incompatible transport instead of inferring it or reading
+  unknown, or GitHub-incompatible transport instead of inferring it or reading
   retired column shapes. If an existing repository lacks only that marker mapping, report
   Idea capture and Idea-source consumption as unavailable until setup adds it;
   do not invalidate or block unrelated workflows.
-- Keep `issue-tracker.md` limited to `tracker_backend` plus human-readable
-  tracker conventions. Implementation delivery policy belongs to Feature Specs
-  and executors.
+- Keep `issue-tracker.md` limited to the resolved GitHub target and
+  human-readable tracker conventions. Implementation delivery policy belongs
+  to executors.
 - Preserve custom prose outside known configuration tables. Report unknown
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
@@ -160,8 +159,7 @@ After direct write authority or separate affirmative confirmation:
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
 - Do not create Idea tracker artifacts during setup. Configuring the marker
-  mapping does not authorize writing GitHub Idea issues, local Idea files, or
-  `planning/ideas/` directories.
+  mapping does not authorize writing GitHub Idea issues.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
 - Do not duplicate moved project context in both `AGENTS.md` and project
