@@ -5,6 +5,10 @@ description: Handle GitHub pull request review threads from feedback through ver
 
 # GitHub Review Threads
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Role
 
 Own the feedback-to-code workflow for pull-request reviews: preserve thread
@@ -44,7 +48,7 @@ It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
-GitStack 8.1.1 is self-contained. The four provider mutation commands
+GitStack 8.1.2 is self-contained. The four provider mutation commands
 (`request`, timeout-warning `comment`, `reply`, and `resolve`) require an exact
 immutable GitStack reservation packet. GitStack atomically consumes that packet
 before transport and owns the durable one-use marker and recovery readback; it

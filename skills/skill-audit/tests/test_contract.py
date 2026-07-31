@@ -45,6 +45,14 @@ class SkillAuditContractTests(unittest.TestCase):
         self.assertLess(historical.index("Read the editable target"), historical.index("git log"))
         self.assertLess(historical.index("git log"), historical.index("Search the memory index"))
         self.assertLess(historical.index("Search the memory index"), historical.index("raw session"))
+        self.assertIn("<codex-root>/memories/MEMORY.md", historical)
+        self.assertIn("<codex-root>/memories/rollout_summaries/", historical)
+        self.assertIn("<codex-root>/sessions/", historical)
+        self.assertIn("<codex-root>/archived_sessions/", historical)
+        self.assertIn(
+            "Never report memory as\nabsent after checking only that singular path",
+            historical,
+        )
 
         for overlay in (
             "references/standalone-skills.md",

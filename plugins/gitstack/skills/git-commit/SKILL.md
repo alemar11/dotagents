@@ -5,6 +5,10 @@ description: Create or push Git commits with explicit staging. Use for regular c
 
 # Git Commit
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Core Rule
 
 Use direct `git` commands. The only bundled helper is the target-aware editor

@@ -8,7 +8,7 @@ from typing import Any
 from . import __version__
 from . import ci, portfolio, reviews, stars
 from .common import GitStackError, envelope, error_envelope, resolve_pr, resolve_repo
-from .health import doctor
+from .health import doctor, doctor_text
 from .provider_text import worktree_snapshot
 from .publish import open_pr, preflight
 
@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.domain == "doctor":
             payload = doctor()
-            print(json.dumps(payload, indent=2) if args.json else _doctor_text(payload))
+            print(json.dumps(payload, indent=2) if args.json else doctor_text(payload))
             return 0 if payload["ok"] else 1
         if args.domain == "repo":
             data = resolve_repo(args.repo) if args.verb == "resolve" else worktree_snapshot()
@@ -133,19 +133,5 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(str(exc), file=sys.stderr)
         return exc.exit_code
-
-
-def _doctor_text(payload: dict[str, object]) -> str:
-    checks = payload["checks"]
-    assert isinstance(checks, dict)
-    return "\n".join([
-        f"gitstack {__version__}",
-        f"git: {'ok' if checks['git']['ok'] else 'missing'}",
-        f"gh: {'ok' if checks['gh']['ok'] else 'missing'}",
-        f"repository: {'ok' if checks['repository']['inside_worktree'] else 'not detected'}",
-        "connector: model-runtime-only",
-    ])
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

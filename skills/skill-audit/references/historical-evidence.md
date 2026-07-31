@@ -17,6 +17,20 @@ gap.
    representative trace is available, state that limitation.
 5. Treat helper output as evidence, never cleanup or mutation authority.
 
+## Codex Evidence Roots
+
+Resolve the Codex root from `CODEX_HOME` when set; otherwise use the current
+user's `.codex` directory. The canonical historical evidence paths are:
+
+- memory index: `<codex-root>/memories/MEMORY.md`
+- rollout summaries: `<codex-root>/memories/rollout_summaries/`
+- current sessions: `<codex-root>/sessions/`
+- archived sessions: `<codex-root>/archived_sessions/`
+
+`<codex-root>/memory/` is not the canonical memory root. Never report memory as
+absent after checking only that singular path. If the canonical memory index is
+missing, report that exact path and continue with the available evidence.
+
 ## Targeted Session Evidence
 
 Run from the `skill-audit` owner root:

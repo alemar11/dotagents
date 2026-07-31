@@ -12,12 +12,12 @@ import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import which
 from typing import Any
 
 
 from . import __version__ as VERSION
 from .common import GitStackError
+from .health import doctor as shared_doctor, doctor_text
 from .provider_text import (
     API_VERSION,
     ProviderText,
@@ -3262,17 +3262,7 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
 
 
 def doctor_payload() -> dict[str, object]:
-    git_path = which("git")
-    gh_path = which("gh")
-    auth = run(["gh", "auth", "status"]) if gh_path else RunResult(127, "", "gh missing")
-    return {
-        "ok": bool(git_path and gh_path),
-        "version": VERSION,
-        "checks": {
-            "git": {"ok": bool(git_path), "path": git_path},
-            "gh": {"ok": bool(gh_path), "path": gh_path, "authenticated": auth.returncode == 0 if gh_path else False},
-        },
-    }
+    return shared_doctor()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3455,9 +3445,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(payload, indent=2))
         else:
-            print(f"gitstack reviews {VERSION}")
-            print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
-            print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
+            print(doctor_text(payload, f"gitstack reviews {VERSION}"))
         return 0 if payload["ok"] else 1
     if args.command == "validate":
         try:

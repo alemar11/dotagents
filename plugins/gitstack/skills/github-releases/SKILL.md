@@ -5,6 +5,10 @@ description: Manage GitHub releases. Use to inspect, plan, draft, publish, or va
 
 # GitHub Releases
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Transport
 
 Prefer the required GitHub connector for supported remote reads and writes. Use

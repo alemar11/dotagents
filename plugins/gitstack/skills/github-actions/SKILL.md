@@ -5,6 +5,10 @@ description: Inspect failing GitHub Actions checks and logs, diagnose the root c
 
 # GitHub Actions
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Role
 
 Inspect GitHub Actions and PR checks. Keep status, diagnosis, and review

@@ -5,6 +5,10 @@ description: Submit local work for review. Use when the user explicitly requests
 
 # Submit
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Role
 
 Publish local work from a checkout. This skill composes bundled GitStack
@@ -69,10 +73,8 @@ closeout. See `references/workflows.md` for body construction and verification.
 1. Run the complete publish preflight before any push: require a named branch,
    reject the repository default branch, verify `gh` authentication, verify the
    `origin` repository and any configured upstream match the current branch,
-   and look up an existing open PR for that branch. Because this preflight is
-   GitHub-dependent, run the complete shared preflight with scoped network
-   permission from the outset. Do not use a sandboxed `gh auth status` failure
-   as evidence that credentials are invalid.
+   and look up an existing open PR for that branch. The shared network execution
+   contract applies to the complete GitHub-dependent preflight from the outset.
 2. Inspect worktree state and confirm the intended scope when it is mixed.
 3. Resolve and validate `closing_issue_refs`. Read an existing PR body when
    present, preserve its valid closing references, and prepare the complete

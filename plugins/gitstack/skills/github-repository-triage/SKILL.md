@@ -5,6 +5,10 @@ description: Triage GitHub repositories read-only. Use for detailed issue and pu
 
 # GitHub Repository Triage
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Transport
 
 Prefer the required GitHub connector for supported remote reads. Use the

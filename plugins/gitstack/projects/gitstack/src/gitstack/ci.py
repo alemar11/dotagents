@@ -13,6 +13,7 @@ from typing import Any, Iterable, Sequence
 
 
 from . import __version__ as VERSION
+from .health import doctor as shared_doctor, doctor_text
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
 FAILURE_CONCLUSIONS = {
@@ -162,33 +163,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def doctor_payload() -> dict[str, object]:
-    git_path = which("git")
-    gh_path = which("gh")
-    git_version = run_git_command(["--version"], None) if git_path else GhResult(127, "", "git missing")
-    gh_version = run_gh_command(["--version"], None) if gh_path else GhResult(127, "", "gh missing")
-    auth = run_gh_command(["auth", "status"], None) if gh_path else GhResult(127, "", "gh missing")
-    repo_root = find_git_root()
-    return {
-        "ok": bool(git_path and gh_path),
-        "version": VERSION,
-        "checks": {
-            "git": {
-                "ok": bool(git_path),
-                "path": git_path,
-                "version": (git_version.stdout or git_version.stderr).splitlines()[0] if git_path else None,
-            },
-            "gh": {
-                "ok": bool(gh_path),
-                "path": gh_path,
-                "version": (gh_version.stdout or gh_version.stderr).splitlines()[0] if gh_path else None,
-                "authenticated": auth.returncode == 0 if gh_path else False,
-            },
-            "repository": {
-                "inside_worktree": repo_root is not None,
-                "root": str(repo_root) if repo_root else None,
-            },
-        },
-    }
+    return shared_doctor()
 
 
 def emit_doctor(json_mode: bool) -> int:
@@ -196,10 +171,7 @@ def emit_doctor(json_mode: bool) -> int:
     if json_mode:
         print(json.dumps(payload, indent=2))
     else:
-        print(f"gitstack ci inspect {VERSION}")
-        for name, item in payload["checks"].items():
-            if isinstance(item, dict):
-                print(f"{name}: {'ok' if item.get('ok', item.get('inside_worktree')) else 'missing'}")
+        print(doctor_text(payload, f"gitstack ci inspect {VERSION}"))
     return 0 if payload["ok"] else 1
 
 

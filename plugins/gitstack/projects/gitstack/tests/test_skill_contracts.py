@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -56,6 +57,70 @@ class GitStackSkillContractTests(unittest.TestCase):
                 self.assertGreaterEqual(len(short_description.group(1)), 25)
                 self.assertLessEqual(len(short_description.group(1)), 64)
                 self.assertIn(f"Use $gitstack:{name}", metadata)
+
+    def test_all_skills_route_shell_network_execution_to_shared_contract(self) -> None:
+        skills_root = PLUGIN_ROOT / "skills"
+        contract = PLUGIN_ROOT / "references" / "network-execution.md"
+        self.assertTrue(contract.is_file())
+
+        for skill_path in sorted(skills_root.glob("*/SKILL.md")):
+            text = skill_path.read_text(encoding="utf-8")
+            with self.subTest(skill=skill_path.parent.name):
+                self.assertIn(
+                    "Before any shell command that may contact GitHub or a package registry",
+                    text,
+                )
+                self.assertIn(
+                    "[Network execution](../../references/network-execution.md)",
+                    text,
+                )
+
+        contract_text = contract.read_text(encoding="utf-8")
+        self.assertIn("sandbox_permissions=require_escalated", contract_text)
+        self.assertIn("<plugin-root>/scripts/gitstack --json doctor", contract_text)
+
+    def test_structured_auth_probe_has_one_source_owner(self) -> None:
+        source_root = PLUGIN_ROOT / "projects" / "gitstack" / "src" / "gitstack"
+        expected_command = [
+            "gh",
+            "auth",
+            "status",
+            "--active",
+            "--hostname",
+            "github.com",
+            "--json",
+            "hosts",
+        ]
+
+        def literal_list(node: ast.AST) -> object:
+            if not isinstance(node, ast.List):
+                return None
+            try:
+                return ast.literal_eval(node)
+            except (ValueError, TypeError):
+                return None
+
+        owners: list[str] = []
+        for path in sorted(source_root.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            if any(
+                literal_list(node) == expected_command
+                for node in ast.walk(tree)
+            ):
+                owners.append(path.name)
+        self.assertEqual(owners, ["health.py"])
+
+        tree = ast.parse((source_root / "health.py").read_text(encoding="utf-8"))
+        assignment = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "AUTH_STATUS_COMMAND"
+                for target in node.targets
+            )
+        )
+        self.assertEqual(ast.literal_eval(assignment.value), expected_command)
 
     def test_executable_fences_do_not_inline_provider_text(self) -> None:
         unsafe = re.compile(

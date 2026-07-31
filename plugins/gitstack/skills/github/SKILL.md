@@ -5,6 +5,10 @@ description: Handle general or mixed GitHub work. Use when a request crosses iss
 
 # GitHub
 
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../references/network-execution.md).
+Connector calls and local-only commands do not use shell escalation.
+
 ## Role
 
 Use this plugin-only umbrella when a GitHub request is mixed, ambiguous, or
@@ -16,8 +20,8 @@ skill and keep that skill's authority and safety rules intact.
 - Prefer the required GitHub connector for supported remote reads and writes.
 - Use `gh` for connector gaps or when a connector call fails. A write may fall
   back automatically only when the original write was authorized, the target
-  repository and operation are identical, and `gh auth status` plus repository
-  access succeed. Report the transport switch.
+  repository and operation are identical, and provider authentication plus
+  repository access succeed. Report the transport switch.
 - Use direct `git` for local status, diffs, staging, commits, branches, hooks,
   tests, and pushes.
 - The shared CLI at `<plugin-root>/scripts/gitstack` uses `gh`; it cannot invoke

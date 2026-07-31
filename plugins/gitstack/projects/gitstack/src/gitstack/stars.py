@@ -920,6 +920,7 @@ def lists_main(argv: list[str] | None = None) -> int:
 # Public command dispatcher
 
 from . import __version__ as VERSION
+from .health import doctor as shared_doctor, doctor_text
 
 
 @dataclass(frozen=True)
@@ -940,28 +941,8 @@ def helper_result(main_func: Callable[[list[str] | None], int], argv: list[str])
     return RunResult(returncode, stdout.getvalue(), stderr.getvalue())
 
 
-def run(command: list[str]) -> RunResult:
-    try:
-        completed = subprocess.run(command, text=True, capture_output=True)
-    except FileNotFoundError:
-        return RunResult(127, "", f"{command[0]} missing")
-    return RunResult(completed.returncode, completed.stdout, completed.stderr)
-
-
 def doctor_payload() -> dict[str, object]:
-    gh_path = which("gh")
-    auth = run(["gh", "auth", "status"]) if gh_path else RunResult(127, "", "gh missing")
-    return {
-        "ok": bool(gh_path),
-        "version": VERSION,
-        "checks": {
-            "gh": {
-                "ok": bool(gh_path),
-                "path": gh_path,
-                "authenticated": auth.returncode == 0 if gh_path else False,
-            }
-        },
-    }
+    return shared_doctor()
 
 
 def parse_json(stdout: str) -> object:
@@ -1068,8 +1049,7 @@ def main(argv: list[str] | None = None) -> int:
         if json_mode:
             print(json.dumps(payload, indent=2))
         else:
-            print(f"gitstack stars {VERSION}")
-            print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
+            print(doctor_text(payload, f"gitstack stars {VERSION}"))
         return 0 if payload["ok"] else 1
     try:
         return invoke(raw, json_mode)
