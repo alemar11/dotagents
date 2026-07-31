@@ -5328,9 +5328,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="ASSIGNMENT_ID=GIT_SHA",
     )
-    ready_create.add_argument("--default-branch-name")
-    ready_create.add_argument("--pr-url")
-    ready_create.add_argument("--provider-observation-ref")
+    ready_create.add_argument("--default-branch-name", required=True)
+    ready_create.add_argument("--pr-url", required=True)
+    ready_create.add_argument("--provider-observation-ref", required=True)
     ready_create.add_argument("--output", required=True)
     ready_create.set_defaults(
         handler=command_assignment_ready_observation_create,
