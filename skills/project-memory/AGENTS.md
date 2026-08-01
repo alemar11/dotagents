@@ -1,12 +1,12 @@
 # Project Memory Maintenance
 
-`skills/project-memory/` is the reusable owner of tracker routing, domain
-memory, localization memory, ADR routing, and evidence-backed Code Review Rules.
-Its runtime behavior belongs in `SKILL.md` and the routed references.
+`skills/project-memory/` is the reusable owner of project context, localization
+memory, ADR routing, and evidence-backed Code Review Rules. Its runtime behavior
+belongs in `SKILL.md` and the routed references.
 
 ## Ownership map
 
-- `references/options.md` owns the four genuine controls and canonical values;
+- `references/options.md` owns the three genuine controls and canonical values;
   do not add execution context or result state as options.
 - `references/domain-modeling.md`, `code-review-rules.md`, and
   `documentation-shapes.md` own their respective durable-document workflows.

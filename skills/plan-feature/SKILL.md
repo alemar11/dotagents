@@ -17,7 +17,7 @@ completion behavior.
 
 The public pipeline is:
 
-`Project Memory routing -> source-route resolution -> optional Idea discovery and validation -> repo-backed clarification -> Feature Spec phase -> issue-graph convergence -> source reconciliation -> deferred domain-memory closeout`
+`Project context routing -> source-route resolution -> optional Idea discovery and validation -> repo-backed clarification -> Feature Spec phase -> issue-graph convergence -> source reconciliation -> deferred domain-memory closeout`
 
 Use it only when the user invokes `$plan-feature`, asks to run Plan Feature, or
 a manually invoked parent workflow routes here. Do not auto-select it for an
@@ -33,9 +33,9 @@ default-path run registry:
 | --- | --- |
 | `write_mode` | `apply`, `propose` |
 
-Reject every unregistered field or value. Project Memory owns GitHub routing;
-`github-workflow-contract` owns feature issue types, workflow states, and their
-transports. Explicit intake or a
+Reject every unregistered field or value. Plan Feature resolves each GitHub
+target from the current Git remote; `github-workflow-contract` owns feature
+issue types, workflow states, and their transports. Explicit intake or a
 validated linked Feature Spec Set owns the affected repository identities.
 Paths, local-root candidates, slugs, refs, branches, dependencies, and domain
 handoffs are data.
@@ -48,7 +48,8 @@ Resolve `write_mode` once:
 
 ## Fixed Planning Contract
 
-- Load `references/spec-phase.md` before Feature Spec work and
+- Load `references/publication.md` before the first phase. Load
+  `references/spec-phase.md` before Feature Spec work and
   `references/issue-phase.md` plus `references/vertical-slices.md` before issue
   work. Load each template only with its owning phase. Those references own
   branch-specific validation, publication, recovery, and reporting detail.
@@ -56,11 +57,11 @@ Resolve `write_mode` once:
   task receives its exact structured request. Scope repair remains an internal
   branch of `existing-source`, never a selectable option or a third source
   route.
-- Treat GitHub routing as Project Memory facts and feature issue types,
-  workflow states, and their transports as `github-workflow-contract` facts.
-  Treat the affected repository set as explicit feature data. Reject missing,
-  stale, contradictory, or GitHub-incompatible facts instead of turning them
-  into Plan Feature options.
+- Treat the current Git remote and affected repository identities as explicit
+  Plan Feature facts. Treat feature issue types, workflow states, and their
+  transports as `github-workflow-contract` facts. Reject missing, stale,
+  contradictory, or GitHub-incompatible facts instead of turning them into
+  Plan Feature options.
 - Keep one run bounded to one feature and derive one `source_route` from intake
   evidence. No durable Spec selects `new-source`; one canonical durable Spec
   selects `existing-source`; an exact recognized incomplete publication
@@ -133,7 +134,7 @@ Resolve `write_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Tracker routing is missing, stale, or contradictory, or a domain-memory closeout is explicitly required. | Use only `tracker-routing` for routing; Plan Feature never performs domain closeout. |
+| `$project-memory` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Memory never supplies GitHub routing or publication behavior. |
 | `$github-workflow-contract` | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan Feature owns when they are applied, and never edits the contract at runtime. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan Feature owns artifact writes. |
@@ -150,7 +151,8 @@ implementation begins.
 
 Read:
 
-- `project-memory/config/issue-tracker.md`;
+- the current repository's GitHub remote, resolved to one exact
+  `owner/repository` target;
 - `github-workflow-contract` and its `references/github-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
   as a selected root; for cross-repository work, use explicit user scope or a
@@ -162,9 +164,9 @@ Read:
   before drafting. For a root or matched route with no context, use repository
   evidence without inventing terminology or a dangling context pointer.
 
-Run only the relevant Project Memory routing slice when setup is incomplete.
-Do not bootstrap unrelated domain, localization, ADR, or agent-instruction
-content.
+Use Project Memory only for context-related setup or closeout. Do not use it to
+resolve GitHub routing, and do not bootstrap unrelated domain, localization,
+ADR, or agent-instruction content.
 
 Resolve `write_mode` from `references/options.md`, then resolve enough accepted
 planning identity to locate the canonical Feature Spec target. Inspect any
@@ -226,9 +228,10 @@ then continue through `references/idea-source.md`; if the user asked only to
 inspect the backlog, report and stop without drafting or mutation. Never
 discover Ideas implicitly.
 
-Stop when selected Ideas do not describe one bounded feature. Do not route a
-missing Idea marker through implicit Project Memory writes; return the exact
-setup prerequisite unless the user separately authorized that setup.
+Stop when selected Ideas do not describe one bounded feature. Do not repair a
+missing Idea marker through implicit context writes; return the exact
+companion-contract prerequisite unless the user separately authorized that
+repair.
 
 Resolve each affected Git repository's tracker facts independently and produce
 one repo-owned implementation-eligible Feature Spec per repository. Never
@@ -282,7 +285,7 @@ drafting or publication. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
-- `write_mode`, derived `source_route`, and Project Memory facts;
+- `write_mode`, derived `source_route`, and project-context facts;
 - planning identity and repository scope;
 - source-ref state and cross-Spec dependency rows;
 - optional validated `source_idea_refs`, normalized Idea evidence, prior
@@ -375,7 +378,7 @@ Return:
 - when applicable, the exact `scope_repair_result` from
   `references/scope-repair.md`;
 - Feature Spec ref or proposed ref, title, and target location;
-- planning identity and Project Memory facts used;
+- planning identity and project-context facts used;
 - retained, created, or proposed issue refs in publication order, repaired
   contract metadata or parent/sub-issue attachment, and verified no-op state when
   applicable;
@@ -412,6 +415,7 @@ captured.
 - `references/idea-source.md`: selected durable Idea validation, intent
   normalization, cumulative coverage, Feature Spec projection, outcome records,
   and terminal lifecycle reconciliation.
+- `references/publication.md`: GitHub publication, stable refs, and recovery.
 - `references/spec-phase.md`: Feature Spec drafting, routing, and publication.
 - `references/scope-repair.md`: separately authorized monotonic allowed-path
   repair, audit, recovery, and result.

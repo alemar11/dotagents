@@ -19,12 +19,15 @@ through the caller.
   knowledge only as optional phase data in `knowledge_delta`; never render it
   in a Feature Spec body.
 - Do not invent users, requirements, constraints, or acceptance criteria.
+- Follow `references/publication.md` for the shared GitHub target, publication
+  modes, stable refs, and recovery contract; this phase owns only Feature Spec
+  publication details.
 - Use `references/options.md` for `write_mode`; consume the derived
   `source_route` and do not create another phase-level option.
-- Treat GitHub routing as Project Memory facts and feature metadata as
-  `github-workflow-contract` facts. Resolve the canonical `feature` metadata
-  contract before rendering or validating a Feature Spec. Require one
-  supported GitHub transport.
+- Treat the current Git remote as the GitHub routing fact and feature metadata
+  as `github-workflow-contract` facts. Resolve the canonical `feature`
+  metadata contract before rendering or validating a Feature Spec. Require
+  one supported GitHub transport.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
   write and return proposed bodies, locations, metadata, and publication order
   rather than executable commands.
@@ -77,11 +80,12 @@ or an unreconstructable template blocks.
 
 ## Workflow
 
-### 1. Ground In Project Memory
+### 1. Ground In Project Context
 
 Read the minimum evidence needed to establish the contract:
 
-- `project-memory/config/issue-tracker.md`;
+- the current repository's GitHub remote, resolved to one exact
+  `owner/repository` target;
 - `github-workflow-contract` and its `references/github-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
   as a selected root; for cross-repository work, use explicit user scope or a

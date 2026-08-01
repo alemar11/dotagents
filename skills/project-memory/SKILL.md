@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: Maintain tracker routing, domain language, ADRs, context, localization memory, and evidence-backed Codex Code Review Rules in the closest applicable AGENTS.md.
+description: Maintain project context, ADRs, localization memory, and evidence-backed Codex Code Review Rules in the closest applicable AGENTS.md.
 ---
 
 # Project Memory
@@ -13,15 +13,13 @@ memory:
 - lean project-memory pointers in `AGENTS.md`;
 - the exact `## Code Review Rules` section in the closest applicable
   `AGENTS.md`;
-- tracker routing in `project-memory/config/issue-tracker.md`;
 - root-first domain routing through `CONTEXT.md`, with optional scoped
   `CONTEXT.md` files;
 - domain docs and centralized ADRs under the memory-owning root's
   `project-memory/adr/`;
 - optional `TRANSLATION.md` when localization rules are real.
 
-Use the smallest requested `memory_slice`. Tracker routing does not require
-domain or localization work, and domain updates do not require tracker setup.
+Use the smallest requested `memory_slice`.
 
 Load `references/options.md` before resolving any branch. Resolve natural
 language directly to canonical field/value assignments and reject noncanonical
@@ -31,7 +29,6 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | GitHub target plus human-readable tracker conventions. |
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -48,14 +45,15 @@ it is not a user or caller option. Apply the exact ordered precedence in
 `existing-project-bootstrap`, or `current-project`. Do not redefine or reorder
 those predicates in another reference.
 
-Resolve `write_mode=propose` for a non-mutating run. Use `write_mode=apply` only
-when the selected scope has write authority.
+An explicit Project Memory setup or update request authorizes writes to the
+selected memory surfaces. Inspection or review requests may return a report
+without changing files; this is request semantics, not a selectable option.
 
 ## Non-Negotiable Boundaries
 
 - Use `AGENTS.md` for operating pointers and the exact `## Code Review Rules`
-  section. Domain context, tracker detail, planning history, localization
-  rules, and accepted decisions live in their dedicated memory surfaces.
+  section. Domain context, planning history, localization rules, and accepted
+  decisions live in their dedicated memory surfaces.
 - Keep Code Review Rules concise and behavior-focused. Store the invariant,
   consequence, and safe path in `AGENTS.md`; keep evidence, evaluation
   matrices, history coverage, and official-doc routing in the Project Memory
@@ -80,17 +78,16 @@ when the selected scope has write authority.
   not nested `project-memory/` directories. Non-Git roots never own Project
   Memory.
 - Seed durable memory only from strong repo evidence, committed behavior,
-  accepted tracker decisions, final session evidence, or explicit user
+  accepted project decisions, final session evidence, or explicit user
   acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
   inferences. Mandatory root-context creation never authorizes invented domain
   facts; keep unsupported purpose, vocabulary, rules, or boundaries explicitly
   unresolved.
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are evidenced or confirmed. Do not create empty ADR directories.
-- Project Memory setup configures tracker routing and conventions but never
-  creates Ideas, issues, or labels. It may create or update the authorized
-  project-memory files and pointers; feature artifacts and their metadata
-  belong to explicitly invoked feature workflows.
+- Project Memory creates or updates only the selected context surfaces and
+  pointers. Feature artifacts and their metadata belong to explicitly invoked
+  feature workflows.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
   only the requested `memory_slice`. A ready implementation-closeout task authorizes
   only its named decisions, evidence, and target surfaces.
@@ -98,39 +95,15 @@ when the selected scope has write authority.
   Rules request. Do not infer it from ordinary code review, `AGENTS.md`
   maintenance, retrospective analysis, or an otherwise broad setup request.
 - An explicitly invoked composed workflow may authorize
-  `domain_operation=inline-update` only
-  when its caller has durable domain-memory write authority. Tracker mutation
-  authority alone is insufficient.
-- Inspect-only, review-only, proposal, dry-run, or indirect suggestions are not
-  write authority. Return the proposed change instead.
+  `domain_operation=inline-update` only when its caller supplies accepted
+  durable knowledge and named target surfaces.
+- For inspection, review, proposal, dry-run, or indirect-suggestion requests,
+  return the requested report without changing files. For explicit setup or
+  update requests, write the selected surfaces and verify them.
 - Preserve unrelated custom prose, comments, overrides, domain docs, ADRs, and
   localization content.
 - Ask only when the target or behavior-affecting value is materially ambiguous
   after repo evidence and documented defaults.
-
-## Tracker Contract
-
-GitHub Issues is the fixed tracker provider. `issue-tracker.md` records the
-resolved GitHub target and human-readable conventions, not a provider option.
-Project Memory does not store feature metadata, label mappings, implementation
-delivery targets, branch or PR policy, or executor authorization. Those belong
-to the consuming feature workflow and its explicit companion contract.
-
-Feature workflows must own the artifact markers, issue types, workflow states,
-exact GitHub values, and the read/write behavior that uses them. They must load
-their own contract, reject unknown or unsupported values, and delegate GitHub
-transport and mutation safety to `$gitstack:github-issues`. Project Memory does
-not provide a fallback registry or compatibility mapping for those concerns.
-Do not add durable keys for Codex runtime project topology, repository sets,
-source-root lists, worktree paths, setup flow, GitHub repo, workers,
-implementation delivery, publication/issue-mutation authority, scheduled
-checks, or current-run mutation intent. Use prose, planning artifacts, or the
-controller ledger for those concerns.
-
-`references/setup-workflow.md` owns the settings editor, canonical table
-validation, draft checklist, pointer block, and completion report.
-When touching `issue-tracker.md`, preserve useful prose and remove runtime-only
-configuration rows within the authorized scope.
 
 ## Reference Loading Matrix
 
@@ -138,15 +111,14 @@ Load only the selected branch:
 
 | Work | Required references |
 | --- | --- |
-| Tracker routing | `issue-tracker-github.md`, `tracker-publishing.md`, and `setup-workflow.md` for edits. |
 | Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`, and `setup-workflow.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md` and `setup-workflow.md`. |
 | Pointer/settings work | `setup-workflow.md`. |
 | Code review rules | `code-review-rules.md`; add its evidence-mining, rule-evaluation, and official-docs references only when their routing conditions apply. |
 
-Do not load domain, localization, or session-history evidence for tracker-only
-or code-review-only work unless the selected reference explicitly routes to
+Do not load domain, localization, or session-history evidence for
+code-review-only work unless the selected reference explicitly routes to
 historical evidence. This operation-specific loading rule is part of the token
 contract.
 For any setup branch, load
@@ -161,14 +133,12 @@ Normally ask no setup questions.
 Select the smallest `memory_slice`, resolve its operation, and derive
 `execution_context` from current evidence. For
 `domain_operation=implementation-closeout`, carry only the named decisions,
-evidence, targets, and integrated feature proof. For
-temporary/rehearsal/validation work, resolve `write_mode=propose` rather than
-persisting run intent as configuration.
+evidence, targets, and integrated feature proof. An explicit setup or update
+request writes the selected surfaces; inspection and review requests return
+their findings without changing them.
 
 ### 2. Inspect Focused Evidence
 
-- tracker: current setup, remotes/config, tracker docs, and relevant local
-  conventions;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
   root and scoped context files, context routing, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
@@ -182,9 +152,8 @@ For existing-project domain bootstrap, use `session-history.md` only when
 recent same-repo evidence is strong enough to be durable.
 
 When `AGENTS.md` mixes concerns, keep operating rules there and route project
-purpose/vocabulary to `CONTEXT.md`, localization to `TRANSLATION.md`, tracker
-settings to `project-memory/config/*`, and accepted load-bearing decisions to
-ADRs.
+purpose/vocabulary to `CONTEXT.md`, localization to `TRANSLATION.md`, and
+accepted load-bearing decisions to ADRs.
 
 ### 3. Resolve Settings Or Delta
 
@@ -200,7 +169,7 @@ existing rule section, candidate set, evaluation state, and write authority.
 
 Before writing, show intended files and meaningful before/after values. Follow
 the loading matrix and existing local formats. Preserve repository-specific
-GitHub conventions without adding provider configuration.
+conventions without adding runtime configuration.
 
 ### 5. Write And Verify Authorized Memory
 
@@ -221,14 +190,13 @@ contexts remain optional and evidence-backed. Every additional Git repository
 explicitly selected by an authorized composed setup follows the same mandatory
 root-context rule; repositories outside that scope remain untouched.
 
-Project Memory setup does not create Feature Spec, Idea, or issue subtrees and
-does not create runtime worker configuration or state. It never creates Idea
-artifacts.
+Project Memory setup does not create feature artifacts or runtime worker
+configuration or state.
 
 ### 6. Report
 
-Report `memory_slice`, `domain_operation`, `execution_context`, `write_mode`,
-files changed, reviewed settings/surfaces, evidence, and consuming workflows.
+Report `memory_slice`, `domain_operation`, `execution_context`, files changed,
+reviewed settings/surfaces, evidence, and consuming workflows.
 For `memory_slice=domain-memory`, also report `capture_outcome`; other slices
 omit that domain-only field. For `memory_slice=code-review-rules`, also report
 the target `AGENTS.md`, rule count, candidate evaluation state, history
@@ -251,8 +219,6 @@ it never counts as captured.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
 - [setup-questions.md](references/setup-questions.md): conditional
   first-time-user ambiguity prompts and internal answer mapping.
-- `issue-tracker-github.md`, `tracker-publishing.md`: tracker artifact, source-ref,
-  publication, and completion contracts.
 - `domain.md`: root/scoped context discovery, routing, and ownership.
 - `domain-modeling.md`: domain setup, inline update, implementation closeout,
   and periodic review semantics.

@@ -17,8 +17,6 @@ review:
 - execution context: `fresh-setup`, `existing-project-bootstrap`, or
   `current-project` (derived in the exact
   precedence from `options.md`, not a stored key or option)
-- resolved GitHub target as exact `owner/repository` factual routing data
-- human-readable tracker conventions
 - root/scoped context routing
 - translation memory decision
 - `AGENTS.md` setup block state
@@ -35,28 +33,20 @@ fields belong to Implement Feature.
 When the requested section is unclear, use the setup-target question in
 [setup-questions.md](setup-questions.md). Otherwise edit only the named or
 required section and preserve unrelated custom prose, path
-conventions, dry-run overrides, and tracker-specific values
+conventions and dry-run overrides
 unless the user explicitly changes them.
 
 Editable sections:
 
-- `github-target`
-- `tracker-conventions`
 - `domain-memory`
 - `translation-memory`
 - `agents-pointers`
 - `code-review-rules`
 - `done`
 
-For each selected configuration section, show the current value first, then
+For each selected setup section, show the current value first, then
 `keep-current` and the relevant alternatives:
 
-- `github-target`: the exact resolved `owner/repository`; replacement requires
-  an explicit repository target or one unambiguous GitHub remote and is factual
-  routing data, never a provider choice.
-- `tracker-conventions`: concise human-readable rules for where tracker
-  artifacts live and how the repository uses GitHub. Feature metadata contracts
-  are owned by the consuming feature workflows and are not edited here.
 - `domain-memory`: show the current root `CONTEXT.md`, scoped routes, and
   centralized ADR root. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
@@ -71,8 +61,8 @@ For each selected configuration section, show the current value first, then
 After edits, show intended changed files and before/after settings. An explicit
 request to set up, configure, initialize, update, or refresh project memory is
 write authority for that scope, so proceed without a second confirmation. For
-review-only, recommendation, dry-run, or indirectly suggested setup, wait for
-affirmative confirmation before writing.
+review-only, recommendation, dry-run, or indirectly suggested setup, return the
+report without writing.
 
 Ask only about a materially ambiguous target or behavior-affecting value that
 repo evidence and the defaults below cannot resolve. Do not force the user
@@ -82,13 +72,8 @@ prompt.
 
 ## Decision Defaults
 
-- Require one resolved GitHub repository target. When it cannot be resolved,
-  report the prerequisite.
-- For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
-  mutation. Resolve `write_mode=propose` and treat it as current-run behavior,
-  not durable issue-tracker configuration.
-- Do not define durable worker assignments, worker-count limits, scheduled
-  checks, publication policy, or issue mutation policy in project memory.
+- Do not define durable worker assignments, worker-count limits, or scheduled
+  checks in project memory.
 - Read root `CONTEXT.md` first when it exists. During authorized domain
   setup/bootstrap, always create or update it at every memory-owning root
   selected by the setup scope. Populate only evidence-backed purpose,
@@ -113,7 +98,6 @@ Before writing, show only applicable items from this list:
 - intended exact `## Code Review Rules` block, target instruction chain, and
   candidate evaluation when that slice is selected;
 - `AGENTS.md` minimization plan;
-- intended `project-memory/config/issue-tracker.md`;
 - intended root `CONTEXT.md` creation or update, including evidence-backed
   content, stable routing, and any explicit unknowns;
 - intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
@@ -122,16 +106,9 @@ Before writing, show only applicable items from this list:
 
 ## Write Rules
 
-After direct write authority or separate affirmative confirmation:
+For an explicit setup or update request:
 
-- Create `project-memory/config/` if needed.
-- Write or update the authorized setup files under `project-memory/config/`.
-- In review mode, update only files needed for separately confirmed changes.
-- Keep `issue-tracker.md` limited to the resolved GitHub target and
-  human-readable tracker conventions. Implementation delivery policy belongs
-  to executors.
-- Preserve custom prose outside known configuration tables. Report unknown
-  configuration keys instead of silently deleting them.
+- Update only files needed for the selected memory surfaces.
 - Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
 - When `code-review-rules` is selected, update the closest applicable
@@ -145,8 +122,6 @@ After direct write authority or separate affirmative confirmation:
   scope before writing any scoped context or completing setup.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
-- Do not create Idea or other tracker artifacts during setup. Tracker routing
-  configuration does not authorize writing GitHub issues or labels.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
 - Do not duplicate moved project context in both `AGENTS.md` and project
@@ -154,16 +129,13 @@ After direct write authority or separate affirmative confirmation:
 
 ## AGENTS.md Pointer Block
 
-Use this shape as a menu. Include only sections whose target file exists or is
-authorized in the selected slice. Omit `Localization` unless `TRANSLATION.md`
-exists or is authorized; never create a broken pointer:
+Use this shape as a menu. Include only sections whose target surface exists,
+is derived at runtime, or is authorized in the selected slice. Omit
+`Localization` unless `TRANSLATION.md` exists or is authorized; never create a
+broken pointer:
 
 ```markdown
 ## Agent skills
-
-### Issue tracker
-
-[one-line summary of where Feature Specs and issues live]. See `project-memory/config/issue-tracker.md`.
 
 ### Domain memory
 
@@ -174,9 +146,9 @@ exists or is authorized; never create a broken pointer:
 [one-line summary of supported localization memory]. See `<path-to-TRANSLATION.md>`.
 ```
 
-Keep this block concise. Do not paste domain vocabulary, tracker procedures,
-implementation policy, localization rules, worker-dispatch rules, or context seed
-material into `AGENTS.md`. `$implement-feature` owns its session worker
+Keep this block concise. Do not paste domain vocabulary, workflow procedures,
+implementation policy, localization rules, worker-dispatch rules, or context
+seed material into `AGENTS.md`. `$implement-feature` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record.
 
 The `## Code Review Rules` section is a separate exact review contract, not a
@@ -190,8 +162,6 @@ Summarize only the applicable fields:
 - execution context;
 - files written;
 - settings reviewed and changed;
-- selected issue tracker;
-- tracker conventions;
 - root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
@@ -210,12 +180,11 @@ Normally ask no questions. After repository evidence and the defaults above
 leave a material ambiguity, load
 [setup-questions.md](setup-questions.md) and use exactly one applicable
 evidence-first template. Its canonical question set covers setup target,
-  conflicting issue locations, separate project contexts, overlapping project
-  ownership, repository-rule ownership, localization conventions, and
-  tracker-convention ownership.
+  separate project contexts, overlapping project ownership, repository-rule
+  ownership, and localization conventions.
 
 Keep Project Memory internals out of user-facing prompts. Ask about concrete
-projects, repositories, paths, trackers, rules, and localization behavior, then
+projects, repositories, paths, rules, and localization behavior, then
 translate the answer to canonical configuration internally. Never ask the user
 whether evidence is sufficient, combine two unresolved decisions in one
 question, or ask a question already resolved by an explicit request, durable

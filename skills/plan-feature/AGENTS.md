@@ -6,13 +6,15 @@ planning behavior stays in `SKILL.md` and the phase-owned references.
 
 ## Ownership map
 
-- `references/spec-phase.md`, `issue-phase.md`, and `vertical-slices.md` own
-  phase behavior; their templates own the rendered artifact shapes.
+- `references/publication.md` owns GitHub publication, stable refs, and
+  recoverable publication transactions. `references/spec-phase.md`,
+  `issue-phase.md`, and `vertical-slices.md` own phase behavior; their
+  templates own the rendered artifact shapes.
 - `references/options.md` owns the run-scoped option contract. Do not add a
   second provider, delivery, or repository-topology registry here.
 - GitHub issue transport is delegated to `$gitstack:github-issues`; Project
-  Memory and the clarification skills remain composing dependencies, not
-  duplicated planning implementations.
+  Memory is used only for project context and the clarification skills remain
+  composing dependencies, not duplicated planning implementations.
 - `tests/` protects graph compression, scope repair, and validator behavior.
 
 ## Maintenance rules

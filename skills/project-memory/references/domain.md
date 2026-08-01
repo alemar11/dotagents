@@ -33,7 +33,7 @@ repository root context when it exists.
 
 When root `CONTEXT.md` exists or its creation is authorized, `AGENTS.md` should
 point at it and carry agent operating rules. It should not duplicate domain
-vocabulary, tracker procedures, planning history, localization rules, or
+vocabulary, workflow procedures, planning history, localization rules, or
 initial context material after those items have a Project Memory home.
 
 ## Memory-owning roots

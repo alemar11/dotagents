@@ -13,13 +13,16 @@ deferred domain-memory closeout.
 
 - Do not change Feature Spec scope or invent requirements.
 - Do not perform implementation or domain-memory writes.
+- Follow `references/publication.md` for the shared GitHub target, publication
+  modes, stable refs, and recovery contract; this phase owns only issue-graph
+  publication details.
 - Use the incoming `write_mode` and derived `source_route`; do not create
   phase-specific choices.
-- Treat GitHub routing as Project Memory facts and issue types, workflow states,
-  and their explicit transports as `github-workflow-contract` facts. Treat
-  affected repository identities as explicit intake or validated Feature Spec
-  Set data. Reject missing, unknown, or GitHub-incompatible transports instead
-  of inferring them.
+- Treat the current Git remote and affected repository identities as explicit
+  intake or validated Feature Spec Set data. Treat issue types, workflow
+  states, and their explicit transports as `github-workflow-contract` facts.
+  Reject missing, unknown, or GitHub-incompatible transports instead of
+  inferring them.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
@@ -260,8 +263,8 @@ If `knowledge_delta` is present:
    to equal the final issue's sole Git repository and every normalized target
    path to equal or descend from one of that issue's `allowed_paths`. Add a
    missing path only when it is already inside the accepted Feature Spec scope;
-   otherwise withhold the issue as blocked. Never rely on Project Memory or one
-   worker to write another repository.
+   otherwise withhold the issue as blocked. Never rely on another context
+   workflow or worker to write another repository.
 5. Require `$project-memory domain-memory` with
    `memory_slice=domain-memory` and
    `domain_operation=implementation-closeout` only after integrated behavior

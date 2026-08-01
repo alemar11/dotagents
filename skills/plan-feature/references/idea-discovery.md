@@ -10,10 +10,9 @@ tracker mutation.
 
 ## Workflow
 
-1. Resolve every candidate tracker-owning repository from explicit user scope,
-   then read that repository's Project Memory tracker routing before listing
-   artifacts. Never expand discovery from the saved-project list or a common
-   parent directory.
+1. Resolve every candidate repository from explicit user scope and verify its
+   current GitHub remote before listing artifacts. Never expand discovery from
+   the saved-project list or a common parent directory.
 2. For GitHub, use `$gitstack:github-issues` read operations with no mutation
    fields to list open issues carrying the `github-workflow-contract` `idea`
    label. Require the contract's explicit `label` transport for the marker and

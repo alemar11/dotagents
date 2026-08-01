@@ -14,8 +14,9 @@ operations.
 
 - `$gitstack:github-issues` owns GitHub transport, reads, mutations, and
   read-after-write verification.
-- `$project-memory` owns tracker target routing plus durable context and ADR
-  memory; it does not define or map feature-workflow labels or issue types.
+- Feature workflows resolve their repository target from the current Git remote;
+  `$project-memory` owns durable context and ADR memory but does not define or
+  map feature-workflow labels or issue types.
 - A consuming feature skill owns when its metadata is read or changed and must
   load [github-labels.md](references/github-labels.md) before doing so.
 

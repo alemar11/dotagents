@@ -37,20 +37,18 @@ it:
 - package manifests, schemas, tests, source directories, or public APIs
 - accepted user decisions and committed repo behavior
 
-Issues, PRs, Feature Specs, tracker discussions, and final session summaries may help
+Issues, PRs, Feature Specs, discussion threads, and final session summaries may help
 discover candidate knowledge, but they are not durable repo authority by
 themselves. Before citing a candidate in `CONTEXT.md`, capture or verify it in a
-repo-owned document, ADR, source file, schema, or test. Tracker links may remain
+repo-owned document, ADR, source file, schema, or test. Source links may remain
 as optional provenance in that durable source.
 
 Do not seed from guesses, tentative plans, rejected options, secrets, raw logs,
 or generic architecture advice.
 
 When `AGENTS.md` is a source, capture only durable project context or accepted
-repo behavior. Leave agent operating rules in `AGENTS.md`, and keep tracker
-routing details in `project-memory/config/issue-tracker.md` instead of copying
-them into `CONTEXT.md`. Feature metadata contracts remain with their consuming
-feature workflows.
+repo behavior. Leave agent operating rules in `AGENTS.md` and keep feature
+metadata contracts with their consuming feature workflows.
 
 For a detected monorepo, verified repository structure is enough evidence for
 stable scope routing in the mandatory root `CONTEXT.md`. It is not evidence for

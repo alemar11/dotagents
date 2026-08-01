@@ -1,8 +1,8 @@
 # Project Memory Option Contract
 
 Load this reference before selecting a Project Memory branch or composing a
-domain-memory handoff. It owns the complete option registry shared by Project
-Memory and its composed callers.
+domain-memory handoff. It owns the complete option registry for Project
+Memory.
 
 ## Syntax
 
@@ -18,9 +18,8 @@ Memory and its composed callers.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`, `agents-pointers`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. `code-review-rules` requires an explicit Code Review Rules request. |
+| `memory_slice` | `domain-memory`, `translation-memory`, `agents-pointers`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. `code-review-rules` requires an explicit Code Review Rules request. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | A domain operation is required only for `memory_slice=domain-memory`. |
-| `write_mode` | `apply`, `propose` | Derived from scoped authority | Inspect-only, review-only, dry-run, and proposal requests select `propose`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for direct Grill Me With Context invocation | Selects whether a composed domain workflow may capture now or must return its data to the caller. |
 
 `capture_mode` applies only to `memory_slice=domain-memory` and composed
@@ -35,9 +34,9 @@ mutually exclusive rules in order:
 1. `fresh-setup`: no established Project Memory surface exists yet at this Git
    repository root. Existing source code alone does not turn a first Project
    Memory setup into bootstrap.
-2. `existing-project-bootstrap`: the first rule is false, Project Memory
-   identity/routing already exists, and the selected domain-memory surface
-   needs its initial accepted population from repository or same-repo session
+2. `existing-project-bootstrap`: the first rule is false, a Project Memory
+   context surface already exists, and the selected domain-memory surface needs
+   its initial accepted population from repository or same-repo session
    evidence.
 3. `current-project`: none of the earlier rules applies; established Project
    Memory is being read or updated without bootstrap semantics.
@@ -67,15 +66,13 @@ provide repository facts, but it must not select or override this result.
   and general `AGENTS.md` maintenance do not select it.
 - A `memory_slice` other than `domain-memory` must not emit `capture_mode` or
   domain capture results.
-- `write_mode=propose` cannot produce `capture_outcome=captured`.
 - An empty or absent durable `knowledge_delta` produces
   `capture_outcome=no-durable-change` unless inspection discovers another
   accepted durable change.
 - `capture_outcome=captured` requires accepted durable knowledge,
-  `write_mode=apply`, every accepted delta item reconciled, every required named
-  target updated or verified already current, and documentation-diff
-  verification across all destinations inside the current Git root. One
-  successful destination never
+  every accepted delta item reconciled, every required named target updated or
+  verified already current, and documentation-diff verification across all
+  destinations inside the current Git root. One successful destination never
   masks an unresolved item or target. Every supplied accepted item must remain
   supported by landed behavior and be durably represented; a rejected or
   contradicted item cannot count as reconciled.
@@ -97,7 +94,7 @@ provide repository facts, but it must not select or override this result.
 
 ## Input Validation
 
-Structured option objects must use only the four registry fields and their
+Structured option objects must use only the three registry fields and their
 canonical values. Reject unknown option fields or values instead of translating
 them. Keep repository facts and `knowledge_delta` in separate input data, and
 emit `execution_context` and `capture_outcome` only as derived output.

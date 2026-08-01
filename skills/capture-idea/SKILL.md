@@ -77,7 +77,6 @@ one-question-at-a-time fallback.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Required tracker routing is missing, stale, or contradictory. | Inspect or run `tracker-routing` only when separately authorized in the same request. Otherwise stop with the exact prerequisite; Capture Idea never performs implicit setup writes. |
 | `$github-workflow-contract` | Capture Idea reads or writes Idea metadata. | Load the exact `idea` and optional `needs-triage` contract values; Capture Idea owns when they are applied, and never edits the contract at runtime. |
 | `$gitstack:github-issues` | Capture Idea needs exact issue or label reads, or `write_mode=apply` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
 
@@ -88,10 +87,10 @@ a dry-run mutation, return executable commands, or perform any write.
 
 ### 1. Resolve Write Mode And Setup
 
-Resolve `write_mode` once from [options.md](references/options.md). Read the
-selected memory-owning root's:
+Resolve `write_mode` once from [options.md](references/options.md). Read:
 
-- `project-memory/config/issue-tracker.md`;
+- the current repository's GitHub remote, resolved to one exact
+  `owner/repository` target;
 - the `github-workflow-contract` and its
   [github-labels.md](../github-workflow-contract/references/github-labels.md).
 
@@ -102,10 +101,9 @@ appear elsewhere. Do not infer ownership from the current Codex task, the
 ChatGPT App primary project or saved-project list, or filesystem proximity.
 
 Require the contract's exact `idea` label and confirm that Ideas use no native
-Issue Type. If the contract or tracker routing is missing, stale,
-contradictory, or ambiguous, stop before capture writes and report the exact
-companion-contract or Project Memory routing prerequisite. Do not repair either
-contract implicitly.
+Issue Type. If the contract or GitHub remote is missing, stale, contradictory,
+or ambiguous, stop before capture writes and report the exact prerequisite. Do
+not repair either contract implicitly.
 
 ### 2. Extract And Normalize Candidates
 

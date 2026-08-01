@@ -14,9 +14,9 @@ before there is evidence from the user, repository, or existing docs.
 
 ## Operation Boundary
 
-Honor the `domain_operation` and `write_mode` options resolved by
-`$project-memory`. Use its evidence-derived `execution_context`; never accept
-that classification as a caller-selected option:
+Honor the `domain_operation` option resolved by `$project-memory`. Use its
+evidence-derived `execution_context`; never accept that classification as a
+caller-selected option:
 
 - `execution_context=fresh-setup`: create the smallest evidence-backed initial context surface.
 - `execution_context=existing-project-bootstrap`: reconcile accepted knowledge from current repo
@@ -29,8 +29,8 @@ that classification as a caller-selected option:
   evidence and acceptance satisfy Project Memory's authority boundary.
 
 Stay within the selected context, authorized target surfaces, and evidence
-boundary. Do not expand into tracker, localization, pointer, or unrelated
-domain surfaces.
+boundary. Do not expand into localization, pointer, or unrelated domain
+surfaces.
 
 When a caller supplies a `knowledge_delta`, treat it as input data: accepted
 terms, rules, boundaries, or decisions plus evidence and intended targets.
@@ -111,7 +111,7 @@ names appear synonymous, resolve whether they are aliases or distinct concepts.
 - Leave unresolved questions explicit rather than smoothing them over.
 - Use project vocabulary and link durable repo sources such as source files,
   tests, schemas, project docs, or ADRs when available.
-- Treat issues, PRs, tracker discussions, and session history as discovery
+- Treat issues, PRs, discussion threads, and session history as discovery
   evidence or optional provenance, not as the sole authority for durable
   context. Restate accepted meaning in a repo-owned source and cite that source.
 

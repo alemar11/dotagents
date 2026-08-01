@@ -27,13 +27,11 @@ findings, and current code remain the primary evidence. Historical Codex
 session, memory, or task evidence is optional candidate evidence; when it is
 unavailable, continue from repository evidence and report the limitation.
 
-Resolve `write_mode=propose` for inspection, recommendation, dry-run, or draft
-requests. Return the exact target and wording without writing. Resolve
-`write_mode=apply` only for an explicit request to create or update the rules.
-Before an apply write, show the intended target and meaningful before/after
-block. Do not write a proposal that lacks the requested authority, and do not
-introduce a second approval flow outside Project Memory's normal write-mode
-boundary.
+For inspection, recommendation, dry-run, or draft requests, return the exact
+target and wording without writing. An explicit request to create or update the
+rules authorizes the selected `AGENTS.md` write. Before writing, show the
+intended target and meaningful before/after block. Do not introduce a second
+approval flow outside Project Memory's normal request boundary.
 
 ## Reference Routing
 
@@ -157,16 +155,16 @@ Show this complete proposal before an authorized apply write:
 - instruction-chain size and any scoping or truncation concern;
 - whether companion deterministic enforcement is missing.
 
-For `write_mode=propose`, stop after returning the proposal. For
-`write_mode=apply`, update only the selected target and preserve unrelated
-instructions, comments, overrides, and existing memory pointers. Create a
-missing `AGENTS.md` only when at least one evidence-backed rule survives, or
-when the user explicitly requested an empty scaffold after being told that it
-adds no review behavior.
+For inspection or recommendation requests, stop after returning the proposal.
+For an explicit update request, update only the selected target and preserve
+unrelated instructions, comments, overrides, and existing memory pointers.
+Create a missing `AGENTS.md` only when at least one evidence-backed rule
+survives, or when the user explicitly requested an empty scaffold after being
+told that it adds no review behavior.
 
 ### 6. Verify The Result
 
-After an apply write:
+After an authorized write:
 
 1. Read the target back.
 2. Confirm the exact heading, rule scope, consequence, safe path, and absence

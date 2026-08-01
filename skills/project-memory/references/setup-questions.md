@@ -8,7 +8,7 @@ Normally ask no questions. When a question is required:
 
 - ask one question at a time;
 - identify the concrete evidence that conflicts or is incomplete;
-- use actual project names, repository names, tracker names, and paths;
+- use actual project names, repository names, and paths;
 - ask about the user's project rather than Project Memory's internal model;
 - offer only relevant choices and mark the evidence-backed recommendation;
 - translate the answer to canonical configuration internally; and
@@ -50,8 +50,8 @@ When the project root is clear but the requested area is not, ask:
 > - Complete setup (Recommended)
 > - A specific area
 
-If the user selects a specific area, ask which one: tracker routing, project
-context, localization conventions, agent pointers, or Code Review Rules.
+If the user selects a specific area, ask which one: project context,
+localization conventions, agent pointers, or Code Review Rules.
 Translate the answer to the corresponding `memory_slice` internally.
 
 ## Separate Project Contexts
@@ -133,8 +133,8 @@ Do not ask:
 - whether root `CONTEXT.md` should be created during authorized setup;
 - how deeply to seed root context;
 - whether repository evidence is sufficient;
-- whether setup should create any Idea issue or file;
-- which execution context, write mode, or capture outcome to use;
+- whether setup should create any feature artifact or file;
+- which execution context or capture outcome to use;
 - whether to choose a context-creation mode; or
 - which abstract repository-shape classification the user prefers.
 

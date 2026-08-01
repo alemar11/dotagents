@@ -66,7 +66,7 @@ The `github-workflow-contract` marker and its compatible transport are required
 only for Idea capture, discovery, or consumption. A missing or incompatible
 contract blocks only those Idea paths. Stop with the exact companion-contract
 prerequisite; do not invalidate an unrelated Plan Feature run or silently
-rewrite Project Memory configuration.
+rewrite project context.
 
 ## Prior Outcomes And Consumed State
 
@@ -172,7 +172,7 @@ never projects or edits a Feature Spec from bound Idea evidence.
 
 - Preserve every captured Idea section unchanged in its source artifact.
 - Draft the Feature Spec from the normalized Idea evidence, repository and
-  Project Memory evidence, and accepted clarification results.
+  project-context evidence, and accepted clarification results.
 - Render each consumed ref as `- Source Idea: <durable-ref>` in the Feature
   Spec's existing `## Source` section.
 - In a multi-repository bundle, place a source ref in every linked repo-owned
