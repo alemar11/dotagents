@@ -144,10 +144,10 @@ evidence and its required integration proof. A GitHub dependency waits for
 merge only when the durable contract explicitly requires merged input; no
 start-condition field exists.
 
-For a GitHub `write_mode=apply` publication, resolve the contract's exact
+For a GitHub `planning_mode=publish` publication, resolve the contract's exact
 `feature` row before rendering the final body. The current contract uses the
 `enhancement` label; apply it outside the body after publication verifies. In
-`write_mode=propose`, omit applied metadata from the body and report the
+`planning_mode=preview`, omit publish-only metadata from the body and report the
 intended contract value separately.
 
 When Plan Feature receives `source_idea_refs`, render their exact durable refs
@@ -160,7 +160,7 @@ planning evidence. Do not copy the tentative Idea sections wholesale or treat
 Proposed Direction and Expected Value as accepted requirements without
 evidence. Keep the transient per-element coverage map out of the Feature Spec;
 persist only the source refs here and the canonical cumulative outcome on the
-Idea after the complete applied planning result is durable and verified.
+Idea after the complete published planning result is durable and verified.
 
 No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
 section. The optional delta remains run/phase data until the issue phase places

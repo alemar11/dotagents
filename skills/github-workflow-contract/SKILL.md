@@ -15,7 +15,7 @@ operations.
 - `$gitstack:github-issues` owns GitHub transport, reads, mutations, and
   read-after-write verification.
 - Feature workflows resolve their repository target from the current Git remote;
-  `$project-memory` owns durable context and ADR memory but does not define or
+  `$project-context` owns durable context and ADR memory but does not define or
   map feature-workflow labels or issue types.
 - A consuming feature skill owns when its metadata is read or changed and must
   load [github-labels.md](references/github-labels.md) before doing so.
@@ -30,7 +30,7 @@ changing the consuming workflow vocabulary.
   [github-labels.md](references/github-labels.md). Do not infer aliases,
   repository-local alternatives, or compatibility mappings.
 - Keep semantic metadata separate from run options, issue bodies, and durable
-  project memory. A proposal may report intended metadata, but it must not
+  project context. A proposal may report intended metadata, but it must not
   mutate GitHub.
 - Before any read-dependent decision, read the exact issue labels and type
   through `$gitstack:github-issues`.

@@ -1,7 +1,7 @@
 # Plan Feature Publication Contract
 
 Use this reference when Plan Feature publishes planning artifacts or returns a
-non-mutating proposal. Plan Feature resolves each target from the current Git
+non-mutating preview. Plan Feature resolves each target from the current Git
 remote; GitHub is the authoritative artifact store and `$gitstack:github-issues`
 owns transport, mutation safety, and hosted-state verification.
 
@@ -17,24 +17,24 @@ the feature's explicit repository data. Temporary body files are transport
 only, must live outside the repository, and must be removed after use.
 
 Use `$gitstack:github-issues` for issue reads, comments, relationships, types,
-labels, and lifecycle transitions. A read or proposal supplies no mutation
+labels, and lifecycle transitions. A read or preview supplies no mutation
 authority and must not be upgraded at this boundary. Keep globally durable
 hosted refs in the form `owner/repository#<number>` or a canonical hosted URL;
 never use a bare issue number as a cross-repository identity.
 
-## Write Mode
+## Planning Mode
 
-| `write_mode` | GitHub behavior |
+| `planning_mode` | GitHub behavior |
 | --- | --- |
-| `apply` | Publish or update hosted issues, verify resulting state, and remove temporary transport files. |
-| `propose` | Return proposed titles, bodies, metadata, relationships, and publication order without mutating GitHub or returning executable commands. |
+| `publish` | Publish or update hosted issues, verify resulting state, and remove temporary transport files. |
+| `preview` | Return proposed titles, bodies, metadata, relationships, and publication order without mutating GitHub or returning executable commands. |
 
-`write_mode` is run-scoped planning authority, not durable project context.
-Resolve inspect-only, review-only, dry-run, rehearsal, validation, and proposal
-requests to `propose`. Resolve `apply` for an explicit request to create or
+`planning_mode` is run-scoped planning authority, not durable project context.
+Resolve inspect-only, review-only, dry-run, rehearsal, validation, and preview
+requests to `preview`. Resolve `publish` for an explicit request to create or
 update durable planning artifacts.
 
-For `apply`, use non-interpolating temporary writes outside the repository,
+For `publish`, use non-interpolating temporary writes outside the repository,
 verify hosted state after every mutation, remove transport files after use, and
 inspect GitHub before retrying a partially completed publication. Never persist
 a repository-local planning mirror.
@@ -59,7 +59,7 @@ Memory configuration. Never persist an issue that points to a staging identity.
 
 Every handoff from a Feature Spec to generated issues carries `source_spec_ref`:
 
-- applied Feature Spec in one repository or a multi-repository feature:
+- published Feature Spec in one repository or a multi-repository feature:
   `source_spec_ref=owner/repository#<spec-number>` or its canonical hosted URL;
 - proposed output before publication:
   `source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec, or
@@ -89,10 +89,10 @@ the complete linked set first.
 - The issue phase owns desired issue bodies, complete durable state enumeration
   before synthesis, fixed-ID reuse of matching issues, uncovered-scope
   synthesis, missing-issue publication, metadata and parent/sub-issue
-  reconciliation, and replacement of proposed refs during applied publication.
-  It revalidates the source, the applicable metadata contract, and complete
-  hosted state before proposal or mutation and never renumbers a retained issue.
-- Both phases carry the same `write_mode`, derived source route, planning
+  reconciliation, and replacement of proposed refs during publication. It
+  revalidates the source, the applicable metadata contract, and complete hosted
+  state before preview output or mutation and never renumbers a retained issue.
+- Both phases carry the same `planning_mode`, derived source route, planning
   identity, and `source_spec_ref`.
 - `$implement-feature` consumes only a durable hosted Feature Spec ref,
   globally qualified for multi-repository work, never proposed output.
@@ -108,7 +108,7 @@ consuming workflow has proved its artifact contract. Do not close a parent
 artifact from an individual child unless the owning workflow's completion
 contract explicitly permits it.
 
-Immediately before a proposal, no-op, or first mutation, re-read the owning
+Immediately before a preview result, no-op, or first mutation, re-read the owning
 Feature Spec, the current metadata contract, and the complete relevant hosted
 state with the same pagination proof used during convergence. If any source,
 contract, body, relationship, or candidate absence changed, discard the stale

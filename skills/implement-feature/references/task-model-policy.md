@@ -4,7 +4,7 @@
 
 This file is the canonical owner of the model and reasoning policy for visible
 Codex worker tasks created by `$implement-feature`. The policy is fixed runtime
-behavior, not a user option, Feature Spec field, Project Memory value, tracker
+behavior, not a user option, Feature Spec field, Project Context value, tracker
 artifact, run-manifest field, or SQLite fact.
 
 The policy applies only to the visible worker task created for each

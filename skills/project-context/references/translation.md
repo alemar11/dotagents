@@ -1,6 +1,6 @@
 # Translation Memory
 
-Use this reference when `project-memory` creates or updates optional
+Use this reference when `project-context` creates or updates optional
 `TRANSLATION.md` localization memory.
 
 ## When to create it

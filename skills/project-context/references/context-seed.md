@@ -1,6 +1,6 @@
 # Initial CONTEXT.md Seed
 
-Use this reference when `project-memory` bootstraps a Git repository. It
+Use this reference when `project-context` bootstraps a Git repository. It
 controls how much evidence-backed content to add; it does not
 decide whether root `CONTEXT.md` exists.
 
@@ -14,7 +14,7 @@ without inventing project facts. For example:
 ```markdown
 # Context
 
-Project Memory entry point for this repository.
+Project Context entry point for this repository.
 
 ## Open Questions
 

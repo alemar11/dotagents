@@ -57,8 +57,8 @@ current state, and never infer full coverage from the source link alone. Any mar
 identity, scope, outcome, or linkage mismatch blocks both bundle continuation
 and Idea mutation.
 
-Perform GitHub source reads through `$gitstack:github-issues` in both write
-modes, omitting mutation fields. `write_mode=propose` still validates current
+Perform GitHub source reads through `$gitstack:github-issues` in both planning
+modes, omitting mutation fields. `planning_mode=preview` still validates current
 hosted state but never requests a dry-run mutation or surfaces executable
 commands.
 
@@ -142,7 +142,7 @@ draft section or non-goal is only a candidate destination. It becomes
 `covered` or `excluded` for terminal reconciliation only after the owning
 Feature Spec has a verified durable ref and section.
 
-With `write_mode=propose`, or whenever another branch returns only a
+With `planning_mode=preview`, or whenever another branch returns only a
 non-durable preview, keep the durable map unchanged and build a separate
 report-only intended projection. Map every material element to a proposed Spec
 section, proposed non-goal, remaining-scope item, or blocking question. Derive
@@ -184,21 +184,21 @@ never projects or edits a Feature Spec from bound Idea evidence.
 
 ## Per-Idea Exit Reconciliation
 
-For `write_mode=apply`, determine durable coverage independently for each
+For `planning_mode=publish`, determine durable coverage independently for each
 selected new-source Idea or bound existing-source Idea and reconcile state once
 when the Plan Feature run exits. For
-`write_mode=propose`, derive only the independent intended projection. Do not
+`planning_mode=preview`, derive only the independent intended projection. Do not
 add or remove workflow labels while an interactive clarification question is
 still active.
 
-| Run outcome for one Idea | Applied durable result |
+| Run outcome for one Idea | Published durable result |
 | --- | --- |
 | Waiting for one specific requester answer | Keep the Idea open, add `needs-info`, and remove `needs-triage`. |
 | Failure before a previously requested answer was supplied | Preserve the Idea's previous state and report the blocker. |
 | Failure after a supplied answer resolved `needs-info` | Keep the Idea open, replace stale `needs-info` with `needs-triage`, and report the technical blocker. |
 | Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, add `needs-triage`, and remove `needs-info`. |
 | Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed. |
-| `write_mode=propose` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
+| `planning_mode=preview` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
 
 If requester input resumes planning, remove `needs-info` only as part of the
 next terminal reconciliation. If planning is intentionally deferred after the
@@ -206,7 +206,7 @@ answer or fails for a non-requester reason, reconcile to `needs-triage`. The two
 workflow states are mutually exclusive.
 
 A planning result is complete only after every Feature Spec, implementation
-issue, metadata mutation, and relationship in the complete applied bundle is
+issue, metadata mutation, and relationship in the complete published bundle is
 durable and verified. A blocked or partially published run never records
 coverage or closes an Idea.
 
@@ -273,7 +273,7 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 
 ## GitHub Lifecycle Mutations
 
-Before a GitHub `write_mode=apply` reconciliation that adds a workflow state,
+Before a GitHub `planning_mode=publish` reconciliation that adds a workflow state,
 require the contract transport to be `label`, resolve that exact contract
 label, and verify that it exists in every affected repository. When a required
 contract label does not exist, create and verify only that exact label through
@@ -287,10 +287,10 @@ target=owner/repository
 
 Do not provision a label merely to clear an absent state. If required-label
 provisioning fails, preserve current hosted state, report the exact missing
-operation, and resume from verified tracker state. In `write_mode=propose`,
+operation, and resume from verified tracker state. In `planning_mode=preview`,
 report any required label creation as intended output but request no mutation.
 
-For GitHub `write_mode=apply`, write and verify the canonical outcome comment
+For GitHub `planning_mode=publish`, write and verify the canonical outcome comment
 first, reconcile `needs-triage` and `needs-info` second, and close a fully
 covered Idea last. Use `$gitstack:github-issues` for each exact operation,
 verify state after every mutation, and retry only operations proven missing.

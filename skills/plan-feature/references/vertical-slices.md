@@ -207,7 +207,7 @@ across Specs.
 The final issue must:
 
 - prove integrated feature behavior;
-- invoke `$project-memory domain-memory` only after implementation proof;
+- invoke `$project-context domain-memory` only after implementation proof;
 - carry exact decisions, target surfaces, and evidence;
 - cover every target surface with the same issue's `affected_repositories` and
   `allowed_paths`;

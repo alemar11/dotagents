@@ -1,7 +1,7 @@
 # Session History
 
 Use this reference only during existing-project bootstrap, when recent local
-agent session history can help seed project memory for an already-used
+agent session history can help seed project context for an already-used
 repository.
 
 ## Default window
@@ -31,7 +31,7 @@ contains a concrete path under the current repo.
 
 ## What to extract
 
-Summarize evidence; do not copy raw transcript text into project memory.
+Summarize evidence; do not copy raw transcript text into project context.
 
 Useful signals:
 
@@ -57,7 +57,7 @@ and ADR content.
 - Put shared stable terminology, boundaries, workflows, rules, and open
   questions in root `CONTEXT.md`; put only a selected scope's delta in its
   scoped `CONTEXT.md` after following root routing.
-- Create ADRs under `project-memory/adr/` only for load-bearing accepted
+- Create ADRs under `project-context/adr/` only for load-bearing accepted
   decisions that future agents or maintainers would otherwise reopen.
 - Cite evidence briefly with paths, issue numbers, commit hashes, or session
   dates when available.

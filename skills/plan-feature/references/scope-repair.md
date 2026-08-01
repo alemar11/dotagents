@@ -43,7 +43,7 @@ repository ownership, proposed refs, unknown keys, runtime identities, and a
 must identify one issue in the complete current bundle.
 
 The request is intake data. `references/options.md` continues to own the sole
-selectable field `write_mode`.
+selectable field `planning_mode`.
 
 ## Validation
 
@@ -87,10 +87,10 @@ Classify the result:
 
 ## Mutation And Recovery
 
-With `write_mode=propose`, write nothing. Return the complete proposed Spec and
+With `planning_mode=preview`, write nothing. Return the complete proposed Spec and
 issue changes, audit entry, mutation order, and `repair_outcome=proposed`.
 
-With `write_mode=apply`, reread every target immediately before its mutation and
+With `planning_mode=publish`, reread every target immediately before its mutation and
 stop on drift. Apply in this fail-safe order:
 
 1. widen the Feature Spec when required;

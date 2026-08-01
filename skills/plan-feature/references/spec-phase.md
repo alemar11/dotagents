@@ -28,13 +28,13 @@ through the caller.
 - Follow `references/publication.md` for the shared GitHub target, publication
   modes, stable refs, and recovery contract; this phase owns only Feature Spec
   publication details.
-- Use `references/options.md` for `write_mode`; consume the derived
+- Use `references/options.md` for `planning_mode`; consume the derived
   `source_route` and do not create another phase-level option.
 - Treat the current Git remote as the GitHub routing fact and feature metadata
   as `github-workflow-contract` facts. Resolve the canonical `feature`
   metadata contract before rendering or validating a Feature Spec. Require
   one supported GitHub transport.
-- Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
+- Publish only with `planning_mode=publish`. With `planning_mode=preview`, perform no
   write and return proposed bodies, locations, metadata, and publication order
   rather than executable commands.
 - Do not create hosted-artifact mirrors or temporary planning trees.
@@ -47,7 +47,7 @@ through the caller.
 
 Receive:
 
-- `write_mode` and the frozen derived `source_route`;
+- `planning_mode` and the frozen derived `source_route`;
 - the GitHub issue-type contract for each affected repository, with explicit
   transport plus exact tracker value from `github-workflow-contract`;
 - planning identity: `feature_slug`, optional `planning_scope`, optional
@@ -157,9 +157,9 @@ For multi-repository work:
    repository identity, unique inside the set, persisted in Planning Identity,
    and frozen with membership.
 2. Produce every repo-owned member to obtain stable durable or proposed refs.
-   In proposal mode use `proposed-spec:<feature_id>/<repository_key>` for each
+   In preview mode use `proposed-spec:<feature_id>/<repository_key>` for each
    member.
-   In apply mode, make every multi-repository ref globally unambiguous with
+   In publish mode, make every multi-repository ref globally unambiguous with
    `owner/repository#<number>` or a canonical hosted URL. Use those same refs in
    every member's `Feature Spec Set` and Feature Dependencies; bare `#<number>`,
    a bare repository key, and bare repo-relative paths are invalid in a
@@ -185,7 +185,7 @@ For multi-repository work:
    the columns `feature_spec_ref | affected_repository | responsibility`,
    exactly one globally qualified row per member including self, non-empty
    responsibility, deterministic repository ordering, and exact normalized equality
-   across the set. Final applied tables contain no proposed refs.
+   across the set. Final published tables contain no proposed refs.
    Normalize by parsing the table, trimming surrounding whitespace in every
    cell, preserving case and content otherwise, rejecting duplicate refs or
    repositories, sorting rows bytewise by `affected_repository`, and rendering
@@ -214,7 +214,7 @@ For multi-repository work:
 
 GitHub routing is fixed for every owning repository. Preserve one publication
 plan ordered by member creation, linked-set finalization, then generated issues.
-Proposed refs are inspection-only and never agent-executable. In apply mode,
+Proposed refs are inspection-only and never agent-executable. In publish mode,
 place every role in one recoverable hosted publication transaction and use
 staging when refs are unknown. Never persist an issue that points to a staging
 identity.
@@ -250,7 +250,7 @@ parallel scheduling.
 ### 3. Gate An Existing Source Or Draft
 
 Use user conversation, clarification output, existing issues or documents,
-project memory, and relevant repository behavior as sources. Ask only for
+project context, and relevant repository behavior as sources. Ask only for
 decisions that materially change scope, acceptance, dependencies, validation,
 or repository ownership.
 
@@ -348,8 +348,8 @@ adding, removing, or rewriting anything.
 For every edge:
 
 - require a unique durable upstream ref, or a proposed ref only in
-  `write_mode=propose`;
-- in a multi-repository applied bundle, require every upstream ref to identify
+  `planning_mode=preview`;
+- in a multi-repository published bundle, require every upstream ref to identify
   its owning repository through `owner/repository#<number>` or a canonical
   hosted URL;
 - reject self, duplicate, missing, and ambiguous refs;
@@ -431,8 +431,8 @@ Withhold the artifact and return blockers when the gate fails.
 On the existing-source route, skip body drafting and publication. Resolve the
 contract's canonical `feature` row before comparing state. The current GitHub
 contract transports that row as the exact `enhancement` label. Under
-`write_mode=apply`, repair only that verified-missing label through
-`issue_operation=add-label`; under `write_mode=propose`, report that exact
+`planning_mode=publish`, repair only that verified-missing label through
+`issue_operation=add-label`; under `planning_mode=preview`, report that exact
 intended repair. A conflicting contract type label blocks. Immediately before
 reporting or applying a repair, re-read the exact source body/ref, current
 labels, and contract row; restart validation or block on any drift rather than
@@ -442,17 +442,17 @@ body gates pass.
 
 Read tracker state and the feature metadata contract immediately before output.
 
-For a new-source apply, resolve the contract's exact `feature` metadata before
+For a new-source publish, resolve the contract's exact `feature` metadata before
 publication. Apply its `enhancement` label only after the final hosted body
-verifies. In proposal mode, omit applied metadata from the body and report the
+verifies. In preview mode, omit publish-only metadata from the body and report the
 intended contract metadata only.
 
 Before the first Feature Spec staging create, direct create, edit, or metadata
 mutation, revalidate the GitHub `feature` row and exact `enhancement` label from
 the contract. If the contract is missing or contradictory, block and never
 switch metadata during recovery. Verify that exact label exists. Under
-`write_mode=apply`, create and verify only that missing contract label through
-`issue_operation=create-label`; under `write_mode=propose`, report that missing
+`planning_mode=publish`, create and verify only that missing contract label through
+`issue_operation=create-label`; under `planning_mode=preview`, report that missing
 label creation as an intended operation without mutation. Preserve verified
 label creation in transaction recovery and retry only an operation still proven
 missing. The same preflight applies before an existing-source metadata repair.
@@ -469,7 +469,7 @@ target plus its source and contract inputs and prove the target remains absent.
 Use non-overwrite semantics, stop on a foreign or ambiguous appearance, and
 verify each successful create before continuing.
 
-For any multi-repository apply, use one recoverable publication transaction.
+For any multi-repository publication run, use one recoverable publication transaction.
 Hosted roles require staging because final issue numbers are unavailable before
 creation:
 
@@ -509,7 +509,7 @@ adopt it as an immutable existing-source bundle or create duplicates. Once every
 and verified, a later retry derives the ordinary existing-source route from any
 member and traverses the whole connected set.
 
-- `write_mode=apply`, GitHub: for a single Spec, publish the final sanitized
+- `planning_mode=publish`, GitHub: for a single Spec, publish the final sanitized
   body directly as `Feature Spec: <Feature Name>`. For a multi-repository
   feature, publish each implementation member through the transaction
   above, then finalize each hosted body through the authorized `edit`. Translate each write to
@@ -518,24 +518,24 @@ member and traverses the whole connected set.
   the final body verifies, and retain the hosted issue number or URL as
   `source_spec_ref`. In multi-repository work, store
   `owner/repository#<number>` or the canonical URL, never a bare issue number.
-- `write_mode=propose`: write nothing. Return the sanitized body, intended
+- `planning_mode=preview`: write nothing. Return the sanitized body, intended
   repository target, contract metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   or `proposed-spec:<feature_id>/<repository_key>` for a linked
   multi-repository member.
   Return publication order and state that every proposed source and the
-  complete proposed issue bundle are non-executable until applied.
+  complete proposed issue bundle are non-executable until published.
 
-After `write_mode=apply` publication succeeds, verify each selected-Idea
+After `planning_mode=publish` publication succeeds, verify each selected-Idea
 candidate section or non-goal through the final durable Feature Spec ref before
 converting it to `covered` or `excluded`. If any destination cannot be resolved
 durably, withhold the coverage result and source reconciliation as an
-incomplete publication. With `write_mode=propose`, or any other non-durable
+incomplete publication. With `planning_mode=preview`, or any other non-durable
 preview, keep durable coverage unchanged and return only the report-only
 intended projection with `intended_coverage`, `intended_covered_scope`, and
 `intended_remaining_scope`; do not render a canonical planning outcome block.
 
-`write_mode=propose` never invokes GitStack for publication or mutation. Exact
+`planning_mode=preview` never invokes GitStack for publication or mutation. Exact
 GitHub Idea discovery and source validation may still use read-only GitStack
 operations with mutation fields omitted. GitStack does not interpret Plan
 Feature's tracker or write policy.
@@ -549,12 +549,12 @@ generated Markdown.
 Return:
 
 - title, feature slug, source ref, and intended or actual location;
-- `write_mode`, derived `source_route`, optional `feature_id`,
+- `planning_mode`, derived `source_route`, optional `feature_id`,
   and selected context identity;
 - affected repositories, allowed paths, and each per-Spec target branch;
 - validated Feature Spec dependencies and acyclicity result;
 - linked Feature Spec refs and publication order when applicable;
-- issue type applied or proposed;
+- issue type published or proposed;
 - open blockers and withheld output;
 - selected or bound durable Idea refs, verified prior outcome refs, and each per-Idea
   cumulative durable `coverage`, `covered_scope`, and `remaining_scope`, or the

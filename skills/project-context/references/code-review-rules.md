@@ -4,7 +4,7 @@ Use this reference when `memory_slice=code-review-rules` is explicitly
 selected to create or improve the exact `## Code Review Rules` contract
 consumed by Codex Code Review. Turn verified repository knowledge into a small
 set of consequential review rules, evaluate each candidate for scope and noise,
-and update the closest applicable `AGENTS.md` through Project Memory.
+and update the closest applicable `AGENTS.md` through Project Context.
 
 This operation is not a code reviewer and does not run GitHub Code Review. It
 configures repository guidance for later reviews. Rules remain advisory and
@@ -20,7 +20,7 @@ review, `AGENTS.md` maintenance, retrospective analysis, or general repository
 improvement requests. Do not infer it from `full-setup` unless the user also
 explicitly requests Code Review Rules.
 
-Project Memory owns repository resolution, candidate discovery, evidence
+Project Context owns repository resolution, candidate discovery, evidence
 filtering, scope selection, evaluation, exact proposal rendering, and the
 authorized `AGENTS.md` write. Repository files, tests, accepted review
 findings, and current code remain the primary evidence. Historical Codex
@@ -31,7 +31,13 @@ For inspection, recommendation, dry-run, or draft requests, return the exact
 target and wording without writing. An explicit request to create or update the
 rules authorizes the selected `AGENTS.md` write. Before writing, show the
 intended target and meaningful before/after block. Do not introduce a second
-approval flow outside Project Memory's normal request boundary.
+approval flow outside Project Context's normal request boundary.
+
+If the user explicitly needs durable explanatory material, keep it as optional
+detail in the consumer repository's flat `project-context/code-review-rules.md`
+and index it from `CONTEXT.md`. Never move the active invariant, consequence,
+or safe path out of `AGENTS.md`, and never make the optional file a prerequisite
+for the rule to apply.
 
 ## Reference Routing
 
@@ -144,7 +150,7 @@ as not forward-validated in the proposal, and do not claim runtime proof.
 Limit the final set to the smallest non-overlapping group that changes review
 behavior without creating predictable noise.
 
-### 5. Draft And Apply Through Project Memory
+### 5. Draft And Apply Through Project Context
 
 Show this complete proposal before an authorized apply write:
 

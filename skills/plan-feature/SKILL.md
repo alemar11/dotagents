@@ -31,7 +31,7 @@ default-path run registry:
 
 | Field | Values |
 | --- | --- |
-| `write_mode` | `apply`, `propose` |
+| `planning_mode` | `preview`, `publish` |
 
 Reject every unregistered field or value. Plan Feature resolves each GitHub
 target from the current Git remote; `github-workflow-contract` owns feature
@@ -40,10 +40,10 @@ validated linked Feature Spec Set owns the affected repository identities.
 Paths, local-root candidates, slugs, refs, branches, dependencies, and domain
 handoffs are data.
 
-Resolve `write_mode` once:
+Resolve `planning_mode` once:
 
-- `apply`: publish through GitHub.
-- `propose`: perform no writes and return proposed bodies, target locations,
+- `publish`: publish through GitHub.
+- `preview`: perform no writes and return proposed bodies, target locations,
   metadata, and publication order. Do not return executable commands.
 
 ## Fixed Planning Contract
@@ -88,7 +88,7 @@ Resolve `write_mode` once:
   every other stable field and executor-owned update, records an audit, and
   never consumes or persists Codex runtime identity.
 - GitHub Issues and pull-request delivery are fixed workflow boundaries. Do not
-  persist provider or delivery selectors in Project Memory, Feature Specs, or
+  persist provider or delivery selectors in Project Context, Feature Specs, or
   issue contracts.
 - Feature Spec and issue acceptance criteria are independent contracts. Before
   publication, require a transient complete, non-contradictory map from every
@@ -103,7 +103,7 @@ Resolve `write_mode` once:
   repair only supported missing metadata or parent attachment, return a
   verified no-op for a complete bundle, and block on duplicates, stale bodies,
   conflicting relationships, or races. Re-read authoritative state immediately
-  before proposal, no-op, and mutation.
+  before preview output, no-op, and mutation.
 - Use portable refs and evidence and keep executor transport, task scheduling,
   checkout, review, publication, and merge authority out of planning artifacts.
 - Each implementation-eligible Spec owns a unique
@@ -134,11 +134,11 @@ Resolve `write_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Memory never supplies GitHub routing or publication behavior. |
-| `$github-workflow-contract` | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan Feature owns when they are applied, and never edits the contract at runtime. |
+| `$project-context` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Context never supplies GitHub routing or publication behavior. |
+| `$github-workflow-contract` | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan Feature owns when they are published, and never edits the contract at runtime. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan Feature owns artifact writes. |
-| `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
+| `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `planning_mode=publish` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either planning mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Preview mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
 mutations belong to the selected executor, not Plan Feature. Terminal
@@ -147,7 +147,7 @@ implementation begins.
 
 ## Workflow
 
-### 1. Resolve Setup, Write Mode, Source Route, And Identity
+### 1. Resolve Setup, Planning Mode, Source Route, And Identity
 
 Read:
 
@@ -164,11 +164,11 @@ Read:
   before drafting. For a root or matched route with no context, use repository
   evidence without inventing terminology or a dangling context pointer.
 
-Use Project Memory only for context-related setup or closeout. Do not use it to
+Use Project Context only for context-related setup or closeout. Do not use it to
 resolve GitHub routing, and do not bootstrap unrelated domain, localization,
 ADR, or agent-instruction content.
 
-Resolve `write_mode` from `references/options.md`, then resolve enough accepted
+Resolve `planning_mode` from `references/options.md`, then resolve enough accepted
 planning identity to locate the canonical Feature Spec target. Inspect any
 supplied ref and that exact target before freezing the route. One canonical
 final durable Spec derives `source_route=existing-source` only when it is not a
@@ -251,12 +251,12 @@ planning evidence and a per-element coverage map through
 supported by repository evidence or explicit clarification. A blocked element
 withholds the requested result; an intentionally deferred element may support
 partial coverage only after at least one material element is durably covered.
-With `write_mode=propose`, build the separate report-only intended projection;
+With `planning_mode=preview`, build the separate report-only intended projection;
 never treat a proposed Spec as durable coverage.
 
 Do not mutate an Idea merely because an interactive clarification is active.
 Only a terminal run exit waiting for one specific requester answer may
-reconcile that Idea to `needs-info` under `write_mode=apply`.
+reconcile that Idea to `needs-info` under `planning_mode=publish`.
 
 On the existing-source route without `scope_repair_request`, inspect open
 questions only to validate whether the durable source's stable contract can be
@@ -285,7 +285,7 @@ drafting or publication. If any source needs a change or the set is incomplete,
 require a separately authorized update. On the new-source route, load
 `references/spec-template.md`, then pass:
 
-- `write_mode`, derived `source_route`, and project-context facts;
+- `planning_mode`, derived `source_route`, and project-context facts;
 - planning identity and repository scope;
 - source-ref state and cross-Spec dependency rows;
 - optional validated `source_idea_refs`, normalized Idea evidence, prior
@@ -296,10 +296,10 @@ require a separately authorized update. On the new-source route, load
   reconstructable templates, slots, selected Idea/prior-outcome refs, and
   completed plus missing operations;
 
-Require a durable hosted `source_spec_ref` for `write_mode=apply`, or
+Require a durable hosted `source_spec_ref` for `planning_mode=publish`, or
 a deterministic proposed ref and publication-order note for
-`write_mode=propose`. Never persist a delta marker in the Spec or silently
-downgrade `write_mode`. Route new blockers back through clarification. Always
+`planning_mode=preview`. Never persist a delta marker in the Spec or silently
+downgrade `planning_mode`. Route new blockers back through clarification. Always
 pass the optional delta directly to the issue phase without adding it to any
 Feature Spec body.
 
@@ -310,7 +310,7 @@ owns the only permitted Feature Spec path mutation, audit, recovery, and result.
 ### 4. Run The Issue Phase
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
-`references/vertical-slices.md`. Pass the same identity, facts, write mode,
+`references/vertical-slices.md`. Pass the same identity, facts, planning mode,
 source ref, optional knowledge delta, linked-set data, and validated cross-Spec
 graph, plus any exact continuation handoff.
 
@@ -319,7 +319,7 @@ discovery before synthesis, fixed-ID reuse, uncovered-scope synthesis, missing
 artifact output, `$plan-harder` passes per missing final issue, race
 revalidation, metadata, dependencies, the Execution Contract, and reporting.
 Existing issues must match the stable graph and body contract; conflicts stop
-the run, while a complete matching applied bundle returns a verified no-op.
+the run, while a complete matching published bundle returns a verified no-op.
 For `scope_repair_request`, bypass ordinary synthesis, graph compression,
 hardening, metadata repair, and issue creation. `scope-repair.md` and the narrow
 branch in `issue-phase.md` may widen only the named issue's `allowed_paths`, then
@@ -341,20 +341,20 @@ Skip this step for `scope_repair_request`; an implementation-time path repair
 does not reopen or reconcile Idea planning lifecycle. Otherwise skip this step
 when neither selected new-source `source_idea_refs` nor derived
 existing-source `bound_source_idea_refs` are present. Otherwise load
-`references/idea-source.md`. With `write_mode=apply` and a complete durable
+`references/idea-source.md`. With `planning_mode=publish` and a complete durable
 result, determine cumulative `partial` or `full` coverage separately for every
 selected or bound Idea from verified prior Specs plus that result. With
-`write_mode=propose`, or
+`planning_mode=preview`, or
 when another branch returned only a non-durable preview, leave the durable map
 unchanged, leave every selected or bound Idea unchanged, and report only
 `intended_coverage`, `intended_covered_scope`,
 `intended_remaining_scope`, and intended transitions from the separate
 projection.
 
-With `write_mode=apply`, a terminal wait for one specific requester answer may
+With `planning_mode=publish`, a terminal wait for one specific requester answer may
 reconcile the affected Ideas to `needs-info` before a planning result exists.
 Reconcile coverage only after every Feature Spec, implementation issue,
-metadata mutation, and relationship in the complete applied bundle is durable
+metadata mutation, and relationship in the complete published bundle is durable
 and verified. A
 technical, validation, configuration, or partial publication failure normally
 preserves each Idea's prior state. When the requester has answered a prior
@@ -374,7 +374,7 @@ the verified cumulative Spec set and coverage result.
 
 Return:
 
-- resolved `write_mode` and derived `source_route`;
+- resolved `planning_mode` and derived `source_route`;
 - when applicable, the exact `scope_repair_result` from
   `references/scope-repair.md`;
 - Feature Spec ref or proposed ref, title, and target location;
@@ -385,11 +385,11 @@ Return:
 - graph and verticality validation, including candidate and final issue counts,
   compression repairs, retained-slice reasons, and avoided initial hardening
   calls;
-- applied tracker metadata when writes occurred;
+- published tracker metadata when writes occurred;
 - discovered candidate refs when discovery ran, selected Idea refs, verified
   prior outcome refs, per-Idea cumulative durable `coverage`, `covered_scope`,
   and `remaining_scope`, or the distinct `intended_coverage`,
-  `intended_covered_scope`, and `intended_remaining_scope`; plus applied or
+  `intended_covered_scope`, and `intended_remaining_scope`; plus published or
   proposed lifecycle transitions and any missing reconciliation operations;
 - repository-owned domain closeout owners when present and the derived
   `capture_outcome`;

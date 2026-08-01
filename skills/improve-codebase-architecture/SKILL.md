@@ -40,7 +40,7 @@ Load `references/options.md` before classifying candidate strength.
   each root against one authorized identity, and inspect each verified
   repository independently. Then read every available scoped `CONTEXT.md`
   matched by affected paths in each selected root's `Scoped Contexts` table,
-  the relevant root `project-memory/adr/` trees, package boundaries, public
+  the relevant root `project-context/adr/` trees, package boundaries, public
   APIs, tests, and the files near the requested area. When a root or matched
   route has no context, inspect its repository paths directly.
 - If subagents are available and the repo is large, use bounded read-only
@@ -90,7 +90,7 @@ to explore.
 ### 4. Grill the selected candidate
 
 After the user chooses a candidate, load and follow `$grill-me-with-context`
-with `capture_mode=inline`. Its inline path must use `$project-memory` with
+with `capture_mode=inline`. Its inline path must use `$project-context` with
 `memory_slice=domain-memory` and `domain_operation=inline-update` for accepted
 durable decisions.
 

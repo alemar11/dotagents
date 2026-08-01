@@ -9,7 +9,7 @@ description: Stress-test repo-backed plans through project context and either ca
 
 Run the `$grill-me` questioning loop for a project-backed plan. Capture durable
 terminology, rules, and accepted decisions through
-`$project-memory domain-memory` with `capture_mode=inline`, or return them as a
+`$project-context domain-memory` with `capture_mode=inline`, or return them as a
 structured handoff with `capture_mode=defer-to-caller`.
 
 Use this when the plan lives in a codebase or explicit repository set and the output
@@ -18,7 +18,7 @@ should improve future agent context, not just the current conversation.
 ## Capture Modes
 
 - `capture_mode=inline` is the default for direct invocation. Use
-  `$project-memory` with `memory_slice=domain-memory` and
+  `$project-context` with `memory_slice=domain-memory` and
   `domain_operation=inline-update` to update the appropriate context docs or
   ADRs as accepted decisions land.
 - `capture_mode=defer-to-caller` is available when an explicit parent workflow requests it
@@ -28,7 +28,7 @@ should improve future agent context, not just the current conversation.
   data object so the caller can assign capture to a later tracked
   implementation or integration task.
 
-Load `$project-memory`'s `references/options.md` before resolving this field.
+Load `$project-context`'s `references/options.md` before resolving this field.
 Do not ask the user to choose when the caller already provided a canonical
 value. Direct user invocation remains `capture_mode=inline` unless the user
 explicitly requests a non-writing or deferred result.
@@ -72,12 +72,12 @@ explicit override, direct invocation preserves `capture_mode=inline`.
   identity, and inspect each verified repository independently. Then read
   every available scoped `CONTEXT.md` matched by affected paths in each
   selected root's `Scoped Contexts` table and the relevant root
-  `project-memory/adr/` trees before asking questions. When a root or matched
+  `project-context/adr/` trees before asking questions. When a root or matched
   route has no context, inspect its repository paths directly without
   inventing one.
 - Load and follow `$grill-me` for the one-question-at-a-time interrogation
   loop.
-- With `capture_mode=inline`, load and follow `$project-memory domain-memory`
+- With `capture_mode=inline`, load and follow `$project-context domain-memory`
   with `memory_slice=domain-memory` and `domain_operation=inline-update` for
   documentation updates.
 - With `capture_mode=defer-to-caller`, use the domain routing evidence to identify target
@@ -100,13 +100,13 @@ Recommended answer: [default and why, in one short sentence]
 ### 3. Capture or structure durable decisions
 
 With `capture_mode=inline`, after an answer resolves a durable point, use
-`$project-memory domain-memory` with `memory_slice=domain-memory` and
+`$project-context domain-memory` with `memory_slice=domain-memory` and
 `domain_operation=inline-update`:
 
 - add or revise glossary terms in `CONTEXT.md`,
 - record business rules, lifecycle states, actors, permissions, or invariants,
 - update relevant project docs with accepted workflow semantics,
-- offer an ADR under `project-memory/adr/` only when a decision is load-bearing
+- offer an ADR under `project-context/adr/` only when a decision is load-bearing
   enough that future work would otherwise reopen it.
 
 Keep documentation updates small and evidence-backed. Prefer enriching the

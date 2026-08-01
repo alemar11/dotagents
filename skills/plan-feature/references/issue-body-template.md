@@ -11,7 +11,7 @@ developer-machine absolute paths.
 
 | Field | Value |
 | --- | --- |
-| `source_spec_ref` | [durable hosted ref; proposed refs are valid only in write_mode=propose] |
+| `source_spec_ref` | [durable hosted ref; proposed refs are valid only in planning_mode=preview] |
 | `feature_slug` | [authoritative lowercase feature slug] |
 | `affected_repositories` | [canonical repo slugs or current-repository] |
 | `allowed_paths` | [smallest complete safe repo-relative or repo-qualified envelope for this slice] |
@@ -111,9 +111,9 @@ issue's sole Git repository and a path equal to or contained by one of this
 issue's `allowed_paths`.]
 
 - Required workflow:
-  - Invoke `$project-memory` with `memory_slice=domain-memory` and
+  - Invoke `$project-context` with `memory_slice=domain-memory` and
     `domain_operation=implementation-closeout` after integrated behavior is
-    proven. Project Memory runs its internal domain-modeling workflow.
+    proven. Project Context runs its internal domain-modeling workflow.
 knowledge_delta:
   canonical_decision_target: [for a cross-repository decision, exactly
     <feature-id>--<repository-key>/<repo-relative-path> naming the declared
@@ -141,14 +141,14 @@ knowledge_delta:
   not choose that delivery mechanism.
 ```
 
-Tracker metadata is rendered by `write_mode` rather than duplicated in the base
+Tracker metadata is rendered by `planning_mode` rather than duplicated in the base
 body:
 
-- GitHub `write_mode=apply`: resolve the exact `task` and `ready-for-agent`
+- GitHub `planning_mode=publish`: resolve the exact `task` and `ready-for-agent`
   labels from `github-workflow-contract` independently. Mutate tracker metadata
   and do not copy those values into the body; do not invent a key or value.
-- `write_mode=propose`: leave both lines out of the proposed body and return the
-  intended contract metadata as report data. A proposal is never an applied queue
+- `planning_mode=preview`: leave both lines out of the proposed body and return the
+  intended contract metadata as report data. A preview is never a published queue
   state.
 
 Do not add a permission, option, or orchestrator-handoff section.

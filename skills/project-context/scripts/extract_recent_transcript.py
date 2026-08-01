@@ -14,7 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-LOG_PREFIX = "[learn]"
+TOOL_VERSION = "1.0.0"
+LOG_PREFIX = "[project-context]"
 UUID_RE = re.compile(r"rollout-.*-([0-9a-fA-F-]{36})\.jsonl$")
 
 
@@ -272,7 +273,12 @@ def find_sub_agents(repo_root: Path) -> list[Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Resolve active Codex session UUID and rollout path.")
+    parser = argparse.ArgumentParser(
+        description="Resolve a Codex session UUID, rollout path, and applicable AGENTS.md candidates."
+    )
+    parser.add_argument("command", nargs="?", choices=("doctor",), default="doctor", help="Run the read-only resolver.")
+    parser.add_argument("--version", action="version", version=TOOL_VERSION)
+    parser.add_argument("--json", action="store_true", help="Emit the machine-readable JSON result (default).")
     parser.add_argument("--session-id", type=str, default="", help="Explicit session UUID to load.")
     parser.add_argument("--rollout-path", type=str, default="", help="Explicit rollout JSONL path.")
     args = parser.parse_args()

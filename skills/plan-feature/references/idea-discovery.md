@@ -34,7 +34,7 @@ tracker mutation.
 7. When selected Ideas do not form one bounded feature, require separate Plan
    Feature runs rather than silently producing an unrelated batch of Specs.
 
-Discovery uses current tracker state even with `write_mode=propose`, but it
+Discovery uses current tracker state even with `planning_mode=preview`, but it
 never requests a GitStack dry-run mutation or returns executable commands.
 
 ## Output

@@ -9,7 +9,7 @@ Normally ask no questions. When a question is required:
 - ask one question at a time;
 - identify the concrete evidence that conflicts or is incomplete;
 - use actual project names, repository names, and paths;
-- ask about the user's project rather than Project Memory's internal model;
+- ask about the user's project rather than Project Context's internal model;
 - offer only relevant choices and mark the evidence-backed recommendation;
 - translate the answer to canonical configuration internally; and
 - ask a follow-up only for a selected custom or split choice that remains
@@ -44,7 +44,7 @@ setup independently in each selected repository.
 
 When the project root is clear but the requested area is not, ask:
 
-> Do you want me to review and update the complete Project Memory setup, or
+> Do you want me to review and update the complete Project Context setup, or
 > only a specific area?
 >
 > - Complete setup (Recommended)

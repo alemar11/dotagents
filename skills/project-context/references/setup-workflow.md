@@ -25,7 +25,7 @@ review:
 Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
 
-Reject runtime-only worker configuration in project-memory setup files; those
+Reject runtime-only worker configuration in project-context setup files; those
 fields belong to Implement Feature.
 
 ## Settings Editor
@@ -39,27 +39,33 @@ unless the user explicitly changes them.
 Editable sections:
 
 - `domain-memory`
+- `durable-capture`
 - `translation-memory`
 - `agents-pointers`
+- `agents-compaction`
 - `code-review-rules`
 - `done`
 
 For each selected setup section, show the current value first, then
 `keep-current` and the relevant alternatives:
 
-- `domain-memory`: show the current root `CONTEXT.md`, scoped routes, and
-  centralized ADR root. Refresh those
+- `domain-memory`: show the current root `CONTEXT.md`, indexed topic files,
+  scoped routes, and centralized ADR root. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
   update root `CONTEXT.md` at every memory-owning root selected by the setup
   scope. Do not present or persist a domain-layout enum.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
 - `agents-pointers`: create missing pointer block, refresh stale pointer block,
-  or minimize copied setup detail into project-memory pointers.
+  or minimize copied setup detail into project-context pointers.
 - `code-review-rules`: inspect, propose, or update the exact Code Review Rules
   section in the closest applicable `AGENTS.md`.
+- `durable-capture`: show the candidate, scope, exact destination, and wording;
+  direct capture always waits for affirmative confirmation.
+- `agents-compaction`: show the applicable chain measurement and before/after
+  proposal; never apply a compaction from threshold detection alone.
 
 After edits, show intended changed files and before/after settings. An explicit
-request to set up, configure, initialize, update, or refresh project memory is
+request to set up, configure, initialize, update, or refresh project context is
 write authority for that scope, so proceed without a second confirmation. For
 review-only, recommendation, dry-run, or indirectly suggested setup, return the
 report without writing.
@@ -73,7 +79,7 @@ prompt.
 ## Decision Defaults
 
 - Do not define durable worker assignments, worker-count limits, or scheduled
-  checks in project memory.
+  checks in project context.
 - Read root `CONTEXT.md` first when it exists. During authorized domain
   setup/bootstrap, always create or update it at every memory-owning root
   selected by the setup scope. Populate only evidence-backed purpose,
@@ -98,6 +104,8 @@ Before writing, show only applicable items from this list:
 - intended exact `## Code Review Rules` block, target instruction chain, and
   candidate evaluation when that slice is selected;
 - `AGENTS.md` minimization plan;
+- durable-capture target, exact wording, and confirmation state when selected;
+- AGENTS chain measurement and section classification when compaction is selected;
 - intended root `CONTEXT.md` creation or update, including evidence-backed
   content, stable routing, and any explicit unknowns;
 - intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
@@ -115,13 +123,18 @@ For an explicit setup or update request:
   `AGENTS.md` with the exact `## Code Review Rules` section. Keep the persisted
   block limited to accepted invariant, consequence, and safe path; preserve
   unrelated instructions and keep evidence, evaluation matrices, and
-  provenance in the run report or Project Memory references.
+  provenance in the run report or Project Context references.
 - Create or update root and scoped `CONTEXT.md` through
   `references/domain-modeling.md`. During authorized setup/bootstrap, ensure
   root `CONTEXT.md` exists at every memory-owning root selected by the setup
   scope before writing any scoped context or completing setup.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
+- For durable capture, write only after the direct user confirms the exact
+  target and wording, unless a composed caller supplies accepted knowledge,
+  named targets, and inline capture authority.
+- For compaction, keep mandatory rules in `AGENTS.md`, create flat topic files
+  only after approval, and update the `CONTEXT.md` index in the same change.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
 - Do not duplicate moved project context in both `AGENTS.md` and project
@@ -152,7 +165,7 @@ seed material into `AGENTS.md`. `$implement-feature` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record.
 
 The `## Code Review Rules` section is a separate exact review contract, not a
-project-memory pointer. Manage it only when the `code-review-rules` slice is
+project-context pointer. Manage it only when the `code-review-rules` slice is
 selected; do not fold its evaluation detail into this pointer block.
 
 ## Completion Report
@@ -161,6 +174,9 @@ Summarize only the applicable fields:
 
 - execution context;
 - files written;
+- capture outcome and confirmation state when durable capture was selected;
+- AGENTS chain files, byte totals, threshold classification, and moved sections
+  when compaction was selected;
 - settings reviewed and changed;
 - root/scoped context routing;
 - localization-memory decision and evidence;
@@ -183,7 +199,7 @@ evidence-first template. Its canonical question set covers setup target,
   separate project contexts, overlapping project ownership, repository-rule
   ownership, and localization conventions.
 
-Keep Project Memory internals out of user-facing prompts. Ask about concrete
+Keep Project Context internals out of user-facing prompts. Ask about concrete
 projects, repositories, paths, rules, and localization behavior, then
 translate the answer to canonical configuration internally. Never ask the user
 whether evidence is sufficient, combine two unresolved decisions in one

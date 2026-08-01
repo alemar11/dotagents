@@ -1,5 +1,0 @@
-interface:
-  display_name: "Project Memory"
-  short_description: "Maintain project memory and evidence-backed Code Review Rules in AGENTS.md."
-  brand_color: "#3B5BDB"
-  default_prompt: "Use $project-memory with the smallest requested memory_slice. For memory_slice=code-review-rules, inspect the applicable AGENTS.md chain, evaluate evidence-backed candidates, and update the exact Code Review Rules section; for memory_slice=domain-memory, resolve domain_operation as setup-bootstrap, inline-update, implementation-closeout, or periodic-review."

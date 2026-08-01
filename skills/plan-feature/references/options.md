@@ -18,18 +18,18 @@ of selectable Plan Feature behavior.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `write_mode` | `apply`, `propose` | `apply` for an explicit request to create durable planning artifacts | `apply` writes through GitHub; `propose` performs no writes. |
+| `planning_mode` | `preview`, `publish` | `publish` for an explicit request to create durable planning artifacts | `publish` writes through GitHub; `preview` performs no writes. |
 
 ## Resolution
 
-Resolve `write_mode` once before phase work:
+Resolve `planning_mode` once before phase work:
 
 - A request that forbids writes, asks for a dry run, or asks to inspect the
-  result before publication resolves to `write_mode=propose`.
+  result before publication resolves to `planning_mode=preview`.
 - An explicit Plan Feature request to create durable planning artifacts
-  defaults to `write_mode=apply`. The feature metadata contract resolves its
+  defaults to `planning_mode=publish`. The feature metadata contract resolves its
   own metadata boundary, while project context is ordinary planning input.
-- `write_mode=propose` returns the complete proposed Feature Spec bundle:
+- `planning_mode=preview` returns the complete proposed Feature Spec bundle:
   bodies, target locations, contract metadata, relationships, and publication
   order. It writes nothing and returns no executable publication commands.
 - Both modes withhold incomplete Feature Specs and implementation issues.

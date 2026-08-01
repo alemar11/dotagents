@@ -16,14 +16,14 @@ deferred domain-memory closeout.
 - Follow `references/publication.md` for the shared GitHub target, publication
   modes, stable refs, and recovery contract; this phase owns only issue-graph
   publication details.
-- Use the incoming `write_mode` and derived `source_route`; do not create
+- Use the incoming `planning_mode` and derived `source_route`; do not create
   phase-specific choices.
 - Treat the current Git remote and affected repository identities as explicit
   intake or validated Feature Spec Set data. Treat issue types, workflow
   states, and their explicit transports as `github-workflow-contract` facts.
   Reject missing, unknown, or GitHub-incompatible transports instead of
   inferring them.
-- Publish only with `write_mode=apply`. With `write_mode=propose`, write
+- Publish only with `planning_mode=publish`. With `planning_mode=preview`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
 - Withhold incomplete or contradictory issues. Do not publish them under a
@@ -47,9 +47,9 @@ deferred domain-memory closeout.
 
 Receive:
 
-- `write_mode` and the frozen derived `source_route`;
+- `planning_mode` and the frozen derived `source_route`;
 - a durable `source_spec_ref`, or a proposed ref only with
-  `write_mode=propose`;
+  `planning_mode=preview`;
 - the complete Feature Spec body and validated cross-Spec dependency graph;
 - planning identity, affected repositories, allowed paths, and shared target
   branch;
@@ -61,13 +61,13 @@ Receive:
   existing-source route, accept the delta only as explicit accepted invocation
   data or an exact continuation handoff, always separate from the unchanged
   source;
-- optional exact continuation handoff from an incomplete apply, containing
+- optional exact continuation handoff from an incomplete publication, containing
   `feature_slug`, every staged or durable Spec ref, multi-repository publication
   transaction identity plus reconstructable templates when present, selected
   `source_idea_refs` plus verified prior outcome refs, and the complete
   `knowledge_delta` until its final owner issue is durable.
 
-Stop when an apply run lacks a durable source ref, when proposed and durable
+Stop when a publish run lacks a durable source ref, when proposed and durable
 refs are mixed ambiguously, or when the source still has blocking open
 questions.
 
@@ -106,7 +106,7 @@ Read the Feature Spec and verify:
   Feature Spec; linked Specs may use different branch names;
 - every Feature Spec dependency ref resolves and the cross-Spec graph is
   acyclic;
-- every applied multi-repository source and dependency ref is globally
+- every published multi-repository source and dependency ref is globally
   unambiguous: `owner/repository#<number>` or a canonical hosted URL;
 - the complete linked Feature Spec Set exists for multi-repository work;
 - portable evidence contains no developer-machine absolute path;
@@ -125,7 +125,7 @@ Return blockers without output when these checks fail.
 
 Before synthesizing a graph, enumerate the complete current durable issue state
 for every implementation-eligible Feature Spec. For GitHub, use pure read
-operations through `$gitstack:github-issues` in either write mode, with mutation
+operations through `$gitstack:github-issues` in either planning mode, with mutation
 fields omitted. Read every open or closed implementation issue attached to the
 Feature Spec and every candidate carrying its durable `source_spec_ref`,
 following pagination through the complete result set. If the connector cannot
@@ -265,7 +265,7 @@ If `knowledge_delta` is present:
    missing path only when it is already inside the accepted Feature Spec scope;
    otherwise withhold the issue as blocked. Never rely on another context
    workflow or worker to write another repository.
-5. Require `$project-memory domain-memory` with
+5. Require `$project-context domain-memory` with
    `memory_slice=domain-memory` and
    `domain_operation=implementation-closeout` only after integrated behavior
    is proven. The issue completes this step only with
@@ -379,7 +379,7 @@ parent/sub-issue operations after the comparison passes.
 
 After structural compression, graph ownership, and durable-state reconciliation
 have stabilized, invoke `$plan-harder` at least once for each missing final
-issue with
+issue with Plan Harder's own
 `planning_mode=issue-hardening` and `output_surface=caller`. Merge the returned
 brief into the issue template:
 
@@ -428,7 +428,7 @@ their dedicated sections; they are not extra knobs.
 
 ### 9. Validate Readiness
 
-An applied issue may receive `ready-for-agent` only when:
+A durable issue may receive `ready-for-agent` only when:
 
 - its source ref is durable;
 - goal, requirements, acceptance criteria, and validation are complete;
@@ -462,9 +462,9 @@ contract value after the same content gates pass. Never emit or persist that wor
 state in a proposed body, label, or queue. Withhold failed issues and return
 their blockers; never downgrade them into a partially agent-ready artifact.
 
-### 10. Apply Or Propose
+### 10. Publish Or Preview
 
-Immediately before returning a proposal, no-op, or performing the first
+Immediately before returning a preview result, no-op, or performing the first
 mutation, re-read the owning Feature Spec body and ref, the current
 `github-workflow-contract`, and the complete all-state issue, metadata, and
 parent/sub-issue set with the same pagination proof as step 2. Compare that
@@ -472,14 +472,14 @@ fresh state with the frozen graph and prior snapshot. If any source, contract,
 body, ID, metadata, relationship, or candidate absence changed during graph
 work or hardening, discard the stale projection and restart convergence from
 fresh source/state evidence; block when the change is foreign, conflicting, or
-cannot be proved completely. This final read is mandatory in both write modes.
+cannot be proved completely. This final read is mandatory in both planning modes.
 
 For every GitHub repository, revalidate the contract's exact `task` and
 `ready-for-agent` labels and collect the labels required by missing operations.
 If the contract is missing or contradictory, block and never switch metadata
-during recovery. Verify each exact label. Under `write_mode=apply`, create and
+during recovery. Verify each exact label. Under `planning_mode=publish`, create and
 verify only a missing contract label through `issue_operation=create-label`
-before the first issue or metadata mutation. Under `write_mode=propose`, report
+before the first issue or metadata mutation. Under `planning_mode=preview`, report
 each missing label creation as an intended operation and perform no mutation.
 Preserve verified label creations in partial-failure recovery and retry only a
 still-missing operation.
@@ -488,7 +488,7 @@ Order output topologically, with the final combined-proof or closeout issue last
 inside its owning implementation member and its domain closeout attached only
 when a delta exists.
 
-- `write_mode=apply`, GitHub: retain exact existing issues and publish only
+- `planning_mode=publish`, GitHub: retain exact existing issues and publish only
   missing issues through
   `$gitstack:github-issues`. Translate each write to GitStack-owned
   `mutation_mode=apply`, its exact target, and one canonical `issue_operation`;
@@ -498,19 +498,19 @@ when a delta exists.
   repair only verified-missing contract metadata or parent/sub-issue attachment
   through the matching canonical GitStack operation, verify every mutation,
   and retain the hosted ref separately from its generated ID.
-- `write_mode=propose`: write nothing. Return retained durable artifacts plus
+- `planning_mode=preview`: write nothing. Return retained durable artifacts plus
   every missing proposed body, intended repository, contract metadata,
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
   `proposed-issue:<feature_id>/<repository_key>/<NN>` for an issue owned by a
   linked multi-repository member.
   On the new-source route, state that neither proposed source nor proposed
-  issues are executable until applied. On the existing-source route, preserve
+  issues are executable until published. On the existing-source route, preserve
   the supplied source as durable and state that only the proposed issue or
   relationship remainder is non-executable. Keep the intended workflow state
   out of the proposed bodies.
 
-`write_mode=propose` never invokes GitStack for publication or mutation. It may
+`planning_mode=preview` never invokes GitStack for publication or mutation. It may
 use pure read operations with mutation fields omitted to prove current hosted
 state and convergence safety. GitStack does not interpret Plan Feature's tracker
 or write policy.
@@ -534,7 +534,7 @@ When no issue, metadata, or relationship operation is missing, perform no
 mutation and report the verified complete bundle as a no-op only after the
 final fresh comparison above remains exact.
 
-If apply exits before every required final issue carrying a nonempty
+If publish exits before every required final issue carrying a nonempty
 repository-owned `knowledge_delta` shard is durable and verified, the result is
 incomplete and must include the exact
 continuation handoff received or constructed by this run: `feature_slug`, all
@@ -548,7 +548,7 @@ the delta.
 
 Return:
 
-- Feature Spec ref, `write_mode`, and derived `source_route`;
+- Feature Spec ref, `planning_mode`, and derived `source_route`;
 - candidate and final issue counts, retained, created, missing, or proposed
   generated IDs and refs, repaired metadata or relationships, no-op state, and
   publication order;
@@ -556,12 +556,12 @@ Return:
 - dependency graph, topological order, and acyclicity proof;
 - verticality, overlap, and compression repairs, retained-slice reasons,
   removed artificial dependencies, and avoided initial hardening calls;
-- contract issue type/state applied or proposed;
+- contract issue type/state published or proposed;
 - confirmation that every issue has one valid Execution Contract;
 - repository-owned domain closeout issues and deferred capture result when
   required;
 - withheld issues and blockers;
-- exact continuation handoff for any partial apply whose required
+- exact continuation handoff for any partial publication whose required
   domain-closeout owners are not all durable, including the complete
   `knowledge_delta` and missing operation list.
 

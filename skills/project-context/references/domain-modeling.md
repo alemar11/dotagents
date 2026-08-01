@@ -2,7 +2,7 @@
 
 Use this internal reference whenever `memory_slice=domain-memory` creates,
 updates, reviews, or reconciles `CONTEXT.md`, relevant domain docs, or ADRs.
-`$project-memory domain-memory` is the public invocation; this reference owns
+`$project-context domain-memory` is the public invocation; this reference owns
 the internal semantic workflow.
 
 ## Goal
@@ -14,7 +14,7 @@ before there is evidence from the user, repository, or existing docs.
 
 ## Operation Boundary
 
-Honor the `domain_operation` option resolved by `$project-memory`. Use its
+Honor the `domain_operation` option resolved by `$project-context`. Use its
 evidence-derived `execution_context`; never accept that classification as a
 caller-selected option:
 
@@ -26,7 +26,7 @@ caller-selected option:
 - `domain_operation=implementation-closeout`: reconcile a carried knowledge delta against the
   behavior and validation that actually landed.
 - `domain_operation=periodic-review`: report or propose changes by default; write only when the
-  evidence and acceptance satisfy Project Memory's authority boundary.
+  evidence and acceptance satisfy Project Context's authority boundary.
 
 Stay within the selected context, authorized target surfaces, and evidence
 boundary. Do not expand into localization, pointer, or unrelated domain
@@ -62,7 +62,7 @@ ownership ambiguous.
   local Git roots separately, verifies each root against one authorized
   identity, and runs this workflow independently in each verified repository.
   Also inspect the relevant
-  `project-memory/adr/` tree, `README.md`, project docs, product specs, issue
+  `project-context/adr/` tree, `README.md`, project docs, product specs, issue
   templates, and nearby source or tests that define the vocabulary already in
   use.
 - When a selected repository's root `CONTEXT.md` contains
@@ -101,13 +101,18 @@ names appear synonymous, resolve whether they are aliases or distinct concepts.
 
 ### 3. Update the smallest durable surface
 
-- Add or revise shared glossary entries and rules in root `CONTEXT.md`; put
-  only scope-specific deltas in the selected scoped `CONTEXT.md`.
-- Add workflow or behavioral detail to the closest relevant project doc.
-- Add an ADR beneath the memory-owning root's `project-memory/adr/` only for an
-  accepted, load-bearing decision future agents would otherwise reopen. Use a
-  scope subdirectory when useful; never create nested scoped
-  `project-memory/` directories.
+- Add or revise shared glossary entries, routing, and explicit unknowns in root
+  `CONTEXT.md`; put only scope-specific deltas in the selected scoped
+  `CONTEXT.md`.
+- Add conditional workflow or behavioral detail to a flat
+  `project-context/<topic>.md` file with a title, scope, `Read when` condition,
+  and owner/update logic, then add or update its `CONTEXT.md` index row.
+- Keep `CONTEXT.md` as the entry point and index; do not duplicate the topic
+  file's full body there.
+- Add an ADR beneath the memory-owning root's `project-context/adr/` only for an
+  accepted, load-bearing decision future agents would otherwise reopen. Create
+  or update `project-context/adr/index.md` in the same change; never create
+  nested scoped `project-context/` directories.
 - Leave unresolved questions explicit rather than smoothing them over.
 - Use project vocabulary and link durable repo sources such as source files,
   tests, schemas, project docs, or ADRs when available.
@@ -156,7 +161,7 @@ Omit empty sections unless `No Durable Change` is the only correct result.
 
 ### 5. Return the capture result
 
-Return to `$project-memory`:
+Return to `$project-context`:
 
 - docs created or updated,
 - terms, rules, boundaries, or decisions captured,

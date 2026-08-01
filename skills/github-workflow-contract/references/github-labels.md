@@ -51,7 +51,7 @@ before starting.
 | Plan Feature | `idea`, `needs-triage`, `needs-info`, `feature`, `task`, `ready-for-agent`. |
 | Implement Feature | None currently; see the companion skill boundary. |
 
-These values are feature-workflow data, not Project Memory configuration. If a
+These values are feature-workflow data, not Project Context configuration. If a
 future repository or plugin needs a different GitHub contract, it must provide
 an explicit replacement contract to its consuming skills rather than restoring
-a Project Memory metadata registry.
+a Project Context metadata registry.

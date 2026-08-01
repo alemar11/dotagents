@@ -2,4 +2,4 @@ interface:
   display_name: "Grill Me With Context"
   short_description: "Stress-test repo-backed plans and capture or hand off durable decisions."
   brand_color: "#BE185D"
-  default_prompt: "Use $grill-me-with-context to challenge this repo-backed plan through $grill-me and inspect existing code and docs first. For direct invocation, use capture_mode=inline and capture accepted durable decisions through $project-memory with memory_slice=domain-memory and domain_operation=inline-update unless the user explicitly requests no documentation writes or deferred capture. Use capture_mode=defer-to-caller only when explicitly requested or passed by a parent workflow."
+  default_prompt: "Use $grill-me-with-context to challenge this repo-backed plan through $grill-me and inspect existing code and docs first. For direct invocation, use capture_mode=inline and capture accepted durable decisions through $project-context with memory_slice=domain-memory and domain_operation=inline-update unless the user explicitly requests no documentation writes or deferred capture. Use capture_mode=defer-to-caller only when explicitly requested or passed by a parent workflow."

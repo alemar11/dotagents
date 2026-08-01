@@ -1,5 +1,0 @@
-interface:
-  display_name: "Learn"
-  short_description: "Capture confirmed durable corrections or preferences and write them only to AGENTS.md."
-  brand_color: "#2F9E44"
-  default_prompt: "Capture the durable correction or preference from this conversation. Show the exact AGENTS.md target and wording, then wait for an affirmative user reply before writing. Never fall back to global when a project-scoped target is missing. After approval, place the rule in the most appropriate section and suffix each inserted bullet with (Codex learning). Do not write memory files."
