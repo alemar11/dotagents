@@ -1,7 +1,0 @@
-interface:
-  display_name: "Engineering Plan"
-  short_description: "Create codebase-grounded plans or harden issues before coding."
-  brand_color: "#4F46E5"
-  default_prompt: "Use $feature-flow:engineering-plan only for an explicitly requested codebase-grounded planning or issue-hardening pass. Research the codebase, ask only materially blocking questions, and return a full plan or compact issue brief without coding or writing files. When Feature Flow Plan calls it to harden one issue, return the structured caller-surface result instead of standalone chat closeout."
-policy:
-  allow_implicit_invocation: false

@@ -36,13 +36,12 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
 
-Feature Flow is the repo-local feature-intake, planning, and implementation plugin. It keeps Idea capture, Plan convergence, Engineering Plan hardening, and Implement orchestration as separate skills, shares one metadata contract, and delegates GitHub transport to GitStack:
+Feature Flow is the repo-local feature-intake, planning, and implementation plugin. It keeps Idea capture, Plan convergence, and Implement orchestration as separate skills, shares one metadata contract, and delegates GitHub transport to GitStack:
 
 | Skill | Purpose |
 | --- | --- |
 | `feature-flow:idea` | Capture durable GitHub Ideas. |
 | `feature-flow:plan` | Converge Feature Specs and agent-ready implementation issue graphs. |
-| `feature-flow:engineering-plan` | Create codebase-grounded implementation plans or harden individual issues. |
 | `feature-flow:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
 
 ## Reusable Skills
@@ -85,7 +84,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `grill-me-with-context` requires `$grill-me` and `$project-context` so it can run the questioning loop, update context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `feature-flow:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
-- `feature-flow:plan` requires `$project-context`, `$grill-me-with-context`, and `$feature-flow:engineering-plan` for project context, feature metadata, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It loads the plugin workflow contract and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes, plus published tracker mutations.
+- `feature-flow:plan` requires `$project-context` and `$grill-me-with-context` for project context, feature metadata, repo-backed clarification, Feature Spec writing, internal issue hardening, and deferred knowledge closeout. It loads the plugin workflow contract and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes, plus published tracker mutations.
 - `feature-flow:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Feature Flow workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/feature-flow/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 

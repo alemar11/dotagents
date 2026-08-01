@@ -116,9 +116,9 @@ Resolve `run_mode` once:
   each cross-repository decision; other repositories may carry qualified
   backlinks, never duplicate canonical records. `references/issue-phase.md`
   owns sharding, terminal dependency derivation, and continuation evidence.
-- Compress the candidate graph before freezing new IDs or invoking
-  `$feature-flow:engineering-plan`. Issue count is observation, not a cap. Harden every missing
-  final issue only after graph, scope, and ownership stabilize; retain matching
+- Compress the candidate graph before freezing new IDs. Issue count is
+  observation, not a cap. Plan then internally hardens every missing final
+  issue only after graph, scope, and ownership stabilize; retain matching
   durable issues and persist only the final hardening result.
 - Prefer concise behavioral prose for decisions and failure policy; reserve
   tables for exact identity and scope. Criteria must be unique and individually
@@ -132,7 +132,6 @@ Resolve `run_mode` once:
 | `$project-context` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Context never supplies GitHub routing or publication behavior. |
 | Feature Flow workflow contract | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan owns when they are published, and never edits the contract at runtime. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
-| `$feature-flow:engineering-plan` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan owns artifact writes. |
 | `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `run_mode=publish` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either planning mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Preview mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
@@ -311,8 +310,9 @@ graph, plus any exact continuation handoff.
 
 The issue phase owns vertical splitting, structural graph compression, durable
 discovery before synthesis, fixed-ID reuse, uncovered-scope synthesis, missing
-artifact output, `$feature-flow:engineering-plan` passes per missing final issue, race
-revalidation, metadata, dependencies, the Execution Contract, and reporting.
+artifact output, internal codebase-grounded hardening for each missing final
+issue, race revalidation, metadata, dependencies, the Execution Contract, and
+reporting.
 Existing issues must match the stable graph and body contract; conflicts stop
 the run, while a complete matching published bundle returns a verified no-op.
 For `scope_repair_request`, bypass ordinary synthesis, graph compression,
@@ -379,7 +379,7 @@ Return:
   applicable;
 - graph and verticality validation, including candidate and final issue counts,
   compression repairs, retained-slice reasons, and avoided initial hardening
-  calls;
+  passes;
 - published tracker metadata when writes occurred;
 - discovered candidate refs when discovery ran, selected Idea refs, verified
   prior outcome refs, per-Idea cumulative durable `coverage`, `covered_scope`,

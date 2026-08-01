@@ -15,17 +15,17 @@ maintenance.
 - `references/ready-gate.md` owns the execution-readiness gate consumed by
   `implement`.
 - `skills/idea/` owns Idea capture and stops after capture reporting.
-- `skills/plan/` owns complete Feature Spec and implementation-issue planning.
-- `skills/engineering-plan/` owns codebase-grounded implementation planning and
-  issue hardening without repository or tracker writes.
+- `skills/plan/` owns complete Feature Spec and implementation-issue planning,
+  including the internal codebase-grounded hardening pass for missing issues.
 - `skills/implement/` owns Codex App orchestration and delivery verification.
 
 ## Maintenance contract
 
-- Keep `idea`, `plan`, and `engineering-plan` as separate public bundled skills.
-- Keep `engineering-plan` separate from `plan`: Plan owns Feature Spec and issue
-  graph convergence; Engineering Plan owns planning-only output and its caller
-  result envelope.
+- Keep `idea`, `plan`, and `implement` as separate public bundled skills.
+- Keep issue hardening internal to `plan`: it owns focused repository research,
+  issue-level gotcha review, blocker detection, and merging only the final
+  stable result into the generated issue. Do not restore a separate public
+  hardening skill or caller-result envelope.
 - Keep `implement` as a separate public bundled skill; do not merge execution
   orchestration into `plan`.
 - Keep `run_mode: preview | publish` identical across `idea` and `plan`;
@@ -40,7 +40,7 @@ maintenance.
 ## Validation
 
 - Validate the manifest with the plugin validator.
-- Validate all four bundled skill metadata files with the skill validator.
+- Validate all three bundled skill metadata files with the skill validator.
 - Run the focused `plan` and `implement` test suites and repository-wide
   stale-reference scans.
 - Run `git diff --check` before handoff.

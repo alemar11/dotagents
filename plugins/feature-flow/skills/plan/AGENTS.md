@@ -12,9 +12,9 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - `references/spec-phase.md`, `issue-phase.md`, and `vertical-slices.md` own
   phase behavior and their templates own rendered artifact shapes.
 - GitHub issue transport is delegated to `$gitstack:github-issues`. Project
-  Context owns durable context routing and closeout, while
-  `$feature-flow:engineering-plan` remains the composing dependency for
-  issue-hardening; Plan owns its invocation and artifact merge.
+  Context owns durable context routing and closeout, while Plan owns the
+  focused repository research, issue hardening, and artifact merge required
+  before an issue is agent-ready.
 - `tests/` protects graph compression, scope repair, and validator behavior.
 
 ## Maintenance contract
@@ -36,6 +36,9 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - Accepted durable decisions are handed to `$project-context` at integrated
   closeout; planning must not write `knowledge_delta` or domain memory into a
   Feature Spec or issue body.
+- Keep issue hardening as an internal Plan phase. Research only the relevant
+  codebase files, contracts, documentation, and tests; preserve caller-owned
+  scope and dependencies; and persist only the final stable issue body.
 
 ## Validation
 

@@ -1,7 +1,7 @@
 {
   "name": "feature-flow",
-  "version": "0.4.0",
-  "description": "Capture ideas, plan feature bundles, harden implementation plans, and coordinate reviewed implementation delivery.",
+  "version": "0.5.0",
+  "description": "Capture ideas, plan feature bundles, and coordinate reviewed implementation delivery.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Feature Flow",
-    "shortDescription": "Capture ideas, plan feature bundles, and harden implementation work.",
-    "longDescription": "Feature Flow provides separate Idea, Plan, Engineering Plan, and Implement skills. Idea records durable GitHub Ideas; Plan converges Feature Specs and implementation issues; Engineering Plan creates codebase-grounded plans or issue-hardening briefs without writing files; Implement coordinates isolated workers through reviewed PR-ready delivery while delegating GitHub transport to GitStack.",
+    "shortDescription": "Capture ideas, plan feature bundles, and coordinate reviewed implementation work.",
+    "longDescription": "Feature Flow provides separate Idea, Plan, and Implement skills. Idea records durable GitHub Ideas; Plan converges Feature Specs, vertical implementation issues, and their internal codebase-grounded hardening; Implement coordinates isolated workers through reviewed PR-ready delivery while delegating GitHub transport to GitStack.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -18,7 +18,6 @@
     "defaultPrompt": [
       "Use $idea to capture this proposal as a durable Idea.",
       "Use $plan to turn this Idea into an agent-ready feature bundle.",
-      "Use $feature-flow:engineering-plan to deepen an implementation plan or harden one issue.",
       "Use $implement to coordinate delivery of a Feature Spec."
     ],
     "brandColor": "#2F6F8F"

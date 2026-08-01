@@ -35,8 +35,8 @@ deferred domain-memory closeout.
 - Treat generated issues as strong executor-ready starting briefs. Protect the
   stable planning contract directly while preserving compatible executor-owned
   operational edits; never compare a whole tracker body or compute its digest.
-- Run structural graph compression before freezing IDs or invoking
-  `$feature-flow:engineering-plan` for missing issues; issue count is report data only.
+- Run structural graph compression before freezing IDs or hardening missing
+  issues; issue count is report data only.
 - The only stable issue-scope mutation is the separately invoked
   `scope_repair_request` branch owned by `scope-repair.md`. It may add a
   monotonic `allowed_paths` envelope to the named durable issue while preserving
@@ -329,7 +329,7 @@ For issue comparison, source and branch identity mean the rendered
 `source_spec_ref` and `target_branch_name`.
 Do not perform a fresh model split merely to recreate comparison prose.
 
-Do not rerun `$feature-flow:engineering-plan` to synthesize comparison prose for a durable issue.
+Do not rerun hardening to synthesize comparison prose for a durable issue.
 Treat its body as contract-equivalent only when the generated ID, title, stable
 fields above, and `dependency_ids` exactly match the desired graph; required
 sections occur exactly once; every current source requirement, acceptance
@@ -378,19 +378,36 @@ parent/sub-issue operations after the comparison passes.
 ### 7. Harden Every Missing Issue
 
 After structural compression, graph ownership, and durable-state reconciliation
-have stabilized, invoke `$feature-flow:engineering-plan` at least once for each
-missing final issue with Engineering Plan's own
-`planning_mode=issue-hardening` and `output_surface=caller`. Merge the returned
-brief into the issue template:
+have stabilized, Plan performs one internal codebase-grounded hardening pass for
+each missing final issue. Keep the pass bounded to the issue's accepted
+repositories, paths, dependencies, and vertical outcome. Inspect the relevant
+source files, architecture patterns, contracts, nearby tests, and documentation;
+fetch official documentation when current external behavior materially affects
+the plan. Resolve what can be established from that evidence and return a
+planning blocker through Plan's clarification path when a material unknown
+would change scope, ownership, acceptance, or validation. Never silently widen
+the Feature Spec or issue graph.
+
+Build transient hardening evidence for:
 
 - implementation approach into `## Implementation Plan`;
+- resolved interpretation and assumptions into `## Context` or implementation
+  prose;
+- likely files, modules, routes, tests, or documentation to inspect into the
+  implementation plan;
 - acceptance details into `## Acceptance Criteria`;
 - commands and fallbacks into `## Validation`;
 - material dependency reasons into `## Context` or implementation prose,
   without repeating dependency IDs;
-- edge cases and constraints into the owning requirements or context section.
+- edge cases, failure modes, rollout concerns, and rollback constraints into
+  the owning requirements or context section.
 
-Do not paste the hardening brief wholesale or create duplicate top-level
+Run a final gotcha review for missing steps, dependencies, vague acceptance
+criteria, unsafe ordering, missing validation, and omitted layers required to
+prove the vertical outcome. If a gap remains material, withhold the issue and
+report the blocker instead of emitting a weaker agent-ready variant.
+
+Do not paste a separate hardening brief wholesale or create duplicate top-level
 sections. Preserve exactly one standard hardening provenance line for the final
 stable pass. Render the implementation approach as a planning-time
 recommendation and include this exact meaning: "This is the planning-time
@@ -407,8 +424,8 @@ gates. If hardening exposes a graph-level defect, discard affected results,
 return to step 5, restabilize the graph and IDs, and re-harden every materially
 changed issue. For a scope repair, run another hardening pass on that
 issue before output. Never use hardening to rewrite an existing durable issue.
-Supersede earlier briefs and persist only final stable results; pass count is
-derived work, not an option or artifact field.
+Supersede earlier transient results and persist only final stable results; pass
+count is derived work, not an option or artifact field.
 
 ### 8. Render The Execution Contract
 
@@ -559,7 +576,7 @@ Return:
 - affected repositories and tracker route for each issue;
 - dependency graph, topological order, and acyclicity proof;
 - verticality, overlap, and compression repairs, retained-slice reasons,
-  removed artificial dependencies, and avoided initial hardening calls;
+  removed artificial dependencies, and avoided initial hardening passes;
 - contract issue type/state published or proposed;
 - confirmation that every issue has one valid Execution Contract;
 - repository-owned domain closeout issues and deferred capture result when
