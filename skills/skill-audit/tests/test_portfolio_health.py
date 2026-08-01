@@ -8,6 +8,7 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +54,98 @@ class PortfolioHealthTests(unittest.TestCase):
 
         self.assertEqual(args.inventory_source, "auto")
 
+    def test_default_roots_follow_the_nearest_git_root(self) -> None:
+        with TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            nested = repo / "skills" / "skill-audit"
+            (repo / ".git").mkdir(parents=True)
+            nested.mkdir(parents=True)
+
+            roots = PORTFOLIO_HEALTH.default_roots(nested)
+
+        self.assertEqual(roots[0], repo.resolve() / "skills")
+        self.assertEqual(roots[1], repo.resolve() / ".agents" / "skills")
+
+    def test_explicit_root_forces_filesystem_scope(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            scoped = base / "scoped"
+            outside = base / "outside"
+            write_skill(scoped, "inside", "inside")
+            outside_skill = write_skill(outside, "outside", "outside")
+            live_record = PORTFOLIO_HEALTH.read_skill(
+                outside_skill,
+                "codex-debug-prompt-input",
+                root=str(outside),
+            )
+            assert live_record is not None
+            args = PORTFOLIO_HEALTH.build_parser().parse_args(
+                ["scan", "--no-logs", "--root", str(scoped)]
+            )
+
+            with mock.patch.object(
+                PORTFOLIO_HEALTH,
+                "live_inventory",
+                return_value=PORTFOLIO_HEALTH.InventoryResult(
+                    [live_record],
+                    "codex-debug-prompt-input",
+                    (),
+                    (str(outside),),
+                ),
+            ) as live_inventory:
+                data = PORTFOLIO_HEALTH.build_report(args)
+
+        live_inventory.assert_not_called()
+        self.assertEqual(data["inventory_source"], "filesystem")
+        self.assertEqual(data["requested_roots"], [str(scoped)])
+        self.assertEqual(data["effective_roots"], [str(scoped)])
+        self.assertEqual([item["name"] for item in data["skills"]], ["inside"])
+
+    def test_partial_live_inventory_falls_back_with_diagnostics(self) -> None:
+        with TemporaryDirectory() as temp:
+            valid = write_skill(Path(temp), "valid", "live")
+            stdout = (
+                f"- valid: Live skill (file: {valid})\n"
+                "- malformed: Live skill (file: /missing/SKILL.md\n"
+            )
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual(result.records, [])
+        self.assertEqual(result.fallback_reason, "codex debug prompt-input returned a partial skill inventory")
+        self.assertEqual(result.diagnostics[0]["code"], "partial-live-inventory")
+        self.assertEqual(result.diagnostics[0]["parse_failures"], 1)
+
+    def test_missing_explicit_root_is_a_structured_error(self) -> None:
+        with TemporaryDirectory() as temp:
+            missing = Path(temp) / "missing"
+            result = run_script(
+                "--json",
+                "scan",
+                "--no-logs",
+                "--root",
+                str(missing),
+            )
+
+        self.assertEqual(result.returncode, 2)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid-root")
+
+    def test_invalid_numeric_option_is_a_structured_error(self) -> None:
+        result = run_script("--json", "scan", "--no-logs", "--limit", "-1")
+
+        self.assertEqual(result.returncode, 2)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid-option")
+
     def test_entrypoint_size_band_boundaries(self) -> None:
         classify = PORTFOLIO_HEALTH.entrypoint_size_band
 
@@ -90,13 +183,16 @@ class PortfolioHealthTests(unittest.TestCase):
 
         self.assertEqual(set(payload), {"ok", "version", "command", "data"})
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["version"], "1.1.0")
         self.assertEqual(payload["command"], ["scan"])
         self.assertNotIn("version", data)
         self.assertEqual(data["entrypoint_policy"]["estimator"], "ceil(utf8_bytes/4)")
         self.assertFalse(data["entrypoint_policy"]["size_alone_fails_health"])
         self.assertEqual(data["usage_scan"]["status"], "skipped")
         self.assertEqual(data["unused_candidates"], [])
+        self.assertEqual(data["requested_roots"], [str(root)])
+        self.assertEqual(data["effective_roots"], [str(root)])
+        self.assertEqual(data["root_summary"], {str(root): 5})
         self.assertEqual(skills["normal-skill"]["entrypoint_size_band"], "normal")
         self.assertEqual(skills["review-skill"]["entrypoint_size_band"], "review")
         self.assertEqual(skills["high-density-skill"]["entrypoint_size_band"], "high-density")
@@ -108,6 +204,10 @@ class PortfolioHealthTests(unittest.TestCase):
             "generated_at",
             "inventory_source",
             "live_error",
+            "fallback_reason",
+            "diagnostics",
+            "requested_roots",
+            "effective_roots",
             "skill_count",
             "budget",
             "description_candidates",
@@ -125,6 +225,7 @@ class PortfolioHealthTests(unittest.TestCase):
                 "description",
                 "path",
                 "source",
+                "root",
                 "body_bytes",
                 "description_bytes",
                 "usage",
@@ -166,13 +267,13 @@ class PortfolioHealthTests(unittest.TestCase):
     def test_version_and_doctor(self) -> None:
         version = run_script("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "portfolio-health 1.0.0")
+        self.assertEqual(version.stdout.strip(), "portfolio-health 1.1.0")
 
         doctor = run_script("--json", "doctor")
         self.assertEqual(doctor.returncode, 0, doctor.stderr)
         payload = json.loads(doctor.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["version"], "1.1.0")
         self.assertFalse(payload["data"]["network_required"])
 
     def test_retired_no_live_flag_is_rejected(self) -> None:

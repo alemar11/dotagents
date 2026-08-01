@@ -20,8 +20,22 @@ Useful variants:
 scripts/portfolio-health scan --inventory-source filesystem --no-logs
 scripts/portfolio-health scan --months 6 --deep-logs --max-log-mb 800
 scripts/portfolio-health scan --context-tokens 272000 --budget-percent 2
-scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/skills
+scripts/portfolio-health --json scan --inventory-source filesystem --root ~/.codex/skills --root ~/.agents/skills
 ```
+
+## Scope And Inventory Selection
+
+- Explicit `--root` values are authoritative and always select filesystem
+  inventory. This makes a scoped audit independent of whether Codex live
+  discovery succeeds.
+- With no explicit roots, `--inventory-source auto` tries Codex prompt input and
+  falls back to filesystem defaults. `--inventory-source filesystem` skips the
+  live probe.
+- Default repository-local roots are anchored to the nearest Git repository
+  containing the current directory, not to the helper's immediate working
+  directory.
+- An explicit root must exist and be readable. A valid but empty root is a
+  successful empty scan; a missing or invalid root is a non-zero error.
 
 ## How To Read The Report
 
@@ -55,8 +69,13 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
 - `usage_scan.status`: `completed` when usage evidence was scanned and
   `skipped` when `--no-logs` was selected. A skipped scan emits no unused
   candidates.
-- `root_summary`: where the inventory came from, useful for spotting cache
-  copies, symlink farms, or unexpected roots.
+- `requested_roots`: explicit roots supplied by the caller, or an empty list
+  when the command used discovery defaults.
+- `effective_roots`: filesystem roots actually scanned, or live skill-root
+  aliases reported by Codex when live discovery succeeds.
+- `root_summary`: counts grouped by the resolved root recorded for each skill.
+  Use `inventory_source`, `fallback_reason`, and `diagnostics` to distinguish
+  live discovery from a filesystem fallback and to inspect partial live data.
 
 ## Audit Rules
 
@@ -78,6 +97,9 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
 - Keep normal runtime execution on `scripts/portfolio-health`.
 - The helper is local/offline and Python standard-library only.
 - `scripts/portfolio-health --version` is the semver source of truth.
+- With `--json`, successful commands emit `{ok, version, command, data}` and
+  invalid scoped inputs emit the same envelope with `ok: false` and an `error`
+  object.
 - Re-verify helper changes with:
 
 ```bash
