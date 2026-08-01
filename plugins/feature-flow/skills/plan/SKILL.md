@@ -131,7 +131,7 @@ Resolve `run_mode` once:
 | --- | --- | --- |
 | `$project-context` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Context never supplies GitHub routing or publication behavior. |
 | Feature Flow workflow contract | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan owns when they are published, and never edits the contract at runtime. |
-| `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
+| Feature Flow clarification protocol | Repo-backed clarification is materially needed on `new-source`. | Load `../../references/clarification-protocol.md`, run its Plan profile, and keep mutation plus knowledge-handoff authority in Plan. |
 | `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `run_mode=publish` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either planning mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Preview mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
@@ -235,9 +235,16 @@ Proposed refs remain non-executable.
 
 ### 2. Clarify Only Material Unknowns
 
-On the new-source route, run `$grill-me-with-context` only when supplied intent
-plus repository evidence cannot support a complete Feature Spec and safe issue
-graph. Resolve one blocking decision at a time.
+On the new-source route, load
+`../../references/clarification-protocol.md` and run its Plan profile only when
+supplied intent plus repository and project-context evidence cannot support a
+complete Feature Spec and safe issue graph. Resolve one blocking decision at a
+time. Treat accepted durable terms, rules, boundaries, or decisions only as
+candidates until Plan validates their portable evidence, repository-owned
+target surfaces, and fit inside accepted scope. Construct optional
+`knowledge_delta` phase data only from validated candidates; otherwise omit it.
+Keep `planning_blockers` separate and never update Project Context during
+planning.
 
 For every selected Idea, normalize the seven canonical sections into transient
 planning evidence and a per-element coverage map through
@@ -404,6 +411,8 @@ captured.
 
 ## References
 
+- `../../references/clarification-protocol.md`: the shared internal question
+  loop; load only its Plan profile for material `new-source` unknowns.
 - `references/options.md`: the complete default-path selectable run registry.
 - `references/idea-discovery.md`: explicitly requested read-only backlog
   discovery and selection before durable Idea-source intake.

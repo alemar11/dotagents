@@ -10,18 +10,25 @@ maintenance.
 - `.codex-plugin/plugin.json` owns plugin identity, discovery metadata, bundled
   skill exposure, and version.
 - `references/options.md` owns the shared `run_mode` registry.
+- `references/clarification-protocol.md` owns the internal question loop and
+  the phase-derived lightweight Idea and context-backed Plan profiles.
 - `references/workflow-contract.md` owns semantic GitHub metadata and label
   values; GitStack owns GitHub transport and verification.
 - `references/ready-gate.md` owns the execution-readiness gate consumed by
   `implement`.
-- `skills/idea/` owns Idea capture and stops after capture reporting.
+- `skills/idea/` owns Idea capture, including conditional lightweight intake
+  clarification, and stops after capture reporting.
 - `skills/plan/` owns complete Feature Spec and implementation-issue planning,
-  including the internal codebase-grounded hardening pass for missing issues.
+  including context-backed clarification, deferred knowledge handoff, and the
+  internal codebase-grounded hardening pass for missing issues.
 - `skills/implement/` owns Codex App orchestration and delivery verification.
 
 ## Maintenance contract
 
 - Keep `idea`, `plan`, and `implement` as separate public bundled skills.
+- Keep clarification internal to `idea` and `plan`. The caller phase derives
+  its profile; do not expose a fourth clarification skill or add a selectable
+  clarification mode.
 - Keep issue hardening internal to `plan`: it owns focused repository research,
   issue-level gotcha review, blocker detection, and merging only the final
   stable result into the generated issue. Do not restore a separate public

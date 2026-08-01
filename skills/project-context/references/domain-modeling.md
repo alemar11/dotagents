@@ -21,8 +21,8 @@ caller-selected option:
 - `execution_context=fresh-setup`: create the smallest evidence-backed initial context surface.
 - `execution_context=existing-project-bootstrap`: reconcile accepted knowledge from current repo
   evidence and, when explicitly loaded, strong recent same-repo history.
-- `domain_operation=inline-update`: capture durable decisions accepted during a direct composed
-  workflow such as `$grill-me-with-context`.
+- `domain_operation=inline-update`: capture durable decisions accepted during a
+  direct composed decision-shaping workflow.
 - `domain_operation=implementation-closeout`: reconcile a carried knowledge delta against the
   behavior and validation that actually landed.
 - `domain_operation=periodic-review`: report or propose changes by default; write only when the

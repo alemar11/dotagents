@@ -1,6 +1,6 @@
 ---
 name: idea
-description: Manually capture one or more discussed proposals as durable GitHub Ideas for later planning.
+description: Manually capture one or more discussed proposals as durable GitHub Ideas for later planning, clarifying only material intake gaps.
 ---
 
 # Idea
@@ -57,6 +57,9 @@ slugs, and refs are execution facts or data, not options.
 - Capture only the accepted proposal. Do not add a planning analysis, domain
   knowledge handoff, Feature Spec fields, acceptance criteria invented by the
   agent, implementation scope, or readiness claim.
+- When an accepted proposal is not yet faithfully capturable, use only the
+  lightweight Idea profile from the internal clarification protocol. It may
+  refine intake facts but never turns Idea into planning or knowledge capture.
 
 ## Runtime Dependency
 
@@ -117,6 +120,16 @@ one candidate exists, an explicit Idea request authorizes saving it
 without another confirmation. If more than one remains, run the selection
 contract from
 [multi-idea-selection.md](references/multi-idea-selection.md) before continuing.
+
+After selection, if the accepted set still has one material capture gap in its
+problem or opportunity, expected value, or proposal boundary,
+load [clarification-protocol.md](../../references/clarification-protocol.md) and
+run its Idea profile before preflight. Do not invoke it merely to improve
+wording. Apply the answer only to transient capture facts, preserve remaining
+nonblocking uncertainty in `Open Questions`, and stop when no concrete proposal
+can be resolved without invention. Candidate selection, tracker ownership,
+duplicate detection, and collision resolution remain owned by their existing
+Idea branches.
 
 ### 3. Preflight The Entire Accepted Set
 

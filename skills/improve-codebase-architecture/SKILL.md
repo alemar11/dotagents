@@ -9,8 +9,9 @@ description: Find evidence-backed architecture candidates, then pressure-test th
 
 Surface architecture improvements that would make a codebase easier to
 understand, test, and change. Present concrete candidates first. Only after the
-user chooses a candidate, use `$grill-me-with-context` to pressure-test the selected
-direction and capture durable domain or architecture decisions.
+user chooses a candidate, pressure-test the selected direction one decision at
+a time and capture accepted durable domain or architecture decisions through
+`$project-context`.
 
 This is a discovery and decision-shaping skill, not an automatic refactor.
 
@@ -87,12 +88,29 @@ report using `references/report-shape.md`.
 Do not propose the final interface yet. Ask the user which candidate they want
 to explore.
 
-### 4. Grill the selected candidate
+### 4. Pressure-test the selected candidate
 
-After the user chooses a candidate, load and follow `$grill-me-with-context`
-with `capture_mode=inline`. Its inline path must use `$project-context` with
-`memory_slice=domain-memory` and `domain_operation=inline-update` for accepted
-durable decisions.
+After the user chooses a candidate, track resolved decisions, material unknowns,
+risks, and deferred questions internally. Ask exactly one high-signal question
+per turn, include a concise recommended answer, and do not ask for facts already
+available in the inspected repository or project context. Continue only while
+another answer can materially change the selected refactor, and stop when the
+direction is actionable or the user asks to proceed.
+
+Use this shape:
+
+```text
+Question: [one concrete decision-shaping question]
+Recommended answer: [the evidence-backed default and why, in one short sentence]
+```
+
+After an answer establishes a durable project-specific term, rule, boundary, or
+architecture decision, use `$project-context` with
+`memory_slice=domain-memory` and `domain_operation=inline-update` to capture the
+smallest evidence-backed update. Do not capture rejected, tentative, or
+unresolved points. When the user explicitly prohibits documentation writes,
+keep accepted durable decisions as a deferred handoff with intended targets and
+evidence instead of invoking a write.
 
 Use it to resolve:
 
@@ -110,7 +128,8 @@ Summarize:
 
 - selected candidate,
 - resolved architecture decisions,
-- docs updated by `$grill-me-with-context`,
+- `capture_outcome` plus docs updated through `$project-context`, or explicitly
+  deferred decisions with their intended targets and evidence,
 - implementation path,
 - tests to add or preserve,
 - remaining risks and deferred questions.
@@ -121,6 +140,8 @@ Summarize:
 - Do not force a refactor when the existing shape is acceptable.
 - Do not bury ADR conflicts; call them out and ask whether to revisit them.
 - Keep speculative candidates clearly labeled.
+- Do not dump a full critique before the next decision-shaping question or
+  continue pressure-testing after the user asks to proceed.
 - Do not implement until the user explicitly switches from architecture
   discovery to execution.
 

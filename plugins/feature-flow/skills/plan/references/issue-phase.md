@@ -384,9 +384,9 @@ repositories, paths, dependencies, and vertical outcome. Inspect the relevant
 source files, architecture patterns, contracts, nearby tests, and documentation;
 fetch official documentation when current external behavior materially affects
 the plan. Resolve what can be established from that evidence and return a
-planning blocker through Plan's clarification path when a material unknown
-would change scope, ownership, acceptance, or validation. Never silently widen
-the Feature Spec or issue graph.
+planning blocker through the Plan profile in the Feature Flow clarification
+protocol when a material unknown would change scope, ownership, acceptance, or
+validation. Never silently widen the Feature Spec or issue graph.
 
 Build transient hardening evidence for:
 

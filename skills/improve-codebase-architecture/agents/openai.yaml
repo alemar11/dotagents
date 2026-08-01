@@ -1,5 +1,5 @@
 interface:
   display_name: "Improve Codebase Architecture"
-  short_description: "Find evidence-backed architecture candidates, then pressure-test the selected refactor."
+  short_description: "Find and pressure-test architecture improvements."
   brand_color: "#4338CA"
-  default_prompt: "Use $improve-codebase-architecture to inspect this repo for evidence-backed architecture improvement candidates, present concrete options with risks and file evidence, then use $grill-me-with-context on the selected candidate before implementation."
+  default_prompt: "Use $improve-codebase-architecture to inspect this repo for evidence-backed architecture candidates, then pressure-test my selection one decision at a time and capture accepted durable decisions through $project-context."

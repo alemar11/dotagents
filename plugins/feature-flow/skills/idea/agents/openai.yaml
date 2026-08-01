@@ -1,7 +1,7 @@
 interface:
   display_name: "Idea"
-  short_description: "Save discussed proposals for later feature planning."
+  short_description: "Capture Ideas with lightweight clarification."
   brand_color: "#D97706"
-  default_prompt: "Use $idea to save the distinct proposals from this discussion as durable Ideas, asking me which ones to keep when there is more than one."
+  default_prompt: "Use $idea to save the distinct proposals from this discussion as durable Ideas, clarifying at most one material intake gap when needed and asking me which proposals to keep when there is more than one."
 policy:
   allow_implicit_invocation: false

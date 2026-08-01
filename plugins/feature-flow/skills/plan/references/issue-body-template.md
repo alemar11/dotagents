@@ -108,7 +108,8 @@ member's repository-owned shard. One exact `canonical_decision_target` owns a
 cross-repository decision; a non-owner shard may carry a qualified backlink but
 not duplicate the record. Every target surface below must resolve to this
 issue's sole Git repository and a path equal to or contained by one of this
-issue's `allowed_paths`.]
+issue's `allowed_paths`. This section is a Plan-to-Implement handoff, not
+evidence that the knowledge has already been captured.]
 
 - Required workflow:
   - Invoke `$project-context` with `memory_slice=domain-memory` and

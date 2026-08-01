@@ -8,9 +8,9 @@ it as a public skill.
 
 Produce, publish, or validate a Feature Spec that can feed the issue phase. An
 existing source preserves stable fields while accepting current executor-owned
-acceptance checkbox markers. If the source is too vague, return the smallest
-blocking question set
-through the caller.
+acceptance checkbox markers. If new-source intent is too vague, return the next
+material blocker through Plan's clarification protocol. Never return a batch of
+questions.
 
 ## Boundaries
 

@@ -33,9 +33,11 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - Keep generated issue dependency and relationship data canonical; preserve
   retained issue identities and stop on stale, conflicting, duplicate, or
   extra durable artifacts rather than repairing them heuristically.
-- Accepted durable decisions are handed to `$project-context` at integrated
-  closeout; planning must not write `knowledge_delta` or domain memory into a
-  Feature Spec or issue body.
+- Accepted durable decisions are carried as optional `knowledge_delta` phase
+  data. Planning must not write it into a Feature Spec, ordinary issue, or
+  domain memory; only the repository-owned final `Domain Knowledge Closeout`
+  issue may persist its exact shard for Implement to reconcile through
+  `$project-context` after integrated behavior is proven.
 - Keep issue hardening as an internal Plan phase. Research only the relevant
   codebase files, contracts, documentation, and tests; preserve caller-owned
   scope and dependencies; and persist only the final stable issue body.

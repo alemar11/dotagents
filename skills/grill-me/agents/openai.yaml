@@ -1,5 +1,0 @@
-interface:
-  display_name: "Grill Me"
-  short_description: "Stress-test plans, decisions, drafts, and workflows on explicit request."
-  brand_color: "#B91C1C"
-  default_prompt: "Use $grill-me to challenge this plan before I act on it; ask one high-signal question at a time with a recommended answer, then summarize the resolved decisions and remaining risks."
