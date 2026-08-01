@@ -28,13 +28,13 @@ through the caller.
 - Follow `references/publication.md` for the shared GitHub target, publication
   modes, stable refs, and recovery contract; this phase owns only Feature Spec
   publication details.
-- Use `references/options.md` for `planning_mode`; consume the derived
+- Use `references/options.md` for `run_mode`; consume the derived
   `source_route` and do not create another phase-level option.
 - Treat the current Git remote as the GitHub routing fact and feature metadata
-  as `github-workflow-contract` facts. Resolve the canonical `feature`
+  as `workflow contract` facts. Resolve the canonical `feature`
   metadata contract before rendering or validating a Feature Spec. Require
   one supported GitHub transport.
-- Publish only with `planning_mode=publish`. With `planning_mode=preview`, perform no
+- Publish only with `run_mode=publish`. With `run_mode=preview`, perform no
   write and return proposed bodies, locations, metadata, and publication order
   rather than executable commands.
 - Do not create hosted-artifact mirrors or temporary planning trees.
@@ -47,9 +47,9 @@ through the caller.
 
 Receive:
 
-- `planning_mode` and the frozen derived `source_route`;
+- `run_mode` and the frozen derived `source_route`;
 - the GitHub issue-type contract for each affected repository, with explicit
-  transport plus exact tracker value from `github-workflow-contract`;
+  transport plus exact tracker value from `workflow contract`;
 - planning identity: `feature_slug`, optional `planning_scope`, optional
   canonical lowercase UUID `feature_id`, and `context_files` containing every
   applicable available repository root and matched scoped context used for
@@ -92,7 +92,7 @@ Read the minimum evidence needed to establish the contract:
 
 - the current repository's GitHub remote, resolved to one exact
   `owner/repository` target;
-- `github-workflow-contract` and its `references/github-labels.md`;
+- the Feature Flow workflow contract at `../../../references/workflow-contract.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
   as a selected root; for cross-repository work, use explicit user scope or a
   durable linked Feature Spec Set to authorize repository identities, require
@@ -127,7 +127,7 @@ with the bound refs. Any mismatch blocks. Missing Idea metadata does not
 block planning runs whose Spec set contains no Idea refs.
 
 Do not apply that ordinary consumed-source rejection to source-only recovery.
-Plan Feature must route reconciliation-only recovery before this phase; a
+Plan must route reconciliation-only recovery before this phase; a
 recovery invocation never drafts or republishes a Feature Spec.
 
 When root context routes multiple products or packages, resolve the selected
@@ -348,7 +348,7 @@ adding, removing, or rewriting anything.
 For every edge:
 
 - require a unique durable upstream ref, or a proposed ref only in
-  `planning_mode=preview`;
+  `run_mode=preview`;
 - in a multi-repository published bundle, require every upstream ref to identify
   its owning repository through `owner/repository#<number>` or a canonical
   hosted URL;
@@ -431,8 +431,8 @@ Withhold the artifact and return blockers when the gate fails.
 On the existing-source route, skip body drafting and publication. Resolve the
 contract's canonical `feature` row before comparing state. The current GitHub
 contract transports that row as the exact `enhancement` label. Under
-`planning_mode=publish`, repair only that verified-missing label through
-`issue_operation=add-label`; under `planning_mode=preview`, report that exact
+`run_mode=publish`, repair only that verified-missing label through
+`issue_operation=add-label`; under `run_mode=preview`, report that exact
 intended repair. A conflicting contract type label blocks. Immediately before
 reporting or applying a repair, re-read the exact source body/ref, current
 labels, and contract row; restart validation or block on any drift rather than
@@ -451,8 +451,8 @@ Before the first Feature Spec staging create, direct create, edit, or metadata
 mutation, revalidate the GitHub `feature` row and exact `enhancement` label from
 the contract. If the contract is missing or contradictory, block and never
 switch metadata during recovery. Verify that exact label exists. Under
-`planning_mode=publish`, create and verify only that missing contract label through
-`issue_operation=create-label`; under `planning_mode=preview`, report that missing
+`run_mode=publish`, create and verify only that missing contract label through
+`issue_operation=create-label`; under `run_mode=preview`, report that missing
 label creation as an intended operation without mutation. Preserve verified
 label creation in transaction recovery and retry only an operation still proven
 missing. The same preflight applies before an existing-source metadata repair.
@@ -509,7 +509,7 @@ adopt it as an immutable existing-source bundle or create duplicates. Once every
 and verified, a later retry derives the ordinary existing-source route from any
 member and traverses the whole connected set.
 
-- `planning_mode=publish`, GitHub: for a single Spec, publish the final sanitized
+- `run_mode=publish`, GitHub: for a single Spec, publish the final sanitized
   body directly as `Feature Spec: <Feature Name>`. For a multi-repository
   feature, publish each implementation member through the transaction
   above, then finalize each hosted body through the authorized `edit`. Translate each write to
@@ -518,7 +518,7 @@ member and traverses the whole connected set.
   the final body verifies, and retain the hosted issue number or URL as
   `source_spec_ref`. In multi-repository work, store
   `owner/repository#<number>` or the canonical URL, never a bare issue number.
-- `planning_mode=preview`: write nothing. Return the sanitized body, intended
+- `run_mode=preview`: write nothing. Return the sanitized body, intended
   repository target, contract metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   or `proposed-spec:<feature_id>/<repository_key>` for a linked
@@ -526,16 +526,16 @@ member and traverses the whole connected set.
   Return publication order and state that every proposed source and the
   complete proposed issue bundle are non-executable until published.
 
-After `planning_mode=publish` publication succeeds, verify each selected-Idea
+After `run_mode=publish` publication succeeds, verify each selected-Idea
 candidate section or non-goal through the final durable Feature Spec ref before
 converting it to `covered` or `excluded`. If any destination cannot be resolved
 durably, withhold the coverage result and source reconciliation as an
-incomplete publication. With `planning_mode=preview`, or any other non-durable
+incomplete publication. With `run_mode=preview`, or any other non-durable
 preview, keep durable coverage unchanged and return only the report-only
 intended projection with `intended_coverage`, `intended_covered_scope`, and
 `intended_remaining_scope`; do not render a canonical planning outcome block.
 
-`planning_mode=preview` never invokes GitStack for publication or mutation. Exact
+`run_mode=preview` never invokes GitStack for publication or mutation. Exact
 GitHub Idea discovery and source validation may still use read-only GitStack
 operations with mutation fields omitted. GitStack does not interpret Plan
 Feature's tracker or write policy.
@@ -549,7 +549,7 @@ generated Markdown.
 Return:
 
 - title, feature slug, source ref, and intended or actual location;
-- `planning_mode`, derived `source_route`, optional `feature_id`,
+- `run_mode`, derived `source_route`, optional `feature_id`,
   and selected context identity;
 - affected repositories, allowed paths, and each per-Spec target branch;
 - validated Feature Spec dependencies and acyclicity result;

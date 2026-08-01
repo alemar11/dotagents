@@ -144,13 +144,13 @@ evidence and its required integration proof. A GitHub dependency waits for
 merge only when the durable contract explicitly requires merged input; no
 start-condition field exists.
 
-For a GitHub `planning_mode=publish` publication, resolve the contract's exact
+For a GitHub `run_mode=publish` publication, resolve the contract's exact
 `feature` row before rendering the final body. The current contract uses the
 `enhancement` label; apply it outside the body after publication verifies. In
-`planning_mode=preview`, omit publish-only metadata from the body and report the
+`run_mode=preview`, omit publish-only metadata from the body and report the
 intended contract value separately.
 
-When Plan Feature receives `source_idea_refs`, render their exact durable refs
+When Plan receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no
 Idea is consumed, and never copy Idea refs into generated implementation issue
 Execution Contracts.

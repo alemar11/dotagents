@@ -1,6 +1,6 @@
 # Captured Idea Discovery
 
-Run discovery only when the user explicitly asks Plan Feature to find, list,
+Run discovery only when the user explicitly asks Plan to find, list,
 or plan from captured Ideas and exact `source_idea_refs` are absent. Never scan
 an Idea backlog during an ordinary planning request.
 
@@ -14,7 +14,7 @@ tracker mutation.
    current GitHub remote before listing artifacts. Never expand discovery from
    the saved-project list or a common parent directory.
 2. For GitHub, use `$gitstack:github-issues` read operations with no mutation
-   fields to list open issues carrying the `github-workflow-contract` `idea`
+   fields to list open issues carrying the `workflow contract` `idea`
    label. Require the contract's explicit `label` transport for the marker and
    every consumed workflow row; reject a missing or incompatible contract. Read
    title, body, state, labels, native Issue Type, comments, and qualified URL.
@@ -34,7 +34,7 @@ tracker mutation.
 7. When selected Ideas do not form one bounded feature, require separate Plan
    Feature runs rather than silently producing an unrelated batch of Specs.
 
-Discovery uses current tracker state even with `planning_mode=preview`, but it
+Discovery uses current tracker state even with `run_mode=preview`, but it
 never requests a GitStack dry-run mutation or returns executable commands.
 
 ## Output
@@ -42,4 +42,4 @@ never requests a GitStack dry-run mutation or returns executable commands.
 Return the resolved tracker owners, eligible candidates, excluded-candidate
 reasons, and selected refs when selection occurred. Once selection produces
 `source_idea_refs`, continue through `idea-source.md`; do not preserve a
-parallel discovery selector or add a Plan Feature option.
+parallel discovery selector or add a Plan option.

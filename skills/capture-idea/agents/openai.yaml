@@ -1,7 +1,0 @@
-interface:
-  display_name: "Capture Idea"
-  short_description: "Save discussed proposals for later feature planning."
-  brand_color: "#D97706"
-  default_prompt: "Use $capture-idea to save the distinct proposals from this discussion as durable Ideas, asking me which ones to keep when there is more than one."
-policy:
-  allow_implicit_invocation: false

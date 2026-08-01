@@ -1,0 +1,25 @@
+{
+  "name": "feature-flow",
+  "version": "0.1.0",
+  "description": "Capture ideas and converge feature plans into agent-ready GitHub issue bundles.",
+  "author": {
+    "name": "alemar11",
+    "url": "https://github.com/alemar11"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Feature Flow",
+    "shortDescription": "Capture ideas and plan complete feature bundles.",
+    "longDescription": "Feature Flow provides separate Idea and Plan skills. Idea records durable GitHub Ideas; Plan converges Feature Specs, implementation issues, relationships, and exact workflow metadata while delegating GitHub transport to GitStack.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Use $idea to capture this proposal as a durable Idea.",
+      "Use $plan to turn this Idea into an agent-ready feature bundle.",
+      "Preview the Feature Flow publication without writing to GitHub."
+    ],
+    "brandColor": "#2F6F8F"
+  }
+}

@@ -37,7 +37,7 @@ unknowns instead of inventing requirements or decisions.
 ```
 
 The issue title supplies `Idea: <Name>`. Render the seven sections in the body.
-Apply the `github-workflow-contract` `idea` label and optional `needs-triage`
+Apply the `workflow contract` `idea` label and optional `needs-triage`
 label; do not set a native Issue Type.
 
 ## Content Boundaries

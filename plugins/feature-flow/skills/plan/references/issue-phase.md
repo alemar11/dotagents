@@ -16,14 +16,14 @@ deferred domain-memory closeout.
 - Follow `references/publication.md` for the shared GitHub target, publication
   modes, stable refs, and recovery contract; this phase owns only issue-graph
   publication details.
-- Use the incoming `planning_mode` and derived `source_route`; do not create
+- Use the incoming `run_mode` and derived `source_route`; do not create
   phase-specific choices.
 - Treat the current Git remote and affected repository identities as explicit
   intake or validated Feature Spec Set data. Treat issue types, workflow
-  states, and their explicit transports as `github-workflow-contract` facts.
+  states, and their explicit transports as `workflow contract` facts.
   Reject missing, unknown, or GitHub-incompatible transports instead of
   inferring them.
-- Publish only with `planning_mode=publish`. With `planning_mode=preview`, write
+- Publish only with `run_mode=publish`. With `run_mode=preview`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
 - Withhold incomplete or contradictory issues. Do not publish them under a
@@ -47,9 +47,9 @@ deferred domain-memory closeout.
 
 Receive:
 
-- `planning_mode` and the frozen derived `source_route`;
+- `run_mode` and the frozen derived `source_route`;
 - a durable `source_spec_ref`, or a proposed ref only with
-  `planning_mode=preview`;
+  `run_mode=preview`;
 - the complete Feature Spec body and validated cross-Spec dependency graph;
 - planning identity, affected repositories, allowed paths, and shared target
   branch;
@@ -364,7 +364,7 @@ For a contract-equivalent GitHub issue, open or closed, an absent contract
 different contract type is a conflict. Only on an open issue that has not
 progressed beyond planning is an absent contract `ready-for-agent` label
 repairable; a conflicting canonical workflow state is a conflict. Resolve the
-`github-workflow-contract` values before recording the repair and use
+`workflow contract` values before recording the repair and use
 `add-label` for each missing label. Unrelated repository labels are not Plan
 Feature metadata. A closed issue with a contract-equivalent body is valid
 progressed lifecycle state owned by the executor: after any safe type-label
@@ -466,7 +466,7 @@ their blockers; never downgrade them into a partially agent-ready artifact.
 
 Immediately before returning a preview result, no-op, or performing the first
 mutation, re-read the owning Feature Spec body and ref, the current
-`github-workflow-contract`, and the complete all-state issue, metadata, and
+`workflow contract`, and the complete all-state issue, metadata, and
 parent/sub-issue set with the same pagination proof as step 2. Compare that
 fresh state with the frozen graph and prior snapshot. If any source, contract,
 body, ID, metadata, relationship, or candidate absence changed during graph
@@ -477,9 +477,9 @@ cannot be proved completely. This final read is mandatory in both planning modes
 For every GitHub repository, revalidate the contract's exact `task` and
 `ready-for-agent` labels and collect the labels required by missing operations.
 If the contract is missing or contradictory, block and never switch metadata
-during recovery. Verify each exact label. Under `planning_mode=publish`, create and
+during recovery. Verify each exact label. Under `run_mode=publish`, create and
 verify only a missing contract label through `issue_operation=create-label`
-before the first issue or metadata mutation. Under `planning_mode=preview`, report
+before the first issue or metadata mutation. Under `run_mode=preview`, report
 each missing label creation as an intended operation and perform no mutation.
 Preserve verified label creations in partial-failure recovery and retry only a
 still-missing operation.
@@ -488,7 +488,7 @@ Order output topologically, with the final combined-proof or closeout issue last
 inside its owning implementation member and its domain closeout attached only
 when a delta exists.
 
-- `planning_mode=publish`, GitHub: retain exact existing issues and publish only
+- `run_mode=publish`, GitHub: retain exact existing issues and publish only
   missing issues through
   `$gitstack:github-issues`. Translate each write to GitStack-owned
   `mutation_mode=apply`, its exact target, and one canonical `issue_operation`;
@@ -498,7 +498,7 @@ when a delta exists.
   repair only verified-missing contract metadata or parent/sub-issue attachment
   through the matching canonical GitStack operation, verify every mutation,
   and retain the hosted ref separately from its generated ID.
-- `planning_mode=preview`: write nothing. Return retained durable artifacts plus
+- `run_mode=preview`: write nothing. Return retained durable artifacts plus
   every missing proposed body, intended repository, contract metadata,
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
@@ -510,9 +510,9 @@ when a delta exists.
   relationship remainder is non-executable. Keep the intended workflow state
   out of the proposed bodies.
 
-`planning_mode=preview` never invokes GitStack for publication or mutation. It may
+`run_mode=preview` never invokes GitStack for publication or mutation. It may
 use pure read operations with mutation fields omitted to prove current hosted
-state and convergence safety. GitStack does not interpret Plan Feature's tracker
+state and convergence safety. GitStack does not interpret Plan's tracker
 or write policy.
 
 In multi-repository work, publish each issue through GitHub in its owning
@@ -521,7 +521,7 @@ cross-repository integration gates. Do not create a separate scheduling
 artifact; the issue graph is authoritative.
 
 Use transient body transport outside repositories for hosted writes and remove
-it after verified mutation. Plan Feature owns only the planning-artifact writes
+it after verified mutation. Plan owns only the planning-artifact writes
 performed in this phase.
 
 Immediately before each hosted create, re-read the exact target plus the owning
@@ -548,7 +548,7 @@ the delta.
 
 Return:
 
-- Feature Spec ref, `planning_mode`, and derived `source_route`;
+- Feature Spec ref, `run_mode`, and derived `source_route`;
 - candidate and final issue counts, retained, created, missing, or proposed
   generated IDs and refs, repaired metadata or relationships, no-op state, and
   publication order;

@@ -1,6 +1,6 @@
 # Scope Repair
 
-Load this reference only when a separately invoked Plan Feature task receives
+Load this reference only when a separately invoked Plan task receives
 an exact `scope_repair_request` for a durable `existing-source` bundle.
 `scope-repair` is a narrow internal branch of that route, not a selectable
 option or a third `source_route`.
@@ -13,7 +13,7 @@ criterion, or validation obligation. It does not authorize a new outcome,
 repository, branch, dependency, acceptance criterion, safety policy, validation
 policy, issue slice, or implementation approach.
 
-Plan Feature owns the planning mutation. It remains unaware of Codex task IDs,
+Plan owns the planning mutation. It remains unaware of Codex task IDs,
 workers, worktrees, claims, queues, assignment generations, runtime collisions,
 and implementation progress. Reject a request containing those runtime fields
 instead of persisting them in a Feature Spec, issue, audit record, or result.
@@ -43,7 +43,7 @@ repository ownership, proposed refs, unknown keys, runtime identities, and a
 must identify one issue in the complete current bundle.
 
 The request is intake data. `references/options.md` continues to own the sole
-selectable field `planning_mode`.
+selectable field `run_mode`.
 
 ## Validation
 
@@ -87,10 +87,10 @@ Classify the result:
 
 ## Mutation And Recovery
 
-With `planning_mode=preview`, write nothing. Return the complete proposed Spec and
+With `run_mode=preview`, write nothing. Return the complete proposed Spec and
 issue changes, audit entry, mutation order, and `repair_outcome=proposed`.
 
-With `planning_mode=publish`, reread every target immediately before its mutation and
+With `run_mode=publish`, reread every target immediately before its mutation and
 stop on drift. Apply in this fail-safe order:
 
 1. widen the Feature Spec when required;
@@ -137,4 +137,4 @@ scope_repair_result:
 
 `applied` and `no-op` are resumable evidence only after the final complete-bundle
 readback succeeds. The invoking runtime independently rereads authoritative
-sources and decides scheduling; Plan Feature never declares a worker runnable.
+sources and decides scheduling; Plan never declares a worker runnable.

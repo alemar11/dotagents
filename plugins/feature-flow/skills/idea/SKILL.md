@@ -1,9 +1,9 @@
 ---
-name: capture-idea
+name: idea
 description: Manually capture one or more discussed proposals as durable GitHub Ideas for later planning.
 ---
 
-# Capture Idea
+# Idea
 
 ## Purpose And Invocation
 
@@ -11,27 +11,23 @@ Use this capture-only skill to save tentative proposals after a discussion so
 they can be selected later as explicit input to a planning workflow. The public
 pipeline is:
 
-`Capture Idea -> Plan Feature -> Implement Feature`
+`Idea -> Plan -> Implement Feature`
 
-Use this skill only when the user invokes `$capture-idea`, asks to run Capture
-Idea, or a manually invoked parent workflow explicitly routes here. Do not
+Use this skill only when the user invokes `$idea`, asks to run Idea, or a
+manually invoked parent workflow explicitly routes here. Do not
 auto-select it for ordinary brainstorming, discussion, planning, issue
 creation, or implementation requests. After reporting the captured Ideas,
 stop.
 
-Capture Idea does not create Feature Specs or implementation issues, plan the
+Idea does not create Feature Specs or implementation issues, plan the
 proposal, modify domain memory, make architecture decisions, or implement
 anything. It preserves an early proposal without claiming that the proposal is
 approved, specified, or ready for work.
 
 ## Structured Option Contract
 
-Load [options.md](references/options.md) before resolving capture behavior. It
+Load the shared [options.md](../../references/options.md) before resolving capture behavior. It
 owns the complete selectable registry:
-
-| Field | Values |
-| --- | --- |
-| `write_mode` | `apply`, `propose` |
 
 Reject every unregistered field or noncanonical value. Explicit repository
 scope, tracker owner, feature metadata values, candidate decisions, names,
@@ -42,7 +38,7 @@ slugs, refs, and queue intent are execution facts or data, not options.
 - Every Idea has exactly one tracker-owning repository. Use globally
   unambiguous durable refs: `owner/repository#<number>` or a canonical hosted
   URL.
-- `$github-workflow-contract` owns the `idea` artifact marker, the
+- The Feature Flow workflow contract owns the `idea` artifact marker, the
   `needs-triage` workflow label, and their GitHub label transport. Explicit user
   scope owns the repository set; each Idea then names one tracker-owning
   repository. Load the contract and reject missing or incompatible metadata;
@@ -56,7 +52,7 @@ slugs, refs, and queue intent are execution facts or data, not options.
 - Resolve every candidate decision, tracker owner, duplicate, and collision
   before the first write. A later write failure may produce a verified partial
   result, but unresolved input must not.
-- In `write_mode=propose`, return proposed bodies, intended targets and
+- In `run_mode=preview`, return proposed bodies, intended targets and
   metadata, and deterministic `proposed-idea:` refs without mutating GitHub.
   Proposed refs are non-durable and must never be presented as valid Plan
   Feature input.
@@ -66,7 +62,7 @@ slugs, refs, and queue intent are execution facts or data, not options.
 
 ## Runtime Dependency
 
-Capture Idea is Codex-dependent because its authoritative GitHub reads and
+Idea is Codex-dependent because its authoritative GitHub reads and
 writes use `$gitstack:github-issues`. When Codex provides `request_user_input`,
 it is an optional accelerator for multi-candidate selection; load
 [multi-idea-selection.md](references/multi-idea-selection.md) and preserve its
@@ -77,22 +73,22 @@ one-question-at-a-time fallback.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$github-workflow-contract` | Capture Idea reads or writes Idea metadata. | Load the exact `idea` and optional `needs-triage` contract values; Capture Idea owns when they are applied, and never edits the contract at runtime. |
-| `$gitstack:github-issues` | Capture Idea needs exact issue or label reads, or `write_mode=apply` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
+| Feature Flow workflow contract | Idea reads or writes Idea metadata. | Load the exact `idea` and optional `needs-triage` contract values; Idea owns when they are applied, and never edits the contract at runtime. |
+| `$gitstack:github-issues` | Idea needs exact issue or label reads, or `run_mode=publish` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
 
-In `write_mode=propose`, allow only read-only GitHub inspection; do not request
+In `run_mode=preview`, allow only read-only GitHub inspection; do not request
 a dry-run mutation, return executable commands, or perform any write.
 
 ## Workflow
 
 ### 1. Resolve Write Mode And Setup
 
-Resolve `write_mode` once from [options.md](references/options.md). Read:
+Resolve `run_mode` once from [options.md](../../references/options.md). Read:
 
 - the current repository's GitHub remote, resolved to one exact
   `owner/repository` target;
-- the `github-workflow-contract` and its
-  [github-labels.md](../github-workflow-contract/references/github-labels.md).
+- the `workflow contract` and its
+  [workflow-contract.md](../../references/workflow-contract.md).
 
 Use explicit user scope and repository evidence to determine the only valid
 tracker-owning Git repository for each possible Idea. A cross-repository Idea
@@ -119,7 +115,7 @@ proposals whose outcomes, owners, or later planning boundaries materially
 differ.
 
 If no concrete proposal exists, report that nothing was captured. If exactly
-one candidate exists, an explicit Capture Idea request authorizes saving it
+one candidate exists, an explicit Idea request authorizes saving it
 without another confirmation. If more than one remains, run the selection
 contract from
 [multi-idea-selection.md](references/multi-idea-selection.md) before continuing.
@@ -147,13 +143,13 @@ Perform these preflight reads through `$gitstack:github-issues` without mutation
 fields in both write modes. Proposal mode still requires current duplicate and
 label evidence even though it cannot change that evidence.
 
-For `write_mode=propose`, stop after returning the complete proposed bodies,
+For `run_mode=preview`, stop after returning the complete proposed bodies,
 targets, intended marker/state metadata, non-durable refs, and publication
 order. Do not return executable tracker commands.
 
 ### 4. Publish To GitHub
 
-For `write_mode=apply`, load
+For `run_mode=publish`, load
 [github-publishing.md](references/github-publishing.md). Publish each accepted,
 non-reused Idea through `$gitstack:github-issues`, checkpointing and verifying
 each result before moving to the next candidate.
@@ -171,4 +167,4 @@ ref. Clearly mark proposals as non-durable. On partial failure, list the exact
 verified refs already created and the remaining safe resume work.
 
 End after capture reporting. Planning and source-Idea lifecycle transitions
-belong to Plan Feature, not Capture Idea.
+belong to Plan, not Idea.

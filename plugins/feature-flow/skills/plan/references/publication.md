@@ -1,7 +1,7 @@
-# Plan Feature Publication Contract
+# Plan Publication Contract
 
-Use this reference when Plan Feature publishes planning artifacts or returns a
-non-mutating preview. Plan Feature resolves each target from the current Git
+Use this reference when Plan publishes planning artifacts or returns a
+non-mutating preview. Plan resolves each target from the current Git
 remote; GitHub is the authoritative artifact store and `$gitstack:github-issues`
 owns transport, mutation safety, and hosted-state verification.
 
@@ -24,12 +24,12 @@ never use a bare issue number as a cross-repository identity.
 
 ## Planning Mode
 
-| `planning_mode` | GitHub behavior |
+| `run_mode` | GitHub behavior |
 | --- | --- |
 | `publish` | Publish or update hosted issues, verify resulting state, and remove temporary transport files. |
 | `preview` | Return proposed titles, bodies, metadata, relationships, and publication order without mutating GitHub or returning executable commands. |
 
-`planning_mode` is run-scoped planning authority, not durable project context.
+`run_mode` is run-scoped planning authority, not durable project context.
 Resolve inspect-only, review-only, dry-run, rehearsal, validation, and preview
 requests to `preview`. Resolve `publish` for an explicit request to create or
 update durable planning artifacts.
@@ -41,7 +41,7 @@ a repository-local planning mirror.
 
 ## Recoverable Multi-Repository Publication
 
-For any new multi-repository bundle, Plan Feature owns one recoverable
+For any new multi-repository bundle, Plan owns one recoverable
 publication transaction across all roles: predeclare every role, the
 parameterized final-body template, and each allowed ref slot. Create uniquely
 marked non-executable staging issues for hosted roles whose refs are unknown;
@@ -92,7 +92,7 @@ the complete linked set first.
   reconciliation, and replacement of proposed refs during publication. It
   revalidates the source, the applicable metadata contract, and complete hosted
   state before preview output or mutation and never renumbers a retained issue.
-- Both phases carry the same `planning_mode`, derived source route, planning
+- Both phases carry the same `run_mode`, derived source route, planning
   identity, and `source_spec_ref`.
 - `$implement-feature` consumes only a durable hosted Feature Spec ref,
   globally qualified for multi-repository work, never proposed output.

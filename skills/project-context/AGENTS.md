@@ -37,9 +37,9 @@ and routed references.
   explicit scoped authority. Preserve unrelated text, show exact target and
   wording, require affirmative confirmation where the runtime contract says
   so, and suffix inserted AGENTS learning bullets with ` (Codex learning)`.
-- Keep `github-workflow-contract` as the feature metadata owner and GitStack as
-  transport owner. Project Context may route to those contracts but must not
-  duplicate their values or publication rules.
+- Keep the Feature Flow workflow contract as the feature metadata owner and
+  GitStack as transport owner. Project Context may route to those contracts but
+  must not duplicate their values or publication rules.
 
 ## Validation
 

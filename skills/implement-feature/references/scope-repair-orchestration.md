@@ -48,7 +48,7 @@ one automatic repair is allowed per assignment. A second scope miss returns
    `create-scope-repair-task`. Create one separate visible Codex task in the
    assignment's saved repository project without a worktree. Set and verify its
    exact title as `🧭 Scope Repair · <Feature Spec title>`. Invoke
-   `$plan-feature` as the separate Plan Feature task against the authoritative
+   `$feature-flow:plan` as the separate Plan task against the authoritative
    `source_spec_ref` and
    implementation issue using only this portable packet:
 

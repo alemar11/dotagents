@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Workflow Contract"
-  short_description: "Define feature-flow GitHub metadata contracts."
-  default_prompt: "Use $github-workflow-contract to resolve the GitHub metadata contract for a feature workflow."
-  brand_color: "#8B5CF6"

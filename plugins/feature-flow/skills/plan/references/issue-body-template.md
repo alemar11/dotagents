@@ -11,7 +11,7 @@ developer-machine absolute paths.
 
 | Field | Value |
 | --- | --- |
-| `source_spec_ref` | [durable hosted ref; proposed refs are valid only in planning_mode=preview] |
+| `source_spec_ref` | [durable hosted ref; proposed refs are valid only in run_mode=preview] |
 | `feature_slug` | [authoritative lowercase feature slug] |
 | `affected_repositories` | [canonical repo slugs or current-repository] |
 | `allowed_paths` | [smallest complete safe repo-relative or repo-qualified envelope for this slice] |
@@ -137,17 +137,17 @@ knowledge_delta:
 - GitHub tracker: after current-head evidence proves the issue criteria, update
   the issue checkboxes and tracker lifecycle truthfully. The selected executor
   owns whether completion is represented by a closing reference, explicit
-  close operation, or another supported tracker transition; Plan Feature does
+  close operation, or another supported tracker transition; Plan does
   not choose that delivery mechanism.
 ```
 
-Tracker metadata is rendered by `planning_mode` rather than duplicated in the base
+Tracker metadata is rendered by `run_mode` rather than duplicated in the base
 body:
 
-- GitHub `planning_mode=publish`: resolve the exact `task` and `ready-for-agent`
-  labels from `github-workflow-contract` independently. Mutate tracker metadata
+- GitHub `run_mode=publish`: resolve the exact `task` and `ready-for-agent`
+  labels from the Feature Flow workflow contract independently. Mutate tracker metadata
   and do not copy those values into the body; do not invent a key or value.
-- `planning_mode=preview`: leave both lines out of the proposed body and return the
+- `run_mode=preview`: leave both lines out of the proposed body and return the
   intended contract metadata as report data. A preview is never a published queue
   state.
 

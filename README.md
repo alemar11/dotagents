@@ -36,6 +36,13 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
 
+Feature Flow is the repo-local feature-intake and planning plugin. It keeps Idea capture and Plan convergence as separate skills, shares one metadata contract, and delegates GitHub transport to GitStack:
+
+| Skill | Purpose |
+| --- | --- |
+| `feature-flow:idea` | Capture durable GitHub Ideas and optionally queue them for triage. |
+| `feature-flow:plan` | Converge Feature Specs and agent-ready implementation issue graphs. |
+
 ## Reusable Skills
 
 | Skill | Purpose |
@@ -51,10 +58,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
-| `plan-feature` | Manually converge feature intent or an existing Spec into a complete publishable or preview planning bundle. |
 | `implement-feature` | Discover available Feature Specs or coordinate visible Codex workers through reviewed GitHub PR delivery. |
-| `github-workflow-contract` | Define the GitHub metadata contract consumed by feature-flow skills. |
 | `focus-task` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `project-context` | Maintain durable project context, ADRs, optional localization memory, confirmed corrections, and evidence-backed Code Review Rules. |
@@ -80,8 +84,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - `grill-me-with-context` requires `$grill-me` and `$project-context` so it can run the questioning loop, update context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `capture-idea` requires `$github-workflow-contract` for feature metadata. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
-- `plan-feature` requires `$project-context`, `$github-workflow-contract`, `$grill-me-with-context`, and `$plan-harder` for project context, feature metadata, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both planning modes, plus published tracker mutations.
+- `feature-flow:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
+- `feature-flow:plan` requires `$project-context`, `$grill-me-with-context`, and `$plan-harder` for project context, feature metadata, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It loads the plugin workflow contract and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes, plus published tracker mutations.
 - `implement-feature` keeps discovery GitHub-only and side-effect free. Explicit execution preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs; it never merges. The normal six-stage flow and exception routing live in `skills/implement-feature/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 
@@ -99,17 +103,19 @@ Project-local skills are repository-specific and are not included in reusable in
 
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
-Register the `alemar11` marketplace from GitHub, then install GitStack:
+Register the `alemar11` marketplace from GitHub, then install the required plugins:
 
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add gitstack@alemar11
+codex plugin add feature-flow@alemar11
 ```
 
 If the `alemar11` marketplace is already registered, install GitStack directly:
 
 ```sh
 codex plugin add gitstack@alemar11
+codex plugin add feature-flow@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -118,6 +124,7 @@ of the GitHub source, then install the same plugin:
 ```sh
 codex plugin marketplace add /path/to/dotagents
 codex plugin add gitstack@alemar11
+codex plugin add feature-flow@alemar11
 ```
 
 During local development, rebuild, test, and reinstall after each versioned
@@ -152,7 +159,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/github-workflow-contract skills/focus-task skills/grill-me skills/project-context skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/implement-feature skills/focus-task skills/grill-me skills/project-context skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -188,10 +195,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill plan-harder \
-  --skill capture-idea \
-  --skill plan-feature \
   --skill implement-feature \
-  --skill github-workflow-contract \
   --skill focus-task \
   --skill grill-me \
   --skill project-context \

@@ -1,6 +1,6 @@
-# Plan Feature Maintenance
+# Plan Maintenance
 
-`skills/plan-feature/` is the single public planning surface for converging a
+`plugins/feature-flow/skills/plan/` is the single public planning surface for converging a
 complete Feature Spec bundle and its implementation issue graph. Runtime
 planning behavior stays in `SKILL.md` and phase-owned references.
 
@@ -21,7 +21,7 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - Preserve the convergent terminal boundary: a successful run has a complete
   implementation-eligible Feature Spec bundle and a nonempty hardened issue
   graph. Do not restore a standalone Spec-only success path.
-- Keep the hard-cut Feature Spec vocabulary, canonical `planning_mode`, exact
+- Keep the hard-cut Feature Spec vocabulary, canonical `run_mode`, exact
   repository identity propagation, linked multi-repository `feature_id`, and
   lower-kebab feature slugs. Do not add read aliases for retired fields,
   values, paths, or authority names.

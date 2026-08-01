@@ -12,7 +12,7 @@ Validation-only discovery may use only durable identity, current-state, and
 prior-outcome classification. It must stop before intent normalization,
 drafting, coverage projection, or lifecycle reconciliation. An Idea is
 tentative source intent for a new Feature Spec, not a Feature Spec itself, an
-implementation issue, or another Plan Feature mode.
+implementation issue, or another Plan mode.
 
 ## Activation And Eligibility
 
@@ -30,7 +30,7 @@ implementation issue, or another Plan Feature mode.
   durable, marker-valid artifact can be selected.
 - Require explicit user selection before combining multiple Ideas, and require
   their accepted scope to describe one bounded feature. Split unrelated Ideas
-  into separate Plan Feature runs.
+  into separate Plan runs.
 
 ## Durable Identity And Validation
 
@@ -39,7 +39,7 @@ Use the globally qualified GitHub ref shape `owner/repository#<number>` or its
 canonical hosted URL. A bare `#<number>` is not a durable source identity.
 
 For ordinary planning input, verify that a GitHub Idea is open, carries the
-`github-workflow-contract` `idea` label, has no native Issue Type, and has at
+`workflow contract` `idea` label, has no native Issue Type, and has at
 most one of the contract's `needs-triage` or `needs-info` workflow labels, with
 no other contract workflow-state label. Require the contract's explicit
 `label` transport for the marker and every consumed workflow row. Read the
@@ -58,14 +58,14 @@ identity, scope, outcome, or linkage mismatch blocks both bundle continuation
 and Idea mutation.
 
 Perform GitHub source reads through `$gitstack:github-issues` in both planning
-modes, omitting mutation fields. `planning_mode=preview` still validates current
+modes, omitting mutation fields. `run_mode=preview` still validates current
 hosted state but never requests a dry-run mutation or surfaces executable
 commands.
 
-The `github-workflow-contract` marker and its compatible transport are required
+The `workflow contract` marker and its compatible transport are required
 only for Idea capture, discovery, or consumption. A missing or incompatible
 contract blocks only those Idea paths. Stop with the exact companion-contract
-prerequisite; do not invalidate an unrelated Plan Feature run or silently
+prerequisite; do not invalidate an unrelated Plan run or silently
 rewrite project context.
 
 ## Prior Outcomes And Consumed State
@@ -142,7 +142,7 @@ draft section or non-goal is only a candidate destination. It becomes
 `covered` or `excluded` for terminal reconciliation only after the owning
 Feature Spec has a verified durable ref and section.
 
-With `planning_mode=preview`, or whenever another branch returns only a
+With `run_mode=preview`, or whenever another branch returns only a
 non-durable preview, keep the durable map unchanged and build a separate
 report-only intended projection. Map every material element to a proposed Spec
 section, proposed non-goal, remaining-scope item, or blocking question. Derive
@@ -184,10 +184,10 @@ never projects or edits a Feature Spec from bound Idea evidence.
 
 ## Per-Idea Exit Reconciliation
 
-For `planning_mode=publish`, determine durable coverage independently for each
+For `run_mode=publish`, determine durable coverage independently for each
 selected new-source Idea or bound existing-source Idea and reconcile state once
-when the Plan Feature run exits. For
-`planning_mode=preview`, derive only the independent intended projection. Do not
+when the Plan run exits. For
+`run_mode=preview`, derive only the independent intended projection. Do not
 add or remove workflow labels while an interactive clarification question is
 still active.
 
@@ -198,7 +198,7 @@ still active.
 | Failure after a supplied answer resolved `needs-info` | Keep the Idea open, replace stale `needs-info` with `needs-triage`, and report the technical blocker. |
 | Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, add `needs-triage`, and remove `needs-info`. |
 | Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed. |
-| `planning_mode=preview` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
+| `run_mode=preview` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
 
 If requester input resumes planning, remove `needs-info` only as part of the
 next terminal reconciliation. If planning is intentionally deferred after the
@@ -217,7 +217,7 @@ GitHub outcome is the complete body of one new comment:
 
 ```markdown
 ## Planning Outcome
-<!-- plan-feature:idea-outcome -->
+<!-- plan:idea-outcome -->
 coverage: <partial|full>
 feature_spec_refs:
 - <globally unambiguous durable ref>
@@ -273,7 +273,7 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 
 ## GitHub Lifecycle Mutations
 
-Before a GitHub `planning_mode=publish` reconciliation that adds a workflow state,
+Before a GitHub `run_mode=publish` reconciliation that adds a workflow state,
 require the contract transport to be `label`, resolve that exact contract
 label, and verify that it exists in every affected repository. When a required
 contract label does not exist, create and verify only that exact label through
@@ -287,10 +287,10 @@ target=owner/repository
 
 Do not provision a label merely to clear an absent state. If required-label
 provisioning fails, preserve current hosted state, report the exact missing
-operation, and resume from verified tracker state. In `planning_mode=preview`,
+operation, and resume from verified tracker state. In `run_mode=preview`,
 report any required label creation as intended output but request no mutation.
 
-For GitHub `planning_mode=publish`, write and verify the canonical outcome comment
+For GitHub `run_mode=publish`, write and verify the canonical outcome comment
 first, reconcile `needs-triage` and `needs-info` second, and close a fully
 covered Idea last. Use `$gitstack:github-issues` for each exact operation,
 verify state after every mutation, and retry only operations proven missing.
