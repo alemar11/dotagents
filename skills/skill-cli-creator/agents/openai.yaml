@@ -1,5 +1,5 @@
 interface:
   display_name: "Skill CLI Creator"
-  short_description: "Build host-aware embedded CLIs that run from a shipped `scripts/<tool>` artifact inside a skill or plugin."
+  short_description: "Create or refactor embedded skill or plugin CLIs"
   default_prompt: "Use $skill-cli-creator to create or refactor an embedded CLI, keep normal execution on its shipped `scripts/<tool>` artifact, and validate the finished command through that artifact."
   brand_color: "#2563EB"

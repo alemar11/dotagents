@@ -1,6 +1,6 @@
 ---
 name: skill-cli-creator
-description: Create or refactor embedded CLIs that ship from `scripts/<tool>` inside an existing skill or plugin.
+description: Create or refactor embedded CLIs that ship from a skill or plugin scripts directory.
 ---
 
 # Skill CLI Creator
