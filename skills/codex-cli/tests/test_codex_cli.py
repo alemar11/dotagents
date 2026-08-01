@@ -242,6 +242,21 @@ class CodexCliContractTests(unittest.TestCase):
             finally:
                 target.close()
 
+    def test_output_final_symlink_created_after_pin_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside.txt"
+            target = cli.pin_output_path(str(root / "result.txt"))
+            assert target is not None
+            try:
+                target.path.symlink_to(outside)
+                with self.assertRaises(cli.CodexCliError) as raised:
+                    cli.write_regular_output(target, "result")
+                self.assertEqual(raised.exception.code, "output-symlink")
+                self.assertFalse(outside.exists())
+            finally:
+                target.close()
+
     def test_output_is_launcher_owned_and_keeps_delegated_sandbox(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             args = cli.parser().parse_args(

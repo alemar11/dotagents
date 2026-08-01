@@ -353,10 +353,10 @@ def validate_output_path(raw_path: str | None) -> Path | None:
             f"output parent directory does not exist: {path.parent}",
             code="output-invalid",
         )
-    # Resolve only the parent aliases before pinning. The final component was
-    # rejected as a symlink above; the resolved directory descriptor is what
-    # protects the later launcher-owned write from delegated path swaps.
-    return path.resolve(strict=False)
+    # Resolve only parent aliases before pinning. Keep the final component
+    # unchanged so the descriptor-relative lstat can reject a final symlink,
+    # including one created after this initial validation.
+    return path.parent.resolve(strict=False) / path.name
 
 
 def _output_directory_flags() -> int:
