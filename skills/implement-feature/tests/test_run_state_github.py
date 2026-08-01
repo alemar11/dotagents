@@ -184,9 +184,9 @@ class RunStateGitHubScenarios(unittest.TestCase):
                 row[1]
                 for row in connection.execute("PRAGMA table_info(assignments)")
             }
-            marker_columns = {
+            reservation_columns = {
                 row[1]
-                for row in connection.execute("PRAGMA table_info(app_operation_markers)")
+                for row in connection.execute("PRAGMA table_info(app_operation_reservations)")
             }
             journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
             run_sql = connection.execute(
@@ -198,7 +198,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(metadata_columns, {"singleton", "schema_version"})
-        self.assertEqual(marker_columns, {"run_id", "action", "subject_id", "operation_id", "created_at"})
+        self.assertEqual(reservation_columns, {"run_id", "action", "subject_id", "operation_id", "created_at"})
         self.assertEqual(self.invoke("capabilities")["database_schema_version"], 1)
         self.assertEqual(journal_mode, "wal")
         self.assertNotIn("regenerated", prepared)
@@ -288,7 +288,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(finished["status"], "succeeded")
 
-    def test_single_use_operations_have_durable_markers(self) -> None:
+    def test_single_use_operations_have_durable_reservations(self) -> None:
         started = self.start("marker-flow")
         operation = self.invoke(
             "app-operation",
@@ -304,14 +304,14 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         connection = sqlite3.connect(self.database)
         try:
-            marker = connection.execute(
+            reservation = connection.execute(
                 """SELECT run_id,action,subject_id,operation_id
-                   FROM app_operation_markers""",
+                   FROM app_operation_reservations""",
             ).fetchone()
         finally:
             connection.close()
         self.assertEqual(
-            marker,
+            reservation,
             (
                 "marker-flow",
                 "set-root-title",

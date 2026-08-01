@@ -78,7 +78,7 @@ SemVer but different bytes is not the retained runtime for that run.
 
 The schema contains only runtime metadata, runs, normalized run-repository
 bindings, assignments, canonical Feature Spec claims, typed Codex
-task-operation reconciliation facts, and single-use operation markers. It may
+task-operation reconciliation facts, and single-use operation reservations. It may
 retain durable source refs, linked
 `feature_id` membership, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
@@ -88,11 +88,11 @@ identity and authoritative repair readback, and PR/provider refs only when
 applicable. GitHub Issues and GitHub PRs are fixed workflow boundaries, not
 stored provider or delivery selectors.
 
-`app_operation_markers` contains one durable reservation for each
+`app_operation_reservations` contains one durable reservation for each
 `(run_id, action, subject_id)` in `SINGLE_USE_ACTIONS`. The reservation is
 created with `ON CONFLICT DO NOTHING` before the corresponding typed row in
 `app_operations`; a duplicate returns the original `operation_id` and must be
-reconciled or replayed through that operation. The marker is deliberately a
+reconciled or replayed through that operation. The reservation is deliberately a
 small idempotency key, not a generic provider payload or a second operation
 state machine.
 

@@ -407,7 +407,7 @@ CURRENT_SCHEMA_COLUMNS = {
         "provider_observation_ref", "head_sha", "pr_url", "observed_state",
         "created_at", "updated_at", "contract_generation", "scope_repair_id",
     ),
-    "app_operation_markers": (
+    "app_operation_reservations": (
         "run_id", "action", "subject_id", "operation_id", "created_at",
     ),
 }
@@ -661,7 +661,7 @@ def create_schema(connection: sqlite3.Connection) -> None:
             scope_repair_id TEXT,
             UNIQUE(run_id, operation_id)
         )""",
-        """CREATE TABLE app_operation_markers (
+        """CREATE TABLE app_operation_reservations (
             run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
             action TEXT NOT NULL,
             subject_id TEXT NOT NULL,
@@ -1599,7 +1599,7 @@ def advance(connection: sqlite3.Connection, run: sqlite3.Row) -> int:
     return revision
 
 
-def reserve_single_use_operation_marker(
+def reserve_single_use_operation(
     connection: sqlite3.Connection,
     run_id: str,
     action: str,
@@ -1608,7 +1608,7 @@ def reserve_single_use_operation_marker(
     created_at: str,
 ) -> None:
     connection.execute(
-        """INSERT INTO app_operation_markers(
+        """INSERT INTO app_operation_reservations(
                run_id,action,subject_id,operation_id,created_at
            ) VALUES (?,?,?,?,?)
            ON CONFLICT(run_id,action,subject_id) DO NOTHING""",
@@ -1617,12 +1617,12 @@ def reserve_single_use_operation_marker(
     if connection.execute("SELECT changes()").fetchone()[0] == 1:
         return
     existing = connection.execute(
-        """SELECT m.operation_id AS marker_operation_id,
+        """SELECT r.operation_id AS reservation_operation_id,
                   o.operation_id,o.action,o.subject_id,o.status
-           FROM app_operation_markers m
-           LEFT JOIN app_operations o
-             ON o.run_id=m.run_id AND o.operation_id=m.operation_id
-           WHERE m.run_id=? AND m.action=? AND m.subject_id=?""",
+           FROM app_operation_reservations r
+             LEFT JOIN app_operations o
+             ON o.run_id=r.run_id AND o.operation_id=r.operation_id
+           WHERE r.run_id=? AND r.action=? AND r.subject_id=?""",
         (run_id, action, subject_id),
     ).fetchone()
     if (
@@ -1633,7 +1633,7 @@ def reserve_single_use_operation_marker(
     ):
         raise StateError(
             "invalid-state-schema",
-            "single-use operation marker does not reference its recorded operation",
+            "single-use operation reservation does not reference its recorded operation",
             4,
         )
     raise StateError(
@@ -2366,7 +2366,7 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         operation_id = new_operation_id()
         now = utc_now()
         if action in SINGLE_USE_ACTIONS:
-            reserve_single_use_operation_marker(
+            reserve_single_use_operation(
                 connection,
                 run_id,
                 action,
@@ -4674,7 +4674,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-7 SQLite coordination for Implement Feature "
+            f"Database-schema-{DATABASE_SCHEMA_VERSION} SQLite coordination for Implement Feature "
             "controllers in the ChatGPT App."
         ),
     )
