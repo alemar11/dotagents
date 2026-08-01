@@ -15,9 +15,15 @@ through the caller.
 ## Boundaries
 
 - Do not implement the feature or split it into issues.
-- Do not edit `CONTEXT.md`, domain documents, or ADRs. Carry accepted durable
-  knowledge only as optional phase data in `knowledge_delta`; never render it
-  in a Feature Spec body.
+- Do not mutate any pre-existing durable project-context, agent-instruction, or
+  repository-documentation surface outside the Feature Spec and tracker
+  operations explicitly owned by this phase. This includes applicable
+  `AGENTS.md`, `CONTEXT.md`, ADRs, translation/localization memory,
+  product/domain documents, and equivalent durable records. These surfaces may
+  be read as evidence, but accepted durable knowledge is carried only as
+  optional phase data in `knowledge_delta`; never render it in a Feature Spec
+  body. Updates to those surfaces require their owning workflow and separate
+  authorization.
 - Do not invent users, requirements, constraints, or acceptance criteria.
 - Follow `references/publication.md` for the shared GitHub target, publication
   modes, stable refs, and recovery contract; this phase owns only Feature Spec
