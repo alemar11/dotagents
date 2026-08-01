@@ -1,6 +1,6 @@
 ---
 name: plugins-reload
-description: Refresh this project's repo-local GitStack and Feature Flow plugins in the Codex cache. Use after changing either plugin or when a new Codex task must load the current plugin files.
+description: Refresh this project's repo-local GitStack and Software Project plugins in the Codex cache. Use after changing either plugin or when a new Codex task must load the current plugin files.
 ---
 
 # Plugins Reload
@@ -9,7 +9,7 @@ Run these commands from the repository root:
 
 ```sh
 codex plugin add "gitstack@alemar11" --json
-codex plugin add "feature-flow@alemar11" --json
+codex plugin add "software-project@alemar11" --json
 ```
 
 For GitStack maintenance, prefer the repository's Bash helper. It runs the

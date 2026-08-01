@@ -1,0 +1,25 @@
+{
+  "name": "software-project",
+  "version": "0.7.0",
+  "description": "Maintain project context, improve architecture, capture ideas, plan feature bundles, and coordinate reviewed implementation delivery.",
+  "author": {
+    "name": "alemar11",
+    "url": "https://github.com/alemar11"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Software Project",
+    "shortDescription": "Maintain context, improve architecture, and deliver planned software work.",
+    "longDescription": "Software Project provides five separate skills for durable project context, evidence-backed architecture improvement, Idea capture, Feature Spec planning, and reviewed implementation delivery. Project Context owns repository knowledge and ADR routing; Improve Codebase Architecture discovers and pressure-tests refactors; Idea, Plan, and Implement share one feature workflow contract while delegating GitHub transport to GitStack.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Use $software-project:project-context to maintain durable repository context and ADRs.",
+      "Use $software-project:improve-codebase-architecture to find and pressure-test architecture improvements.",
+      "Use $software-project:plan to turn an Idea into an agent-ready feature bundle."
+    ],
+    "brandColor": "#2F6F8F"
+  }
+}

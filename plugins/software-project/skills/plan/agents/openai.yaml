@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan Spec"
+  short_description: "Converge complete planning bundles for publication or preview."
+  brand_color: "#10B981"
+  default_prompt: "Use $software-project:plan to converge feature intent or a durable Feature Spec into one complete planning bundle, clarify only material unknowns against project evidence, and defer accepted durable knowledge to implementation closeout."
+policy:
+  allow_implicit_invocation: false

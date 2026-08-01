@@ -36,13 +36,15 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
 
-Feature Flow is the repo-local feature-intake, planning, and implementation plugin. It keeps Idea capture, Plan convergence, and Implement orchestration as separate skills, shares one internal clarification protocol plus one metadata contract, and delegates GitHub transport to GitStack:
+Software Project is the repo-local project-lifecycle plugin. It keeps durable context, architecture discovery, Idea capture, Plan convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to GitStack:
 
 | Skill | Purpose |
 | --- | --- |
-| `feature-flow:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
-| `feature-flow:plan` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
-| `feature-flow:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
+| `software-project:project-context` | Maintain durable project context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
+| `software-project:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
+| `software-project:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
+| `software-project:plan` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
+| `software-project:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
 
 ## Reusable Skills
 
@@ -52,13 +54,11 @@ Feature Flow is the repo-local feature-intake, planning, and implementation plug
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
-| `improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Virtual, Store, DB, AI, CLI, and integrations. |
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `focus-task` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
-| `project-context` | Maintain durable project context, ADRs, optional localization memory, confirmed corrections, and evidence-backed Code Review Rules. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
@@ -79,10 +79,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- `improve-codebase-architecture` uses `$project-context` after its internal pressure-test to capture accepted durable domain or architecture decisions.
-- `feature-flow:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
-- `feature-flow:plan` uses the plugin's internal clarification protocol for context-backed questions and `$project-context` for context or ADR routing plus implementation-closeout handoff. Plan owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes plus published tracker mutations.
-- `feature-flow:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Feature Flow workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/feature-flow/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
+- `software-project:improve-codebase-architecture` uses `$software-project:project-context` after its internal pressure-test to capture accepted durable domain or architecture decisions.
+- `software-project:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
+- `software-project:plan` uses the plugin's internal clarification protocol for context-backed questions and `$software-project:project-context` for context or ADR routing plus implementation-closeout handoff. Plan owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes plus published tracker mutations.
+- `software-project:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Software Project workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/software-project/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 
 ## Project-Local Skills
@@ -104,14 +104,14 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add gitstack@alemar11
-codex plugin add feature-flow@alemar11
+codex plugin add software-project@alemar11
 ```
 
 If the `alemar11` marketplace is already registered, install GitStack directly:
 
 ```sh
 codex plugin add gitstack@alemar11
-codex plugin add feature-flow@alemar11
+codex plugin add software-project@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -120,7 +120,7 @@ of the GitHub source, then install the same plugin:
 ```sh
 codex plugin marketplace add /path/to/dotagents
 codex plugin add gitstack@alemar11
-codex plugin add feature-flow@alemar11
+codex plugin add software-project@alemar11
 ```
 
 During local development, rebuild, test, and reinstall after each versioned
@@ -155,7 +155,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus-task skills/project-context skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus-task skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -184,13 +184,11 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill code-wiki \
   --skill crusty \
   --skill okf \
-  --skill improve-codebase-architecture \
   --skill skill-cli-creator \
   --skill tanstack \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill focus-task \
-  --skill project-context \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \

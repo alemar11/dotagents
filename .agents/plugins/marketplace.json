@@ -17,10 +17,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "feature-flow",
+      "name": "software-project",
       "source": {
         "source": "local",
-        "path": "./plugins/feature-flow"
+        "path": "./plugins/software-project"
       },
       "policy": {
         "installation": "AVAILABLE",
