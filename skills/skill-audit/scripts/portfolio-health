@@ -19,11 +19,15 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 LIVE_LINE_RE = re.compile(r"^\s*-\s+([^:]+(?::[^:]+)?):\s*(.*?)\s+\(file:\s*(.*?)\)\s*$")
 LIVE_CANDIDATE_RE = re.compile(r"^\s*-\s+.*\(file:")
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 SKILL_ROOT_RE = re.compile(r"^\s*-\s+`([^`]+)`\s*=\s*`([^`]+)`")
+SKILL_ROOT_SECTION_START_RE = re.compile(r"^\s*### Skill roots\s*$")
+SKILL_ROOT_SECTION_END_RE = re.compile(r"^\s*###\s+")
+SKILL_CATALOG_START_RE = re.compile(r"^\s*### Available skills\s*$")
+SKILL_CATALOG_END_RE = re.compile(r"^\s*(?:</skills_instructions>|## (?!#))")
 ENTRYPOINT_BYTES_PER_TOKEN = 4
 ENTRYPOINT_REVIEW_TOKENS = 2_500
 ENTRYPOINT_HIGH_DENSITY_TOKENS = 4_000
@@ -107,7 +111,7 @@ def git_root(start: Path) -> Path | None:
 
 def default_roots(start: Path | None = None) -> list[Path]:
     cwd = start or Path.cwd()
-    local_root = git_root(cwd) or git_root(Path(__file__).resolve()) or cwd
+    local_root = git_root(cwd) or cwd
     codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
     roots = [
         local_root / "skills",
@@ -227,13 +231,28 @@ def live_inventory() -> InventoryResult:
         detail = (result.stderr or result.stdout).strip()
         return InventoryResult([], source, (), (), fallback_reason=detail[:500] or f"codex exited {result.returncode}")
     lines = prompt_input_lines(result.stdout)
-    roots = skill_root_aliases(lines)
+    try:
+        roots = skill_root_aliases(lines)
+    except InputError as error:
+        return InventoryResult(
+            [],
+            source,
+            (),
+            (),
+            fallback_reason=str(error),
+            diagnostics=(
+                {
+                    "code": error.code,
+                    "message": str(error),
+                },
+            ),
+        )
     effective_roots = tuple(str(root) for root in dedupe_paths(list(roots.values())))
     records: list[SkillRecord] = []
     candidate_lines = 0
     parse_failures = 0
     unreadable_paths: list[str] = []
-    for line in lines:
+    for line in skill_catalog_lines(lines):
         if not LIVE_CANDIDATE_RE.search(line):
             continue
         candidate_lines += 1
@@ -289,17 +308,58 @@ def live_inventory() -> InventoryResult:
 
 
 def prompt_input_lines(stdout: str) -> list[str]:
-    values = [stdout]
     try:
         parsed = json.loads(stdout)
     except json.JSONDecodeError:
         parsed = None
-    if parsed is not None:
-        values.extend(collect_strings(parsed))
+    values = collect_strings(parsed) if parsed is not None else [stdout]
     lines: list[str] = []
     for value in values:
         lines.extend(str(value).splitlines())
     return lines
+
+
+def skill_catalog_lines(lines: list[str]) -> list[str]:
+    """Return only entries from Codex's authoritative available-skills catalog."""
+    lines = authoritative_skill_lines(lines)
+    catalog: list[str] = []
+    in_catalog = False
+    for line in lines:
+        if SKILL_CATALOG_START_RE.match(line):
+            in_catalog = True
+            continue
+        if in_catalog and SKILL_CATALOG_END_RE.match(line):
+            break
+        if in_catalog:
+            catalog.append(line)
+    return catalog
+
+
+def authoritative_skill_lines(lines: list[str]) -> list[str]:
+    """Return lines inside Codex's structured skills-instructions block."""
+    blocks: list[list[str]] = []
+    current: list[str] | None = None
+    start_marker = "<skills_instructions>"
+    end_marker = "</skills_instructions>"
+    for line in lines:
+        remainder = line
+        while remainder:
+            if current is None:
+                start_index = remainder.find(start_marker)
+                if start_index < 0:
+                    break
+                current = []
+                remainder = remainder[start_index + len(start_marker) :]
+                continue
+            end_index = remainder.find(end_marker)
+            if end_index < 0:
+                current.append(remainder)
+                break
+            current.append(remainder[:end_index])
+            blocks.append(current)
+            current = None
+            remainder = remainder[end_index + len(end_marker) :]
+    return blocks[0] if blocks else []
 
 
 def collect_strings(value: Any) -> list[str]:
@@ -319,11 +379,26 @@ def collect_strings(value: Any) -> list[str]:
 
 
 def skill_root_aliases(lines: list[str]) -> dict[str, Path]:
+    lines = authoritative_skill_lines(lines)
     roots: dict[str, Path] = {}
+    in_root_section = False
     for line in lines:
+        if SKILL_ROOT_SECTION_START_RE.match(line):
+            in_root_section = True
+            continue
+        if in_root_section and SKILL_ROOT_SECTION_END_RE.match(line):
+            break
+        if not in_root_section:
+            continue
         match = SKILL_ROOT_RE.match(line)
         if match:
-            roots[match.group(1)] = Path(match.group(2)).expanduser()
+            alias, raw_path = match.groups()
+            if alias in roots:
+                raise InputError(
+                    "live-root-alias-conflict",
+                    f"duplicate skill root alias in authoritative section: {alias}",
+                )
+            roots[alias] = Path(raw_path).expanduser()
     return roots
 
 

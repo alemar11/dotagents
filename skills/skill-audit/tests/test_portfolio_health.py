@@ -66,6 +66,16 @@ class PortfolioHealthTests(unittest.TestCase):
         self.assertEqual(roots[0], repo.resolve() / "skills")
         self.assertEqual(roots[1], repo.resolve() / ".agents" / "skills")
 
+    def test_default_roots_keep_non_git_cwd_scope(self) -> None:
+        with TemporaryDirectory() as temp:
+            cwd = Path(temp) / "caller"
+            cwd.mkdir()
+
+            roots = PORTFOLIO_HEALTH.default_roots(cwd)
+
+        self.assertEqual(roots[0], cwd / "skills")
+        self.assertEqual(roots[1], cwd / ".agents" / "skills")
+
     def test_explicit_root_forces_filesystem_scope(self) -> None:
         with TemporaryDirectory() as temp:
             base = Path(temp)
@@ -105,8 +115,13 @@ class PortfolioHealthTests(unittest.TestCase):
         with TemporaryDirectory() as temp:
             valid = write_skill(Path(temp), "valid", "live")
             stdout = (
+                "<skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{Path(temp)}`\n"
+                "### Available skills\n"
                 f"- valid: Live skill (file: {valid})\n"
                 "- malformed: Live skill (file: /missing/SKILL.md\n"
+                "</skills_instructions>\n"
             )
             completed = subprocess.CompletedProcess(
                 ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
@@ -121,6 +136,128 @@ class PortfolioHealthTests(unittest.TestCase):
         self.assertEqual(result.fallback_reason, "codex debug prompt-input returned a partial skill inventory")
         self.assertEqual(result.diagnostics[0]["code"], "partial-live-inventory")
         self.assertEqual(result.diagnostics[0]["parse_failures"], 1)
+
+    def test_live_inventory_ignores_file_like_text_outside_catalog(self) -> None:
+        with TemporaryDirectory() as temp:
+            valid = write_skill(Path(temp), "valid", "live")
+            stdout = (
+                "<skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{Path(temp)}`\n"
+                "### Available skills\n"
+                f"- valid: Live skill (file: {valid})\n"
+                "</skills_instructions>\n"
+                "- unrelated: User text (file: /missing/SKILL.md)\n"
+            )
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual([record.name for record in result.records], ["valid"])
+        self.assertIsNone(result.fallback_reason)
+        self.assertEqual(result.diagnostics, ())
+
+    def test_live_inventory_ignores_root_aliases_outside_authoritative_block(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            valid = write_skill(base / "inside", "valid", "live")
+            stdout = (
+                "<skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{base / 'inside'}`\n"
+                "### Available skills\n"
+                "- valid: Live skill (file: r0/valid/SKILL.md)\n"
+                "</skills_instructions>\n"
+                f"- `r0` = `{base / 'outside'}`\n"
+            )
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual([record.realpath for record in result.records], [str(valid.resolve())])
+        self.assertIsNone(result.fallback_reason)
+
+    def test_live_inventory_accepts_concatenated_instruction_boundary(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            valid = write_skill(base, "valid", "live")
+            stdout = (
+                "</plugins_instructions><skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{base}`\n"
+                "### Available skills\n"
+                "- valid: Live skill (file: r0/valid/SKILL.md)\n"
+                "</skills_instructions>\n"
+            )
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual([record.name for record in result.records], ["valid"])
+        self.assertIsNone(result.fallback_reason)
+
+    def test_live_inventory_decodes_json_prompt_input_envelope(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            write_skill(base, "valid", "live")
+            prompt_text = (
+                "</plugins_instructions><skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{base}`\n"
+                "### Available skills\n"
+                "- valid: Live skill (file: r0/valid/SKILL.md)\n"
+                "</skills_instructions>\n"
+            )
+            stdout = json.dumps({"content": [{"type": "text", "text": prompt_text}]})
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual([record.name for record in result.records], ["valid"])
+        self.assertIsNone(result.fallback_reason)
+
+    def test_live_inventory_rejects_duplicate_root_aliases(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            stdout = (
+                "<skills_instructions>\n"
+                "### Skill roots\n"
+                f"- `r0` = `{base / 'one'}`\n"
+                f"- `r0` = `{base / 'two'}`\n"
+                "### Available skills\n"
+                "</skills_instructions>\n"
+            )
+            completed = subprocess.CompletedProcess(
+                ["codex", "debug", "prompt-input"], 0, stdout=stdout, stderr=""
+            )
+
+            with mock.patch.object(PORTFOLIO_HEALTH.shutil, "which", return_value="/usr/bin/codex"), mock.patch.object(
+                PORTFOLIO_HEALTH.subprocess, "run", return_value=completed
+            ):
+                result = PORTFOLIO_HEALTH.live_inventory()
+
+        self.assertEqual(result.fallback_reason, "duplicate skill root alias in authoritative section: r0")
+        self.assertEqual(result.diagnostics[0]["code"], "live-root-alias-conflict")
 
     def test_missing_explicit_root_is_a_structured_error(self) -> None:
         with TemporaryDirectory() as temp:
@@ -183,7 +320,7 @@ class PortfolioHealthTests(unittest.TestCase):
 
         self.assertEqual(set(payload), {"ok", "version", "command", "data"})
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertEqual(payload["command"], ["scan"])
         self.assertNotIn("version", data)
         self.assertEqual(data["entrypoint_policy"]["estimator"], "ceil(utf8_bytes/4)")
@@ -267,13 +404,13 @@ class PortfolioHealthTests(unittest.TestCase):
     def test_version_and_doctor(self) -> None:
         version = run_script("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertEqual(version.stdout.strip(), "portfolio-health 1.1.0")
+        self.assertEqual(version.stdout.strip(), "portfolio-health 1.1.1")
 
         doctor = run_script("--json", "doctor")
         self.assertEqual(doctor.returncode, 0, doctor.stderr)
         payload = json.loads(doctor.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertFalse(payload["data"]["network_required"])
 
     def test_retired_no_live_flag_is_rejected(self) -> None:
