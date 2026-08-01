@@ -52,7 +52,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
-| `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
+| `plan-feature` | Manually converge feature intent or an existing Spec into a complete publishable or preview planning bundle. |
 | `implement-feature` | Discover available Feature Specs or coordinate visible Codex workers through reviewed GitHub PR delivery. |
 | `github-workflow-contract` | Define the GitHub metadata contract consumed by feature-flow skills. |
 | `focus-task` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
@@ -81,7 +81,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `grill-me-with-context` requires `$grill-me` and `$project-context` so it can run the questioning loop, update context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `capture-idea` requires `$github-workflow-contract` for feature metadata. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
-- `plan-feature` requires `$project-context`, `$github-workflow-contract`, `$grill-me-with-context`, and `$plan-harder` for project context, feature metadata, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both write modes, plus applied tracker mutations.
+- `plan-feature` requires `$project-context`, `$github-workflow-contract`, `$grill-me-with-context`, and `$plan-harder` for project context, feature metadata, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both planning modes, plus published tracker mutations.
 - `implement-feature` keeps discovery GitHub-only and side-effect free. Explicit execution preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs; it never merges. The normal six-stage flow and exception routing live in `skills/implement-feature/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 

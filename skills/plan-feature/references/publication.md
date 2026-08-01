@@ -52,8 +52,8 @@ contract-owned metadata only after each final hosted body verifies.
 A retry may resume only an exact transaction identity, role map, complete
 reconstructable parameterized templates, allowed ref slots, materialized final
 bodies, selected Idea refs plus prior outcomes, and current hosted state.
-Foreign or changed targets block. This transaction is run data, not Project
-Memory configuration. Never persist an issue that points to a staging identity.
+Foreign or changed targets block. This transaction is run data, not durable
+project-context data. Never persist an issue that points to a staging identity.
 
 ## Stable Feature Spec References
 

@@ -265,7 +265,7 @@ current durable body and intake `source_spec_ref` through the dependency and
 body gates below. Compare stable fields directly while treating acceptance
 checkbox markers as executor-owned progress: preserve their current state, but
 require criterion text, count, and order to remain unchanged. After both gates
-pass, return that current source to the issue phase and skip Apply Or Propose.
+pass, return that current source to the issue phase and skip Publish Or Preview.
 If a missing section, blocking
 question, new decision, schema repair, or content correction would change the
 source, stop and require a separate explicitly authorized Feature Spec update
@@ -426,7 +426,7 @@ Then verify:
 
 Withhold the artifact and return blockers when the gate fails.
 
-### 6. Apply Or Propose
+### 6. Publish Or Preview
 
 On the existing-source route, skip body drafting and publication. Resolve the
 contract's canonical `feature` row before comparing state. The current GitHub
