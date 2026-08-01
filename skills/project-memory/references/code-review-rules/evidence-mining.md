@@ -81,9 +81,9 @@ and safe path. Historical provenance stays outside the persisted rule.
 ## New Repository Behavior
 
 Do not manufacture "basic" rules for a repository without evidence. If no
-candidate survives, return a no-op and recommend revisiting the skill after the
-team has repeated review findings or documented a meaningful invariant.
+candidate survives, return a no-op and recommend revisiting the operation after
+the team has repeated review findings or documented a meaningful invariant.
 
-Create a new `AGENTS.md` only after the user approves at least one supported
-rule. An explicitly requested empty scaffold is allowed only after explaining
-that it changes no review behavior.
+Create a new `AGENTS.md` only after at least one supported rule is authorized.
+An explicitly requested empty scaffold is allowed only after explaining that
+it changes no review behavior.

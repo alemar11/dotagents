@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: Maintain tracker routing, domain language, ADRs, context, decisions, and localization memory.
+description: Maintain tracker routing, domain language, ADRs, context, localization memory, and evidence-backed Codex Code Review Rules in the closest applicable AGENTS.md.
 ---
 
 # Project Memory
@@ -11,6 +11,8 @@ Use `$project-memory` as the single public entry point for durable repository
 memory:
 
 - lean project-memory pointers in `AGENTS.md`;
+- the exact `## Code Review Rules` section in the closest applicable
+  `AGENTS.md`;
 - tracker routing in `project-memory/config/issue-tracker.md`;
 - canonical artifact-marker, issue-type, and workflow-state vocabulary and
   repository mappings plus explicit transport in
@@ -36,6 +38,7 @@ structured fields in current handoffs and reports.
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
+| `code-review-rules` | Evidence-backed Codex Code Review Rules in the closest applicable `AGENTS.md`. |
 | `full-setup` | All applicable slices, only when explicitly requested. |
 
 For `memory_slice=domain-memory`, resolve `domain_operation` from
@@ -53,9 +56,13 @@ when the selected scope has write authority.
 
 ## Non-Negotiable Boundaries
 
-- Use `AGENTS.md` for operating pointers only. Domain context, tracker detail,
-  planning history, localization rules, and accepted decisions live in their
-  dedicated memory surfaces.
+- Use `AGENTS.md` for operating pointers and the exact `## Code Review Rules`
+  section. Domain context, tracker detail, planning history, localization
+  rules, and accepted decisions live in their dedicated memory surfaces.
+- Keep Code Review Rules concise and behavior-focused. Store the invariant,
+  consequence, and safe path in `AGENTS.md`; keep evidence, evaluation
+  matrices, history coverage, and official-doc routing in the Project Memory
+  references and run report.
 - Load `references/domain-modeling.md` before creating, updating, reviewing, or
   reconciling `CONTEXT.md`, domain docs, or ADRs. Read the current
   memory-owning root's `CONTEXT.md` when it exists. During authorized
@@ -89,6 +96,9 @@ when the selected scope has write authority.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
   only the requested `memory_slice`. A ready implementation-closeout task authorizes
   only its named decisions, evidence, and target surfaces.
+- Select `memory_slice=code-review-rules` only from an explicit Code Review
+  Rules request. Do not infer it from ordinary code review, `AGENTS.md`
+  maintenance, retrospective analysis, or an otherwise broad setup request.
 - An explicitly invoked composed workflow may authorize
   `domain_operation=inline-update` only
   when its caller has durable domain-memory write authority. Tracker mutation
@@ -143,9 +153,12 @@ Load only the selected branch:
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md` and `setup-workflow.md`. |
 | Pointer/settings work | `setup-workflow.md`. |
+| Code review rules | `code-review-rules.md`; add its evidence-mining, rule-evaluation, and official-docs references only when their routing conditions apply. |
 
 Do not load domain, localization, or session-history evidence for tracker-only
-work. This operation-specific loading rule is part of the token contract.
+or code-review-only work unless the selected reference explicitly routes to
+historical evidence. This operation-specific loading rule is part of the token
+contract.
 For any setup branch, load
 [setup-questions.md](references/setup-questions.md) only when inspected
 evidence and the defaults in `setup-workflow.md` leave a material ambiguity.
@@ -170,7 +183,10 @@ persisting run intent as configuration.
   root and scoped context files, context routing, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
   market requirements;
-- pointers: `AGENTS.md` and the files it should index.
+- pointers: `AGENTS.md` and the files it should index;
+- code review rules: the root-to-target `AGENTS.md` chain, existing Code Review
+  Rules, affected code/tests/contracts, and bounded accepted history when
+  routed by `references/code-review-rules.md`.
 
 For existing-project domain bootstrap, use `session-history.md` only when
 recent same-repo evidence is strong enough to be durable.
@@ -187,6 +203,8 @@ for ambiguous values. Resolve only its behavior-affecting settings. For
 `domain_operation=implementation-closeout` or
 `domain_operation=inline-update`, summarize the carried decisions, evidence,
 named targets, and write authority instead of unrelated setup.
+For `memory_slice=code-review-rules`, summarize the target instruction chain,
+existing rule section, candidate set, evaluation state, and write authority.
 
 ### 4. Draft And Show The Change
 
@@ -200,6 +218,12 @@ Update only authorized files. Keep `AGENTS.md` pointer-first. Use
 `domain-modeling.md` for domain content and reconcile implementation-closeout
 decisions against behavior that actually landed; omit provisional planning
 language and verify the docs diff alongside feature proof.
+
+For `memory_slice=code-review-rules`, update only the closest applicable
+`AGENTS.md`. Preserve unrelated instructions and pointers, use the exact
+`## Code Review Rules` heading, and persist only the accepted invariant,
+consequence, and safe path. Do not persist evaluation matrices, confidence,
+history provenance, issue IDs, session IDs, or generic starter rules.
 
 For authorized domain setup/bootstrap, ensure root `CONTEXT.md` exists at every
 memory-owning root selected by the setup scope before completion. Scoped
@@ -216,7 +240,9 @@ artifacts.
 Report `memory_slice`, `domain_operation`, `execution_context`, `write_mode`,
 files changed, reviewed settings/surfaces, evidence, and consuming workflows.
 For `memory_slice=domain-memory`, also report `capture_outcome`; other slices
-omit that domain-only field. Keep destinations, accepted/rejected decisions,
+omit that domain-only field. For `memory_slice=code-review-rules`, also report
+the target `AGENTS.md`, rule count, candidate evaluation state, history
+coverage, and result state. Keep destinations, accepted/rejected decisions,
 and deferral explanations as separate data. For
 `domain_operation=implementation-closeout`, also report the source
 task/decision, durable decisions accepted or rejected, named targets updated,
@@ -242,6 +268,8 @@ it never counts as captured.
 - `domain.md`: root/scoped context discovery, routing, and ownership.
 - `domain-modeling.md`: domain setup, inline update, implementation closeout,
   and periodic review semantics.
+- `code-review-rules.md`: Code Review Rules discovery, evaluation, rendering,
+  and `AGENTS.md` update semantics.
 - `documentation-shapes.md`: fallback context and ADR shapes.
 - `context-seed.md`, `session-history.md`: initial and session-backed bootstrap.
 - `translation.md`: optional localization memory.

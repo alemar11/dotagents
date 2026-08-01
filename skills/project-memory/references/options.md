@@ -18,7 +18,7 @@ Memory and its composed callers.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`, `agents-pointers`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. |
+| `memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`, `agents-pointers`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. `code-review-rules` requires an explicit Code Review Rules request. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | A domain operation is required only for `memory_slice=domain-memory`. |
 | `write_mode` | `apply`, `propose` | Derived from scoped authority | Inspect-only, review-only, dry-run, and proposal requests select `propose`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for direct Grill Me With Context invocation | Selects whether a composed domain workflow may capture now or must return its data to the caller. |
@@ -62,6 +62,9 @@ provide repository facts, but it must not select or override this result.
 - `memory_slice=domain-memory` requires a `domain_operation` other than
   `not-applicable`; every other `memory_slice` requires
   `domain_operation=not-applicable`.
+- `memory_slice=code-review-rules` is selected only from an explicit request to
+  create, improve, install, or review Code Review Rules; ordinary code review
+  and general `AGENTS.md` maintenance do not select it.
 - A `memory_slice` other than `domain-memory` must not emit `capture_mode` or
   domain capture results.
 - `write_mode=propose` cannot produce `capture_outcome=captured`.

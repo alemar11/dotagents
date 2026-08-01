@@ -24,6 +24,7 @@ review:
 - root/scoped context routing
 - translation memory decision
 - `AGENTS.md` setup block state
+- Code Review Rules section state when that slice is selected
 
 Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
@@ -48,6 +49,7 @@ Editable sections:
 - `domain-memory`
 - `translation-memory`
 - `agents-pointers`
+- `code-review-rules`
 - `done`
 
 For each selected configuration section, show the current value first, then
@@ -71,6 +73,8 @@ For each selected configuration section, show the current value first, then
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
 - `agents-pointers`: create missing pointer block, refresh stale pointer block,
   or minimize copied setup detail into project-memory pointers.
+- `code-review-rules`: inspect, propose, or update the exact Code Review Rules
+  section in the closest applicable `AGENTS.md`.
 
 After edits, show intended changed files and before/after settings. An explicit
 request to set up, configure, initialize, update, or refresh project memory is
@@ -116,6 +120,8 @@ Before writing, show only applicable items from this list:
 - current settings summary for review mode;
 - before/after summary for proposed changes;
 - intended `AGENTS.md` pointer block;
+- intended exact `## Code Review Rules` block, target instruction chain, and
+  candidate evaluation when that slice is selected;
 - `AGENTS.md` minimization plan;
 - intended `project-memory/config/issue-tracker.md`;
 - intended `project-memory/config/triage-labels.md`;
@@ -152,6 +158,11 @@ After direct write authority or separate affirmative confirmation:
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
+- When `code-review-rules` is selected, update the closest applicable
+  `AGENTS.md` with the exact `## Code Review Rules` section. Keep the persisted
+  block limited to accepted invariant, consequence, and safe path; preserve
+  unrelated instructions and keep evidence, evaluation matrices, and
+  provenance in the run report or Project Memory references.
 - Create or update root and scoped `CONTEXT.md` through
   `references/domain-modeling.md`. During authorized setup/bootstrap, ensure
   root `CONTEXT.md` exists at every memory-owning root selected by the setup
@@ -196,6 +207,10 @@ implementation policy, localization rules, worker-dispatch rules, or context see
 material into `AGENTS.md`. `$implement-feature` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record.
 
+The `## Code Review Rules` section is a separate exact review contract, not a
+project-memory pointer. Manage it only when the `code-review-rules` slice is
+selected; do not fold its evaluation detail into this pointer block.
+
 ## Completion Report
 
 Summarize only the applicable fields:
@@ -209,6 +224,8 @@ Summarize only the applicable fields:
 - root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
+- Code Review Rules target, rule count, evaluation state, history coverage, and
+  result when selected;
 - session-history window and whether it was used;
 - root-context creation or update, evidence-backed terms/rules/routing, and
   explicit unknowns;

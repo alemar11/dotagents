@@ -51,8 +51,9 @@ When the project root is clear but the requested area is not, ask:
 > - A specific area
 
 If the user selects a specific area, ask which one: issue tracking and workflow
-labels, Idea labels, project context, localization conventions, or agent
-pointers. Translate the answer to the corresponding `memory_slice` internally.
+labels, Idea labels, project context, localization conventions, agent pointers,
+or Code Review Rules. Translate the answer to the corresponding `memory_slice`
+internally.
 
 ## Separate Project Contexts
 
