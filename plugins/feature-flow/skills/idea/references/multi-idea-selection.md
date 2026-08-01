@@ -33,7 +33,7 @@ Interpret a free-form answer only for the candidate it names. It may:
 - rename or revise the candidate;
 - merge it with another candidate;
 - split it into clearer distinct candidates;
-- save it and explicitly queue it for triage;
+- save it;
 - provide another unambiguous save or skip decision.
 
 After a merge or split, rebuild semantic deduplication, names, slugs, owners,

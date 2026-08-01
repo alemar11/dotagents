@@ -1,8 +1,8 @@
 # Idea Template
 
-Use this template only after the candidate's name, owner, queue intent, and
-source evidence are resolved. Preserve tentative language. Record unknowns as
-unknowns instead of inventing requirements or decisions.
+Use this template only after the candidate's name, owner, and source evidence
+are resolved. Preserve tentative language. Record unknowns as unknowns instead
+of inventing requirements or decisions.
 
 ## Canonical Content
 
@@ -37,8 +37,7 @@ unknowns instead of inventing requirements or decisions.
 ```
 
 The issue title supplies `Idea: <Name>`. Render the seven sections in the body.
-Apply the `workflow contract` `idea` label and optional `needs-triage`
-label; do not set a native Issue Type.
+Apply the `workflow contract` `idea` label; do not set a native Issue Type.
 
 ## Content Boundaries
 

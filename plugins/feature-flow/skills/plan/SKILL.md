@@ -354,12 +354,12 @@ and verified. A
 technical, validation, configuration, or partial publication failure normally
 preserves each Idea's prior state. When the requester has answered a prior
 `needs-info` blocker, prevent that stale state from surviving a later technical
-failure by reconciling it to `needs-triage` at terminal exit.
+failure by clearing it at terminal exit and reporting the technical blocker.
 
-Partial coverage writes the canonical cumulative planning-outcome block and
-returns the Idea to `needs-triage`; full coverage writes the canonical
-cumulative block, clears actionable states, and closes the GitHub Idea. Apply
-each decision independently and retry only
+Partial coverage writes the canonical cumulative planning-outcome block, keeps
+the Idea open, and clears `needs-info`; full coverage writes the canonical
+cumulative block, clears `needs-info`, and closes the GitHub Idea. Apply each
+decision independently and retry only
 missing operations after partial source reconciliation. On resume, use the
 reconciliation-only branch and treat a closed GitHub Idea as already reconciled
 only when its complete canonical record exactly matches

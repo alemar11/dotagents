@@ -39,12 +39,12 @@ Use the globally qualified GitHub ref shape `owner/repository#<number>` or its
 canonical hosted URL. A bare `#<number>` is not a durable source identity.
 
 For ordinary planning input, verify that a GitHub Idea is open, carries the
-`workflow contract` `idea` label, has no native Issue Type, and has at
-most one of the contract's `needs-triage` or `needs-info` workflow labels, with
-no other contract workflow-state label. Require the contract's explicit
-`label` transport for the marker and every consumed workflow row. Read the
-complete body and the complete comment history, following pagination until
-every marker-bearing planning-outcome comment has been inspected.
+`workflow contract` `idea` label, has no native Issue Type, and has either no
+workflow-state label or only the contract's `needs-info` label. Require the
+contract's explicit `label` transport for the marker and every consumed
+workflow row. Read the complete body and the complete comment history,
+following pagination until every marker-bearing planning-outcome comment has
+been inspected.
 
 For existing-source continuation, first verify every bound ref appears in the
 stable Spec content and no `- Source Idea:` ref was omitted. Then read each
@@ -193,17 +193,17 @@ still active.
 
 | Run outcome for one Idea | Published durable result |
 | --- | --- |
-| Waiting for one specific requester answer | Keep the Idea open, add `needs-info`, and remove `needs-triage`. |
+| Waiting for one specific requester answer | Keep the Idea open and add `needs-info`. |
 | Failure before a previously requested answer was supplied | Preserve the Idea's previous state and report the blocker. |
-| Failure after a supplied answer resolved `needs-info` | Keep the Idea open, replace stale `needs-info` with `needs-triage`, and report the technical blocker. |
-| Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, add `needs-triage`, and remove `needs-info`. |
-| Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed. |
+| Failure after a supplied answer resolved `needs-info` | Keep the Idea open, clear stale `needs-info`, and report the technical blocker. |
+| Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, and clear `needs-info`. |
+| Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-info`, then close the GitHub Idea as completed. |
 | `run_mode=preview` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
 
 If requester input resumes planning, remove `needs-info` only as part of the
 next terminal reconciliation. If planning is intentionally deferred after the
-answer or fails for a non-requester reason, reconcile to `needs-triage`. The two
-workflow states are mutually exclusive.
+answer or fails for a non-requester reason, leave the Idea open with no
+workflow-state label. `needs-info` is the only workflow state for an Idea.
 
 A planning result is complete only after every Feature Spec, implementation
 issue, metadata mutation, and relationship in the complete published bundle is
@@ -291,9 +291,9 @@ operation, and resume from verified tracker state. In `run_mode=preview`,
 report any required label creation as intended output but request no mutation.
 
 For GitHub `run_mode=publish`, write and verify the canonical outcome comment
-first, reconcile `needs-triage` and `needs-info` second, and close a fully
-covered Idea last. Use `$gitstack:github-issues` for each exact operation,
-verify state after every mutation, and retry only operations proven missing.
+first, reconcile `needs-info` second, and close a fully covered Idea last. Use
+`$gitstack:github-issues` for each exact operation, verify state after every
+mutation, and retry only operations proven missing.
 Retain the `idea` marker when closing.
 
 Apply lifecycle operations only for explicitly selected new-source

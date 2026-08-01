@@ -23,8 +23,8 @@ tracker mutation.
    outcomes. Exclude malformed or fully consumed artifacts from ordinary
    selection. Classify an open GitHub Idea with a latest full outcome as
    reconciliation-pending rather than a planning candidate. Surface
-   `needs-info`, queue state, and every prior partial planning outcome rather
-   than hiding them.
+   `needs-info` and every prior partial planning outcome rather than hiding
+   them.
 5. Present each eligible candidate with its globally unambiguous ref, tracker
    owner, title, concise Summary, workflow state, and prior Feature Spec refs.
    Discovery itself never changes labels, files, comments, or issue state.

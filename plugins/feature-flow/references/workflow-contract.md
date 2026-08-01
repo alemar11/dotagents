@@ -28,7 +28,6 @@ from the workflow-state matrix.
 
 | Label | Applied by | Read by | Removed by | Scope |
 | --- | --- | --- | --- | --- |
-| `needs-triage` | `idea`, `plan` | `idea`, `plan` | `plan` when lifecycle advances | Idea lifecycle |
 | `needs-info` | `plan` | `plan` | `plan` when blockers are resolved | Idea lifecycle |
 | `ready-for-agent` | `plan` | `plan`, `implement` | executor-owned after planning | Implementation issue readiness |
 
@@ -36,11 +35,10 @@ from the workflow-state matrix.
 
 - `idea` is applied to every durable Idea and is never applied to an
   implementation issue.
-- `needs-triage` and `needs-info` are mutually exclusive.
-- A captured Idea is dormant by default; `needs-triage` is added only when the
-  user explicitly queues it for evaluation.
-- `needs-info` is applied only when Plan has unresolved information required to
-  continue planning.
+- A captured Idea has no workflow-state label by default.
+- `needs-info` is the only workflow-state label allowed on an Idea and is
+  applied only when Plan has unresolved information required to continue
+  planning.
 - `ready-for-agent` belongs only to implementation issues after Plan has
   produced a complete, hardened issue contract.
 - Every final implementation issue must carry `ready-for-agent` before
@@ -52,6 +50,6 @@ from the workflow-state matrix.
 
 | Skill | Applies | Reads | Does not own |
 | --- | --- | --- | --- |
-| `idea` | `idea`, optional `needs-triage` | Idea marker and queue state | Feature Specs, implementation issues, planning transitions |
-| `plan` | `needs-triage`, `needs-info`, `ready-for-agent` | All active metadata | GitHub transport |
+| `idea` | `idea` | Idea marker | Feature Specs, implementation issues, planning transitions |
+| `plan` | `needs-info`, `ready-for-agent` | All active metadata | GitHub transport |
 | `implement` | none | `ready-for-agent` as the execution gate | Label application and taxonomy |

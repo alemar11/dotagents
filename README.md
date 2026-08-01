@@ -40,7 +40,7 @@ Feature Flow is the repo-local feature-intake, planning, and implementation plug
 
 | Skill | Purpose |
 | --- | --- |
-| `feature-flow:idea` | Capture durable GitHub Ideas and optionally queue them for triage. |
+| `feature-flow:idea` | Capture durable GitHub Ideas. |
 | `feature-flow:plan` | Converge Feature Specs and agent-ready implementation issue graphs. |
 | `feature-flow:engineering-plan` | Create codebase-grounded implementation plans or harden individual issues. |
 | `feature-flow:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |

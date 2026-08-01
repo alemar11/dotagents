@@ -31,24 +31,22 @@ owns the complete selectable registry:
 
 Reject every unregistered field or noncanonical value. Explicit repository
 scope, tracker owner, feature metadata values, candidate decisions, names,
-slugs, refs, and queue intent are execution facts or data, not options.
+slugs, and refs are execution facts or data, not options.
 
 ## Fixed Capture Contract
 
 - Every Idea has exactly one tracker-owning repository. Use globally
   unambiguous durable refs: `owner/repository#<number>` or a canonical hosted
   URL.
-- The Feature Flow workflow contract owns the `idea` artifact marker, the
-  `needs-triage` workflow label, and their GitHub label transport. Explicit user
-  scope owns the repository set; each Idea then names one tracker-owning
-  repository. Load the contract and reject missing or incompatible metadata;
-  do not define fallback taxonomy or silently write setup files.
+- The Feature Flow workflow contract owns the `idea` artifact marker and its
+  GitHub label transport. Explicit user scope owns the repository set; each Idea
+  then names one tracker-owning repository. Load the contract and reject
+  missing or incompatible metadata; do not define fallback taxonomy or silently
+  write setup files.
 - A GitHub Idea is an open issue titled `Idea: <Name>`, has the contract's
   `idea` label, and has native Issue Type unset.
-- Capture creates a dormant Idea by default. Add `needs-triage` only when the
-  user explicitly queues that candidate for evaluation. At capture time,
-  `needs-triage` is the only allowed workflow state. Open questions in the body
-  do not imply `needs-info` or any other label or state.
+- Capture creates an Idea with only the `idea` label. Open questions in the body
+  do not imply `needs-info` or any other workflow state.
 - Resolve every candidate decision, tracker owner, duplicate, and collision
   before the first write. A later write failure may produce a verified partial
   result, but unresolved input must not.
@@ -73,7 +71,7 @@ one-question-at-a-time fallback.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| Feature Flow workflow contract | Idea reads or writes Idea metadata. | Load the exact `idea` and optional `needs-triage` contract values; Idea owns when they are applied, and never edits the contract at runtime. |
+| Feature Flow workflow contract | Idea reads or writes Idea metadata. | Load the exact `idea` contract value; Idea owns when it is applied, and never edits the contract at runtime. |
 | `$gitstack:github-issues` | Idea needs exact issue or label reads, or `run_mode=publish` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
 
 In `run_mode=preview`, allow only read-only GitHub inspection; do not request
@@ -124,14 +122,14 @@ contract from
 
 Before any write:
 
-1. Resolve every accepted candidate's final name, slug, body, queue intent, and
-   one tracker owner.
+1. Resolve every accepted candidate's final name, slug, body, and one tracker
+   owner.
 2. Render its body with [idea-template.md](references/idea-template.md).
 3. Derive its target and globally unambiguous applied or proposed ref.
 4. Inspect the target tracker for equivalent open Ideas, title collisions, and
    label availability.
 5. Treat an existing artifact as an exact equivalent only when its proposal,
-   tracker owner, canonical marker, type absence, and queue state are
+   tracker owner, canonical marker, type absence, and workflow state are
    compatible. Reuse that durable ref and do not create a duplicate.
 6. When the same title or slug has materially different content or
    incompatible metadata, ask whether to reuse, rename, or revise. Never
@@ -162,9 +160,9 @@ operations, and retry only operations proven absent. Never replay the complete
 batch from stale assumptions.
 
 Report each candidate as `created`, `reused`, `proposed`, `skipped`, or
-`failed`, with its tracker owner, name, queue intent, and durable or proposed
-ref. Clearly mark proposals as non-durable. On partial failure, list the exact
-verified refs already created and the remaining safe resume work.
+`failed`, with its tracker owner, name, and durable or proposed ref. Clearly
+mark proposals as non-durable. On partial failure, list the exact verified refs
+already created and the remaining safe resume work.
 
 End after capture reporting. Planning and source-Idea lifecycle transitions
 belong to Plan, not Idea.
