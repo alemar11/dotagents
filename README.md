@@ -41,6 +41,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | Skill | Purpose |
 | --- | --- |
 | `autoreview` | Explicitly run a `gpt-5.6-sol` closeout review at high or xhigh effort, adding one native lens only for high-risk changes. |
+| `codex-cli` | Launch one complete prompt in a separate Codex CLI task with Sol/Terra/Luna selection and model-aware reasoning. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Direct-only independent advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
@@ -152,7 +153,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/github-workflow-contract skills/focus-task skills/grill-me skills/project-context skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/github-workflow-contract skills/focus-task skills/grill-me skills/project-context skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -178,6 +179,7 @@ Install all reusable skills globally for Codex:
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
   --skill autoreview \
+  --skill codex-cli \
   --skill code-wiki \
   --skill crusty \
   --skill okf \
