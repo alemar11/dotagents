@@ -33,6 +33,10 @@ when the package is intended for Codex.
 - Create reusable skills under `skills/<name>/` and maintainer skills under
   `.agents/skills/<name>/`. Give each a stable lower-kebab name, `SKILL.md`,
   and `agents/openai.yaml` when it is a discoverable Codex skill.
+- Keep `skills/plugins-reload/SKILL.md` synchronized with the repo-local plugin
+  set in `.agents/plugins/marketplace.json` and update its reload commands when
+  a project plugin is added, removed, renamed, or its installation workflow
+  changes.
 - Keep selection metadata, trigger rules, load-bearing workflow order,
   mutation boundaries, and output contracts in `SKILL.md`. Keep branch-specific
   detail in directly routed lowercase `references/*.md` files.
