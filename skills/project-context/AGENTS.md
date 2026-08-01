@@ -1,34 +1,51 @@
 # Project Context Maintenance
 
-`skills/project-context/` is the reusable owner of durable project context,
-localization memory, ADR routing, confirmed durable capture, AGENTS.md
-compaction proposals, and evidence-backed Code Review Rules. Runtime behavior
-belongs in `SKILL.md` and the routed references.
+`skills/project-context/` owns durable project context, ADR routing, optional
+localization memory, confirmed durable capture, Code Review Rules, and
+explicit `AGENTS.md` compaction proposals. Runtime behavior stays in `SKILL.md`
+and routed references.
 
 ## Ownership map
 
-- `references/options.md` owns canonical selectable fields and values; do not
-  add execution context, confirmation state, or capture results as options.
+- `references/options.md` owns the complete selectable-field registry. Keep
+  execution context, write authority, confirmation, evidence, and capture
+  results as data rather than options.
 - `references/domain.md`, `domain-modeling.md`, `durable-capture.md`,
   `agents-compaction.md`, `code-review-rules.md`, and
-  `documentation-shapes.md` own their respective workflows and shapes.
+  `documentation-shapes.md` own their named workflows and shapes.
 - Consumer repositories own root/scoped `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-context/`, and the closest applicable
-  `AGENTS.md`. This package must not invent repository paths or copy durable
-  facts without evidence and authority.
-- `scripts/extract_recent_transcript.py` is an optional Codex-session evidence
-  helper. It emits JSON, writes no config, and is not a source of durable truth.
-- The skill has no persistent configuration and no tracker or publication
-  contract. Use focused Markdown, path, helper, stale-vocabulary, and
-  documentation-diff checks for maintenance.
+  `AGENTS.md`. This package must not invent repository paths or copy facts
+  without evidence and authority.
+- `scripts/extract_recent_transcript.py` is an optional session-evidence
+  helper. It emits JSON, writes no configuration, and is not durable truth.
 
-## Durable-boundary rules
+## Maintenance contract
 
-- Keep runtime guidance separate from maintainer routing. Preserve unrelated
-  project prose when updating pointers, Code Review Rules, or compaction
-  proposals.
-- Keep evidence, evaluation matrices, history, and before/after proposals in
-  references or run reports; write only the exact named durable surfaces
-  authorized by the caller or confirmed by the user.
-- Keep always-active invariants in `AGENTS.md`; conditional detail belongs in
-  indexed flat topic files under the consumer repository's `project-context/`.
+- The skill has no persistent configuration and no tracker, publication,
+  delivery, or worker-orchestration contract. Do not reintroduce
+  `project-context/config/` or move workflow-owned metadata here.
+- Keep the consumer structure canonical: one repository-root
+  `project-context/` with flat topic files and `adr/` for accepted decisions;
+  root `CONTEXT.md` is the entry point, `TRANSLATION.md` is optional and
+  evidence-backed, and nested context roots are not created for monorepo
+  scopes.
+- Keep always-active invariants and the minimum normative Code Review Rules in
+  the closest `AGENTS.md`; conditional detail, matrices, history, and
+  provenance belong in indexed context files or references.
+- Durable capture and compaction are proposal-first unless the caller supplies
+  explicit scoped authority. Preserve unrelated text, show exact target and
+  wording, require affirmative confirmation where the runtime contract says
+  so, and suffix inserted AGENTS learning bullets with ` (Codex learning)`.
+- Keep `github-workflow-contract` as the feature metadata owner and GitStack as
+  transport owner. Project Context may route to those contracts but must not
+  duplicate their values or publication rules.
+
+## Validation
+
+- Run focused Markdown, link, stale-vocabulary, and documentation-diff checks
+  for reference changes, plus the package tests when executable behavior
+  changes.
+- Verify the helper's JSON contract and no-write behavior when touching the
+  transcript helper. Validate context pointers, ADR indexes, and absence of
+  duplicate normative rules for surface changes.

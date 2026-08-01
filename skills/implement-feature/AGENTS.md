@@ -1,30 +1,43 @@
 # Implement Feature Maintenance
 
 `skills/implement-feature/` owns the Codex App orchestration entrypoint for
-GitHub Feature Specs. Its runtime contract is intentionally split between
-`SKILL.md` and the directly routed references; do not move that contract into
-this maintenance pointer.
+GitHub Feature Specs. Runtime behavior stays in `SKILL.md` and the directly
+routed references; this file records maintenance contracts for the package.
 
-## Owned runtime surfaces
+## Owned surfaces
 
 - `scripts/run-state` is the sole stateful helper. Its CLI version, runtime
-  contract, protocol versions, artifact fingerprinting, and database schema are
-  separate authorities; the executable and `references/run-state.md` must stay
-  aligned.
-- `scripts/verify-ready` is a separate read-only terminal verifier and must not
-  write run state.
+  contract, named JSON protocols, artifact fingerprint, and database schema
+  are separate authorities; the executable and `references/run-state.md`
+  must stay aligned.
+- `scripts/verify-ready` is a separate read-only terminal verifier and must
+  never write run state.
 - `tests/test_run_state_github.py` and `tests/test_verify_ready.py` are the
-  focused executable regression surfaces. The remaining `references/` files own
-  startup, worker, recovery, scope-repair, and closeout details.
+  focused executable regression surfaces. The other references own startup,
+  worker, recovery, scope-repair, and closeout details.
 
-## Maintenance rules
+## Maintenance contract
 
-- Preserve the one-runtime, no-migration hard cut for the run-state database;
-  do not add aliases, compatibility importers, alternate state files, or a
-  second orchestrator.
-- Keep the Codex-dependent boundary explicit and retain portable fallbacks only
-  where the runtime contract already defines them. Do not reintroduce local
-  tracker or merge delivery paths.
-- Any helper or protocol change requires the focused suites plus the shipped
-  command's help/version/doctor or read-only verification checks before it is
-  treated as valid.
+- Preserve the one-runtime hard cut for run state: no aliases, compatibility
+  importers, alternate state files, migrations, or second orchestrator. Keep
+  the database schema version independent from CLI and protocol versions.
+- Preserve the Codex App-only, manual invocation boundary and the one-to-one
+  local saved Git-project preflight. Do not reintroduce local tracker,
+  publication, merge, or delivery paths.
+- Keep GitHub Issues as the source tracker and GitHub PR as the delivery
+  boundary. GitStack owns Git/GitHub transport; this package owns orchestration
+  and verification, not transport implementation.
+- Keep worker implementation and review evidence worker-owned, root follow-up
+  evidence-only, and cross-worktree access forbidden. Do not persist raw
+  Feature Spec or issue bodies in run state.
+- Treat worker/task identity, exact HEAD evidence, scope revision, and
+  recovery observations as typed protocol data. Reject stale generations and
+  unknown fields instead of adding compatibility readers.
+
+## Validation
+
+- Run the focused run-state and `verify-ready` suites for helper or protocol
+  changes.
+- Verify each shipped command's help/version and read-only or doctor checks;
+  exercise recovery or scope repair with a bounded fixture when those paths
+  change.

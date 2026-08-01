@@ -11,16 +11,22 @@ requirements remain in `SKILL.md` and its references.
 - `scripts/code_wiki/version.py` owns the helper version used by
   `scripts/code-wiki --version`.
 - `references/wiki-html-contract.md`, `references/repo-study-playbook.md`,
-  and `references/image-guidance.md` own the output and study contracts; do not
-  duplicate their detailed rules in this file.
+  and `references/image-guidance.md` own output and study contracts; do not
+  duplicate their detailed rules here.
 - `tests/` protects the launcher, validation reports, HTML contract, and
   evidence/link behavior.
 
+## Maintenance contract
+
+- Keep final wiki outputs outside `.cache`. Default clones and temporary
+  analysis artifacts belong under `~/.cache/dotagents/skills/code-wiki/`;
+  requested self-contained source storage belongs under the documented wiki
+  output root with its ignore-all source cache.
+- Preserve the Codex-dependent boundary and keep image generation and
+  subagent use optional only where the runtime contract provides a fallback.
+
 ## Validation
 
-- For runtime changes, run the focused unittest suite and verify
-  `scripts/code-wiki --help`, `--version`, and a disposable local inventory,
-  scaffold, or validate fixture through the shipped launcher.
-- Keep generated wiki outputs and source caches outside the skill package's
-  tracked runtime surfaces unless a user explicitly requests self-contained
-  source storage under the documented output root.
+- Run the focused unittest suite for runtime changes.
+- Verify `scripts/code-wiki --help`, `--version`, and a disposable local
+  inventory, scaffold, or validate fixture through the shipped launcher.
