@@ -8,8 +8,9 @@ behavior, not a user option, Feature Spec field, Project Context value, tracker
 artifact, run-manifest field, or SQLite fact.
 
 The policy applies only to the visible worker task created for each
-implementation-eligible Feature Spec. AutoReview owns its own review model
-policy independently.
+implementation-eligible Feature Spec. Native `codex review` uses the installed
+Codex CLI's review command and is not a separate Implement Feature model
+selection or run-state option.
 
 ## Canonical Profile
 

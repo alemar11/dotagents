@@ -24,7 +24,7 @@ Run this checklist before finalizing maintainer updates.
 ## 3. Execute Validation
 
 - Run every selected validation lane and record its commands and results.
-- Run `$autoreview` for non-trivial implementations and resolve or explicitly
+- Run native `codex review` for non-trivial implementations and resolve or explicitly
   disposition accepted findings.
 - Treat a missing required lane as `result=fail` unless the user explicitly accepts a
   narrower result.

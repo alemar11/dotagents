@@ -103,8 +103,8 @@ recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, review-candidate preparation, finding
 acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
-worker always runs AutoReview. Root never runs AutoReview and only verifies the
-worker's reported review evidence.
+worker always runs the native `codex review` command in its managed checkout;
+root never runs review and only verifies the worker's reported review evidence.
 
 The controller task may be bound to a local Codex multi-folder project. Codex
 uses that project's primary folder for new-task working directory, default Git
@@ -240,7 +240,7 @@ more Feature Specs. A discovery-only request never enters this flow.
    authorized and supported, recompute same-root overlap, then send the
    crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,
-   Codex task, Git, PR, CI, and AutoReview-owned review evidence without editing or
+   Codex task, Git, PR, CI, and native Codex review evidence without editing or
    judging criteria. Complete each assignment claim when its root-verified
    evidence reaches `pr-ready`, then finish the run only
    when the whole requested GitHub PR vector is ready.

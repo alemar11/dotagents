@@ -26,11 +26,11 @@ Update parent Feature Spec criteria only after the complete Spec-level behavior
 is proven. Read the parent again after every change. GitHub mutations go through
 the current GitStack issue workflow.
 
-Complete and read back all tracker mutations before opening AutoReview's first
-full review on the committed candidate. If a review fix invalidates acceptance
-proof, uncheck or repair the tracker state, read it back, and include the
-restored tracker state in the same coherent fix HEAD before AutoReview
-fix-verification. A tracker-only HEAD after clean review is sequencing drift:
+Complete and read back all tracker mutations before opening the first full
+native Codex review on the committed candidate. If a review fix invalidates
+acceptance proof, uncheck or repair the tracker state, read it back, and include
+the restored tracker state in the same coherent fix HEAD before rerunning
+`codex review`. A tracker-only HEAD after clean review is sequencing drift:
 it does not justify another model review and must not be used as terminal
 evidence.
 

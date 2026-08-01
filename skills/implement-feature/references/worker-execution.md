@@ -5,8 +5,8 @@ ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
 repairs, tests, validation, commits, review-candidate preparation, finding
 acceptance and fixes, GitHub issue progress, GitHub PR publication, CI, provider
-review fixes, AutoReview, and final evidence. Root only orchestrates and
-verifies the worker's reported evidence.
+review fixes, native Codex review, and final evidence. Root only orchestrates
+and verifies the worker's reported evidence.
 
 Before implementation, verify or create/select the declared named branch in the
 managed worktree. Detached HEAD, another branch, or a dirty baseline blocks
@@ -14,12 +14,11 @@ until the worker safely establishes the contract inside its own worktree. Never
 switch the original/main worktree and never treat the managed worktree alone as
 durable delivery.
 
-Before editing implementation files, run
-`<autoreview-skill-root>/scripts/autoreview --json doctor` immediately after
-read-only checkout identity preflight and before branch selection. Continue
-only when it succeeds. If the capability is unavailable, report
+Before editing implementation files, run `codex review --help` immediately
+after read-only checkout identity preflight and before branch selection.
+Continue only when it succeeds. If the capability is unavailable, report
 `blocked-app-capability` and stop before implementation. Do not retry with
-escalation or copy credentials. Root never takes over AutoReview; the worker
+escalation or copy credentials. Root never takes over native review; the worker
 retains design, implementation, finding verification, fixes, validation,
 tracker, review, and delivery authority.
 
@@ -77,13 +76,12 @@ Respect the accepted material attempt budget and required validation result.
 Use target-repository instructions for commits and validation. Use current
 GitStack workflows only for required GitHub operations. Finish implementation,
 focused validation, tracker checkbox/readback work, and the coherent committed
-candidate HEAD before starting the review handoff. The worker invokes
-`$autoreview`, verifies and aggregates findings, owns every fix and
-revalidation, and sends any changed candidate through the same worker-owned
-AutoReview chain for fix verification. AutoReview owns
-`review_profile=standard|high-risk`; only its `high-risk` path adds one native
-current-head Codex review. Never force-push published history, merge, enqueue,
-deploy, release, or perform post-merge closure.
+candidate HEAD before starting the review handoff. The worker derives
+`review_profile=standard|high-risk`, runs native `codex review` against the
+candidate's base branch, verifies and aggregates its findings, owns every fix
+and revalidation, and reruns the same command whenever a fix changes HEAD.
+Both review profiles invoke the native command. Never force-push published
+history, merge, enqueue, deploy, release, or perform post-merge closure.
 
 Before worker-owned review, run:
 
@@ -96,11 +94,19 @@ Before worker-owned review, run:
 
 Use its exact `head_sha` and `base_sha` fields verbatim. Never expand a short
 SHA manually. The worker repeats this readback immediately before launch and
-keeps the review evidence bound to the exact candidate HEAD.
+keeps the review evidence bound to the exact candidate HEAD. Then run:
+
+```bash
+codex review --base <base-branch>
+```
+
+The command reviews the complete branch delta against the declared base. If
+the worker fixes a finding, repeat `verify-ready`, rerun the same command, and
+bind `codex_review_head_sha` and `review_head_sha` to the resulting HEAD.
 
 Follow `tracker-checklists.md` for every issue and parent checkbox. If later work
 invalidates proof, uncheck it and read back the correction. Restore and commit
-that proof before the next AutoReview fix verification; do not create a
+that proof before the next native review fix verification; do not create a
 tracker-only post-review HEAD.
 
 The successful result is `pr-ready-for-merge` with GitHub PR/provider/CI and

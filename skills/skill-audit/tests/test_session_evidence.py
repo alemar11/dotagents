@@ -30,7 +30,7 @@ class SessionEvidenceTests(unittest.TestCase):
         return Path(handle.name)
 
     def test_custom_code_mode_call_captures_worker_metadata(self) -> None:
-        target_path = "/repo/skills/autoreview/SKILL.md"
+        target_path = "/repo/skills/codex-cli/SKILL.md"
         path = self.write_session(
             [
                 {
@@ -57,7 +57,7 @@ class SessionEvidenceTests(unittest.TestCase):
                             "const a = await tools.exec_command({cmd:\"sed -n '1,80p' "
                             f"{target_path}\"}}); "
                             "const b = await tools.exec_command("
-                            "{cmd:\"scripts/autoreview --mode branch\"});"
+                            "{cmd:\"scripts/codex-cli --mode branch\"});"
                         ),
                     },
                 },
@@ -76,9 +76,9 @@ class SessionEvidenceTests(unittest.TestCase):
         )
         self.addCleanup(path.unlink, missing_ok=True)
         targets = cli.parse_targets(
-            ["autoreview"],
+            ["codex-cli"],
             [target_path],
-            ["autoreview=scripts/autoreview"],
+            ["codex-cli=scripts/codex-cli"],
         )
 
         records, session_id = cli.scan_file(path, targets, None)
@@ -115,14 +115,14 @@ class SessionEvidenceTests(unittest.TestCase):
                     "payload": {
                         "type": "custom_tool_call",
                         "name": "exec",
-                        "input": "scripts/autoreview --mode local",
+                        "input": "scripts/codex-cli --mode local",
                     },
                 },
             ]
         )
         self.addCleanup(path.unlink, missing_ok=True)
         targets = cli.parse_targets(
-            ["autoreview"], [], ["autoreview=scripts/autoreview"]
+            ["codex-cli"], [], ["codex-cli=scripts/codex-cli"]
         )
 
         records, session_id = cli.scan_file(path, targets, None)
@@ -160,9 +160,9 @@ class SessionEvidenceTests(unittest.TestCase):
         self.assertEqual(records[0].transport, "function-call")
 
     def test_summary_exposes_transport_and_thread_source(self) -> None:
-        target = cli.Target("autoreview", ("autoreview",), (), ())
+        target = cli.Target("codex-cli", ("codex-cli",), (), ())
         record = cli.Evidence(
-            target="autoreview",
+            target="codex-cli",
             source="opened-skill-doc",
             timestamp="2026-07-11T10:00:00Z",
             session_id="worker-1",
@@ -185,7 +185,7 @@ class SessionEvidenceTests(unittest.TestCase):
             sessions_scanned=1,
         )
 
-        data = summary["targets"]["autoreview"]
+        data = summary["targets"]["codex-cli"]
         self.assertEqual(data["evidence_records"], 1)
         self.assertNotIn("events", data)
         self.assertEqual(data["transports"], {"code-mode-custom-tool": 1})
@@ -196,7 +196,7 @@ class SessionEvidenceTests(unittest.TestCase):
     def test_copied_item_identity_is_deduplicated_across_sessions(self) -> None:
         records = [
             cli.Evidence(
-                target="autoreview",
+                target="codex-cli",
                 source="runtime-command",
                 timestamp="2026-07-11T10:00:00Z",
                 session_id=session_id,
@@ -206,7 +206,7 @@ class SessionEvidenceTests(unittest.TestCase):
                 detail=detail,
             )
             for session_id, detail in (
-                ("root-1", "scripts/autoreview --mode local"),
+                ("root-1", "scripts/codex-cli --mode local"),
                 ("worker-copy", "copied detail should not create another record"),
             )
         ]
@@ -219,7 +219,7 @@ class SessionEvidenceTests(unittest.TestCase):
     def test_legacy_calls_with_distinct_details_are_retained(self) -> None:
         records = [
             cli.Evidence(
-                target="autoreview",
+                target="codex-cli",
                 source="runtime-command",
                 timestamp="2026-07-11T10:00:00Z",
                 session_id="root-1",
@@ -229,8 +229,8 @@ class SessionEvidenceTests(unittest.TestCase):
                 detail=detail,
             )
             for detail in (
-                "scripts/autoreview --mode local",
-                "scripts/autoreview --mode branch",
+                "scripts/codex-cli --mode local",
+                "scripts/codex-cli --mode branch",
             )
         ]
 

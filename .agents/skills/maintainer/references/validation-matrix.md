@@ -12,7 +12,7 @@ union of its lanes; one successful lane never substitutes for another.
 | Plugin | Apply the required semantic version bump, align embedded CLI version, rebuild deterministically, run plugin tests, reinstall, compare source/cache artifacts, and prove from before/after status that reinstall introduced no checkout changes. |
 | Migration or removal | Scan callers/dependencies/install docs, verify replacement discovery, prove retired surfaces are absent, and test the chosen compatibility policy. |
 | Codex dependency change | Verify `AGENTS.md` classification and explicit Codex contracts or portable fallbacks. |
-| Non-trivial implementation | Run `$autoreview` on the final scoped diff and resolve or disposition accepted findings before commit/publication. |
+| Non-trivial implementation | Run native `codex review` on the final scoped diff and resolve or disposition accepted findings before commit/publication. |
 
 ## Evidence Rules
 

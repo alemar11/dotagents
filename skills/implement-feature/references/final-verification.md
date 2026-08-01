@@ -27,11 +27,10 @@ For each assignment, root rereads:
 - exact target branch and head SHA;
 - base branch, base SHA, and proven ancestry;
 - current-head validation evidence;
-- current-head AutoReview evidence with its derived
-  `review_profile=standard|high-risk`; `standard` requires no native Codex
-  review, while `high-risk` requires the single native Codex review on that
-  same initial `review_candidate_head_sha` and an AutoReview evidence chain
-  that closes its findings on the current HEAD;
+- current-head native Codex review evidence with its worker-derived
+  `review_profile=standard|high-risk`; both profiles require `codex review` on
+  the candidate, and its final `codex_review_head_sha` must bind the current
+  HEAD after all accepted fixes;
 - actionable feedback resolution;
 - committed tracker readback and a clean managed worktree;
 - open non-draft PR identity, provider default-branch base, configured CI,

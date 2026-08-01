@@ -55,7 +55,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         return {
             "schema": "implement-feature/run-manifest",
             "schema_version": "4.0.0",
-            "runtime_contract_version": "8.0.0",
+            "runtime_contract_version": "9.0.0",
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "controller_project_id": "controller-project",
@@ -149,7 +149,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--base-is-ancestor",
             "--validation-head-sha",
             head_sha,
-            "--autoreview-head-sha",
+            "--review-head-sha",
             head_sha,
             "--review-candidate-head-sha",
             head_sha,
@@ -157,6 +157,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
             review_profile,
             "--readiness-mode",
             "terminal",
+            "--codex-review-head-sha",
+            codex_review_head_sha or head_sha,
             "--tracker-readback-ref",
             "tracker:example:42",
             "--default-branch-name",
@@ -168,8 +170,6 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--output",
             str(output),
         ]
-        if codex_review_head_sha is not None:
-            arguments.extend(["--codex-review-head-sha", codex_review_head_sha])
         return arguments
 
     def test_current_schema_has_no_retired_transport_storage(self) -> None:
@@ -351,10 +351,10 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(stale["error"]["code"], "revision-conflict")
 
-    def test_autoreview_owner_is_fixed_to_worker(self) -> None:
+    def test_review_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
         self.assertEqual(capabilities["cli_version"], "1.0.0")
-        self.assertEqual(capabilities["runtime_contract_version"], "8.0.0")
+        self.assertEqual(capabilities["runtime_contract_version"], "9.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],
             "4.0.0",

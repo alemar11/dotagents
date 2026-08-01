@@ -11,8 +11,8 @@ The behavior-affecting startup fields are:
 After validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
 expected worker count, ChatGPT-created worktrees, GitHub publication, tracker
-mutation, validation, AutoReview, and the AutoReview-owned
-native Codex review only when the derived profile is `high-risk`, plus the exact
+mutation, validation, and the native `codex review` command for every worker,
+plus the exact
 terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
 `high` for complex work, or `xhigh` for risky or cross-system work. An explicit

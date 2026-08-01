@@ -169,10 +169,10 @@ instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider
 refs when applicable.
 
-The worker sends the structured AutoReview result and evidence refs bound to the
-exact reviewed HEAD. Root may read and relay those facts as coordination
-evidence, but never launches AutoReview, adds diagnosis, or supplies repair
-strategy. The worker owns finding acceptance, repair, validation, and
+The worker sends the native `codex review` result summary and evidence refs
+bound to the exact reviewed HEAD. Root may read and relay those facts as
+coordination evidence, but never launches review, adds diagnosis, or supplies
+repair strategy. The worker owns finding acceptance, repair, validation, and
 replacement evidence.
 
 The stable-source mutation ownership table in `feature-spec-contract.md` is
@@ -193,7 +193,7 @@ evidence is bound to `abc`.”
 
 Forbidden example: “Rerun test X and modify file Y.”
 
-Outside the verbatim structured AutoReview result, root provides no diagnosis,
+Outside the worker's verbatim native review result, root provides no diagnosis,
 commands, implementation guidance, checklist judgment, or repair strategy.
 Diagnosis, repair, validation, and replacement evidence remain worker-owned.
 Durable-contract drift is different: record the assignment as blocked instead
@@ -209,11 +209,11 @@ Before its worker-owned review, the worker builds the review handoff with:
 ```
 
 The worker forwards the returned `base_sha` and `head_sha` without shortening,
-expanding, or reconstructing either value to its own AutoReview invocation.
-AutoReview branch mode uses that exact base, `--review-phase full`, and
-`--evidence-output`; commit mode is not a substitute because it cannot open the
-branch evidence chain needed after accepted fixes. Root only verifies the
-resulting evidence and never edits or reviews the candidate.
+expanding, or reconstructing either value to its native review invocation.
+`codex review --base <base-branch>` reviews the complete branch delta. The
+worker reruns it after every accepted fix and binds the final result to the
+current HEAD. Root only verifies the resulting evidence and never edits or
+reviews the candidate.
 
 Before root sends a controller message, record `send-worker-message` in SQLite. After sending, verify
 the immediate response and independently read the exact task conversation,

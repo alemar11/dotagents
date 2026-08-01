@@ -20,7 +20,7 @@ from typing import Any
 
 
 CLI_VERSION = "1.0.0"
-RUNTIME_CONTRACT_VERSION = "8.0.0"
+RUNTIME_CONTRACT_VERSION = "9.0.0"
 DATABASE_SCHEMA_VERSION = 1
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 SQLITE_JOURNAL_MODE = "WAL"
@@ -167,7 +167,7 @@ READY_COMMON_FIELDS = {
     "worktree_clean",
     "base_is_ancestor",
     "validation_head_sha",
-    "autoreview_head_sha",
+    "review_head_sha",
     "review_candidate_head_sha",
     "review_profile",
     "codex_review_head_sha",
@@ -3396,8 +3396,6 @@ def ready_observation_descriptor(
         "review_profile": review_profile,
         "readiness_mode": readiness_mode,
     }
-    if review_profile == "standard":
-        constants["codex_review_head_sha"] = None
     required = set(READY_COMMON_FIELDS)
     required.update(READY_GITHUB_FIELDS)
     required -= set(constants)
@@ -3431,20 +3429,12 @@ def ready_observation_payload(
             "invalid-ready-observation",
             "review_profile must be standard or high-risk",
         )
-    if review_profile == "standard":
-        if args.codex_review_head_sha is not None:
-            raise StateError(
-                "invalid-ready-observation",
-                "standard review_profile does not accept codex_review_head_sha",
-            )
-        codex_review_head_sha = None
-    else:
-        codex_review_head_sha = args.codex_review_head_sha
-        if codex_review_head_sha is None:
-            raise StateError(
-                "invalid-ready-observation",
-                "high-risk review_profile requires codex_review_head_sha",
-            )
+    codex_review_head_sha = args.codex_review_head_sha
+    if codex_review_head_sha is None:
+        raise StateError(
+            "invalid-ready-observation",
+            "native Codex review requires codex_review_head_sha",
+        )
     payload: dict[str, Any] = {
         **protocol_fields("delivery_ready_observation"),
         "assignment_id": assignment["assignment_id"],
@@ -3459,7 +3449,7 @@ def ready_observation_payload(
         "worktree_clean": args.worktree_clean,
         "base_is_ancestor": args.base_is_ancestor,
         "validation_head_sha": args.validation_head_sha,
-        "autoreview_head_sha": args.autoreview_head_sha,
+        "review_head_sha": args.review_head_sha,
         "review_candidate_head_sha": args.review_candidate_head_sha,
         "review_profile": review_profile,
         "codex_review_head_sha": codex_review_head_sha,
@@ -3537,7 +3527,7 @@ def validate_ready_evidence(
             "invalid-ready-observation",
             "delivery readiness requires a clean worktree and proven base ancestry",
         )
-    for field in ("validation_head_sha", "autoreview_head_sha"):
+    for field in ("validation_head_sha", "review_head_sha"):
         if head(value[field], field) != observed_head:
             raise StateError(
                 "stale-ready-evidence",
@@ -3551,20 +3541,11 @@ def validate_ready_evidence(
             "review_profile must be standard or high-risk",
         )
     codex_review_head = value["codex_review_head_sha"]
-    review_candidate_head = head(
-        value["review_candidate_head_sha"],
-        "review_candidate_head_sha",
-    )
-    if review_profile == "standard":
-        if codex_review_head is not None:
-            raise StateError(
-                "invalid-ready-observation",
-                "standard review_profile requires codex_review_head_sha=null",
-            )
-    elif head(codex_review_head, "codex_review_head_sha") != review_candidate_head:
+    head(value["review_candidate_head_sha"], "review_candidate_head_sha")
+    if head(codex_review_head, "codex_review_head_sha") != observed_head:
         raise StateError(
             "stale-ready-evidence",
-            "codex_review_head_sha does not bind review_candidate_head_sha",
+            "codex_review_head_sha does not bind current HEAD",
             4,
         )
     string(value["tracker_readback_ref"], "tracker_readback_ref", 2048)
@@ -4921,7 +4902,7 @@ def build_parser() -> argparse.ArgumentParser:
     ready_create.add_argument("--worktree-clean", action="store_true", required=True)
     ready_create.add_argument("--base-is-ancestor", action="store_true", required=True)
     ready_create.add_argument("--validation-head-sha", required=True)
-    ready_create.add_argument("--autoreview-head-sha", required=True)
+    ready_create.add_argument("--review-head-sha", required=True)
     ready_create.add_argument("--review-candidate-head-sha", required=True)
     ready_create.add_argument(
         "--review-profile",
@@ -4933,7 +4914,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("terminal", "peer-input"),
         required=True,
     )
-    ready_create.add_argument("--codex-review-head-sha")
+    ready_create.add_argument("--codex-review-head-sha", required=True)
     ready_create.add_argument("--tracker-readback-ref", required=True)
     ready_create.add_argument(
         "--prerequisite-head",

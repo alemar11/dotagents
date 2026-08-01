@@ -2,7 +2,7 @@
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
 uses the shipped artifact. CLI release `1.0.0` implements the breaking runtime
-contract `8.0.0` over database schema `1`. Worker creation now atomically
+contract `9.0.0` over database schema `1`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -17,7 +17,7 @@ Four version domains are deliberately independent:
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
 | CLI | `1.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `8.0.0` | Coordination semantics required by an active run |
+| Runtime contract | `9.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -160,7 +160,7 @@ scripts/run-state --json assignment ready-observation create \
   --base-branch-name main --base-sha BASE \
   --checkout-path /absolute/checkout \
   --worktree-clean --base-is-ancestor \
-  --validation-head-sha HEAD --autoreview-head-sha HEAD \
+  --validation-head-sha HEAD --review-head-sha HEAD \
   --review-candidate-head-sha CANDIDATE --review-profile standard \
   --default-branch-name main --pr-url https://github.com/owner/repository/pull/44 \
   --provider-observation-ref PROVIDER \
@@ -213,7 +213,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="4.0.0"`, `runtime_contract_version="8.0.0"`, and the
+`schema_version="4.0.0"`, `runtime_contract_version="9.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -304,8 +304,9 @@ it accepts `archived` or
 Both ready-observation commands require
 `--readiness-mode terminal|peer-input`; the selected value is stored in the
 payload. The ready builder accepts repeated
-`--prerequisite-head ASSIGNMENT_ID=GIT_SHA` flags. `high-risk` requires
-`--codex-review-head-sha`; `standard` rejects it and emits JSON `null`.
+`--prerequisite-head ASSIGNMENT_ID=GIT_SHA` flags. Every review profile requires
+`--codex-review-head-sha`, which must bind the native review to the current
+HEAD.
 GitHub PR delivery requires `--default-branch-name`, `--pr-url`, and
 `--provider-observation-ref`.
 `peer-input` applies the dependent-assignment validation that the consumer
@@ -320,8 +321,9 @@ never choose or replace one. That ID is the durable logical operation identity.
 The returned positive `launch_count` identifies one authorized execution
 generation: begin creates generation `1`, and every accepted replay increments
 it. For `send-bootstrap`, begin also derives the stable `bootstrap_id` in
-`bootstrap-*` form. The operation has no review-owner choice: AutoReview is
-always worker-owned, while root remains an orchestrator and evidence verifier.
+`bootstrap-*` form. The operation has no review-owner choice: native
+`codex review` is always worker-owned, while root remains an orchestrator and
+evidence verifier.
 Every result authorizes only its reported generation.
 
 `create-scope-repair-task` binds the assignment's current repair ID and contract
@@ -403,8 +405,8 @@ Its expected title is derived from the immutable assignment count:
 
 Ready observations always bind assignment/thread/repository/checkout, named head
 and base branches, head/base SHAs, clean worktree, base ancestry, current-head
-validation and AutoReview SHAs, the first coherent review-candidate SHA, the
-derived review profile, its conditional native Codex-review SHA, GitHub issue
+validation and native Codex-review SHAs, the first coherent review-candidate
+SHA, the derived review profile, GitHub issue
 readback, the GitHub default branch, canonical PR URL, provider observation ref,
 and the exact prerequisite HEAD map. Status is always `pr-ready-for-merge`.
 
@@ -413,19 +415,18 @@ The exact common ready-observation fields are:
 `readiness_mode`, `head_sha`, `head_branch_name`,
 `base_branch_name`,
 `base_sha`, `checkout_path`, `worktree_clean`, `base_is_ancestor`,
-`validation_head_sha`, `autoreview_head_sha`, `review_candidate_head_sha`,
+`validation_head_sha`, `review_head_sha`, `review_candidate_head_sha`,
 `review_profile`, `codex_review_head_sha`,
 `tracker_readback_ref`, `prerequisite_heads`, and `status`. Every observation
 also requires exactly `default_branch_name`, `pr_url`, and
 `provider_observation_ref`. No other keys are accepted.
 
-`review_profile` is exactly `standard` or `high-risk`, derived by AutoReview.
-For `standard`, `codex_review_head_sha` must be JSON `null`. For `high-risk`,
-it must equal `review_candidate_head_sha`, proving that AutoReview's one native
-Codex review inspected the same initial candidate as its structured full pass.
-After accepted fixes, `validation_head_sha` and `autoreview_head_sha` bind the
-final `head_sha`; `review_candidate_head_sha` remains the immutable initial
-candidate linked through AutoReview's evidence chain.
+`review_profile` is exactly `standard` or `high-risk`, derived by the worker
+from the accepted task risk. Both profiles invoke native `codex review`; the
+`codex_review_head_sha` must equal the final `head_sha` that the command
+reviewed. After accepted fixes, `validation_head_sha` and `review_head_sha`
+bind the final `head_sha`; `review_candidate_head_sha` remains the immutable
+initial candidate used to start the review handoff.
 
 `readiness_mode` is exactly `terminal` or `peer-input`. `terminal` records the
 GitHub PR terminal assignment state and releases its claim.
@@ -542,7 +543,7 @@ the typed observation required by the operation lifecycle above.
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
 or build output. `CLI_VERSION` is `1.0.0`,
-`RUNTIME_CONTRACT_VERSION` remains `8.0.0`;
+`RUNTIME_CONTRACT_VERSION` is `9.0.0`;
 `DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `state prepare`, plus

@@ -29,7 +29,7 @@ Maintain existing skill and plugin packages through one routed control plane:
 This project-local skill is Codex-dependent. Use `$skill-audit` read-only when
 health or workflow-family claims require portfolio, writing-quality, prompt-cost,
 or session evidence. Use `$skill-creator` or `$plugin-creator` for substantial
-public reshapes and `$autoreview` for non-trivial implementation closeout. The
+public reshapes and native `codex review` for non-trivial implementation closeout. The
 remaining workflows rely on the local repository filesystem, shell, and `git`.
 
 ## Routing And Progressive Disclosure
