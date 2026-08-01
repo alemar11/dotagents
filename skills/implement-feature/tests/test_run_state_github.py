@@ -188,6 +188,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
                 row[1]
                 for row in connection.execute("PRAGMA table_info(app_operation_markers)")
             }
+            journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
             run_sql = connection.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'"
             ).fetchone()[0]
@@ -198,7 +199,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
             connection.close()
         self.assertEqual(metadata_columns, {"singleton", "schema_version"})
         self.assertEqual(marker_columns, {"run_id", "action", "subject_id", "operation_id", "created_at"})
-        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 7)
+        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 1)
+        self.assertEqual(journal_mode, "wal")
         self.assertNotIn("regenerated", prepared)
         self.assertNotIn("tracker_backend", assignment_columns)
         self.assertNotIn("delivery_type", assignment_columns)
@@ -351,7 +353,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
 
     def test_autoreview_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "7.0.1")
+        self.assertEqual(capabilities["cli_version"], "1.0.0")
         self.assertEqual(capabilities["runtime_contract_version"], "8.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],

@@ -1,8 +1,8 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `7.0.1` implements the breaking runtime
-contract `8.0.0` over database schema `7`. Worker creation now atomically
+uses the shipped artifact. CLI release `1.0.0` implements the breaking runtime
+contract `8.0.0` over database schema `1`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -16,9 +16,9 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `7.0.1` | User-facing commands and executable behavior |
+| CLI | `1.0.0` | User-facing commands and executable behavior |
 | Runtime contract | `8.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `7` | Exact SQLite tables, columns, indexes, and constraints |
+| Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -47,20 +47,22 @@ All controllers for the same machine user share:
 ~/.cache/dotagents/skills/implement-feature/run-state.sqlite3
 ```
 
-The directory and DB are owner-only. SQLite transactions use a fixed 5000 ms
-busy timeout. There is no filesystem lock. The application-owned,
+The directory and DB are owner-only. SQLite uses persistent WAL journal mode,
+and transactions use a fixed 5000 ms busy timeout. Writers enable WAL before
+starting their transaction; read-only connections verify the existing mode
+without changing it. There is no filesystem lock. The application-owned,
 single-row `runtime_metadata` table is the sole schema source of truth:
 
 ```sql
 CREATE TABLE runtime_metadata (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 7)
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1)
 );
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=7)`. The integer stored here is not the CLI, runtime-contract,
-or JSON protocol version. Schema number `7` does not authorize an alternate
+`(schema_version=1)`. The integer stored here is not the CLI, runtime-contract,
+or JSON protocol version. Schema number `1` does not authorize an alternate
 shape: every table, column, index, and constraint must match exactly or the CLI
 returns `invalid-state-schema` without deleting or rewriting the DB. `PRAGMA
 user_version` is not application state and is never read or written. Local
@@ -539,12 +541,13 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `7.0.1`,
+or build output. `CLI_VERSION` is `1.0.0`,
 `RUNTIME_CONTRACT_VERSION` remains `8.0.0`;
-`DATABASE_SCHEMA_VERSION` is integer `7`; each protocol entry remains at
+`DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
-read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python
-compilation and the remaining executable verifier checks after changes.
+read-only `capabilities`, `doctor`, and `state prepare`, plus
+`feature-spec-set validate`, Python compilation, and the remaining executable
+verifier checks after changes. `SQLITE_JOURNAL_MODE` remains `WAL`.
 
 Version each domain for its own contract:
 
@@ -572,7 +575,7 @@ breaking hard cut. Never add
 state carry-forward.
 
 At runtime, call read-only `capabilities` and `doctor` first and then
-`state prepare`. The shipped runtime accepts only schema 7. An empty database
+`state prepare`. The shipped runtime accepts only schema 1. An empty database
 is initialized with the exact current tables, columns, indexes, constraints,
 and singleton metadata row. An existing database must already match that exact
 shape; any other schema number, historical shape, unversioned table set,

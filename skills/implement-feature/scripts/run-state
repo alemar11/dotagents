@@ -19,10 +19,11 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "7.0.1"
+CLI_VERSION = "1.0.0"
 RUNTIME_CONTRACT_VERSION = "8.0.0"
-DATABASE_SCHEMA_VERSION = 7
+DATABASE_SCHEMA_VERSION = 1
 SQLITE_BUSY_TIMEOUT_MS = 5_000
+SQLITE_JOURNAL_MODE = "WAL"
 MAX_INPUT_BYTES = 512 * 1024
 MAX_UNCHANGED_WAIT_SWEEPS = 3
 
@@ -324,11 +325,27 @@ def open_database(path: Path, *, write: bool) -> sqlite3.Connection:
         isolation_level=None,
         uri=not write,
     )
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
-    if not write:
-        connection.execute("PRAGMA query_only = ON")
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        if not write:
+            connection.execute("PRAGMA query_only = ON")
+        pragma = (
+            f"PRAGMA journal_mode = {SQLITE_JOURNAL_MODE}"
+            if write
+            else "PRAGMA journal_mode"
+        )
+        journal_mode = connection.execute(pragma).fetchone()[0]
+        if str(journal_mode).lower() != SQLITE_JOURNAL_MODE.lower():
+            raise StateError(
+                "sqlite-journal-mode-mismatch",
+                f"SQLite journal mode must be {SQLITE_JOURNAL_MODE.lower()}, found {journal_mode}",
+                4,
+            )
+    except Exception:
+        connection.close()
+        raise
     return connection
 
 

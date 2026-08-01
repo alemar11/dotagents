@@ -105,7 +105,7 @@ the owning run without claiming delivery success.
 ## Verification CLI Maintenance
 
 Normal runtime execution stays on `scripts/verify-ready`, whose
-`CLI_VERSION = "2.0.0"` is its SemVer source of truth. It is read-only: neither
+`CLI_VERSION = "1.0.0"` is its SemVer source of truth. It is read-only: neither
 `doctor` nor `review-candidate` writes repository or run state. Use a major bump
 for a breaking command removal and a patch bump for a compatible correction.
 Re-run `--help`, `--version`, `--json doctor`, and the review-candidate fixture

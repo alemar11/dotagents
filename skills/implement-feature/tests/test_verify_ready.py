@@ -71,7 +71,7 @@ class VerifyReadyScenarios(unittest.TestCase):
         version = subprocess.run([str(TOOL), "--version"], capture_output=True, text=True, check=True)
         doctor = subprocess.run([str(TOOL), "--json", "doctor"], capture_output=True, text=True, check=True)
         help_result = subprocess.run([str(TOOL), "--help"], capture_output=True, text=True, check=True)
-        self.assertEqual(version.stdout.strip(), "2.0.0")
+        self.assertEqual(version.stdout.strip(), "1.0.0")
         self.assertTrue(json.loads(doctor.stdout)["ok"])
         self.assertIn("review-candidate", help_result.stdout)
         self.assertNotIn("local-branch", help_result.stdout)
