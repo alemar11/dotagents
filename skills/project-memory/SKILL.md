@@ -14,9 +14,6 @@ memory:
 - the exact `## Code Review Rules` section in the closest applicable
   `AGENTS.md`;
 - tracker routing in `project-memory/config/issue-tracker.md`;
-- canonical artifact-marker, issue-type, and workflow-state vocabulary and
-  repository mappings plus explicit transport in
-  `project-memory/config/triage-labels.md`;
 - root-first domain routing through `CONTEXT.md`, with optional scoped
   `CONTEXT.md` files;
 - domain docs and centralized ADRs under the memory-owning root's
@@ -34,7 +31,7 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | GitHub target plus canonical artifact-marker, issue-type, and workflow-state vocabulary and mappings. |
+| `tracker-routing` | GitHub target plus human-readable tracker conventions. |
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -90,9 +87,10 @@ when the selected scope has write authority.
   unresolved.
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are evidenced or confirmed. Do not create empty ADR directories.
-- Project Memory setup configures Idea routing and marker mappings but never
-  creates Idea issues or files. Idea artifacts belong to an explicitly invoked
-  Idea-capture workflow.
+- Project Memory setup configures tracker routing and conventions but never
+  creates Ideas, issues, or labels. It may create or update the authorized
+  project-memory files and pointers; feature artifacts and their metadata
+  belong to explicitly invoked feature workflows.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
   only the requested `memory_slice`. A ready implementation-closeout task authorizes
   only its named decisions, evidence, and target surfaces.
@@ -105,8 +103,8 @@ when the selected scope has write authority.
   authority alone is insufficient.
 - Inspect-only, review-only, proposal, dry-run, or indirect suggestions are not
   write authority. Return the proposed change instead.
-- Preserve unrelated custom prose, mappings, comments, overrides, domain docs,
-  ADRs, and localization content.
+- Preserve unrelated custom prose, comments, overrides, domain docs, ADRs, and
+  localization content.
 - Ask only when the target or behavior-affecting value is materially ambiguous
   after repo evidence and documented defaults.
 
@@ -114,23 +112,15 @@ when the selected scope has write authority.
 
 GitHub Issues is the fixed tracker provider. `issue-tracker.md` records the
 resolved GitHub target and human-readable conventions, not a provider option.
-Project Memory does not store implementation delivery targets, branch or PR
-policy, or executor authorization. Those belong to the current Feature Spec or
-the executing workflow.
+Project Memory does not store feature metadata, label mappings, implementation
+delivery targets, branch or PR policy, or executor authorization. Those belong
+to the consuming feature workflow and its explicit companion contract.
 
-`references/triage-labels.md` is the sole reusable registry for canonical
-`artifact_marker`, `issue_type`, and `workflow_state` values plus their mapping
-transports. The generated `project-memory/config/triage-labels.md` is the
-repository-specific source of truth for tracker values and transport. Marker
-rows use `label`; issue types use `native-type`, `label`, or `body-field`;
-workflow states use `label`. These are
-mapping data, not run options. Consuming skills must load them, reject missing,
-unknown, or GitHub-incompatible transports, and must not define parallel enums
-or aliases.
-The `artifact_marker: idea` mapping is required only for Idea capture and
-Idea-source consumption. If it is absent, stop those Idea-specific operations
-with a setup prerequisite while leaving unrelated planning and implementation
-workflows valid.
+Feature workflows must own the artifact markers, issue types, workflow states,
+exact GitHub values, and the read/write behavior that uses them. They must load
+their own contract, reject unknown or unsupported values, and delegate GitHub
+transport and mutation safety to `$gitstack:github-issues`. Project Memory does
+not provide a fallback registry or compatibility mapping for those concerns.
 Do not add durable keys for Codex runtime project topology, repository sets,
 source-root lists, worktree paths, setup flow, GitHub repo, workers,
 implementation delivery, publication/issue-mutation authority, scheduled
@@ -148,7 +138,7 @@ Load only the selected branch:
 
 | Work | Required references |
 | --- | --- |
-| Tracker routing | `issue-tracker-github.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
+| Tracker routing | `issue-tracker-github.md`, `tracker-publishing.md`, and `setup-workflow.md` for edits. |
 | Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`, and `setup-workflow.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md` and `setup-workflow.md`. |
@@ -177,8 +167,8 @@ persisting run intent as configuration.
 
 ### 2. Inspect Focused Evidence
 
-- tracker: current setup, remotes/config, templates, tracker docs, artifact
-  marker labels, and relevant local conventions;
+- tracker: current setup, remotes/config, tracker docs, and relevant local
+  conventions;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
   root and scoped context files, context routing, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
@@ -261,8 +251,6 @@ it never counts as captured.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
 - [setup-questions.md](references/setup-questions.md): conditional
   first-time-user ambiguity prompts and internal answer mapping.
-- `triage-labels.md`: sole reusable canonical artifact-marker,
-  issue-type/workflow-state registry and repository mapping template.
 - `issue-tracker-github.md`, `tracker-publishing.md`: tracker artifact, source-ref,
   publication, and completion contracts.
 - `domain.md`: root/scoped context discovery, routing, and ownership.

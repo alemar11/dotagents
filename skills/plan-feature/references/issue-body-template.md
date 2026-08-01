@@ -144,15 +144,11 @@ knowledge_delta:
 Tracker metadata is rendered by `write_mode` rather than duplicated in the base
 body:
 
-- GitHub `write_mode=apply`: resolve the mapped task type and
-  `ready-for-agent` state transports independently. Require `label` for the
-  workflow state. For task-type `native-type` or `label`, mutate tracker
-  metadata and do not copy that value into the body. For task-type `body-field`,
-  insert the exact configured field in the header metadata region after the H1
-  and before the first `##` heading before publication; do not invent a key or
-  value.
+- GitHub `write_mode=apply`: resolve the exact `task` and `ready-for-agent`
+  labels from `github-workflow-contract` independently. Mutate tracker metadata
+  and do not copy those values into the body; do not invent a key or value.
 - `write_mode=propose`: leave both lines out of the proposed body and return the
-  intended mappings as report metadata. A proposal is never an applied queue
+  intended contract metadata as report data. A proposal is never an applied queue
   state.
 
 Do not add a permission, option, or orchestrator-handoff section.

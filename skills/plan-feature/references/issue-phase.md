@@ -15,10 +15,11 @@ deferred domain-memory closeout.
 - Do not perform implementation or domain-memory writes.
 - Use the incoming `write_mode` and derived `source_route`; do not create
   phase-specific choices.
-- Treat GitHub routing, issue types, workflow states, and their explicit
-  transports as Project Memory facts. Treat affected repository identities as
-  explicit intake or validated Feature Spec Set data. Reject missing, unknown,
-  or GitHub-incompatible transports instead of inferring them.
+- Treat GitHub routing as Project Memory facts and issue types, workflow states,
+  and their explicit transports as `github-workflow-contract` facts. Treat
+  affected repository identities as explicit intake or validated Feature Spec
+  Set data. Reject missing, unknown, or GitHub-incompatible transports instead
+  of inferring them.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
@@ -344,7 +345,7 @@ Then reconcile:
   mutable execution content;
 - treat an absent desired issue as missing and continue to hardening for that
   issue only;
-- when a contract-equivalent issue exists but mapped tracker metadata or its
+- when a contract-equivalent issue exists but contract tracker metadata or its
   parent/sub-issue attachment is missing, record only that supported missing
   reconciliation operation;
 - when every desired issue, metadata value, and parent/sub-issue attachment is
@@ -355,26 +356,21 @@ Then reconcile:
   graph mismatch. Do not rewrite, close, replace, renumber, or silently adopt a
   conflicting artifact.
 
-For a contract-equivalent GitHub issue, open or closed, an absent mapped
-`native-type` or label-backed task type is repairable because type is not
-executor lifecycle state; a different mapped type is a conflict. Only on an
-open issue that has not progressed beyond planning is an absent label-backed
-`ready-for-agent` state repairable; a conflicting canonical workflow state is a
-conflict. Resolve each configured GitHub metadata transport before recording
-the repair: `native-type` uses `set-type` and `label` uses `add-label`. A configured
-`body-field` is part of the stable planning contract, not repairable tracker
-metadata: it must already match, and a missing or different body field is a body
-conflict that blocks convergence until a separately authorized replacement
-lands. Never attempt a native type operation when types are disabled. Unrelated
-  repository labels are not Plan Feature metadata. A closed issue with a
-  contract-equivalent body is valid progressed lifecycle state owned by the
-  executor: after any safe GitHub type-only repair, retain it without restoring
-  `ready-for-agent` or reopening it.
+For a contract-equivalent GitHub issue, open or closed, an absent contract
+`task` label is repairable because type is not executor lifecycle state; a
+different contract type is a conflict. Only on an open issue that has not
+progressed beyond planning is an absent contract `ready-for-agent` label
+repairable; a conflicting canonical workflow state is a conflict. Resolve the
+`github-workflow-contract` values before recording the repair and use
+`add-label` for each missing label. Unrelated repository labels are not Plan
+Feature metadata. A closed issue with a contract-equivalent body is valid
+progressed lifecycle state owned by the executor: after any safe type-label
+repair, retain it without restoring `ready-for-agent` or reopening it.
 
 An implementation issue already in a closed state remains part of durable state.
 It must match the same contract; never create a duplicate active issue for it.
-Partial-publication recovery resumes only missing issue,
-mapped metadata, and parent/sub-issue operations after the comparison passes.
+Partial-publication recovery resumes only missing issue, contract metadata, and
+parent/sub-issue operations after the comparison passes.
 
 ### 7. Harden Every Missing Issue
 
@@ -459,33 +455,31 @@ after Spec-level proof, and restores unchecked state when later invalidated.
 Root coordination never edits or judges individual criteria.
 
 A proposed issue may report `ready-for-agent` only as its intended future
-mapping after the same content gates pass. Never emit or persist that workflow
+contract value after the same content gates pass. Never emit or persist that workflow
 state in a proposed body, label, or queue. Withhold failed issues and return
 their blockers; never downgrade them into a partially agent-ready artifact.
 
 ### 10. Apply Or Propose
 
 Immediately before returning a proposal, no-op, or performing the first
-mutation, re-read the owning Feature Spec body and ref, the current Project
-Memory transport mappings, and the complete all-state issue, metadata, and
+mutation, re-read the owning Feature Spec body and ref, the current
+`github-workflow-contract`, and the complete all-state issue, metadata, and
 parent/sub-issue set with the same pagination proof as step 2. Compare that
-fresh state with the frozen graph and prior snapshot. If any source, mapping,
+fresh state with the frozen graph and prior snapshot. If any source, contract,
 body, ID, metadata, relationship, or candidate absence changed during graph
 work or hardening, discard the stale projection and restart convergence from
 fresh source/state evidence; block when the change is foreign, conflicting, or
 cannot be proved completely. This final read is mandatory in both write modes.
 
-For every GitHub repository, revalidate the external task-type transport/value
-and collect the exact configured labels required by missing operations. A
-`native-type` must still be enabled and expose the mapped task value; otherwise
-block for a Project Memory mapping update and never switch transport during
-recovery. Collect a task-type label only when that row uses `label`, and require
-the `ready-for-agent` workflow row to use `label`. Verify each label exists.
-Under `write_mode=apply`, create and verify only a missing exact configured
-label through `issue_operation=create-label` before the first issue or metadata
-mutation. Under `write_mode=propose`, report each missing label creation as an
-intended operation and perform no mutation. Preserve verified label creations
-in partial-failure recovery and retry only a still-missing operation.
+For every GitHub repository, revalidate the contract's exact `task` and
+`ready-for-agent` labels and collect the labels required by missing operations.
+If the contract is missing or contradictory, block and never switch metadata
+during recovery. Verify each exact label. Under `write_mode=apply`, create and
+verify only a missing contract label through `issue_operation=create-label`
+before the first issue or metadata mutation. Under `write_mode=propose`, report
+each missing label creation as an intended operation and perform no mutation.
+Preserve verified label creations in partial-failure recovery and retry only a
+still-missing operation.
 
 Order output topologically, with the final combined-proof or closeout issue last
 inside its owning implementation member and its domain closeout attached only
@@ -495,17 +489,14 @@ when a delta exists.
   missing issues through
   `$gitstack:github-issues`. Translate each write to GitStack-owned
   `mutation_mode=apply`, its exact target, and one canonical `issue_operation`;
-  resolve the configured task-type and agent-ready transports independently.
-  Require `label` for the GitHub workflow state. Render a configured task-type
-  `body-field` into the final applied body before creation; apply `native-type`
-  or `label` transports only after that body verifies. Attach the issue as a
+  resolve the contract's exact `task` and `ready-for-agent` labels
+  independently, and apply them only after the body verifies. Attach the issue as a
   sub-issue of the Feature Spec when supported,
-  repair only verified-missing mapped metadata or parent/sub-issue attachment
+  repair only verified-missing contract metadata or parent/sub-issue attachment
   through the matching canonical GitStack operation, verify every mutation,
-  and retain the hosted ref separately from its generated ID. Never attempt a
-  native type mutation when GitHub Issue Types are disabled.
+  and retain the hosted ref separately from its generated ID.
 - `write_mode=propose`: write nothing. Return retained durable artifacts plus
-  every missing proposed body, intended repository, mapped metadata,
+  every missing proposed body, intended repository, contract metadata,
   relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
   `proposed-issue:<feature_id>/<repository_key>/<NN>` for an issue owned by a
@@ -531,8 +522,8 @@ it after verified mutation. Plan Feature owns only the planning-artifact writes
 performed in this phase.
 
 Immediately before each hosted create, re-read the exact target plus the owning
-Feature Spec and mapping rows and prove that the frozen artifact is still
-absent. Stop and restart or block if a foreign issue, source edit, mapping
+Feature Spec and contract inputs and prove that the frozen artifact is still
+absent. Stop and restart or block if a foreign issue, source edit, contract
 change, or ambiguous mutation result appears; never create a duplicate. Verify
 every successful create before moving to the next operation.
 
@@ -562,7 +553,7 @@ Return:
 - dependency graph, topological order, and acyclicity proof;
 - verticality, overlap, and compression repairs, retained-slice reasons,
   removed artificial dependencies, and avoided initial hardening calls;
-- mapped issue type/state applied or proposed;
+- contract issue type/state applied or proposed;
 - confirmation that every issue has one valid Execution Contract;
 - repository-owned domain closeout issues and deferred capture result when
   required;

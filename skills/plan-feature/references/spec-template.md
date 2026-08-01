@@ -144,13 +144,11 @@ evidence and its required integration proof. A GitHub dependency waits for
 merge only when the durable contract explicitly requires merged input; no
 start-condition field exists.
 
-For a GitHub `write_mode=apply` publication, resolve the configured `feature`
-transport before rendering the final body. Apply `native-type` or `label`
-outside the body after publication verifies. When Project Memory instead maps
-`feature` to `body-field`, insert that exact configured field in the
-header metadata region after the H1 and before `## Source`; include it in the
-final body and do not invent a key or value. In `write_mode=propose`, omit
-applied metadata from the body and report the intended mapping separately.
+For a GitHub `write_mode=apply` publication, resolve the contract's exact
+`feature` row before rendering the final body. The current contract uses the
+`enhancement` label; apply it outside the body after publication verifies. In
+`write_mode=propose`, omit applied metadata from the body and report the
+intended contract value separately.
 
 When Plan Feature receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no

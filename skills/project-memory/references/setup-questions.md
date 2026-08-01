@@ -50,10 +50,9 @@ When the project root is clear but the requested area is not, ask:
 > - Complete setup (Recommended)
 > - A specific area
 
-If the user selects a specific area, ask which one: issue tracking and workflow
-labels, Idea labels, project context, localization conventions, agent pointers,
-or Code Review Rules. Translate the answer to the corresponding `memory_slice`
-internally.
+If the user selects a specific area, ask which one: tracker routing, project
+context, localization conventions, agent pointers, or Code Review Rules.
+Translate the answer to the corresponding `memory_slice` internally.
 
 ## Separate Project Contexts
 
@@ -126,87 +125,6 @@ internal memory feature.
 `TRANSLATION.md` only when the selected scope already has write authority. `No`
 resolves localization as not applicable. `Not yet` creates no translation file
 and reports the missing durable guidance explicitly.
-
-## Artifact-Marker Mapping
-
-Ask only when the active GitHub tracker already uses the proposed Idea label
-for a conflicting purpose or exposes a different established label for saved
-proposals. Show the evidence-backed proposal before requesting correction.
-
-> I found these labels for saved proposals in `<tracker-name>`:
-> `<available-labels>`. I propose using:
->
-> - Ideas saved for possible later planning -> `<tracker-value>`
->
-> Is this mapping correct?
->
-> - Use the proposed mapping (Recommended)
-> - Change the mapping
-
-Map that row internally to canonical `artifact_marker: idea`. If the user
-chooses to change it, ask only for the replacement GitHub label. An unmodified
-GitHub `idea` label requires no question.
-
-## Issue-Type Mapping
-
-Ask only when the active tracker exposes customized or conflicting issue types.
-Show an evidence-backed proposal before requesting correction.
-
-> I found these issue categories in `<tracker-name>`: `<available-types>`. I
-> propose using:
->
-> - Broken or regressed behavior -> `<tracker-value>`
-> - New capabilities or product enhancements -> `<tracker-value>`
-> - Implementation, maintenance, documentation, or cleanup -> `<tracker-value>`
->
-> Is this mapping correct?
->
-> - Use the proposed mapping (Recommended)
-> - Change the mapping
-
-Map those rows internally to canonical `bug`, `feature`, and `task`. If the
-user chooses to change the mapping, ask only for the incorrect row or rows and
-record both the concrete mechanism and value. Map GitHub Issue Types to
-`native-type`, GitHub labels to `label`, and an exact line near the top of the
-issue body to `body-field`.
-
-When GitHub Issue Types are disabled and repository evidence establishes no
-fallback, ask one concrete follow-up before asking for values:
-
-> GitHub Issue Types are disabled for `<tracker-name>`, and I found no existing
-> issue-category convention. Where should issue categories be recorded?
->
-> - GitHub labels (Recommended when suitable labels exist)
-> - An exact field near the top of each issue body
-
-Then ask only for the missing labels or complete body lines. An unmodified
-GitHub default requires no question.
-
-## Workflow-State Mapping
-
-Ask only when the active tracker exposes customized or conflicting workflow
-labels or states. Show an evidence-backed proposal before requesting
-correction.
-
-> I found these workflow labels or states in `<tracker-name>`:
-> `<available-states>`. I propose using:
->
-> - Needs initial review -> `<tracker-value>`
-> - Waiting for more information -> `<tracker-value>`
-> - Fully specified and ready for the agent queue -> `<tracker-value>`
-> - Requires human implementation or judgment -> `<tracker-value>`
-> - Will not be actioned -> `<tracker-value>`
->
-> Is this mapping correct?
->
-> - Use the proposed mapping (Recommended)
-> - Change the mapping
-
-Map those rows internally to `needs-triage`, `needs-info`, `ready-for-agent`,
-`ready-for-human`, and `wontfix`. If the user chooses to change the mapping,
-ask only for the incorrect row or rows. Record GitHub workflow states with
-transport `label`; do not map workflow states to Issue Types or body fields. An
-unmodified GitHub default requires no question.
 
 ## Questions Setup Must Not Ask
 

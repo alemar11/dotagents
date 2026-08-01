@@ -27,10 +27,10 @@ Resolve `write_mode` once before phase work:
 - A request that forbids writes, asks for a dry run, or asks to inspect the
   result before publication resolves to `write_mode=propose`.
 - An explicit Plan Feature request to create durable planning artifacts
-  defaults to `write_mode=apply`. Project Memory resolves its own write
-  authority independently.
+  defaults to `write_mode=apply`. Project Memory and the feature metadata
+  contract resolve their own boundaries independently.
 - `write_mode=propose` returns the complete proposed Feature Spec bundle:
-  bodies, target locations, mapped metadata, relationships, and publication
+  bodies, target locations, contract metadata, relationships, and publication
   order. It writes nothing and returns no executable publication commands.
 - Both modes withhold incomplete Feature Specs and implementation issues.
   Temporary hosted publication-transaction staging issues are non-executable

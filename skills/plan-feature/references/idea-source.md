@@ -39,10 +39,10 @@ Use the globally qualified GitHub ref shape `owner/repository#<number>` or its
 canonical hosted URL. A bare `#<number>` is not a durable source identity.
 
 For ordinary planning input, verify that a GitHub Idea is open, carries the
-configured `artifact_marker=idea` label, has no native Issue Type, and has at
-most one of the mapped `needs-triage` or `needs-info` workflow labels, with no
-other mapped canonical workflow-state label. Require explicit Project Memory
-transport `label` for the marker and every consumed workflow row. Read the
+`github-workflow-contract` `idea` label, has no native Issue Type, and has at
+most one of the contract's `needs-triage` or `needs-info` workflow labels, with
+no other contract workflow-state label. Require the contract's explicit
+`label` transport for the marker and every consumed workflow row. Read the
 complete body and the complete comment history, following pagination until
 every marker-bearing planning-outcome comment has been inspected.
 
@@ -62,11 +62,11 @@ modes, omitting mutation fields. `write_mode=propose` still validates current
 hosted state but never requests a dry-run mutation or surfaces executable
 commands.
 
-The Project Memory marker mapping and its compatible transport are required
+The `github-workflow-contract` marker and its compatible transport are required
 only for Idea capture, discovery, or consumption. A missing or incompatible
-mapping blocks only those Idea paths.
-Stop with the exact tracker-routing prerequisite; do not invalidate an
-unrelated Plan Feature run or silently rewrite Project Memory configuration.
+contract blocks only those Idea paths. Stop with the exact companion-contract
+prerequisite; do not invalidate an unrelated Plan Feature run or silently
+rewrite Project Memory configuration.
 
 ## Prior Outcomes And Consumed State
 
@@ -274,10 +274,10 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 ## GitHub Lifecycle Mutations
 
 Before a GitHub `write_mode=apply` reconciliation that adds a workflow state,
-require its configured transport to be `label`, resolve that exact label, and
-verify that it exists in every affected repository. When a required mapping exists but its
-concrete label does not, create and verify only that exact configured label
-through `$gitstack:github-issues` before mutating any affected Idea:
+require the contract transport to be `label`, resolve that exact contract
+label, and verify that it exists in every affected repository. When a required
+contract label does not exist, create and verify only that exact label through
+`$gitstack:github-issues` before mutating any affected Idea:
 
 ```text
 mutation_mode=apply

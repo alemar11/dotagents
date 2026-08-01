@@ -9,7 +9,7 @@ owner of selectable Capture Idea behavior.
 - User wording is selection evidence, never an alternative field or value.
 - Reject every field or value not listed in the Run Registry. Do not accept
   aliases, retired syntax, or compatibility mappings.
-- Keep explicit repository scope, tracker owner, marker and state mappings,
+- Keep explicit repository scope, tracker owner, contract metadata,
   candidate decisions, queue intent, names, slugs, refs, duplicate state, and
   evidence as facts or execution data.
 
@@ -26,7 +26,7 @@ Resolve `write_mode` once before candidate selection:
 - An explicit Capture Idea request to save Ideas defaults to
   `write_mode=apply`.
 - `write_mode=propose` returns complete proposed bodies, target locations,
-  intended marker and optional state metadata, deterministic refs, and
+  intended contract metadata, deterministic refs, and
   publication order. It does not create a GitHub label or issue, or return
   executable publication commands.
 - Never silently downgrade an authorized `apply` run after a blocker. Return
@@ -37,8 +37,8 @@ Resolve `write_mode` once before candidate selection:
 Carry, but do not persist as option fields:
 
 - exactly one GitHub tracker-owning repository per candidate;
-- the configured concrete mapping for `artifact_marker: idea`;
-- the configured concrete `needs-triage` mapping when queueing was explicit;
+- the exact `idea` label from `github-workflow-contract`;
+- the exact `needs-triage` label from that contract when queueing was explicit;
 - final candidate decision, name, lowercase kebab-case slug, body, queue intent,
   target, source evidence, and duplicate/collision result;
 - applied durable ref, or proposal ref

@@ -21,9 +21,10 @@ through the caller.
 - Do not invent users, requirements, constraints, or acceptance criteria.
 - Use `references/options.md` for `write_mode`; consume the derived
   `source_route` and do not create another phase-level option.
-- Treat GitHub routing and tracker mappings as Project Memory facts. Resolve the
-  canonical `feature` type mapping before rendering or validating a Feature
-  Spec. Require one supported GitHub transport.
+- Treat GitHub routing as Project Memory facts and feature metadata as
+  `github-workflow-contract` facts. Resolve the canonical `feature` metadata
+  contract before rendering or validating a Feature Spec. Require one
+  supported GitHub transport.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
   write and return proposed bodies, locations, metadata, and publication order
   rather than executable commands.
@@ -38,8 +39,8 @@ through the caller.
 Receive:
 
 - `write_mode` and the frozen derived `source_route`;
-- the GitHub issue-type mapping for each affected repository, with explicit
-  transport plus exact tracker value from that repository's Project Memory;
+- the GitHub issue-type contract for each affected repository, with explicit
+  transport plus exact tracker value from `github-workflow-contract`;
 - planning identity: `feature_slug`, optional `planning_scope`, optional
   canonical lowercase UUID `feature_id`, and `context_files` containing every
   applicable available repository root and matched scoped context used for
@@ -57,9 +58,9 @@ Receive:
   validation and later lifecycle reconciliation;
 - optional exact multi-repository publication-continuation handoff containing
   transaction identity, role-to-target/ref map, reconstructable parameterized
-  templates, ref and optional body-metadata slots, selected Idea and
-  prior-outcome refs, any complete `knowledge_delta`, and verified completed
-  plus exact missing operations;
+  templates, allowed ref slots, selected Idea and prior-outcome refs, any
+  complete `knowledge_delta`, and verified completed plus exact missing
+  operations;
 - authored Feature Spec dependency rows;
 - optional `knowledge_delta` with `decisions`, `target_surfaces`, and
   `evidence` lists, plus a separate `planning_blockers` list;
@@ -81,7 +82,7 @@ or an unreconstructable template blocks.
 Read the minimum evidence needed to establish the contract:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/triage-labels.md`;
+- `github-workflow-contract` and its `references/github-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
   as a selected root; for cross-repository work, use explicit user scope or a
   durable linked Feature Spec Set to authorize repository identities, require
@@ -104,7 +105,7 @@ On the new-source route, when `source_idea_refs` are present, run ordinary
 durable-artifact validation through `idea-source.md` before drafting. Read every
 canonical Idea section and planning outcome, validate tracker ownership and
 prior coverage Feature Spec refs, and derive the cumulative covered and
-  remaining scope. Reject proposed refs, missing marker mappings, consumed or
+  remaining scope. Reject proposed refs, missing contract Idea metadata, consumed or
   typed GitHub Ideas, and ambiguous repository ownership.
 
 On the existing-source route, validate `bound_source_idea_refs` through
@@ -112,7 +113,7 @@ On the existing-source route, validate `bound_source_idea_refs` through
 immutable Spec bodies, validate each Idea and outcome history, and derive
 coverage from the Idea content plus unchanged Specs rather than from links
 alone. If explicit `source_idea_refs` were supplied, require exact set equality
-with the bound refs. Any mismatch blocks. A missing Idea marker mapping does not
+with the bound refs. Any mismatch blocks. Missing Idea metadata does not
 block planning runs whose Spec set contains no Idea refs.
 
 Do not apply that ordinary consumed-source rejection to source-only recovery.
@@ -310,7 +311,7 @@ implementation and issue-splitting sections as planning-time recommendations,
 not immutable technical scripts.
 
 When durable Idea refs were supplied, transform their normalized evidence
-through the mapping in `idea-source.md`. Before publication, trace every
+through the transformation rules in `idea-source.md`. Before publication, trace every
 material accepted element to a candidate Feature Spec section, explicit
 non-goal, deferred remaining-scope item, or blocking question. Do not convert
 tentative direction or expected value into accepted requirements without
@@ -418,35 +419,29 @@ Withhold the artifact and return blockers when the gate fails.
 ### 6. Apply Or Propose
 
 On the existing-source route, skip body drafting and publication. Resolve the
-configured transport for canonical `feature` metadata before comparing state.
-For GitHub, use `issue_operation=set-type` only for a
-`native-type` mapping, `issue_operation=add-label` for a `label` fallback, or
-the exact `body-field` convention when that convention is already satisfied by
-the immutable source. Under `write_mode=apply`, repair only the missing hosted
-native type or label; under `write_mode=propose`, report that exact intended
-repair. A conflicting native type or mapped fallback blocks. Never invent or
-attempt an unsupported native type operation when GitHub Issue Types are
-disabled. Immediately before reporting or applying a repair, re-read the exact
-source body/ref, current metadata, and mapping row; restart validation or block
-on any drift rather than mutating against a stale immutable source. Then return the
-current durable source, including preserved executor-owned checkbox markers,
-after the dependency and body gates pass.
+contract's canonical `feature` row before comparing state. The current GitHub
+contract transports that row as the exact `enhancement` label. Under
+`write_mode=apply`, repair only that verified-missing label through
+`issue_operation=add-label`; under `write_mode=propose`, report that exact
+intended repair. A conflicting contract type label blocks. Immediately before
+reporting or applying a repair, re-read the exact source body/ref, current
+labels, and contract row; restart validation or block on any drift rather than
+mutating against stale evidence. Then return the current durable source,
+including preserved executor-owned checkbox markers, after the dependency and
+body gates pass.
 
-Read tracker and type mappings immediately before output.
+Read tracker state and the feature metadata contract immediately before output.
 
-For a new-source apply, resolve the configured `feature` metadata transport
-before publication. `native-type` and `label` transports are applied only after
-the final hosted body verifies. A configured `body-field` is rendered
-into the applied final body before final-body verification. In proposal mode, omit
-applied metadata from the body and report the intended transport and value as
-proposal metadata only.
+For a new-source apply, resolve the contract's exact `feature` metadata before
+publication. Apply its `enhancement` label only after the final hosted body
+verifies. In proposal mode, omit applied metadata from the body and report the
+intended contract metadata only.
 
 Before the first Feature Spec staging create, direct create, edit, or metadata
-mutation, revalidate every GitHub `feature` transport and exact value. A
-`native-type` must still be enabled and expose the mapped value; otherwise block
-for a Project Memory mapping update and never switch transport during recovery.
-For `label`, verify the exact configured label exists. Under
-`write_mode=apply`, create and verify only a missing exact mapped label through
+mutation, revalidate the GitHub `feature` row and exact `enhancement` label from
+the contract. If the contract is missing or contradictory, block and never
+switch metadata during recovery. Verify that exact label exists. Under
+`write_mode=apply`, create and verify only that missing contract label through
 `issue_operation=create-label`; under `write_mode=propose`, report that missing
 label creation as an intended operation without mutation. Preserve verified
 label creation in transaction recovery and retry only an operation still proven
@@ -460,7 +455,7 @@ in place, overwrite it, or publish a duplicate. During one recognized
 multi-repository transaction, artifacts created by its own verified hosted
 operations are expected and do not trigger this foreign-race guard.
 Immediately before each hosted staging or direct create, re-read that exact
-target plus its source and mapping inputs and prove the target remains absent.
+target plus its source and contract inputs and prove the target remains absent.
 Use non-overwrite semantics, stop on a foreign or ambiguous appearance, and
 verify each successful create before continuing.
 
@@ -470,38 +465,34 @@ creation:
 
 1. Before any mutation, validate every role-keyed parameterized final-body
    template and predeclare the complete member, `Feature Spec Set`, and Feature
-   Dependency ref slots plus the exact optional configured
-   body-metadata slot and value. Generate one transaction identity and record
-   each role, exact target, title, complete reconstructable template, allowed
-   ref slots, and allowed body-metadata insertion. Materialize final bodies only
-   after every ref used by that body is resolved and the optional final-only
-   body metadata is inserted. Do not compute whole-body tracker digests.
+   Dependency ref slots. Generate one transaction identity and record each role,
+   exact target, title, complete reconstructable template, and allowed ref
+   slots. Materialize final bodies only after every ref used by that body is
+   resolved. Do not compute whole-body tracker digests.
 2. Re-read every target, then immediately re-read and prove exact-target absence
    before each missing predeclared hosted-role create with
    `issue_operation=create`. A hosted staged body contains all final content
-   except the predeclared ref substitutions and optional final-only
-   `body-field` metadata, plus a unique transaction/role marker and an explicit
-   non-executable staging notice. Do not apply final feature metadata, generate issues, or
-   present a staged issue as a Feature Spec.
+   except the predeclared ref substitutions, plus a unique transaction/role
+   marker and an explicit non-executable staging notice. Do not apply final
+   feature metadata, generate issues, or present a staged issue as a Feature
+   Spec.
 3. After every hosted ref is known, materialize every final body. Invoke
-   `issue_operation=edit` only to replace the predeclared ref slots, insert the
-   exact predeclared final-only `body-field` metadata when configured, remove the
-   staging marker and notice, and produce that predeclared final body. Reject every
-   other body difference. Verify a body convention as part of that final body;
-   apply any native Issue Type or label transport only after the body verifies.
+   `issue_operation=edit` only to replace the predeclared ref slots, remove the
+   staging marker and notice, and produce that predeclared final body. Reject
+   every other body difference. Verify the final body, then apply the exact
+   contract `enhancement` label.
 4. Verify every hosted final body and globally qualified ref before ending the
    transaction or starting issue generation.
 
 After each transaction mutation, retain the verified role-to-ref map and return
 it in any partial-failure continuation handoff together with every complete
-parameterized body template, allowed ref slot, optional exact
-body-metadata slot and value, selected `source_idea_refs`, all verified prior
-outcome refs, the complete `knowledge_delta` when present, completed operations,
-and exact missing operations. On retry, recognize a new-source continuation
-only when the supplied or reconstructable transaction identity, role map,
-reconstructable templates, allowed ref slots, optional body-metadata slot and
-value, materialized final bodies when available, and current tracker state
-match directly. A digest is insufficient recovery evidence.
+parameterized body template, allowed ref slot, selected `source_idea_refs`, all
+verified prior outcome refs, the complete `knowledge_delta` when present,
+completed operations, and exact missing operations. On retry, recognize a
+new-source continuation only when the supplied or reconstructable transaction
+identity, role map, reconstructable templates, allowed ref slots, materialized
+final bodies when available, and current tracker state match directly. A digest
+is insufficient recovery evidence.
 Resume only missing `create`, predeclared `edit`, or metadata operations. A
 partial hosted set without sufficient exact recovery evidence blocks; never
 adopt it as an immutable existing-source bundle or create duplicates. Once every Spec is final
@@ -513,12 +504,12 @@ member and traverses the whole connected set.
   feature, publish each implementation member through the transaction
   above, then finalize each hosted body through the authorized `edit`. Translate each write to
   GitStack-owned `mutation_mode=apply`, its exact target, and one canonical
-  `issue_operation`; apply the configured feature metadata transport only after
+  `issue_operation`; apply the contract's feature metadata transport only after
   the final body verifies, and retain the hosted issue number or URL as
   `source_spec_ref`. In multi-repository work, store
   `owner/repository#<number>` or the canonical URL, never a bare issue number.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
-  repository target, mapped metadata, and deterministic source identity:
+  repository target, contract metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   or `proposed-spec:<feature_id>/<repository_key>` for a linked
   multi-repository member.

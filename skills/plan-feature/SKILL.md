@@ -33,8 +33,9 @@ default-path run registry:
 | --- | --- |
 | `write_mode` | `apply`, `propose` |
 
-Reject every unregistered field or value. Project Memory owns GitHub routing,
-issue types, workflow states, and their transports. Explicit intake or a
+Reject every unregistered field or value. Project Memory owns GitHub routing;
+`github-workflow-contract` owns feature issue types, workflow states, and their
+transports. Explicit intake or a
 validated linked Feature Spec Set owns the affected repository identities.
 Paths, local-root candidates, slugs, refs, branches, dependencies, and domain
 handoffs are data.
@@ -55,10 +56,11 @@ Resolve `write_mode` once:
   task receives its exact structured request. Scope repair remains an internal
   branch of `existing-source`, never a selectable option or a third source
   route.
-- Treat GitHub routing, issue types, workflow states, and their transports as
-  Project Memory facts. Treat the affected repository set as explicit feature
-  data. Reject missing, stale, contradictory, or GitHub-incompatible facts
-  instead of turning them into Plan Feature options.
+- Treat GitHub routing as Project Memory facts and feature issue types,
+  workflow states, and their transports as `github-workflow-contract` facts.
+  Treat the affected repository set as explicit feature data. Reject missing,
+  stale, contradictory, or GitHub-incompatible facts instead of turning them
+  into Plan Feature options.
 - Keep one run bounded to one feature and derive one `source_route` from intake
   evidence. No durable Spec selects `new-source`; one canonical durable Spec
   selects `existing-source`; an exact recognized incomplete publication
@@ -131,10 +133,11 @@ Resolve `write_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Tracker routing or an explicitly required Idea marker mapping is missing, stale, or contradictory. | Use only `tracker-routing`; a missing Idea mapping blocks only Idea capture, discovery, or consumption, and Plan Feature never performs domain closeout. |
+| `$project-memory` | Tracker routing is missing, stale, or contradictory, or a domain-memory closeout is explicitly required. | Use only `tracker-routing` for routing; Plan Feature never performs domain closeout. |
+| `$github-workflow-contract` | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan Feature owns when they are applied, and never edits the contract at runtime. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every missing final implementation issue after structural graph compression and durable-state reconciliation. | At least one issue-hardening call per missing issue, with only the final stable result persisted; contract-equivalent durable issues are validated and retained, and Plan Feature owns artifact writes. |
-| `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, mapped metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
+| `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `write_mode=apply` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either write mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
 mutations belong to the selected executor, not Plan Feature. Terminal
@@ -148,7 +151,7 @@ implementation begins.
 Read:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/triage-labels.md`;
+- `github-workflow-contract` and its `references/github-labels.md`;
 - root `CONTEXT.md` first when it exists, treating the current Git repository
   as a selected root; for cross-repository work, use explicit user scope or a
   durable linked Feature Spec Set to authorize repository identities, require
@@ -374,7 +377,7 @@ Return:
 - Feature Spec ref or proposed ref, title, and target location;
 - planning identity and Project Memory facts used;
 - retained, created, or proposed issue refs in publication order, repaired
-  mapped metadata or parent/sub-issue attachment, and verified no-op state when
+  contract metadata or parent/sub-issue attachment, and verified no-op state when
   applicable;
 - graph and verticality validation, including candidate and final issue counts,
   compression repairs, retained-slice reasons, and avoided initial hardening

@@ -1,138 +1,58 @@
 # Issue Tracker: GitHub
 
-Feature Specs, implementation issues, and captured Ideas for this repo live as
-GitHub issues.
-Use `$gitstack:github-issues` for GitHub issue lifecycle operations.
+Feature Specs, implementation issues, and captured Ideas for this repository
+live as GitHub issues. Use `$gitstack:github-issues` for GitHub issue lifecycle
+operations.
 
-GitHub is the authoritative artifact store. Project Memory stores
-only tracker routing and conventions; implementation delivery, branch/PR
-strategy, and executor permissions belong to Feature Specs and executing
-workflows.
+GitHub is the authoritative artifact store. Project Memory stores only the
+resolved tracker target and human-readable conventions; feature workflows own
+artifact metadata, label/type semantics, delivery, branch/PR strategy, and
+executor permissions.
 
-Do not create repo-local planning mirrors merely to feed hosted mutations.
-Temporary body files must live outside the repo and be removed after use.
+Do not create repository-local planning mirrors merely to feed hosted
+mutations. Temporary body files must live outside the repository and be removed
+after use.
 
-## Publication
+## Publication Boundary
 
-- `write_mode=apply`: use `$gitstack:github-issues` to create or update issues,
-  relationships, types, and labels. Normalize each write to
+- `write_mode=apply`: the consuming workflow may use
+  `$gitstack:github-issues` to create or update issues, relationships, types,
+  and labels after its own contract gates pass. Normalize each write to
   `mutation_mode=apply`, the exact repository/issue target, and one canonical
   `issue_operation`, then verify hosted state.
 - `write_mode=propose`: return proposed titles, bodies, metadata,
   relationships, and publication order without mutating GitHub or returning
   executable commands.
 
-When proposed output precedes the hosted Feature Spec, use
-`source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec or
-`proposed-spec:<feature-id>/<repository-key>` for each linked
-multi-repository Feature Spec.
-Order the proposal so each owning Feature Spec is created before its issues.
-Before hosted child creation, replace that proposed ref in the child's canonical
-`## Execution Contract` `source_spec_ref` row with the owning
-`#<spec-number>` for a single-repository bundle, or with
-`owner/repository#<spec-number>` or its canonical hosted URL for a
-multi-repository member. Use the same globally qualified identity in every
-member's `Feature Spec Set` and cross-repository Feature Dependency rows. Never
-treat a proposed ref as an executable source, use a bare issue number across
-repositories, or add a duplicate header field.
+Project Memory does not select the metadata values or authorize their mutation.
+The consuming workflow must load its feature or domain-specific contract and
+delegate every operation to GitStack.
 
-## Conventions
+## Routing Conventions
 
-Infer the repo from `git remote -v` unless this file records a specific target.
-Use `$gitstack:github-issues` to create, read, edit, comment on, label, type,
-attach, or close GitHub issues.
+Infer the repository from `git remote -v` unless this file records a specific
+target. Use `$gitstack:github-issues` for issue reads, comments, relationships,
+types, labels, and lifecycle transitions. A read or proposal supplies no
+mutation authority and must not be upgraded at this boundary.
 
-For a mutation, pass `mutation_mode=apply`, the exact repository/issue target,
-and one canonical `issue_operation`. A read or proposal supplies no mutation
-authority and must not be upgraded at this boundary.
+Keep globally durable hosted refs in the form
+`owner/repository#<number>` or a canonical hosted URL. Never use a bare issue
+number as a cross-repository identity.
 
-Load canonical issue types and workflow states only from
-`references/triage-labels.md`, then use the concrete tracker mappings in
-`project-memory/config/triage-labels.md`. This tracker reference does not repeat
-that registry. Require every consumed mapping row to declare transport. If
-GitHub issue types are disabled or customized for the organization, record the
-exact available `native-type`, fallback `label`, or complete `body-field`
-convention in the repository mapping file; never infer transport from the
-tracker value.
-
-Load canonical artifact markers from the same registry and repository mapping.
-If the `idea` marker mapping is missing, block only Idea capture and Idea-source
-consumption; Feature Spec and implementation-issue workflows remain valid.
-
-## Title Format
-
-- Feature Spec issue: `Feature Spec: <Feature Name>`
-- Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
-- Idea issue: `Idea: <Name>`
-
-Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
-the Feature Spec planning identity, or the Feature Spec source path. Derive it
-from the title only when no accepted slug exists. Use two-digit ordering
-(`01`, `02`, `03`) for implementation issues.
-
-## Idea Capture
-
-Represent a durable Idea as an open, untyped GitHub issue titled
-`Idea: <Name>`. Apply the repository mapping for `artifact_marker: idea`, whose
-default tracker value is the `idea` label, and leave the native GitHub Issue
-Type unset.
-
-A dormant Idea has the marker label and no workflow-state label. An Idea that
-is queued for evaluation or waiting on requester input may carry exactly one
-Idea-compatible mapped workflow-state label from `triage-labels.md`. Those
-states are mutually exclusive; no other canonical workflow state is valid for
-an Idea. Project Memory setup configures these mappings but does not create
-Idea issues.
-
-## Feature Planning
-
-- Resolve every artifact's issue type by role from
-  `references/triage-labels.md` and the repository mapping immediately before
-  publication. Dispatch through that row's explicit transport and exact tracker
-  value. Do not hard-code canonical or tracker-specific type values in this
-  reference.
-- Publish the Feature Spec as a GitHub issue titled
-  `Feature Spec: <Feature Name>`.
-- Treat generated implementation issues as the execution graph. Do not create
-  a separate execution-plan issue.
-- Publish implementation issues as sub-issues of the Feature Spec with titles
-  using the format above.
-- `$plan-feature` owns Feature Spec and generated issue body shape, including
-  `source_spec_ref`, affected repositories and paths, dependency ids, planning
-  identity, linked Feature Spec Set refs, and graph validation.
-- For multi-repository planning, publish one linked repo-owned Feature Spec in
-  every affected repository and attach that repository's implementation issues
-  beneath it. Do not persist a coordination repository or global project label
-  as setup configuration.
-
-## Existing Issue Classification
-
-When a caller classifies an existing issue, load the canonical issue types,
-workflow states, and their selection semantics from
-`references/triage-labels.md`, then resolve their concrete GitHub mappings from
-`project-memory/config/triage-labels.md`. Workflow state requires its mapped
-`label` transport and never belongs in the GitHub issue type or body field. This
-reference defines no additional type, state, or transport values.
+When proposed output precedes a hosted artifact, the consuming workflow owns
+the proposal-ref format, publication order, and replacement of that ref with a
+verified hosted identity. Project Memory does not define a second workflow
+contract for those details.
 
 ## Completion Convention
 
-Use a GitHub closing keyword only when the consuming implementation workflow
-has proved that the referenced issue is satisfied. The issue closes when the
-closing change reaches the default branch. Do not close a parent Feature Spec
-from an individual child issue; a final integration change may close it only
-after all Feature Spec gates pass.
-
-This implementation-proof convention applies to Feature Specs and
-implementation issues. A source Idea follows the separate Plan Feature
-consumption contract: after the complete requested planning result is durable
-and verified, Plan Feature may close an Idea that it determined was fully
-covered, retaining the Idea marker and recording the authoritative Feature
-Spec refs. A partially covered Idea remains open.
-
-Project Memory records this tracker convention but does not choose the
-implementation stopping point, grant issue-mutation authority, or prescribe a
-branch/PR workflow.
+Use a GitHub closing keyword or explicit lifecycle transition only when the
+consuming workflow has proved that its artifact contract is satisfied. Do not
+close a parent artifact from an individual child unless the owning workflow's
+completion contract explicitly permits it.
 
 ## Fetch
 
-Use `$gitstack:github-issues` to view the issue and recent comments.
+Use `$gitstack:github-issues` to view an issue and its recent comments. Read the
+complete relevant state before making a decision or retrying an ambiguous
+mutation.

@@ -47,9 +47,10 @@ Do not seed from guesses, tentative plans, rejected options, secrets, raw logs,
 or generic architecture advice.
 
 When `AGENTS.md` is a source, capture only durable project context or accepted
-repo behavior. Leave agent operating rules in `AGENTS.md`, and move tracker or
-triage details to `project-memory/config/*` instead of copying them into
-`CONTEXT.md`.
+repo behavior. Leave agent operating rules in `AGENTS.md`, and keep tracker
+routing details in `project-memory/config/issue-tracker.md` instead of copying
+them into `CONTEXT.md`. Feature metadata contracts remain with their consuming
+feature workflows.
 
 For a detected monorepo, verified repository structure is enough evidence for
 stable scope routing in the mandatory root `CONTEXT.md`. It is not evidence for

@@ -29,26 +29,15 @@ completed publication. Never persist a repository-local planning mirror.
 
 For any multi-repository new-source bundle, Plan Feature owns one recoverable
 publication transaction across all roles: predeclare every role, parameterized
-final-body template, allowed ref slot, and optional exact final-only
-body-metadata insertion. Create uniquely marked non-executable staging issues
-for hosted roles whose refs are unknown; materialize and hash final bodies after
-every hosted ref is resolved; then use only the predeclared `edit` substitutions
-and body-metadata insertion to finalize hosted cross-links. Native Issue Type or
-label metadata applies only after each final hosted body verifies; a configured
-body-convention is absent from staging and verified inside the final body. A
-retry may resume only an exact transaction identity, role map, complete
-reconstructable parameterized templates and hashes, allowed ref slots, the
-optional body-metadata slot and value, any materialized final hashes, selected
-Idea refs plus prior outcomes, and current tracker state; a hash alone is
-insufficient. Foreign or changed targets block. This transaction is run data,
-not Project Memory configuration.
-
-When a consumed GitHub mapping uses `label`, Plan Feature verifies the exact
-configured label before the dependent artifact or metadata mutation. An
-applied run may create and verify only that missing mapped label through
-`issue_operation=create-label`; a proposal reports the intended operation
-without mutation. Project Memory setup records mappings but does not create
-repository labels.
+final-body template, and allowed ref slot. Create uniquely marked
+non-executable staging issues for hosted roles whose refs are unknown;
+materialize final bodies after every hosted ref is resolved; then use only the
+predeclared `edit` substitutions to finalize hosted cross-links. Contract-owned
+metadata applies only after each final hosted body verifies. A retry may resume
+only an exact transaction identity, role map, complete reconstructable
+parameterized templates, allowed ref slots, materialized final bodies, selected
+Idea refs plus prior outcomes, and current tracker state. Foreign or changed
+targets block. This transaction is run data, not Project Memory configuration.
 
 ## Stable Feature Spec References
 
@@ -86,7 +75,8 @@ the complete linked set first.
   state enumeration before synthesis, fixed-ID reuse of matching issues,
   uncovered-scope synthesis, missing-issue publication, metadata and
   parent/sub-issue reconciliation, and replacement of proposed refs during
-  applied publication. It revalidates source, mappings, and complete tracker
+  applied publication. It revalidates source, the applicable metadata contract,
+  and complete tracker
   state before proposal or mutation and never renumbers a retained issue.
 - `$plan-feature` carries the same `write_mode`, derived source route, planning
   identity, and `source_spec_ref` through both phases.

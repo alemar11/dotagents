@@ -34,7 +34,7 @@ owns the complete selectable registry:
 | `write_mode` | `apply`, `propose` |
 
 Reject every unregistered field or noncanonical value. Explicit repository
-scope, tracker owner, marker and state mappings, candidate decisions, names,
+scope, tracker owner, feature metadata values, candidate decisions, names,
 slugs, refs, and queue intent are execution facts or data, not options.
 
 ## Fixed Capture Contract
@@ -42,13 +42,12 @@ slugs, refs, and queue intent are execution facts or data, not options.
 - Every Idea has exactly one tracker-owning repository. Use globally
   unambiguous durable refs: `owner/repository#<number>` or a canonical hosted
   URL.
-- Project Memory owns tracker routing, the `idea` artifact marker mapping,
-  workflow-state mappings, and their explicit GitHub transports. Explicit user
+- `$github-workflow-contract` owns the `idea` artifact marker, the
+  `needs-triage` workflow label, and their GitHub label transport. Explicit user
   scope owns the repository set; each Idea then names one tracker-owning
-  repository. Require `label` for marker and consumed workflow-state rows;
-  reject missing or incompatible transports. Consume configured facts; do not
-  define fallback taxonomy or silently write setup files.
-- A GitHub Idea is an open issue titled `Idea: <Name>`, has the configured
+  repository. Load the contract and reject missing or incompatible metadata;
+  do not define fallback taxonomy or silently write setup files.
+- A GitHub Idea is an open issue titled `Idea: <Name>`, has the contract's
   `idea` label, and has native Issue Type unset.
 - Capture creates a dormant Idea by default. Add `needs-triage` only when the
   user explicitly queues that candidate for evaluation. At capture time,
@@ -78,7 +77,8 @@ one-question-at-a-time fallback.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Required tracker routing or Idea marker mapping is missing, stale, or contradictory. | Inspect or run the matching setup slice only when separately authorized in the same request. Otherwise stop with the exact prerequisite; Capture Idea never performs implicit setup writes. |
+| `$project-memory` | Required tracker routing is missing, stale, or contradictory. | Inspect or run `tracker-routing` only when separately authorized in the same request. Otherwise stop with the exact prerequisite; Capture Idea never performs implicit setup writes. |
+| `$github-workflow-contract` | Capture Idea reads or writes Idea metadata. | Load the exact `idea` and optional `needs-triage` contract values; Capture Idea owns when they are applied, and never edits the contract at runtime. |
 | `$gitstack:github-issues` | Capture Idea needs exact issue or label reads, or `write_mode=apply` authorizes publication. | Pure preflight reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to GitStack-owned `mutation_mode=apply`, the exact target, and one canonical `issue_operation`. GitStack owns safe transport, label administration, issue creation, verification, and partial recovery. |
 
 In `write_mode=propose`, allow only read-only GitHub inspection; do not request
@@ -92,7 +92,8 @@ Resolve `write_mode` once from [options.md](references/options.md). Read the
 selected memory-owning root's:
 
 - `project-memory/config/issue-tracker.md`;
-- `project-memory/config/triage-labels.md`.
+- the `github-workflow-contract` and its
+  [github-labels.md](../github-workflow-contract/references/github-labels.md).
 
 Use explicit user scope and repository evidence to determine the only valid
 tracker-owning Git repository for each possible Idea. A cross-repository Idea
@@ -100,13 +101,11 @@ must name one canonical owning repository; optional qualified backlinks may
 appear elsewhere. Do not infer ownership from the current Codex task, the
 ChatGPT App primary project or saved-project list, or filesystem proximity.
 
-Require an explicit configured mapping for `artifact_marker: idea` with
-transport `label`, its concrete `idea` label mapping, and `label` for any
-consumed workflow-state row; confirm that Ideas use no native Issue Type. If a
-required fact is missing, stale, contradictory, or ambiguous, stop before
-capture writes and report the exact Project Memory setup prerequisite. Do not
-repair configuration unless the same request separately authorizes Project
-Memory setup.
+Require the contract's exact `idea` label and confirm that Ideas use no native
+Issue Type. If the contract or tracker routing is missing, stale,
+contradictory, or ambiguous, stop before capture writes and report the exact
+companion-contract or Project Memory routing prerequisite. Do not repair either
+contract implicitly.
 
 ### 2. Extract And Normalize Candidates
 
