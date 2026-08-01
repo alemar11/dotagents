@@ -14,7 +14,7 @@ versioned GitStack marker and request fingerprint. Callers cannot provide or
 assemble request text. The operation reuses only one exact matching comment;
 plain, markerless, malformed, conflicting, or duplicate requests fail closed.
 
-In GitStack 8.1.2, `prepare` and `validate` remain read-only packet creation and
+In GitStack 8.1.3, `prepare` and `validate` remain read-only packet creation and
 inspection surfaces. Provider mutations require the exact GitStack reservation;
 GitStack itself owns its atomic one-use consumption and recovery state and has
 no runtime dependency on an orchestrator skill or its ledger.
