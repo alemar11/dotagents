@@ -1,3 +1,3 @@
 """GitStack shared CLI."""
 
-__version__ = "8.1.3"
+__version__ = "8.1.4"
