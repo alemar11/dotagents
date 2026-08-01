@@ -1,6 +1,6 @@
-# Plan Harder Templates
+# Engineering Plan Templates
 
-Use these templates only after `$plan-harder` has selected the matching
+Use these templates only after `$feature-flow:engineering-plan` has selected the matching
 `planning_mode` and `output_surface` from `references/options.md`. With
 `output_surface=standalone`, keep the returned plan or issue-hardening brief in
 chat. `output_surface=caller` applies only to

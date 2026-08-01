@@ -132,7 +132,7 @@ combine or order the affected outcomes instead.
 
 Run this gate on every complete candidate issue graph after repository scope,
 integration ownership, and domain-closeout ownership are assigned, but before
-stable IDs or `$plan-harder` calls for missing slices. Durable seed IDs are
+stable IDs or `$feature-flow:engineering-plan` calls for missing slices. Durable seed IDs are
 already stable.
 Evaluate structure rather than issue count;
 the number of candidates is measurement data, never a threshold, cap, option,
@@ -175,7 +175,7 @@ ownership, and domain-closeout ownership. Freeze generated IDs only after the
 gate passes: freeze only missing IDs and never renumber durable seeds. Report
 the candidate count, final count, combined or removed
 slices, removed artificial dependencies, retained enabling or integration
-reasons, and avoided initial `$plan-harder` calls, calculated as candidate count
+reasons, and avoided initial Engineering Plan calls, calculated as candidate count
 minus final count. Report later repair passes separately. Persist none of this
 as an option, Feature Spec field, Execution Contract row, or issue-body section.
 
@@ -229,7 +229,7 @@ Every agent-ready issue must have:
 - portable source and evidence refs;
 - no unresolved human decision or placeholder question;
 - a passed structural graph-compression gate before IDs were frozen;
-- a completed final stable `$plan-harder` issue-hardening pass, after graph and
+- a completed final stable `$feature-flow:engineering-plan` issue-hardening pass, after graph and
   scope stabilization;
 - domain closeout only on the unique final issue when required.
 
@@ -249,5 +249,5 @@ When validation fails, repair in this order:
 7. domain closeout ownership;
 8. template and metadata consistency.
 
-Re-run `$plan-harder` for any issue materially changed by repairs, keep only the
+Re-run `$feature-flow:engineering-plan` for any issue materially changed by repairs, keep only the
 final stable result and one provenance line, then repeat the readiness gate.

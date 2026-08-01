@@ -12,8 +12,9 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - `references/spec-phase.md`, `issue-phase.md`, and `vertical-slices.md` own
   phase behavior and their templates own rendered artifact shapes.
 - GitHub issue transport is delegated to `$gitstack:github-issues`. Project
-  Context owns durable context routing and closeout, while clarification and
-  issue-hardening skills remain composing dependencies.
+  Context owns durable context routing and closeout, while
+  `$feature-flow:engineering-plan` remains the composing dependency for
+  issue-hardening; Plan owns its invocation and artifact merge.
 - `tests/` protects graph compression, scope repair, and validator behavior.
 
 ## Maintenance contract

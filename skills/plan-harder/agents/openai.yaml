@@ -1,5 +1,0 @@
-interface:
-  display_name: "Plan Harder"
-  short_description: "Create higher-rigor plans or harden single issues before coding."
-  brand_color: "#4F46E5"
-  default_prompt: "Use $plan-harder only for an explicitly requested higher-rigor planning or issue-hardening pass. Research the codebase, ask only materially blocking questions, and return a full plan or compact issue brief without coding or writing files. When a planning skill calls it to harden one issue, return the structured caller-surface result instead of standalone chat closeout."

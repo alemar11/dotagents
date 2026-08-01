@@ -16,11 +16,16 @@ maintenance.
   `implement`.
 - `skills/idea/` owns Idea capture and stops after capture reporting.
 - `skills/plan/` owns complete Feature Spec and implementation-issue planning.
+- `skills/engineering-plan/` owns codebase-grounded implementation planning and
+  issue hardening without repository or tracker writes.
 - `skills/implement/` owns Codex App orchestration and delivery verification.
 
 ## Maintenance contract
 
-- Keep `idea` and `plan` as separate public bundled skills.
+- Keep `idea`, `plan`, and `engineering-plan` as separate public bundled skills.
+- Keep `engineering-plan` separate from `plan`: Plan owns Feature Spec and issue
+  graph convergence; Engineering Plan owns planning-only output and its caller
+  result envelope.
 - Keep `implement` as a separate public bundled skill; do not merge execution
   orchestration into `plan`.
 - Keep `run_mode: preview | publish` identical across `idea` and `plan`;
@@ -35,7 +40,7 @@ maintenance.
 ## Validation
 
 - Validate the manifest with the plugin validator.
-- Validate all three bundled skill metadata files with the skill validator.
+- Validate all four bundled skill metadata files with the skill validator.
 - Run the focused `plan` and `implement` test suites and repository-wide
   stale-reference scans.
 - Run `git diff --check` before handoff.

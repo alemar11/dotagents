@@ -36,7 +36,7 @@ deferred domain-memory closeout.
   stable planning contract directly while preserving compatible executor-owned
   operational edits; never compare a whole tracker body or compute its digest.
 - Run structural graph compression before freezing IDs or invoking
-  `$plan-harder` for missing issues; issue count is report data only.
+  `$feature-flow:engineering-plan` for missing issues; issue count is report data only.
 - The only stable issue-scope mutation is the separately invoked
   `scope_repair_request` branch owned by `scope-repair.md`. It may add a
   monotonic `allowed_paths` envelope to the named durable issue while preserving
@@ -329,7 +329,7 @@ For issue comparison, source and branch identity mean the rendered
 `source_spec_ref` and `target_branch_name`.
 Do not perform a fresh model split merely to recreate comparison prose.
 
-Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
+Do not rerun `$feature-flow:engineering-plan` to synthesize comparison prose for a durable issue.
 Treat its body as contract-equivalent only when the generated ID, title, stable
 fields above, and `dependency_ids` exactly match the desired graph; required
 sections occur exactly once; every current source requirement, acceptance
@@ -378,8 +378,8 @@ parent/sub-issue operations after the comparison passes.
 ### 7. Harden Every Missing Issue
 
 After structural compression, graph ownership, and durable-state reconciliation
-have stabilized, invoke `$plan-harder` at least once for each missing final
-issue with Plan Harder's own
+have stabilized, invoke `$feature-flow:engineering-plan` at least once for each
+missing final issue with Engineering Plan's own
 `planning_mode=issue-hardening` and `output_surface=caller`. Merge the returned
 brief into the issue template:
 
@@ -397,6 +397,10 @@ recommendation and include this exact meaning: "This is the planning-time
 recommended approach. The implementing Codex task may replace it with a simpler
 or safer design when the accepted goal, scope, constraints and acceptance
 criteria remain unchanged."
+
+The provenance marker is role-based and must describe completion of the final
+implementation-hardening pass without naming the invoking skill. This keeps
+durable issue bodies independent from skill renames and plugin packaging.
 
 Run final verticality, scope-overlap, dependency, validation, and readiness
 gates. If hardening exposes a graph-level defect, discard affected results,

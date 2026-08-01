@@ -1,9 +1,9 @@
 ---
-name: plan-harder
-description: Create higher-rigor implementation plans or harden a single issue into an agent-ready brief before coding.
+name: engineering-plan
+description: Create codebase-grounded implementation plans or harden a single issue into an agent-ready brief before coding.
 ---
 
-# Plan Harder
+# Engineering Plan
 
 ## Goal
 
@@ -13,7 +13,7 @@ is ready for careful execution.
 
 Only create the plan. Do not implement the work.
 
-Plan Harder resolves one `planning_mode`:
+Engineering Plan resolves one `planning_mode`:
 
 - `planning_mode=full-plan`: create a phased implementation plan for a feature,
   migration, refactor, or other multi-step change.
@@ -24,8 +24,8 @@ It also resolves one `output_surface`:
 
 - `output_surface=standalone`: return the plan or hardened issue brief to the
   user in chat.
-- `output_surface=caller`: when another skill explicitly invokes Plan Harder
-  with `planning_mode=issue-hardening`, return the structured result to that
+- `output_surface=caller`: when another skill explicitly invokes Engineering
+  Plan with `planning_mode=issue-hardening`, return the structured result to that
   workflow so it can merge or persist the brief. Do not emit standalone
   closeout text on this surface. `planning_mode=full-plan` requires
   `output_surface=standalone`.
@@ -65,20 +65,20 @@ Default to the smallest valid route:
 
 ## Trigger Rules
 
-- Use when the user explicitly invokes `plan-harder` or asks for a harder,
-  deeper, or more stress-tested plan.
+- Use when the user explicitly invokes `engineering-plan` or asks for a deeper
+  or more stress-tested plan.
 - Use `planning_mode=issue-hardening` when the user asks to harden, solidify,
   make agent-ready, or de-risk a single issue or vertical slice before
   implementation.
-- Use `planning_mode=issue-hardening` when another skill invokes `plan-harder` on one
-  issue as a pre-implementation rigor pass.
+- Use `planning_mode=issue-hardening` when another skill invokes
+  `engineering-plan` on one issue as a pre-implementation rigor pass.
 - Use for ambiguous, high-risk, or multi-phase work only when the user has
   explicitly asked for planning, plan hardening, or a pre-implementation rigor
   pass.
 - Do not auto-select this skill merely because an implementation request is
   complex, risky, or underspecified. Keep ordinary execution planning inside
   the implementation workflow unless the user or a calling planning skill
-  explicitly requests Plan Harder.
+  explicitly requests Engineering Plan.
 - Do not use for straightforward planning work that does not need an extra
   review pass.
 
@@ -87,8 +87,8 @@ Default to the smallest valid route:
 - With `output_surface=standalone`, return the plan or issue-hardening brief in
   chat.
 - Never save to `plans/`, create `plans/`, or write a Markdown plan file.
-- If the user asks to save the plan, explain that this skill only plans harder
-  and returns the result; a separate workflow can persist it afterward.
+- If the user asks to save the plan, explain that this skill only prepares and
+  returns the result; a separate workflow can persist it afterward.
 - When the plan is meant to feed later implementation or GitHub issue creation,
   end with issue-sized work slices and a clear handoff note.
 - When hardening an existing issue, end with a clear implementation handoff for
@@ -121,7 +121,7 @@ With `output_surface=caller`:
   still needs phases or multiple tasks.
 - Use `planning_mode=issue-hardening` for one existing issue, one vertical
   slice, or one work item produced by a Feature Spec or issue-splitting skill.
-- If another skill calls Plan Harder with an issue body, treat that as
+- If another skill calls Engineering Plan with an issue body, treat that as
   `planning_mode=issue-hardening` with `output_surface=caller`.
   `planning_mode=full-plan` uses `output_surface=standalone`.
 
@@ -255,7 +255,7 @@ Keep the brief small enough to paste into an issue body or issue comment.
 
 ## Example Requests
 
-- "Plan harder for this auth migration before we touch any code."
+- "Create an engineering plan for this auth migration before we touch any code."
 - "Give me a deeper, stress-tested implementation plan for this feature."
 - "Harden this issue before I give it to an agent."
 - "Make this vertical slice agent-ready without creating a separate plan file."

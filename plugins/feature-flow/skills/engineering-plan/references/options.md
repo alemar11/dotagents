@@ -1,6 +1,6 @@
-# Plan Harder Option Contract
+# Engineering Plan Option Contract
 
-Load this reference before selecting a Plan Harder route or returning a
+Load this reference before selecting an Engineering Plan route or returning a
 structured caller result. It is the canonical registry for selectable planning
 behavior and result classification.
 

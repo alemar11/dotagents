@@ -41,7 +41,7 @@ contracts, integration order, and named gates.]
 
 ## Implementation Plan
 
-Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
+Plan-hardening: final stable implementation-hardening pass completed for this issue.
 
 This is the planning-time recommended approach. The implementing Codex task may
 replace it with a simpler or safer design when the accepted goal, scope,
