@@ -9,6 +9,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import stat
@@ -21,6 +22,24 @@ from typing import Any, Sequence
 
 
 VERSION = "0.1.2"
+CODEX_VERSION_RE = re.compile(
+    r"\bcodex(?:-cli)?\s+v?\d+(?:\.\d+){2}(?:[-+][0-9A-Za-z.-]+)?\b",
+    re.IGNORECASE,
+)
+CODEX_GLOBAL_HELP_FLAGS = (
+    "--ask-for-approval",
+    "--config",
+    "--model",
+    "--sandbox",
+    "--cd",
+)
+CODEX_EXEC_HELP_FLAGS = (
+    "--ephemeral",
+    "--skip-git-repo-check",
+    "--color",
+    "--output-schema",
+    "--output-last-message",
+)
 EFFORT_ORDER = ("low", "medium", "high", "xhigh", "max", "ultra")
 TASK_PROFILE_EFFORTS = {
     "routine": "low",
@@ -209,15 +228,10 @@ def resolve_executable(value: str) -> str:
     )
     if explicit_path:
         candidate = candidate.absolute()
-        if candidate.is_symlink():
-            raise CodexCliError(
-                f"Codex executable must be a runnable regular non-symlink file: {candidate}",
-                code="codex-executable-unavailable",
-            )
         candidate = candidate.resolve(strict=False)
         if not candidate.is_file() or not os.access(candidate, os.X_OK):
             raise CodexCliError(
-                f"Codex executable must be a runnable regular non-symlink file: {candidate}",
+                f"Codex executable must be a runnable regular file: {candidate}",
                 code="codex-executable-unavailable",
             )
         return str(candidate)
@@ -695,7 +709,7 @@ def codex_version(
     executable: str,
 ) -> tuple[bool, str | None, str | None, str | None]:
     try:
-        result = subprocess.run(
+        version_result = subprocess.run(
             [executable, "--version"],
             capture_output=True,
             text=True,
@@ -705,11 +719,48 @@ def codex_version(
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return False, None, str(exc), None
-    stdout = (result.stdout or "").strip() or None
-    stderr = (result.stderr or "").strip() or None
+    stdout = (version_result.stdout or "").strip() or None
+    stderr = (version_result.stderr or "").strip() or None
     output = stdout or stderr
-    if result.returncode != 0:
+    if version_result.returncode != 0:
         return False, output, stderr or stdout or "version check failed", stderr
+    if stdout is None or CODEX_VERSION_RE.search(stdout) is None:
+        return False, output, "unrecognized Codex CLI version output", stderr
+
+    help_checks = (
+        (("--help",), CODEX_GLOBAL_HELP_FLAGS, "global help"),
+        (("exec", "--help"), CODEX_EXEC_HELP_FLAGS, "exec help"),
+    )
+    for suffix, required_flags, label in help_checks:
+        try:
+            help_result = subprocess.run(
+                [executable, *suffix],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return False, output, f"{label} check failed: {exc}", stderr
+        help_text = "\n".join(
+            value for value in (help_result.stdout, help_result.stderr) if value
+        )
+        if help_result.returncode != 0:
+            return (
+                False,
+                output,
+                f"{label} check failed with exit code {help_result.returncode}",
+                help_result.stderr.strip() or stderr,
+            )
+        missing_flags = [flag for flag in required_flags if flag not in help_text]
+        if missing_flags:
+            return (
+                False,
+                output,
+                f"{label} is missing launcher flags: {', '.join(missing_flags)}",
+                help_result.stderr.strip() or stderr,
+            )
     return True, output, None, stderr
 
 

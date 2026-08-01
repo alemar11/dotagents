@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from typing import Any
@@ -175,7 +176,7 @@ class CodexCliContractTests(unittest.TestCase):
             cli.load_prompt(args)
         self.assertEqual(raised.exception.code, "prompt-source-conflict")
 
-    def test_explicit_executable_path_rejects_symlink(self) -> None:
+    def test_explicit_executable_path_accepts_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / "codex-target"
@@ -183,9 +184,50 @@ class CodexCliContractTests(unittest.TestCase):
             target.chmod(0o700)
             link = root / "codex-link"
             link.symlink_to(target)
-            with self.assertRaises(cli.CodexCliError) as raised:
-                cli.resolve_executable(str(link))
-        self.assertEqual(raised.exception.code, "codex-executable-unavailable")
+            resolved = cli.resolve_executable(str(link))
+        self.assertEqual(Path(resolved), target.resolve())
+
+    def test_codex_version_requires_expected_cli_contract(self) -> None:
+        responses = [
+            subprocess.CompletedProcess(
+                args=["codex", "--version"],
+                returncode=0,
+                stdout="codex-cli 0.146.0\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["codex", "--help"],
+                returncode=0,
+                stdout=" ".join(cli.CODEX_GLOBAL_HELP_FLAGS),
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["codex", "exec", "--help"],
+                returncode=0,
+                stdout=" ".join(cli.CODEX_EXEC_HELP_FLAGS),
+                stderr="",
+            ),
+        ]
+        with mock.patch.object(cli.subprocess, "run", side_effect=responses):
+            available, version, error, stderr = cli.codex_version("codex")
+        self.assertTrue(available)
+        self.assertEqual(version, "codex-cli 0.146.0")
+        self.assertIsNone(error)
+        self.assertIsNone(stderr)
+
+    def test_codex_version_rejects_unrelated_zero_exit_binary(self) -> None:
+        response = subprocess.CompletedProcess(
+            args=["true", "--version"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+        with mock.patch.object(cli.subprocess, "run", return_value=response):
+            available, version, error, stderr = cli.codex_version("true")
+        self.assertFalse(available)
+        self.assertIsNone(version)
+        self.assertEqual(error, "unrecognized Codex CLI version output")
+        self.assertIsNone(stderr)
 
     def test_explicit_relative_executable_is_absolute_before_child_cd(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
