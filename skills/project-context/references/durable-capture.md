@@ -69,7 +69,9 @@ After authorization:
 1. reread every target and stop on drift or conflict;
 2. update only the selected surface and preserve unrelated custom text;
 3. update `CONTEXT.md` indexes, `adr/index.md`, or short AGENTS pointers when
-   required;
+   required; when the destination is `AGENTS.md`, ensure each inserted learning
+   bullet ends with ` (Codex learning)` and do not add that marker to unrelated
+   prose;
 4. read the result back and verify relative links and target existence;
 5. scan for duplicate normative wording and run `git diff --check`;
 6. report `captured`, `deferred`, or `no-durable-change` with destinations and
