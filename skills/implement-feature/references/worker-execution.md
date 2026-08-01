@@ -5,8 +5,8 @@ ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
 repairs, tests, validation, commits, review-candidate preparation, finding
 acceptance and fixes, GitHub issue progress, GitHub PR publication, CI, provider
-review fixes, and final evidence. The bootstrap's `review_owner=worker|root`
-owns AutoReview execution only.
+review fixes, AutoReview, and final evidence. Root only orchestrates and
+verifies the worker's reported evidence.
 
 Before implementation, verify or create/select the declared named branch in the
 managed worktree. Detached HEAD, another branch, or a dirty baseline blocks
@@ -14,18 +14,14 @@ until the worker safely establishes the contract inside its own worktree. Never
 switch the original/main worktree and never treat the managed worktree alone as
 durable delivery.
 
-Resolve the bootstrap's `review_owner=worker|root` before editing
-implementation files and treat the reconciled value returned with bootstrap as
-canonical. With worker ownership, run
+Before editing implementation files, run
 `<autoreview-skill-root>/scripts/autoreview --json doctor` immediately after
 read-only checkout identity preflight and before branch selection. Continue
-only when it succeeds. On
-`recovery=reroute-to-capable-root`, send the structured result to root and wait
-for its evidence-only `set-review-owner` readback; accept only the single
-canonical worker-to-root transition and do not invoke AutoReview afterward. Do
-not retry with escalation or copy credentials. Root ownership changes only the
-later review executor. The worker retains design, implementation, finding
-verification, fixes, validation, tracker, and delivery authority.
+only when it succeeds. If the capability is unavailable, report
+`blocked-app-capability` and stop before implementation. Do not retry with
+escalation or copy credentials. Root never takes over AutoReview; the worker
+retains design, implementation, finding verification, fixes, validation,
+tracker, review, and delivery authority.
 
 Before accepting implementation authority, deduplicate the bootstrap envelope
 by its opaque `bootstrap_id`:
@@ -81,18 +77,15 @@ Respect the accepted material attempt budget and required validation result.
 Use target-repository instructions for commits and validation. Use current
 GitStack workflows only for required GitHub operations. Finish implementation,
 focused validation, tracker checkbox/readback work, and the coherent committed
-candidate HEAD before starting the review handoff. With
-`review_owner=worker`, the worker invokes `$autoreview`. With
-`review_owner=root`, the worker sends only the authoritative review-candidate
-handoff and the root executes AutoReview read-only, returning its structured
-result and evidence refs. In either case, the worker verifies and aggregates
-findings, owns every fix and revalidation, and sends any changed candidate back
-to the same review owner for AutoReview fix verification. AutoReview owns
+candidate HEAD before starting the review handoff. The worker invokes
+`$autoreview`, verifies and aggregates findings, owns every fix and
+revalidation, and sends any changed candidate through the same worker-owned
+AutoReview chain for fix verification. AutoReview owns
 `review_profile=standard|high-risk`; only its `high-risk` path adds one native
 current-head Codex review. Never force-push published history, merge, enqueue,
 deploy, release, or perform post-merge closure.
 
-Before a worker-owned review or a root reroute, run:
+Before worker-owned review, run:
 
 ```bash
 <implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
@@ -102,10 +95,8 @@ Before a worker-owned review or a root reroute, run:
 ```
 
 Use its exact `head_sha` and `base_sha` fields verbatim. Never expand a short
-SHA manually. The review executor repeats this readback immediately before
-launch. A root reroute always starts structured AutoReview in branch mode with
-the exact base, `review_phase=full`, and an evidence output so accepted fixes
-can continue in one evidence chain; it never substitutes commit mode.
+SHA manually. The worker repeats this readback immediately before launch and
+keeps the review evidence bound to the exact candidate HEAD.
 
 Follow `tracker-checklists.md` for every issue and parent checkbox. If later work
 invalidates proof, uncheck it and read back the correction. Restore and commit

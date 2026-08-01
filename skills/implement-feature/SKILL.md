@@ -5,6 +5,48 @@ description: Discover or implement durable GitHub Feature Specs in the ChatGPT A
 
 # Implement Feature Spec
 
+## Normal Execution Path
+
+For an explicit execution request, present and follow this six-stage path:
+
+1. Select complete GitHub Feature Specs and their implementation issues.
+2. Preflight the sources, repositories, saved Git projects, dependencies, and
+   worker profiles; resolve the one startup authorization interaction.
+3. Prepare the run and claim each available Spec/head-branch pair.
+4. Create one visible managed-worktree worker per claimed Spec and deliver its
+   assignment.
+5. Let each worker implement, test, update the tracker, review, and publish its
+   GitHub PR autonomously.
+6. Verify current-head evidence and finish at `pr-ready-for-merge`; never merge.
+
+Keep `run-state` commands, protocol versions, operation IDs, replay generations,
+and observation files internal unless an exception requires explaining them.
+The detailed contracts remain in the directly routed references below.
+
+## Exception Routing
+
+- Discovery requests stop after GitHub-only Spec listing.
+- A claim conflict uses the bounded wait path in
+  `references/claim-waits-and-recovery.md`.
+- An interrupted or ambiguous App action is reconciled before any replay through
+  `references/codex-task-orchestration.md`.
+- Durable-contract drift blocks the assignment; it does not trigger planning or
+  an ad hoc repair.
+- An out-of-envelope path uses the one bounded branch in
+  `references/scope-repair-orchestration.md`.
+- Final evidence mismatch returns evidence only to the worker, which owns repair.
+
+For the out-of-envelope path branch, the worker stops before using the missing
+path and reports the repository-relative path plus the evidence that it is
+needed. Root then spawns one separate visible Plan Feature task, when the
+startup permission allows it, to update the GitHub Feature Spec's
+`allowed_paths`. That planner task only changes the durable planning contract;
+it never implements code, edits the worker, or replaces the worker task. After
+the published contract is read back, root recomputes overlap and sends the
+next contract generation to the same worker. A denied or unavailable planner
+leaves the original assignment blocked; a second path miss requires a new
+planning run.
+
 ## Request Routing
 
 After explicit invocation, classify the request before loading startup
@@ -61,8 +103,8 @@ recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, review-candidate preparation, finding
 acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
-bootstrap's `review_owner=worker|root` owns AutoReview execution only; a
-root-owned review never grants root implementation or repair authority.
+worker always runs AutoReview. Root never runs AutoReview and only verifies the
+worker's reported review evidence.
 
 The controller task may be bound to a local Codex multi-folder project. Codex
 uses that project's primary folder for new-task working directory, default Git
@@ -159,18 +201,9 @@ more Feature Specs. A discovery-only request never enters this flow.
    preflight.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
-2. Run read-only `scripts/run-state --json capabilities` and
-   `scripts/run-state --json doctor`, then
-   `scripts/run-state --json state prepare`. CLI `6.0.0` implements runtime
-   contract `7.0.0` over the permanently unversioned per-user SQLite DB at
-   `~/.cache/dotagents/skills/implement-feature/run-state.sqlite3`; database
-   schema integer `6` is separate from those SemVer identities. Every run pins
-   its exact runtime contract, CLI, and shipped artifact SHA-256. The runtime
-   accepts only the complete current schema: an empty database is initialized,
-   while any existing non-current, corrupt, unversioned, or structurally
-   invalid state stops fail-closed without migration, reset, or row carry-forward.
-   No historical schema registry, retained-runtime drain, or cutover target is
-   tracked. No filesystem lock is used.
+2. Prepare shared run state through read-only `capabilities` and `doctor`, then
+   `state prepare`. Keep the exact schema, runtime pin, and fail-closed behavior
+   internal; `references/run-state.md` owns those details.
 3. Call `run start` with the manifest plus one repeated
    `--feature-spec-set-input <absolute-file>` per linked set; standalone Specs
    pass none. The CLI revalidates every complete body and requires exact
@@ -185,16 +218,11 @@ more Feature Specs. A discovery-only request never enters this flow.
    peers may start before their input HEADs stabilize so they can collaborate,
    but final proof must bind the exact prerequisite revisions. Never create a
    worker for an assignment whose Spec or head branch claim is waiting.
-5. For each worker, follow `references/codex-task-orchestration.md` and send
-   the full assignment under the generated `bootstrap_id`, including canonical
-   `review_owner=worker|root`. Persist the initial owner atomically on
-   `send-bootstrap begin --review-owner`; allow at most one worker-to-root
-   reroute through the reconciled `set-review-owner` operation after the early
-   AutoReview doctor path. A verified,
-   worker-accepted bootstrap starts its complete implementation authority;
-   duplicate delivery of that same logical bootstrap has one effect. The
-   atomic creation prompt is transport-only; there is no baseline-only
-   implementation phase or later GO.
+5. For each worker, follow `references/codex-task-orchestration.md` to create the
+   visible task and deliver its full assignment. Operation IDs and replay
+   generations are internal coordination facts. A verified, worker-accepted
+   bootstrap starts complete implementation authority; the creation prompt
+   grants none.
 6. Let the worker follow `references/worker-execution.md` and
    `references/tracker-checklists.md` autonomously. Monitor coarse progress by
    reading the visible tasks. After an interruption, check whether each recorded

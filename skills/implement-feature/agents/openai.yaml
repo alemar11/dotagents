@@ -1,7 +1,7 @@
 interface:
   display_name: "Implement Feature Spec"
-  short_description: "Discover Feature Specs or coordinate their end-to-end Codex workers."
+  short_description: "Discover Specs or deliver reviewed GitHub PRs."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $implement-feature to discover available GitHub Feature Specs without startup side effects, or explicitly start selected Specs in visible Codex worker tasks and ChatGPT-created worktrees through implementation, validation, current-head review, GitHub issue proof, and reviewed GitHub PR closeout. Explicit execution authorizes creating those worker tasks and worktrees without another confirmation."
+  default_prompt: "Use $implement-feature to list GitHub Feature Specs or explicitly run selected Specs through isolated implementation, validation, review, and PR-ready closeout; merging remains outside the skill."
 policy:
   allow_implicit_invocation: false

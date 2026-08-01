@@ -66,19 +66,22 @@ scope_repair_request:
     - "<evidence-ref>"
 ```
 
-6. Wait for the planner task. Accept only the exact `scope_repair_result`
+   Root does not edit the Spec or issue itself. The planner task may publish
+   only the monotonic `allowed_paths` expansion and then returns its result to
+   root.
+5. Wait for the planner task. Accept only the exact `scope_repair_result`
    contract from Plan Feature with `repair_outcome=applied|no-op`, matching refs and
    repair ID, and a fresh authoritative readback proving the complete Spec and
    issue graph. `blocked` and `full-replan-required` leave the assignment
    blocked.
-7. Recompute overlap from the newly read durable `allowed_paths`. When another
+6. Recompute overlap from the newly read durable `allowed_paths`. When another
    same-root assignment still overlaps, wait for that assignment to finish and
    rerun the overlap check. Do not mutate the planning artifact again.
-8. Build a typed scope-repair observation, then record and execute
+7. Build a typed scope-repair observation, then record and execute
    `send-scope-revision`. The follow-up targets the original worker task and
    contains the new complete stable contract, the planner result and readback
    refs, `contract_generation=N+1`, and the derived `scope_revision_id`.
-9. Finish the recorded operation only after independent conversation readback
+8. Finish the recorded operation only after independent conversation readback
    proves the worker accepted that exact revision. The runtime atomically
    increments the assignment generation and restores its pre-block state.
 

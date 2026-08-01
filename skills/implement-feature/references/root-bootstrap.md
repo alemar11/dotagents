@@ -93,7 +93,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "4.0.0",
-  "runtime_contract_version": "7.0.0",
+  "runtime_contract_version": "8.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -109,7 +109,7 @@ Root is a lightweight control plane. Before mutation:
       "assignment_id": "spec-42",
       "source_spec_ref": "owner/repository#42",
       "repository_identity": "github:owner/repository",
-      "title": "🛠️ Woker · Exact Feature Spec title",
+      "title": "🛠️ Implement Feature · Exact Feature Spec title",
       "target_branch_name": "feature/example",
       "prerequisite_assignment_ids": []
     }
@@ -119,7 +119,7 @@ Root is a lightweight control plane. Before mutation:
 ```
 
 Each assignment `title` is the complete canonical worker-task title
-`🛠️ Woker · <Feature Spec title>`; the runtime rejects a bare or differently
+`🛠️ Implement Feature · <Feature Spec title>`; the runtime rejects a bare or differently
 prefixed title.
 
 The Feature Spec Set validator input has the exact protocol
@@ -203,27 +203,16 @@ all-aborted pre-bootstrap run finishes as `preimplementation-aborted`; if a
 sibling implementation already started, every sibling must become terminal and
 the mixed run finishes as `abandoned`, not as successful delivery.
 
-Each full bootstrap carries the canonical operational field
-`review_owner=worker|root`. Record its initial value atomically with
-`send-bootstrap begin --review-owner worker|root`; begin returns that persisted
-owner for the envelope. Root may select itself only
-after its own AutoReview doctor succeeds. Prefer the worker when its capability
-is already proven. When capability is unknown, record and bootstrap with
-`review_owner=worker`; after read-only checkout identity preflight and before
-branch or implementation mutation, the worker runs
+Each full bootstrap has one fixed execution policy: the worker owns AutoReview.
+After read-only checkout identity preflight and before branch or implementation
+mutation, the worker runs
 `<autoreview-skill-root>/scripts/autoreview --json doctor`. A successful doctor
-confirms the worker owner. `recovery=reroute-to-capable-root` is a hard handoff:
-the worker sends the structured doctor result, root runs the same doctor
-immediately, and either performs one reconciled worker-to-root
-`set-review-owner` operation whose evidence-only follow-up records
-`review_owner=root`, or blocks as `blocked-app-capability` before
-implementation. Never copy credentials or try an escalated worker launch after
-the reroute result. The owner stays out of the run manifest but is authoritative
-SQLite bootstrap-operation state: replay keeps the same operation ID and owner,
-duplicate effects are idempotent, a second reroute or root-to-worker reversal
-fails closed, and
-recovery reads `run show` instead of inferring ownership from conversation
-prose.
+is required before implementation. If the worker cannot use the declared
+AutoReview capability, it reports `blocked-app-capability` before editing;
+root records the evidence and does not take over the review. The bootstrap
+contains no review-owner choice or reroute field, and replay keeps only the
+same operation ID and `bootstrap_id`. Never copy credentials or try an
+escalated launch.
 
 After the required ordinary workers and worktrees exist, forward-test the
 declared distributed execution topology before combined validation. Every

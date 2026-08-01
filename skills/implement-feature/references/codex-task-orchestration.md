@@ -27,12 +27,8 @@ For every such change, root follows one crash-safe sequence:
 Bootstrap may replay after `unknown` or `failed` readback because the worker
 deduplicates its stable `bootstrap_id`; this provides exactly-once bootstrap
 effect, not exactly-once delivery. The protected `create-worker`,
-`set-review-owner`, `set-root-title`, and `archive-worker`
-actions may replay
-only from `failed` with readback that authoritatively proves that launch had no
-effect. A successful `set-review-owner` history permits one initial
-`worker|root` selection and at most one `worker` to `root` reroute; the same
-logical operation is idempotent and a conflicting new owner fails closed.
+`set-root-title`, and `archive-worker` actions may replay only from `failed`
+with readback that authoritatively proves that launch had no effect.
 `send-worker-message` has no replay path. A pending operation is never
 replayable, an immediate tool error is not proof of no effect, and no operation
 is relaunched under a new logical identifier. SQLite stores only identity and
@@ -57,8 +53,8 @@ explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
 1. Set and verify the exact immutable root title once. For one assignment use
-   `🤖 Orchestrator · 1 Feature`. For two or more use
-   `🤖 Orchestrator · N Features`, where `N` is the immutable total
+   `🤖 Implement Feature · 1 Spec`. For two or more use
+   `🤖 Implement Feature · N Specs`, where `N` is the immutable total
    assignment count, including waiting or blocked assignments. Never update the
    root title as assignments progress. The title is UI evidence, never identity
    or durable state.
@@ -68,7 +64,7 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    `model=gpt-5.6-sol` and the assignment's resolved
    `thinking=medium|high|xhigh` from `task-model-policy.md`, and pass the
    assignment's complete canonical `title`, exactly
-   `🛠️ Woker · <Feature Spec title>`, as the `create_thread` title. Use
+   `🛠️ Implement Feature · <Feature Spec title>`, as the `create_thread` title. Use
    this exact no-authority preparation prompt: `This visible task is being
    prepared as an Implement Feature worker. Do not inspect, edit, branch, test,
    publish, or mutate anything yet. Wait for the controller's full bootstrap
@@ -90,9 +86,8 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    `preimplementation-aborted`. If a sibling already started, wait until every
    sibling is terminal and finish the mixed run as `abandoned`, never as a
    successful delivery. Never repair the drift with a later rename operation.
-4. Begin `send-bootstrap --review-owner worker|root` and copy only its returned
-   canonical `review_owner=worker|root` into the full envelope with the recorded
-   `bootstrap_id`, GitHub Issue source ref, Feature ID, repository key,
+4. Begin `send-bootstrap` and copy its returned `bootstrap_id` into the full
+   envelope with the GitHub Issue source ref, Feature ID, repository key,
    repository, branch, allowed paths, issue graph, acceptance and validation
    budgets, safety,
    worker autonomy, checklist rules, final evidence, and every known peer's
@@ -167,22 +162,16 @@ Root may send a follow-up only for recovered task facts, a newly created
 peer's exact task/repository/branch/role/checkout identity, an authoritative
 durable-source change already authored outside the active run and independently
 read back, a reconciled scope revision from
-`scope-repair-orchestration.md`, an early AutoReview capability reroute, a root-owned
-AutoReview result, or an authoritative final-verification mismatch. An early
-review-owner follow-up is the external effect of the recorded
-`set-review-owner` operation and contains only the structured doctor result and
-`review_owner=root`; it occurs before implementation, is reconciled by exact
-operation ID/readback, and grants root review execution, not implementation
-authority. A new
+`scope-repair-orchestration.md`, or an authoritative final-verification
+mismatch. A new
 peer-identity follow-up carries identity only; it does not introduce technical
 instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider
 refs when applicable.
 
-A root-owned AutoReview result follow-up contains only the structured findings
-and evidence refs returned by AutoReview, bound to the exact reviewed HEAD. It
-may report that the review is clean or identify review findings, but it must not
-add root-authored diagnosis, commands, implementation guidance, or repair
+The worker sends the structured AutoReview result and evidence refs bound to the
+exact reviewed HEAD. Root may read and relay those facts as coordination
+evidence, but never launches AutoReview, adds diagnosis, or supplies repair
 strategy. The worker owns finding acceptance, repair, validation, and
 replacement evidence.
 
@@ -210,7 +199,7 @@ Diagnosis, repair, validation, and replacement evidence remain worker-owned.
 Durable-contract drift is different: record the assignment as blocked instead
 of suggesting repair.
 
-For a root-owned review, require the worker to build the review handoff with:
+Before its worker-owned review, the worker builds the review handoff with:
 
 ```bash
 <implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
@@ -220,12 +209,11 @@ For a root-owned review, require the worker to build the review handoff with:
 ```
 
 The worker forwards the returned `base_sha` and `head_sha` without shortening,
-expanding, or reconstructing either value. Root reruns the same command against
-the same checkout and requires exact JSON identity before review. It then uses
-AutoReview branch mode with that exact base, `--review-phase full`, and
-`--evidence-output`; commit mode is not a reroute substitute because it cannot
-open the branch evidence chain needed after accepted fixes. Root returns only
-findings and evidence to the worker and never edits the candidate.
+expanding, or reconstructing either value to its own AutoReview invocation.
+AutoReview branch mode uses that exact base, `--review-phase full`, and
+`--evidence-output`; commit mode is not a substitute because it cannot open the
+branch evidence chain needed after accepted fixes. Root only verifies the
+resulting evidence and never edits or reviews the candidate.
 
 Before root sends a controller message, record `send-worker-message` in SQLite. After sending, verify
 the immediate response and independently read the exact task conversation,

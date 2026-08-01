@@ -1,8 +1,8 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `6.0.0` implements the breaking runtime
-contract `7.0.0` over database schema `6`. Worker creation now atomically
+uses the shipped artifact. CLI release `7.0.0` implements the breaking runtime
+contract `8.0.0` over database schema `6`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -16,8 +16,8 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `6.0.0` | User-facing commands and executable behavior |
-| Runtime contract | `7.0.0` | Coordination semantics required by an active run |
+| CLI | `7.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `8.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `6` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -30,7 +30,7 @@ machine-readable registry for these identities and protocols:
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
 | Run manifest | `implement-feature/run-manifest` | `4.0.0` |
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `2.0.0` |
-| Codex task-operation observation | `implement-feature/app-operation-observation` | `3.0.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `4.0.0` |
 | Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` | `3.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `3.0.0` |
@@ -197,7 +197,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="4.0.0"`, `runtime_contract_version="7.0.0"`, and the
+`schema_version="4.0.0"`, `runtime_contract_version="8.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -279,9 +279,8 @@ blocks cleanup and retains the claim.
 When every assignment remains pre-bootstrap, the all-aborted run finishes as
 `preimplementation-aborted`. When a sibling already started, every sibling must
 reach a terminal delivery or abandoned state and the mixed run finishes as
-`abandoned`, never as successful delivery. For the worker-to-root
-`set-review-owner` reroute, it accepts only `root`; for a successful
-`archive-worker`, it accepts `archived` or
+`abandoned`, never as successful delivery. For a successful `archive-worker`,
+it accepts `archived` or
 `completed`. The template exposes these closed values under
 `field_constraints`, so callers do not infer them from the UI label.
 `create-scope-repair-task` likewise accepts only `active|idle`.
@@ -305,11 +304,9 @@ never choose or replace one. That ID is the durable logical operation identity.
 The returned positive `launch_count` identifies one authorized execution
 generation: begin creates generation `1`, and every accepted replay increments
 it. For `send-bootstrap`, begin also derives the stable `bootstrap_id` in
-`bootstrap-*` form and returns the reconciled canonical `review_owner`; begin
-requires `--review-owner worker|root` and stores it on that same logical
-operation. Every begin or replay result reports that original owner,
-so a later worker-to-root reroute cannot rewrite the already delivered
-envelope. Every result authorizes only its reported generation.
+`bootstrap-*` form. The operation has no review-owner choice: AutoReview is
+always worker-owned, while root remains an orchestrator and evidence verifier.
+Every result authorizes only its reported generation.
 
 `create-scope-repair-task` binds the assignment's current repair ID and contract
 generation and returns the exact expected planner title
@@ -332,7 +329,6 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | --- | --- |
 | `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_title`, `observed_state` |
 | `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`, `observed_title` |
-| `set-review-owner` | `thread_id`, `observed_state` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
 | `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
@@ -371,7 +367,6 @@ generation. Its action-specific gates are:
 | `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
 | `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
-| `set-review-owner` | Prior generation is `failed` and `readback_ref` authoritatively proves the owner follow-up was not delivered; success permits the single worker-to-root reroute |
 | `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
 | `send-worker-message` | Never replayable |
@@ -385,8 +380,8 @@ claim downstream deduplication.
 `set-root-title` has one logical `operation_id` for each run; an authorized
 failed/no-effect replay is another launch generation of that same operation.
 Its expected title is derived from the immutable assignment count:
-`🤖 Orchestrator · 1 Feature` for one assignment and
-`🤖 Orchestrator · N Features` for two or more.
+`🤖 Implement Feature · 1 Spec` for one assignment and
+`🤖 Implement Feature · N Specs` for two or more.
 
 ## Delivery-Ready Observation
 
@@ -530,8 +525,8 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `6.0.0`,
-`RUNTIME_CONTRACT_VERSION` remains `7.0.0`;
+or build output. `CLI_VERSION` remains `7.0.0`,
+`RUNTIME_CONTRACT_VERSION` remains `8.0.0`;
 `DATABASE_SCHEMA_VERSION` remains integer `6`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python

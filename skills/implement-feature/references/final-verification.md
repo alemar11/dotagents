@@ -16,9 +16,9 @@ verify that assignment again.
 
 The review candidate identity must originate from `scripts/verify-ready --json
 review-candidate`, not from a manually expanded short SHA. Worker and root
-repeat that read-only command against the managed checkout before a root-owned
-review and require identical full `base_sha`, `head_sha`, branch, cleanliness,
-and ancestry fields.
+repeat that read-only command against the managed checkout before the
+worker-owned review and require identical full `base_sha`, `head_sha`, branch,
+cleanliness, and ancestry fields.
 
 For each assignment, root rereads:
 

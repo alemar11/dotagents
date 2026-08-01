@@ -55,7 +55,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         return {
             "schema": "implement-feature/run-manifest",
             "schema_version": "4.0.0",
-            "runtime_contract_version": "7.0.0",
+            "runtime_contract_version": "8.0.0",
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "controller_project_id": "controller-project",
@@ -71,7 +71,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
                     "assignment_id": "spec-01",
                     "source_spec_ref": "owner/repository#42",
                     "repository_identity": "github:owner/repository",
-                    "title": "🛠️ Woker · Example",
+                    "title": "🛠️ Implement Feature · Example",
                     "target_branch_name": "feature/example",
                     "prerequisite_assignment_ids": [],
                 }
@@ -228,6 +228,99 @@ class RunStateGitHubScenarios(unittest.TestCase):
             expected=2,
         )
         self.assertEqual(error["error"]["code"], "invalid-input")
+
+    def test_task_titles_use_implement_feature_vocabulary(self) -> None:
+        started = self.start("title-flow")
+        operation = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "title-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--action",
+            "set-root-title",
+            "--subject-id",
+            "root-title-flow",
+        )
+        observation = self.base / "root-title-observation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "title-flow",
+            "--expected-revision",
+            str(operation["revision"]),
+            "--operation-id",
+            str(operation["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:title",
+            "--readback-ref",
+            "readback:title",
+            "--observed-title",
+            "🤖 Implement Feature · 1 Spec",
+            "--output",
+            str(observation),
+        )
+        finished = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "title-flow",
+            "--expected-revision",
+            str(operation["revision"]),
+            "--operation-id",
+            str(operation["operation_id"]),
+            "--observation",
+            str(observation),
+        )
+        self.assertEqual(finished["status"], "succeeded")
+
+    def test_autoreview_owner_is_fixed_to_worker(self) -> None:
+        capabilities = self.invoke("capabilities")
+        self.assertEqual(capabilities["cli_version"], "7.0.0")
+        self.assertEqual(capabilities["runtime_contract_version"], "8.0.0")
+        self.assertEqual(
+            capabilities["protocols"]["app_operation_observation"]["version"],
+            "4.0.0",
+        )
+
+        removed_option = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "removed-owner",
+            "--expected-revision",
+            "0",
+            "--action",
+            "set-root-title",
+            "--subject-id",
+            "root",
+            "--review-owner",
+            "root",
+            expected=2,
+        )
+        self.assertEqual(removed_option["error"]["code"], "invalid-command-line")
+
+        removed_action = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "removed-owner",
+            "--expected-revision",
+            "0",
+            "--action",
+            "set-review-owner",
+            "--subject-id",
+            "worker",
+            expected=2,
+        )
+        self.assertEqual(removed_action["error"]["code"], "invalid-command-line")
 
     def test_pr_ready_builder_requires_github_evidence_and_finish(self) -> None:
         started = self.start("ready-flow")

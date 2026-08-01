@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "6.0.0"
-RUNTIME_CONTRACT_VERSION = "7.0.0"
+CLI_VERSION = "7.0.0"
+RUNTIME_CONTRACT_VERSION = "8.0.0"
 DATABASE_SCHEMA_VERSION = 6
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
@@ -41,7 +41,7 @@ PROTOCOLS = {
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "3.0.0",
+        "schema_version": "4.0.0",
     },
     "scope_repair_observation": {
         "schema": "implement-feature/scope-repair-observation",
@@ -99,7 +99,6 @@ OWNED_ID_LIKE_RE = re.compile(
 APP_ACTIONS = {
     "create-worker",
     "create-scope-repair-task",
-    "set-review-owner",
     "send-bootstrap",
     "send-scope-revision",
     "send-worker-message",
@@ -117,7 +116,6 @@ SINGLE_USE_ACTIONS = {
 PROTECTED_REPLAY_ACTIONS = SINGLE_USE_ACTIONS | {
     "create-scope-repair-task",
     "send-scope-revision",
-    "set-review-owner",
 }
 
 APP_OPERATION_COMMON_FIELDS = {
@@ -143,7 +141,6 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "observed_state",
         "observed_title",
     },
-    "set-review-owner": {"thread_id", "observed_state"},
     "send-bootstrap": {"thread_id", "bootstrap_id"},
     "send-scope-revision": {
         "thread_id",
@@ -202,11 +199,11 @@ def utc_now() -> str:
 
 
 def root_task_title(assignment_count: int) -> str:
-    feature_label = "Feature" if assignment_count == 1 else "Features"
-    return f"🤖 Orchestrator · {assignment_count} {feature_label}"
+    spec_label = "Spec" if assignment_count == 1 else "Specs"
+    return f"🤖 Implement Feature · {assignment_count} {spec_label}"
 
 
-WORKER_TASK_TITLE_PREFIX = "🛠️ Woker · "
+WORKER_TASK_TITLE_PREFIX = "🛠️ Implement Feature · "
 SCOPE_REPAIR_TASK_TITLE_PREFIX = "🧭 Scope Repair · "
 
 
@@ -1967,76 +1964,10 @@ def command_run_wait_sweep(args: argparse.Namespace) -> dict[str, Any]:
         connection.close()
 
 
-def canonical_review_owner(
-    connection: sqlite3.Connection,
-    run_id: str,
-    assignment_id: str,
-) -> str | None:
-    bootstrap = connection.execute(
-        """SELECT sequence,observed_state FROM app_operations
-           WHERE run_id=? AND assignment_id=? AND action='send-bootstrap'
-           ORDER BY sequence LIMIT 1""",
-        (run_id, assignment_id),
-    ).fetchone()
-    if bootstrap is None:
-        return None
-    initial_owner = bootstrap["observed_state"]
-    if initial_owner not in {"worker", "root"}:
-        runtime = connection.execute(
-            "SELECT runtime_contract_version FROM runs WHERE run_id=?",
-            (run_id,),
-        ).fetchone()
-        if runtime and runtime["runtime_contract_version"] != RUNTIME_CONTRACT_VERSION:
-            return None
-        raise StateError(
-            "invalid-state-schema",
-            "bootstrap operation has no canonical review owner",
-            4,
-        )
-    reroutes = [
-        row[0]
-        for row in connection.execute(
-            """SELECT observed_state FROM app_operations
-               WHERE run_id=? AND assignment_id=?
-                 AND action='set-review-owner' AND status='succeeded'
-                 AND sequence>?
-               ORDER BY sequence""",
-            (run_id, assignment_id, bootstrap["sequence"]),
-        )
-    ]
-    if reroutes not in ([], ["root"]) or (initial_owner == "root" and reroutes):
-        raise StateError(
-            "invalid-state-schema",
-            "review-owner history permits only one worker-to-root reroute",
-            4,
-        )
-    return "root" if reroutes else initial_owner
-
-
-def bootstrap_review_owner(
-    operation: sqlite3.Row,
-) -> str:
-    owner = operation["observed_state"]
-    if owner not in {"worker", "root"}:
-        raise StateError(
-            "invalid-state-schema",
-            "bootstrap operation has no canonical review owner",
-            4,
-        )
-    return owner
-
-
 def assignment_projection(
-    connection: sqlite3.Connection,
     row: sqlite3.Row,
 ) -> dict[str, Any]:
-    value = dict(row)
-    value["review_owner"] = canonical_review_owner(
-        connection,
-        row["run_id"],
-        row["assignment_id"],
-    )
-    return value
+    return dict(row)
 
 
 def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
@@ -2059,7 +1990,7 @@ def command_run_show(args: argparse.Namespace) -> dict[str, Any]:
             )
         ]
         assignments = [
-            assignment_projection(connection, row)
+            assignment_projection(row)
             for row in connection.execute(
                 """SELECT a.*,rr.project_id
                    FROM assignments a
@@ -2129,7 +2060,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
     if action in {
         "create-worker",
         "create-scope-repair-task",
-        "set-review-owner",
         "send-bootstrap",
         "send-scope-revision",
         "send-worker-message",
@@ -2152,34 +2082,6 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 raise StateError(
                     "invalid-assignment-transition",
                     "planner task creation requires a scope-repair-blocked assignment",
-                    4,
-                )
-        elif action == "set-review-owner":
-            if assignment["state"] != "active":
-                raise StateError(
-                    "invalid-assignment-transition",
-                    "review-owner reroute requires an active bootstrapped worker",
-                    4,
-                )
-            unresolved_owner = connection.execute(
-                """SELECT operation_id FROM app_operations
-                   WHERE run_id=? AND assignment_id=?
-                     AND action='set-review-owner'
-                     AND status IN ('pending','unknown')
-                   ORDER BY sequence DESC LIMIT 1""",
-                (run["run_id"], assignment_id),
-            ).fetchone()
-            if unresolved_owner:
-                raise StateError(
-                    "protected-operation-already-started",
-                    "review-owner transition already has an unresolved logical operation: "
-                    f"{unresolved_owner['operation_id']}",
-                    4,
-                )
-            if canonical_review_owner(connection, run["run_id"], assignment_id) != "worker":
-                raise StateError(
-                    "review-owner-conflict",
-                    "review ownership can reroute only once from worker to root",
                     4,
                 )
         elif action == "send-bootstrap":
@@ -2342,19 +2244,7 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
     run_id = token(args.run_id, "run_id")
     action = string(args.action, "action", 80)
     subject_id = string(args.subject_id, "subject_id", 256)
-    review_owner = args.review_owner
     scope_repair_input = args.scope_repair_observation
-    if action == "send-bootstrap":
-        if review_owner not in {"worker", "root"}:
-            raise StateError(
-                "invalid-input",
-                "send-bootstrap requires --review-owner worker|root",
-            )
-    elif review_owner is not None:
-        raise StateError(
-            "invalid-input",
-            "--review-owner is valid only for send-bootstrap",
-        )
     if action == "send-scope-revision":
         if scope_repair_input is None:
             raise StateError(
@@ -2434,7 +2324,7 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
                 action,
                 subject_id,
                 assignment_id,
-                review_owner,
+                None,
                 provider_observation_ref,
                 now,
                 now,
@@ -2454,7 +2344,6 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         }
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
-            result["review_owner"] = review_owner
         elif action == "create-scope-repair-task":
             result["repair_id"] = operation_repair_id
             result["contract_generation"] = operation_generation
@@ -2670,10 +2559,6 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
         field_constraints["observed_state"] = {
             "allowed_values": ["archived", "completed"],
         }
-    elif status == "succeeded" and action == "set-review-owner":
-        field_constraints["observed_state"] = {
-            "allowed_values": ["root"],
-        }
     return {
         "observation_kind": "app-operation",
         "action": action,
@@ -2878,26 +2763,6 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "planner task is already bound to another runtime subject",
                 4,
             )
-    elif action == "set-review-owner":
-        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
-        if observed["thread_id"] != assignment["thread_id"]:
-            raise StateError(
-                "worker-identity-drift",
-                "review-owner receipt belongs to another worker",
-                4,
-            )
-        next_owner = observed["observed_state"]
-        current_owner = canonical_review_owner(
-            connection,
-            run["run_id"],
-            assignment["assignment_id"],
-        )
-        if (current_owner, next_owner) != ("worker", "root"):
-            raise StateError(
-                "review-owner-conflict",
-                "review ownership permits only one worker-to-root reroute",
-                4,
-            )
     elif action == "set-root-title":
         assignment_count = connection.execute(
             "SELECT COUNT(*) FROM assignments WHERE run_id=?",
@@ -2921,7 +2786,6 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "bootstrap requires atomic worker creation with verified title readback",
                 4,
             )
-        bootstrap_review_owner(operation)
         connection.execute("UPDATE assignments SET state='active',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
         connection.execute("UPDATE runs SET implementation_started=1 WHERE run_id=?", (run["run_id"],))
     elif action == "send-scope-revision":
@@ -3161,8 +3025,6 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
             "receipt_ref", "readback_ref", "thread_id", "project_id", "checkout_path",
             "git_common_dir", "observed_title", "provider_observation_ref", "head_sha", "pr_url", "observed_state"
         )}
-        if operation["action"] == "send-bootstrap":
-            values["observed_state"] = bootstrap_review_owner(operation)
         connection.execute(
             """UPDATE app_operations SET status=?,receipt_ref=?,readback_ref=?,thread_id=?,project_id=?,
                checkout_path=?,git_common_dir=?,observed_title=?,provider_observation_ref=?,head_sha=?,pr_url=?,
@@ -3209,11 +3071,6 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         if operation is None:
             raise StateError("operation-not-found", f"operation does not exist: {operation_id}", 3)
         action = operation["action"]
-        authorized_review_owner = (
-            bootstrap_review_owner(operation)
-            if action == "send-bootstrap"
-            else None
-        )
         if action not in PROTECTED_REPLAY_ACTIONS:
             raise StateError(
                 "operation-replay-unsupported",
@@ -3253,8 +3110,7 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
                SET status='pending',launch_count=launch_count+1,receipt_ref=NULL,
                    readback_ref=NULL,thread_id=NULL,project_id=NULL,checkout_path=NULL,
                    git_common_dir=NULL,observed_title=NULL,provider_observation_ref=NULL,
-                   head_sha=NULL,pr_url=NULL,
-                   observed_state=CASE WHEN action='send-bootstrap' THEN observed_state ELSE NULL END,
+                   head_sha=NULL,pr_url=NULL,observed_state=NULL,
                    updated_at=?
                WHERE run_id=? AND operation_id=?""",
             (utc_now(), run_id, operation_id),
@@ -3272,7 +3128,6 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
         }
         if action == "send-bootstrap":
             result["bootstrap_id"] = bootstrap_id_for(operation_id)
-            result["review_owner"] = authorized_review_owner
         elif action == "create-scope-repair-task":
             result["repair_id"] = operation["scope_repair_id"]
             result["contract_generation"] = operation["contract_generation"]
@@ -3304,7 +3159,6 @@ def app_operation_projection(
     value = dict(row)
     if value["action"] == "send-bootstrap":
         value["bootstrap_id"] = bootstrap_id_for(value["operation_id"])
-        value["review_owner"] = bootstrap_review_owner(row)
     elif value["action"] == "create-scope-repair-task":
         assignment = get_assignment(
             connection,
@@ -4758,7 +4612,6 @@ def build_parser() -> argparse.ArgumentParser:
     begin.add_argument("--expected-revision", type=int, required=True)
     begin.add_argument("--action", choices=sorted(APP_ACTIONS), required=True)
     begin.add_argument("--subject-id", required=True)
-    begin.add_argument("--review-owner", choices=("worker", "root"))
     begin.add_argument("--scope-repair-observation")
     begin.set_defaults(handler=command_app_operation_begin, command_name="app-operation begin")
     op_finish = operation_commands.add_parser("finish", help="record or reconcile the immediate response and independent state inspection")
