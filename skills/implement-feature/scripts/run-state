@@ -19,9 +19,9 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "7.0.0"
+CLI_VERSION = "7.0.1"
 RUNTIME_CONTRACT_VERSION = "8.0.0"
-DATABASE_SCHEMA_VERSION = 6
+DATABASE_SCHEMA_VERSION = 7
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 MAX_INPUT_BYTES = 512 * 1024
 MAX_UNCHANGED_WAIT_SWEEPS = 3
@@ -390,6 +390,9 @@ CURRENT_SCHEMA_COLUMNS = {
         "provider_observation_ref", "head_sha", "pr_url", "observed_state",
         "created_at", "updated_at", "contract_generation", "scope_repair_id",
     ),
+    "app_operation_markers": (
+        "run_id", "action", "subject_id", "operation_id", "created_at",
+    ),
 }
 
 
@@ -639,6 +642,15 @@ def create_schema(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             contract_generation INTEGER,
             scope_repair_id TEXT,
+            UNIQUE(run_id, operation_id)
+        )""",
+        """CREATE TABLE app_operation_markers (
+            run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE RESTRICT,
+            action TEXT NOT NULL,
+            subject_id TEXT NOT NULL,
+            operation_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(run_id, action, subject_id),
             UNIQUE(run_id, operation_id)
         )""",
         "CREATE UNIQUE INDEX one_worker_thread_identity ON assignments(thread_id) WHERE thread_id IS NOT NULL",
@@ -1554,9 +1566,65 @@ def require_revision(run: sqlite3.Row, expected: int) -> None:
 
 
 def advance(connection: sqlite3.Connection, run: sqlite3.Row) -> int:
-    revision = run["revision"] + 1
-    connection.execute("UPDATE runs SET revision=?,updated_at=? WHERE run_id=?", (revision, utc_now(), run["run_id"]))
+    expected_revision = run["revision"]
+    revision = expected_revision + 1
+    updated = connection.execute(
+        """UPDATE runs SET revision=?,updated_at=?
+           WHERE run_id=? AND revision=?""",
+        (revision, utc_now(), run["run_id"], expected_revision),
+    ).rowcount
+    if updated != 1:
+        raise StateError(
+            "revision-conflict",
+            f"run revision changed before guarded update: {run['run_id']}",
+            4,
+        )
     return revision
+
+
+def reserve_single_use_operation_marker(
+    connection: sqlite3.Connection,
+    run_id: str,
+    action: str,
+    subject_id: str,
+    operation_id: str,
+    created_at: str,
+) -> None:
+    connection.execute(
+        """INSERT INTO app_operation_markers(
+               run_id,action,subject_id,operation_id,created_at
+           ) VALUES (?,?,?,?,?)
+           ON CONFLICT(run_id,action,subject_id) DO NOTHING""",
+        (run_id, action, subject_id, operation_id, created_at),
+    )
+    if connection.execute("SELECT changes()").fetchone()[0] == 1:
+        return
+    existing = connection.execute(
+        """SELECT m.operation_id AS marker_operation_id,
+                  o.operation_id,o.action,o.subject_id,o.status
+           FROM app_operation_markers m
+           LEFT JOIN app_operations o
+             ON o.run_id=m.run_id AND o.operation_id=m.operation_id
+           WHERE m.run_id=? AND m.action=? AND m.subject_id=?""",
+        (run_id, action, subject_id),
+    ).fetchone()
+    if (
+        existing is None
+        or existing["operation_id"] is None
+        or existing["action"] != action
+        or existing["subject_id"] != subject_id
+    ):
+        raise StateError(
+            "invalid-state-schema",
+            "single-use operation marker does not reference its recorded operation",
+            4,
+        )
+    raise StateError(
+        "protected-operation-already-started",
+        f"{action} already uses {existing['operation_id']} "
+        f"({existing['status']}); reconcile or replay that exact operation",
+        4,
+    )
 
 
 def active_spec_owner(
@@ -2278,21 +2346,17 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
             if action == "send-scope-revision" and assignment is not None
             else None
         )
-        if action in SINGLE_USE_ACTIONS:
-            existing = connection.execute(
-                """SELECT operation_id,status FROM app_operations
-                   WHERE run_id=? AND action=? AND subject_id=?""",
-                (run_id, action, subject_id),
-            ).fetchone()
-            if existing:
-                raise StateError(
-                    "protected-operation-already-started",
-                    f"{action} already uses {existing['operation_id']} "
-                    f"({existing['status']}); reconcile or replay that exact operation",
-                    4,
-                )
         operation_id = new_operation_id()
         now = utc_now()
+        if action in SINGLE_USE_ACTIONS:
+            reserve_single_use_operation_marker(
+                connection,
+                run_id,
+                action,
+                subject_id,
+                operation_id,
+                now,
+            )
         operation_generation = None
         operation_repair_id = None
         provider_observation_ref = None
@@ -2711,9 +2775,9 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 f"worker or checkout is already bound to {collision['run_id']}/{collision['assignment_id']}",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments SET state='worker-created',thread_id=?,checkout_path=?,git_common_dir=?,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=? AND state='planned'""",
             (
                 observed["thread_id"],
                 checkout_path,
@@ -2722,7 +2786,13 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 run["run_id"],
                 assignment["assignment_id"],
             ),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "worker creation state changed before guarded update",
+                4,
+            )
     elif action == "create-scope-repair-task":
         assignment = get_assignment(
             connection,
@@ -2786,7 +2856,17 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "bootstrap requires atomic worker creation with verified title readback",
                 4,
             )
-        connection.execute("UPDATE assignments SET state='active',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
+        updated = connection.execute(
+            """UPDATE assignments SET state='active',updated_at=?
+               WHERE run_id=? AND assignment_id=? AND state='worker-created'""",
+            (now, run["run_id"], assignment["assignment_id"]),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "bootstrap state changed before guarded update",
+                4,
+            )
         connection.execute("UPDATE runs SET implementation_started=1 WHERE run_id=?", (run["run_id"],))
     elif action == "send-scope-revision":
         assignment = get_assignment(
@@ -2830,11 +2910,11 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "scope revision requires the authoritative planning readback",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments
                SET state=?,blocked_from_state=NULL,
                    contract_generation=?,scope_repair_id=NULL,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=? AND state='blocked-scope-repair'""",
             (
                 restored,
                 operation["contract_generation"],
@@ -2842,7 +2922,13 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 run["run_id"],
                 assignment["assignment_id"],
             ),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "scope-repair state changed before guarded update",
+                4,
+            )
         connection.execute(
             """UPDATE spec_claims SET recovery_readback_ref=?
                WHERE run_id=? AND assignment_id=?""",
@@ -2885,7 +2971,17 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "archive requires authoritative proof that the managed checkout is absent",
                 4,
             )
-        connection.execute("UPDATE assignments SET state='preimplementation-aborted',updated_at=? WHERE run_id=? AND assignment_id=?", (now, run["run_id"], assignment["assignment_id"]))
+        updated = connection.execute(
+            """UPDATE assignments SET state='preimplementation-aborted',updated_at=?
+               WHERE run_id=? AND assignment_id=? AND state='worker-created'""",
+            (now, run["run_id"], assignment["assignment_id"]),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "archive state changed before guarded update",
+                4,
+            )
 
 
 def app_operation_replay_authorized(
@@ -3025,12 +3121,27 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
             "receipt_ref", "readback_ref", "thread_id", "project_id", "checkout_path",
             "git_common_dir", "observed_title", "provider_observation_ref", "head_sha", "pr_url", "observed_state"
         )}
-        connection.execute(
+        updated = connection.execute(
             """UPDATE app_operations SET status=?,receipt_ref=?,readback_ref=?,thread_id=?,project_id=?,
                checkout_path=?,git_common_dir=?,observed_title=?,provider_observation_ref=?,head_sha=?,pr_url=?,
-               observed_state=?,updated_at=? WHERE run_id=? AND operation_id=?""",
-            (observed["status"], *(values[field] for field in values), utc_now(), run_id, operation_id),
-        )
+               observed_state=?,updated_at=?
+               WHERE run_id=? AND operation_id=? AND status=? AND launch_count=?""",
+            (
+                observed["status"],
+                *(values[field] for field in values),
+                utc_now(),
+                run_id,
+                operation_id,
+                operation["status"],
+                operation["launch_count"],
+            ),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "operation-state-conflict",
+                "app operation changed before guarded observation update",
+                4,
+            )
         revision = advance(connection, run)
         connection.commit()
         result = {
@@ -3105,16 +3216,28 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
                 "replay subject no longer resolves to the recorded assignment",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE app_operations
                SET status='pending',launch_count=launch_count+1,receipt_ref=NULL,
                    readback_ref=NULL,thread_id=NULL,project_id=NULL,checkout_path=NULL,
                    git_common_dir=NULL,observed_title=NULL,provider_observation_ref=NULL,
                    head_sha=NULL,pr_url=NULL,observed_state=NULL,
                    updated_at=?
-               WHERE run_id=? AND operation_id=?""",
-            (utc_now(), run_id, operation_id),
-        )
+               WHERE run_id=? AND operation_id=? AND status=? AND launch_count=?""",
+            (
+                utc_now(),
+                run_id,
+                operation_id,
+                operation["status"],
+                operation["launch_count"],
+            ),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "operation-state-conflict",
+                "app operation changed before guarded replay update",
+                4,
+            )
         revision = advance(connection, run)
         connection.commit()
         result = {
@@ -3571,11 +3694,12 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
             if evidence["readiness_mode"] == "peer-input"
             else evidence["terminal_state"]
         )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments SET state=?,head_sha=?,base_branch_name=?,base_sha=?,
                worktree_clean=1,base_is_ancestor=1,pr_url=?,default_branch_name=?,
                provider_observation_ref=?,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=?
+                 AND state IN ('active','peer-input-ready')""",
             (
                 persisted_state,
                 evidence["observed_head"],
@@ -3588,7 +3712,13 @@ def command_assignment_ready(args: argparse.Namespace) -> dict[str, Any]:
                 run_id,
                 assignment_id,
             ),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "assignment state changed before guarded ready update",
+                4,
+            )
         claim_released = False
         if evidence["readiness_mode"] == "terminal":
             now = utc_now()
@@ -3636,12 +3766,19 @@ def command_assignment_block(args: argparse.Namespace) -> dict[str, Any]:
                 "durable-contract blocking requires an active or peer-input-ready post-bootstrap worker",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments
                SET state='blocked-durable-contract',blocked_from_state=?,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=?
+                 AND state IN ('active','peer-input-ready')""",
             (assignment["state"], utc_now(), run_id, assignment_id),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "assignment state changed before guarded durable-contract block",
+                4,
+            )
         connection.execute(
             """UPDATE spec_claims SET recovery_readback_ref=NULL
                WHERE run_id=? AND assignment_id=?""",
@@ -3676,12 +3813,19 @@ def command_assignment_capability_block(args: argparse.Namespace) -> dict[str, A
                 "ChatGPT App capability blocking requires an active or peer-input-ready post-bootstrap worker",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments
                SET state='blocked-app-capability',blocked_from_state=?,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=?
+                 AND state IN ('active','peer-input-ready')""",
             (assignment["state"], utc_now(), run_id, assignment_id),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "assignment state changed before guarded app-capability block",
+                4,
+            )
         connection.execute(
             """UPDATE spec_claims SET recovery_readback_ref=NULL
                WHERE run_id=? AND assignment_id=?""",
@@ -3723,11 +3867,12 @@ def command_assignment_scope_block(args: argparse.Namespace) -> dict[str, Any]:
                 4,
             )
         repair_id = new_scope_repair_id()
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments
                SET state='blocked-scope-repair',blocked_from_state=?,
                    scope_repair_id=?,scope_repair_readback_ref=NULL,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
+               WHERE run_id=? AND assignment_id=?
+                 AND state IN ('active','peer-input-ready') AND contract_generation=1""",
             (
                 assignment["state"],
                 repair_id,
@@ -3735,7 +3880,13 @@ def command_assignment_scope_block(args: argparse.Namespace) -> dict[str, Any]:
                 run_id,
                 assignment_id,
             ),
-        )
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "assignment state changed before guarded scope-repair block",
+                4,
+            )
         connection.execute(
             """UPDATE spec_claims SET recovery_readback_ref=NULL
                WHERE run_id=? AND assignment_id=?""",
@@ -3943,11 +4094,17 @@ def command_assignment_resume(args: argparse.Namespace) -> dict[str, Any]:
                 "resume observation does not match the required recovery state",
                 4,
             )
-        connection.execute(
+        updated = connection.execute(
             """UPDATE assignments SET state=?,blocked_from_state=NULL,updated_at=?
-               WHERE run_id=? AND assignment_id=?""",
-            (restored, utc_now(), run_id, assignment_id),
-        )
+               WHERE run_id=? AND assignment_id=? AND state=? AND blocked_from_state=?""",
+            (restored, utc_now(), run_id, assignment_id, assignment["state"], restored),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "assignment-state-conflict",
+                "blocked assignment state changed before guarded resume update",
+                4,
+            )
         connection.execute(
             """UPDATE spec_claims SET recovery_readback_ref=?
                WHERE run_id=? AND assignment_id=?""",
@@ -4479,7 +4636,17 @@ def command_run_finish(args: argparse.Namespace) -> dict[str, Any]:
                 )
         now = utc_now()
         terminal = args.outcome
-        connection.execute("UPDATE runs SET status=?,revision=?,updated_at=?,finished_at=? WHERE run_id=?", (terminal, run["revision"] + 1, now, now, run_id))
+        updated = connection.execute(
+            """UPDATE runs SET status=?,revision=?,updated_at=?,finished_at=?
+               WHERE run_id=? AND revision=?""",
+            (terminal, run["revision"] + 1, now, now, run_id, run["revision"]),
+        ).rowcount
+        if updated != 1:
+            raise StateError(
+                "revision-conflict",
+                f"run revision changed before guarded finish update: {run_id}",
+                4,
+            )
         if args.outcome == "preimplementation-aborted":
             connection.execute(
                 """UPDATE assignments SET state='preimplementation-aborted',updated_at=?
@@ -4509,7 +4676,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = StructuredArgumentParser(
         prog="run-state",
         description=(
-            "Database-schema-6 SQLite coordination for Implement Feature "
+            "Database-schema-7 SQLite coordination for Implement Feature "
             "controllers in the ChatGPT App."
         ),
     )

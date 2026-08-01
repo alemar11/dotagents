@@ -184,6 +184,10 @@ class RunStateGitHubScenarios(unittest.TestCase):
                 row[1]
                 for row in connection.execute("PRAGMA table_info(assignments)")
             }
+            marker_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(app_operation_markers)")
+            }
             run_sql = connection.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'"
             ).fetchone()[0]
@@ -193,7 +197,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(metadata_columns, {"singleton", "schema_version"})
-        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 6)
+        self.assertEqual(marker_columns, {"run_id", "action", "subject_id", "operation_id", "created_at"})
+        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 7)
         self.assertNotIn("regenerated", prepared)
         self.assertNotIn("tracker_backend", assignment_columns)
         self.assertNotIn("delivery_type", assignment_columns)
@@ -281,9 +286,72 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(finished["status"], "succeeded")
 
+    def test_single_use_operations_have_durable_markers(self) -> None:
+        started = self.start("marker-flow")
+        operation = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "marker-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--action",
+            "set-root-title",
+            "--subject-id",
+            "root-marker-flow",
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            marker = connection.execute(
+                """SELECT run_id,action,subject_id,operation_id
+                   FROM app_operation_markers""",
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertEqual(
+            marker,
+            (
+                "marker-flow",
+                "set-root-title",
+                "root-marker-flow",
+                operation["operation_id"],
+            ),
+        )
+
+        duplicate = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "marker-flow",
+            "--expected-revision",
+            str(operation["revision"]),
+            "--action",
+            "set-root-title",
+            "--subject-id",
+            "root-marker-flow",
+            expected=4,
+        )
+        self.assertEqual(duplicate["error"]["code"], "protected-operation-already-started")
+        self.assertIn(str(operation["operation_id"]), duplicate["error"]["message"])
+
+        stale = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "marker-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--action",
+            "set-root-title",
+            "--subject-id",
+            "root-marker-flow-2",
+            expected=4,
+        )
+        self.assertEqual(stale["error"]["code"], "revision-conflict")
+
     def test_autoreview_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "7.0.0")
+        self.assertEqual(capabilities["cli_version"], "7.0.1")
         self.assertEqual(capabilities["runtime_contract_version"], "8.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],

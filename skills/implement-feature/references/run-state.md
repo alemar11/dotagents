@@ -1,8 +1,8 @@
 # Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `7.0.0` implements the breaking runtime
-contract `8.0.0` over database schema `6`. Worker creation now atomically
+uses the shipped artifact. CLI release `7.0.1` implements the breaking runtime
+contract `8.0.0` over database schema `7`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
@@ -16,9 +16,9 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `7.0.0` | User-facing commands and executable behavior |
+| CLI | `7.0.1` | User-facing commands and executable behavior |
 | Runtime contract | `8.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `6` | Exact SQLite tables, columns, indexes, and constraints |
+| Database schema | integer `7` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -54,13 +54,13 @@ single-row `runtime_metadata` table is the sole schema source of truth:
 ```sql
 CREATE TABLE runtime_metadata (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 6)
+    schema_version INTEGER NOT NULL CHECK (schema_version = 7)
 );
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=6)`. The integer stored here is not the CLI, runtime-contract,
-or JSON protocol version. Schema number `6` does not authorize an alternate
+`(schema_version=7)`. The integer stored here is not the CLI, runtime-contract,
+or JSON protocol version. Schema number `7` does not authorize an alternate
 shape: every table, column, index, and constraint must match exactly or the CLI
 returns `invalid-state-schema` without deleting or rewriting the DB. `PRAGMA
 user_version` is not application state and is never read or written. Local
@@ -75,8 +75,9 @@ SemVer but different bytes is not the retained runtime for that run.
 ## Stored Data Allowlist
 
 The schema contains only runtime metadata, runs, normalized run-repository
-bindings, assignments, canonical Feature Spec claims, and typed Codex
-task-operation reconciliation facts. It may retain durable source refs, linked
+bindings, assignments, canonical Feature Spec claims, typed Codex
+task-operation reconciliation facts, and single-use operation markers. It may
+retain durable source refs, linked
 `feature_id` membership, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
 identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
@@ -84,6 +85,19 @@ normal Git head/base/ancestry facts, contract generation, opaque scope repair
 identity and authoritative repair readback, and PR/provider refs only when
 applicable. GitHub Issues and GitHub PRs are fixed workflow boundaries, not
 stored provider or delivery selectors.
+
+`app_operation_markers` contains one durable reservation for each
+`(run_id, action, subject_id)` in `SINGLE_USE_ACTIONS`. The reservation is
+created with `ON CONFLICT DO NOTHING` before the corresponding typed row in
+`app_operations`; a duplicate returns the original `operation_id` and must be
+reconciled or replayed through that operation. The marker is deliberately a
+small idempotency key, not a generic provider payload or a second operation
+state machine.
+
+Script-level validation explains whether a transition is allowed, while the
+final SQL mutation repeats the expected revision or state as a predicate. Each
+guarded mutation must affect exactly one row; otherwise the transaction fails
+closed with a conflict error.
 
 It must not store raw Spec or issue bodies, checklists, issue phases, allowed
 path prose, validation attempts, worker technical or domain state, arbitrary
@@ -525,9 +539,9 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` remains `7.0.0`,
+or build output. `CLI_VERSION` remains `7.0.1`,
 `RUNTIME_CONTRACT_VERSION` remains `8.0.0`;
-`DATABASE_SCHEMA_VERSION` remains integer `6`; each protocol entry remains at
+`DATABASE_SCHEMA_VERSION` is integer `7`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `feature-spec-set validate`, plus Python
 compilation and the remaining executable verifier checks after changes.
@@ -558,7 +572,7 @@ breaking hard cut. Never add
 state carry-forward.
 
 At runtime, call read-only `capabilities` and `doctor` first and then
-`state prepare`. The shipped runtime accepts only schema 6. An empty database
+`state prepare`. The shipped runtime accepts only schema 7. An empty database
 is initialized with the exact current tables, columns, indexes, constraints,
 and singleton metadata row. An existing database must already match that exact
 shape; any other schema number, historical shape, unversioned table set,
