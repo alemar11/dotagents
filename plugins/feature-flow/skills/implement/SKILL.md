@@ -1,5 +1,5 @@
 ---
-name: implement-feature
+name: implement
 description: Discover or implement durable GitHub Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs. Use only when explicitly invoked.
 ---
 
@@ -38,7 +38,7 @@ The detailed contracts remain in the directly routed references below.
 
 For the out-of-envelope path branch, the worker stops before using the missing
 path and reports the repository-relative path plus the evidence that it is
-needed. Root then spawns one separate visible Plan Feature task, when the
+needed. Root then spawns one separate visible Feature Flow Plan task, when the
 startup permission allows it, to update the GitHub Feature Spec's
 `allowed_paths`. That planner task only changes the durable planning contract;
 it never implements code, edits the worker, or replaces the worker task. After
@@ -58,7 +58,7 @@ references:
   remain discovery even when they contain the word "implement".
 - Enter the execution flow only when the user explicitly directs the skill to
   start, implement, or resume one or more Feature Specs. That explicit
-  `$implement-feature` execution request authorizes creating the disclosed
+  `$implement` execution request authorizes creating the disclosed
   visible worker tasks and their ChatGPT-created worktrees. Do not ask for an
   additional worker-task creation confirmation.
 
@@ -78,7 +78,7 @@ For `discovery-only`:
 
 ## Fixed Contract
 
-Use this skill only after explicit `$implement-feature` invocation in the
+Use this skill only after explicit `$implement` invocation in the
 ChatGPT App in Codex mode. For execution, consume complete execution-ready
 Feature Specs and their issues unchanged. Never plan or implement in root,
 create raw worktrees, merge, enqueue, deploy,
@@ -94,6 +94,14 @@ by that run. The sole mutation exception is a separately owned monotonic
 requires a new run and claim after the
 existing owner is reconciled; root and workers must never create the change,
 even when a user directly requests it inside the active run.
+
+`../../references/ready-gate.md` owns the execution-readiness boundary. Before
+any startup authorization, run-state preparation, claim, worker, or worktree
+mutation, the root must read the complete implementation issue graph and
+verify the exact `ready-for-agent` label on every final implementation issue.
+The parent Feature Spec is not a substitute for its child issue labels. A
+missing label blocks that Spec before state and is routed back to Plan;
+Implement never adds or repairs the label.
 
 The root coordinates; each visible Codex worker task executes one Feature Spec
 end to end in the ChatGPT-created worktree assigned to that task. A worker that remains within the durable
@@ -178,10 +186,13 @@ question during the run.
 This flow applies only after the user explicitly directs execution of one or
 more Feature Specs. A discovery-only request never enters this flow.
 
-1. Load `references/feature-spec-contract.md` and
-   `references/root-bootstrap.md`. Validate current durable sources,
+1. Load `../../references/workflow-contract.md`,
+   `../../references/ready-gate.md`, `references/feature-spec-contract.md`,
+   and `references/root-bootstrap.md`. Validate current durable sources,
    dependencies, repository identities, allowed paths, acceptance, validation,
    GitHub PR delivery, and exact repository-to-worker-project mapping before state.
+   Apply the ready-for-agent gate to every final implementation issue before
+   resolving worker profiles, startup authorization, run state, or claims.
    Resolve each worker's fixed model and adaptive thinking level through
    `references/task-model-policy.md`, verify destination-host support, and
    disclose every resolved profile before startup authorization.
@@ -252,8 +263,10 @@ own Feature Spec claim; independent assignments continue.
 
 ## Reference Routing
 
-- Always load `references/options.md`, `references/feature-spec-contract.md`,
-  `references/root-bootstrap.md`, `references/task-model-policy.md`, and
+- Always load `../../references/workflow-contract.md`,
+  `../../references/ready-gate.md`, `references/options.md`,
+  `references/feature-spec-contract.md`, `references/root-bootstrap.md`,
+  `references/task-model-policy.md`, and
   `references/codex-task-orchestration.md` before startup mutation.
 - Load `references/scope-repair-orchestration.md` when startup authorization is
   resolved or a worker reports an out-of-envelope path.

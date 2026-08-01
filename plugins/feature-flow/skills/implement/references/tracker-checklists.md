@@ -1,4 +1,4 @@
-# Tracker Checklists
+# Implement Tracker Checklists
 
 The worker, not root, owns acceptance judgment and tracker mutation for its
 Feature Spec. Before each issue, after recovery, and before final verification,

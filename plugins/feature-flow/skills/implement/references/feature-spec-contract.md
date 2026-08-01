@@ -1,4 +1,4 @@
-# Execution-Ready Feature Spec Contract
+# Implement Execution-Ready Feature Spec Contract
 
 Read the complete durable GitHub Feature Spec and implementation-issue graph
 before startup. Reject proposals, standalone or incomplete Specs, planning
@@ -27,7 +27,7 @@ above:
 | `implement-feature-worker` | `forbidden` |
 
 `external-planning-owner` means a human tracker owner or a separately invoked
-planning workflow operating outside the active `$implement-feature` run. A
+planning workflow operating outside the active `$implement` run. A
 direct user message to the active root or worker does not change that actor's
 role and does not grant planning authority.
 

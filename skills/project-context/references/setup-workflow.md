@@ -161,7 +161,7 @@ broken pointer:
 
 Keep this block concise. Do not paste domain vocabulary, workflow procedures,
 implementation policy, localization rules, worker-dispatch rules, or context
-seed material into `AGENTS.md`. `$implement-feature` owns its session worker
+seed material into `AGENTS.md`. `$feature-flow:implement` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record.
 
 The `## Code Review Rules` section is a separate exact review contract, not a

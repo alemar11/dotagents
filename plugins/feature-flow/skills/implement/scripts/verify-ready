@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Bundled by Feature Flow; implement-feature protocol identifiers remain stable.
 from __future__ import annotations
 
 import argparse
@@ -93,7 +94,7 @@ def review_candidate(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(description="Read-only terminal verification for implement-feature deliveries.")
+    root = argparse.ArgumentParser(description="Read-only terminal verification for Feature Flow implementation deliveries.")
     root.add_argument("--version", action="version", version=CLI_VERSION)
     root.add_argument("--json", action="store_true", help="emit a stable JSON result")
     commands = root.add_subparsers(dest="command", required=True)

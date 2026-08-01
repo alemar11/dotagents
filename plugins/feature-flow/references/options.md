@@ -1,6 +1,7 @@
 # Feature Flow Options
 
-Both bundled skills expose the same run-scoped option registry.
+The `idea` and `plan` bundled skills expose the same run-scoped option
+registry. The `implement` skill has its own startup-authorization contract.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |

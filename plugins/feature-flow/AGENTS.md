@@ -1,8 +1,9 @@
 # Feature Flow Plugin Maintenance
 
-`plugins/feature-flow/` is the repo-local source package for feature intake and
-planning. Runtime behavior belongs in the bundled skills and references; this
-file governs package ownership and maintenance.
+`plugins/feature-flow/` is the repo-local source package for feature intake,
+planning, and implementation orchestration. Runtime behavior belongs in the
+bundled skills and references; this file governs package ownership and
+maintenance.
 
 ## Ownership map
 
@@ -11,21 +12,30 @@ file governs package ownership and maintenance.
 - `references/options.md` owns the shared `run_mode` registry.
 - `references/workflow-contract.md` owns semantic GitHub metadata and label
   values; GitStack owns GitHub transport and verification.
+- `references/ready-gate.md` owns the execution-readiness gate consumed by
+  `implement`.
 - `skills/idea/` owns Idea capture and stops after capture reporting.
 - `skills/plan/` owns complete Feature Spec and implementation-issue planning.
+- `skills/implement/` owns Codex App orchestration and delivery verification.
 
 ## Maintenance contract
 
 - Keep `idea` and `plan` as separate public bundled skills.
-- Keep `run_mode: preview | publish` identical across both skills.
+- Keep `implement` as a separate public bundled skill; do not merge execution
+  orchestration into `plan`.
+- Keep `run_mode: preview | publish` identical across `idea` and `plan`;
+  `implement` retains its own startup-authorization contract.
 - Do not reintroduce retired standalone package names or compatibility aliases.
-- Keep `implement-feature` outside this plugin and do not add readiness
-  enforcement here.
+- Preserve the Implement Feature App-only execution boundary and its internal
+  `implement-feature` protocol/cache identifiers during the move.
+- Keep `ready-for-agent` enforcement in `implement`'s preflight; `implement`
+  must not apply or repair the label.
 - Keep GitHub transport in GitStack; do not add a second provider adapter.
 
 ## Validation
 
 - Validate the manifest with the plugin validator.
-- Validate both bundled skill metadata with the skill validator.
-- Run the focused `plan` tests and repository-wide stale-reference scans.
+- Validate all three bundled skill metadata files with the skill validator.
+- Run the focused `plan` and `implement` test suites and repository-wide
+  stale-reference scans.
 - Run `git diff --check` before handoff.

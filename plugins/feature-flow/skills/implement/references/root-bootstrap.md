@@ -1,9 +1,15 @@
-# Root Bootstrap
+# Implement Root Bootstrap
 
 Root is a lightweight control plane. Before mutation:
 
-1. Read and validate the complete current Feature Spec frontier through
-   `feature-spec-contract.md`.
+1. Read `../../../references/workflow-contract.md` and
+   `../../../references/ready-gate.md`, then read and validate the complete
+   current Feature Spec frontier through `feature-spec-contract.md`. Before
+   resolving worker profiles, startup authorization, or writing any run state,
+   enforce the ready-for-agent gate against the complete implementation issue
+   graph. Read the exact label metadata through the GitStack issue workflow;
+   incomplete pagination, stale reads, races, or one missing label stop the
+   affected Spec before claims, tasks, or worktrees.
 2. Read the current Codex task and `list_projects`. When task readback reports a
    non-null `projectId`, require it to identify one local saved Codex project on
    the task's current host and record that exact `controller_project_id`; also

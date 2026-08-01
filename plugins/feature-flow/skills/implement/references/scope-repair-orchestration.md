@@ -1,4 +1,4 @@
-# Scope Repair Orchestration
+# Implement Scope Repair Orchestration
 
 Use this branch only after a bootstrapped worker reports that a file required
 by the accepted implementation lies outside the durable `allowed_paths`

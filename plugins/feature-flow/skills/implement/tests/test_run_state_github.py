@@ -1,4 +1,5 @@
 from __future__ import annotations
+# Bundled under Feature Flow; implement-feature protocol and cache identifiers remain stable.
 
 import json
 import os

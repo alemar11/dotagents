@@ -94,7 +94,7 @@ the complete linked set first.
   state before preview output or mutation and never renumbers a retained issue.
 - Both phases carry the same `run_mode`, derived source route, planning
   identity, and `source_spec_ref`.
-- `$implement-feature` consumes only a durable hosted Feature Spec ref,
+- `$feature-flow:implement` consumes only a durable hosted Feature Spec ref,
   globally qualified for multi-repository work, never proposed output.
 
 ## Durable Targets And Completion

@@ -1,4 +1,4 @@
-# Run State CLI
+# Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
 uses the shipped artifact. CLI release `1.0.0` implements the breaking runtime

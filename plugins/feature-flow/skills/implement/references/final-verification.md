@@ -1,4 +1,4 @@
-# Final Verification
+# Implement Final Verification
 
 The worker first reports the terminal observation `pr-ready-for-merge`.
 Root then performs read-only verification; it does not edit code, rerun implementation,

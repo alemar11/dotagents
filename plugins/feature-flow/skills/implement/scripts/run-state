@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Bundled by Feature Flow; implement-feature protocol and cache identifiers remain stable.
 from __future__ import annotations
 
 import argparse

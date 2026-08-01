@@ -1,7 +1,7 @@
 # Codex CLI Model Policy
 
 This is the canonical model, reasoning, and selection policy for the codex-cli
-skill. It is independent from implement-feature; changing this file must not
+skill. It is independent from the Feature Flow implementation skill; changing this file must not
 change that skill.
 
 ## Model registry

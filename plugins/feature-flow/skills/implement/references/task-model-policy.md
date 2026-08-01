@@ -1,9 +1,9 @@
-# Visible Worker Model Policy
+# Implement Visible Worker Model Policy
 
 ## Ownership
 
 This file is the canonical owner of the model and reasoning policy for visible
-Codex worker tasks created by `$implement-feature`. The policy is fixed runtime
+Codex worker tasks created by `$implement`. The policy is fixed runtime
 behavior, not a user option, Feature Spec field, Project Context value, tracker
 artifact, run-manifest field, or SQLite fact.
 

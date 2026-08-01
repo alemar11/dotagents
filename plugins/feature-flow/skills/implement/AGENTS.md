@@ -1,6 +1,6 @@
 # Implement Feature Maintenance
 
-`skills/implement-feature/` owns the Codex App orchestration entrypoint for
+`plugins/feature-flow/skills/implement/` owns the Codex App orchestration entrypoint for
 GitHub Feature Specs. Runtime behavior stays in `SKILL.md` and the directly
 routed references; this file records maintenance contracts for the package.
 
@@ -27,6 +27,8 @@ routed references; this file records maintenance contracts for the package.
 - Keep GitHub Issues as the source tracker and GitHub PR as the delivery
   boundary. GitStack owns Git/GitHub transport; this package owns orchestration
   and verification, not transport implementation.
+- Enforce the plugin `ready-for-agent` gate before run-state preparation,
+  claims, workers, or worktrees. Do not apply or repair the label here.
 - Keep worker implementation and review evidence worker-owned, root follow-up
   evidence-only, and cross-worktree access forbidden. Do not persist raw
   Feature Spec or issue bodies in run state.

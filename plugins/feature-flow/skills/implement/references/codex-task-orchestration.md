@@ -1,4 +1,4 @@
-# Codex Task Orchestration
+# Implement Codex Task Orchestration
 
 Root alone creates or changes visible Codex tasks, titles, and archives through
 the ChatGPT App. Root owns only controller bootstrap and the explicitly
@@ -202,7 +202,7 @@ of suggesting repair.
 Before its worker-owned review, the worker builds the review handoff with:
 
 ```bash
-<implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
+<implement-skill-root>/scripts/verify-ready --json review-candidate \
   --checkout <managed-checkout> \
   --branch <target-branch> \
   --base-sha <startup-base-sha>

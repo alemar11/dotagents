@@ -1,4 +1,4 @@
-# End-To-End Worker Execution
+# Implement End-To-End Worker Execution
 
 The worker executes one assigned Feature Spec end to end in the
 ChatGPT-created worktree assigned to its visible Codex task. It owns issue
@@ -86,7 +86,7 @@ history, merge, enqueue, deploy, release, or perform post-merge closure.
 Before worker-owned review, run:
 
 ```bash
-<implement-feature-skill-root>/scripts/verify-ready --json review-candidate \
+<implement-skill-root>/scripts/verify-ready --json review-candidate \
   --checkout <managed-checkout> \
   --branch <target-branch> \
   --base-sha <startup-base-sha>

@@ -1,4 +1,4 @@
-# Implement Feature Startup Authorization
+# Implement Startup Authorization
 
 The behavior-affecting startup fields are:
 
@@ -16,7 +16,7 @@ plus the exact
 terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
 `high` for complex work, or `xhigh` for risky or cross-system work. An explicit
-`$implement-feature` request to start, implement, or resume the selected Specs
+`$implement` request to start, implement, or resume the selected Specs
 explicitly requests those exact task profiles and resolves
 `visible_app_task_permission=granted` without an additional worker-task
 creation question. An explicit denial overrides that grant and stops before
