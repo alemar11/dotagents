@@ -6,6 +6,9 @@ This project is maintenance-only source for the plugin-shared `scripts/gitstack`
 
 - Requires Python 3.11 or newer and uses only the standard library.
 - Uses direct `git` for local repository state and `gh` for GitHub operations unavailable through the model-facing connector.
+- The `stack` domain wraps only the official `github/gh-stack` CLI extension;
+  `stack ensure --install` is the sole explicit extension-install path and
+  never installs an agent skill.
 - The subprocess cannot invoke connector tools or access the GitHub App token.
 - Reads and `doctor` never write config or caches. GitHub writes remain explicit named commands with dry-run support where applicable.
 - Avoid heuristic provider-failure classification based on ad hoc lists of stderr substrings. Prefer structured results, stable typed errors, and fail closed when authentication or network state cannot be proven. (Codex learning)
@@ -18,6 +21,11 @@ This project is maintenance-only source for the plugin-shared `scripts/gitstack`
 - Run `scripts/reinstall-local` only when intentionally testing the versioned
   source through the configured `alemar11` marketplace and installed cache.
 - Verify the shipped artifact with `--help`, `--version`, `--json doctor`, and a safe dry-run or read-only command.
+- Include `--json stack ensure` in read-only smoke checks; do not install the
+  extension as part of tests or artifact builds.
+- Stack subprocess smoke tests must use a fake `gh` and assert exact arguments,
+  inherited working directory, and non-interactive environment; never use a
+  real extension installation as test setup.
 - Do not run from `build/`; it is intermediate output.
 
 ## Versioning

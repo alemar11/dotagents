@@ -6,6 +6,7 @@ import shutil
 
 from . import __version__
 from .common import run
+from .stack import extension_status
 
 
 AUTH_STATUS_COMMAND = [
@@ -47,6 +48,7 @@ def doctor() -> dict[str, object]:
     gh = shutil.which("gh")
     authentication_status = _authentication_status() if gh else "not-checked"
     root = run(["git", "rev-parse", "--show-toplevel"]) if git else None
+    gh_stack = extension_status(gh) if gh else extension_status()
     return {
         "ok": bool(git and gh),
         "provider_ready": authentication_status == "verified",
@@ -62,6 +64,7 @@ def doctor() -> dict[str, object]:
                 "authentication_source": "provider-default" if gh else "missing",
             },
             "repository": {"inside_worktree": bool(root and root.returncode == 0), "root": root.stdout.strip() if root and root.returncode == 0 else None},
+            "gh_stack": gh_stack,
             "connector": {"availability": "model-runtime-only", "cli_access": False},
         },
     }
@@ -84,6 +87,7 @@ def doctor_text(payload: dict[str, object], heading: str | None = None) -> str:
         [
             f"git: {'ok' if checks['git']['ok'] else 'missing'}",
             f"gh: {gh_state}",
+            f"gh-stack: {checks['gh_stack']['status']}",
             f"provider: {'ready' if payload['provider_ready'] else 'unverified'}",
             f"repository: {'ok' if checks['repository']['inside_worktree'] else 'not detected'}",
         ]

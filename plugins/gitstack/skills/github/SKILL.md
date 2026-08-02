@@ -26,6 +26,14 @@ skill and keep that skill's authority and safety rules intact.
   tests, and pushes.
 - The shared CLI at `<plugin-root>/scripts/gitstack` uses `gh`; it cannot invoke
   connector tools or access the GitHub App token.
+- Use `<plugin-root>/scripts/gitstack stack ...` for the GitHub stacked-PR CLI
+  boundary. It wraps the official `github/gh-stack` extension, checks the
+  extension before invoking it, and never installs the agent skill. Run
+  `stack ensure --install` only when extension installation is explicitly
+  authorized; it is network-bearing and can change the local GitHub CLI setup.
+- Read [`../../references/stack-cli.md`](../../references/stack-cli.md) for the
+  typed command surface, JSON envelope, raw escape hatch, and extension
+  readiness states.
 
 Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 
@@ -35,6 +43,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | --- | --- |
 | Local staging or commit, optionally push without PR | `$gitstack:git-commit` |
 | Publish local work as a branch and draft PR | `$gitstack:submit` |
+| Stacked PR branch/stack lifecycle | `<plugin-root>/scripts/gitstack stack ...` and `../../references/stack-cli.md` |
 | Issue and PR queue triage for one or more repositories | `$gitstack:github-repository-triage` |
 | GitHub issue lifecycle and relationships | `$gitstack:github-issues` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$gitstack:github-investigation` |
@@ -45,3 +54,10 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 
 Do not load every specialist. Select the smallest owner, then return here only
 if the work crosses domains.
+
+## References
+
+- [`../../references/stack-cli.md`](../../references/stack-cli.md): stacked-PR
+  wrapper contract and maintenance commands.
+- [`../../references/network-execution.md`](../../references/network-execution.md):
+  shell network and authentication boundaries.

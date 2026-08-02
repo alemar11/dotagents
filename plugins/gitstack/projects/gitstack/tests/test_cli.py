@@ -28,14 +28,25 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "8.1.5")
+        self.assertEqual(output.strip(), "8.2.1")
 
     def test_json_doctor_shape(self) -> None:
-        code, output = self.invoke(["--json", "doctor"])
+        doctor_payload = {
+            "ok": True,
+            "provider_ready": True,
+            "version": "8.2.1",
+            "checks": {
+                "connector": {"cli_access": False},
+                "gh_stack": {"status": "missing"},
+            },
+        }
+        with mock.patch.object(cli, "doctor", return_value=doctor_payload):
+            code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "8.1.5")
+        self.assertEqual(payload["version"], "8.2.1")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
+        self.assertIn("gh_stack", payload["checks"])
 
     def test_json_argument_error(self) -> None:
         code, output = self.invoke(["--json", "repo", "resolve", "--repo", "bad"])
@@ -43,6 +54,20 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(code, 64)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
+    def test_stack_raw_preserves_upstream_json_after_separator(self) -> None:
+        with mock.patch.object(cli.stack, "execute_raw", return_value=0) as execute:
+            code = cli.main(["stack", "raw", "--", "view", "--json"])
+
+        self.assertEqual(code, 0)
+        execute.assert_called_once_with(["--", "view", "--json"], json_mode=False)
+
+    def test_stack_raw_accepts_wrapper_json_before_separator(self) -> None:
+        with mock.patch.object(cli.stack, "execute_raw", return_value=0) as execute:
+            code = cli.main(["stack", "raw", "--json", "--", "view"])
+
+        self.assertEqual(code, 0)
+        execute.assert_called_once_with(["--", "view"], json_mode=True)
 
     def test_review_mutation_help_requires_gitstack_reservation_only(self) -> None:
         for command in ("request", "comment", "reply", "resolve"):

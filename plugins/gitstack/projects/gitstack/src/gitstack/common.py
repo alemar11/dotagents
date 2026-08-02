@@ -5,7 +5,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from . import __version__
 
@@ -34,16 +34,35 @@ class GitStackError(RuntimeError):
         self.details = details
 
 
-def run(command: Sequence[str], cwd: Path | None = None) -> Result:
+def run(
+    command: Sequence[str],
+    cwd: Path | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+    stdin: int | None = None,
+) -> Result:
     try:
-        proc = subprocess.run(list(command), cwd=cwd, text=True, capture_output=True)
+        proc = subprocess.run(
+            list(command),
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            env=dict(env) if env is not None else None,
+            stdin=stdin,
+        )
     except FileNotFoundError:
         return Result(127, "", f"{command[0]} is not installed or not on PATH.")
     return Result(proc.returncode, proc.stdout, proc.stderr)
 
 
-def checked(command: Sequence[str], cwd: Path | None = None) -> Result:
-    result = run(command, cwd)
+def checked(
+    command: Sequence[str],
+    cwd: Path | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+    stdin: int | None = None,
+) -> Result:
+    result = run(command, cwd, env=env, stdin=stdin)
     if result.returncode:
         raise GitStackError((result.stderr or result.stdout or "command failed").strip(), exit_code=result.returncode)
     return result

@@ -6,7 +6,7 @@ import sys
 from typing import Any
 
 from . import __version__
-from . import ci, portfolio, reviews, stars
+from . import ci, portfolio, reviews, stack, stars
 from .common import GitStackError, envelope, error_envelope, resolve_pr, resolve_repo
 from .health import doctor, doctor_text
 from .provider_text import worktree_snapshot
@@ -46,6 +46,15 @@ def parser() -> Parser:
     reviews_parser.add_argument("args", nargs=argparse.REMAINDER)
     stars_parser = commands.add_parser("stars", help="Manage stars and authenticated-user star lists.")
     stars_parser.add_argument("args", nargs=argparse.REMAINDER)
+    stack_parser = commands.add_parser("stack", help="Wrap the GitHub gh-stack extension.")
+    stack_sub = stack_parser.add_subparsers(dest="verb", required=True)
+    stack_ensure = stack_sub.add_parser("ensure", help="Check or explicitly install github/gh-stack.")
+    stack_ensure.add_argument("--install", action="store_true", help="Install the official extension when it is missing.")
+    for command in stack.STACK_COMMANDS:
+        stack_command = stack_sub.add_parser(command, help=f"Run gh stack {command} without interactive prompts.")
+        stack_command.add_argument("args", nargs=argparse.REMAINDER)
+    stack_raw = stack_sub.add_parser("raw", help="Run a non-interactive upstream gh stack command.")
+    stack_raw.add_argument("args", nargs=argparse.REMAINDER)
     publish = commands.add_parser("publish", help="Preflight and open draft pull requests.")
     publish_sub = publish.add_subparsers(dest="verb", required=True)
     publish_preflight = publish_sub.add_parser("preflight")
@@ -77,14 +86,36 @@ def _emit(data: object, command: list[str], json_mode: bool) -> None:
         print(json.dumps(data, indent=2))
 
 
+def _json_option_index(argv: list[str]) -> int | None:
+    """Find the wrapper-level --json without consuming raw upstream flags."""
+
+    raw_separator: int | None = None
+    for index in range(len(argv) - 2):
+        if argv[index : index + 2] == ["stack", "raw"]:
+            try:
+                raw_separator = argv.index("--", index + 2)
+            except ValueError:
+                pass
+            break
+
+    for index, argument in enumerate(argv):
+        if argument != "--json":
+            continue
+        if raw_separator is not None and index > raw_separator:
+            continue
+        return index
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = list(argv if argv is not None else sys.argv[1:])
     if raw == ["--version"]:
         print(__version__)
         return 0
-    json_mode = "--json" in raw
-    if json_mode:
-        raw.remove("--json")
+    json_index = _json_option_index(raw)
+    json_mode = json_index is not None
+    if json_mode and json_index is not None:
+        raw.pop(json_index)
         raw.insert(0, "--json")
     try:
         args = parser().parse_args(raw)
@@ -110,6 +141,14 @@ def main(argv: list[str] | None = None) -> int:
             return _forward(reviews, args.args, args.json, "")
         if args.domain == "stars":
             return _forward(stars, args.args, args.json, "")
+        if args.domain == "stack" and args.verb == "ensure":
+            data = stack.ensure(install=args.install)
+            _emit(data, ["stack", "ensure"], args.json)
+            return 0
+        if args.domain == "stack" and args.verb == "raw":
+            return stack.execute_raw(args.args, json_mode=args.json)
+        if args.domain == "stack":
+            return stack.execute(args.verb, args.args, json_mode=args.json)
         if args.domain == "publish" and args.verb == "preflight":
             data = preflight(args.repo)
         elif args.domain == "publish" and args.verb == "open":

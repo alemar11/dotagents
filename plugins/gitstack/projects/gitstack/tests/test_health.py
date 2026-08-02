@@ -15,6 +15,17 @@ from gitstack.common import Result
 class HealthContractTests(unittest.TestCase):
     def doctor_for(self, auth_payload: object, *, returncode: int = 1) -> dict[str, object]:
         calls: list[list[str]] = []
+        stack_status = {
+            "ok": False,
+            "status": "missing",
+            "installed": False,
+            "command": "stack",
+            "repository": "github/gh-stack",
+            "version": None,
+            "publisher_verification": None,
+            "reason": None,
+            "gh_path": "/usr/bin/gh",
+        }
 
         def fake_run(command: list[str]) -> Result:
             calls.append(command)
@@ -27,7 +38,11 @@ class HealthContractTests(unittest.TestCase):
             health.shutil,
             "which",
             side_effect=lambda tool: f"/usr/bin/{tool}",
-        ), mock.patch.object(health, "run", side_effect=fake_run):
+        ), mock.patch.object(health, "run", side_effect=fake_run), mock.patch.object(
+            health,
+            "extension_status",
+            return_value=stack_status,
+        ):
             payload = health.doctor()
 
         self.assertEqual(calls[0], health.AUTH_STATUS_COMMAND)
