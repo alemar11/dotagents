@@ -17,6 +17,20 @@ its references; this file governs the plugin package and its shared artifact.
 - `skills/<name>/` owns only its narrow provider-primitive contract and local
   adapters or reference summaries.
 
+## Stacked PR upstream
+
+The stack domain wraps the official [`github/gh-stack`](https://github.com/github/gh-stack)
+GitHub CLI extension. The current compatibility reference is upstream `v0.0.9`;
+this is a validation baseline, not a runtime pin. The wrapper currently installs
+the latest upstream version because its explicit installation path uses
+`gh extension install github/gh-stack` without `--pin`.
+
+When the upstream extension changes, revalidate the typed command surface,
+non-interactive behavior, JSON output, extension status/version detection, and
+the stacked-PR lifecycle workflows before treating the new version as
+compatible. The wrapper must fail closed when the extension is missing,
+unversioned, or belongs to another repository.
+
 ## Maintenance contract
 
 - Keep the manifest, `projects/gitstack/pyproject.toml`, package version,
