@@ -58,7 +58,7 @@ Software Project is the repo-local project-lifecycle plugin. It keeps durable pr
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Virtual, Store, DB, AI, CLI, and integrations. |
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
-| `focus-task` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
+| `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
@@ -167,7 +167,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus-task skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -200,7 +200,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill tanstack \
   --skill codex-changelog \
   --skill xcode-changelog \
-  --skill focus-task \
+  --skill focus \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \

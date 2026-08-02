@@ -1,9 +1,9 @@
 ---
-name: focus-task
+name: focus
 description: Create a focused new Codex task from a compact handoff of the latest substantive discussion.
 ---
 
-# Focus Task
+# Focus
 
 ## Goal
 
@@ -13,10 +13,10 @@ title with one relevant leading emoji, and leave the calling task unchanged.
 
 ## Trigger Rules
 
-- Use only when the user explicitly invokes `$focus-task`.
+- Use only when the user explicitly invokes `$focus`.
 - Do not trigger for ordinary discussion, summarization, planning, or task
   management requests.
-- Invoking `$focus-task` explicitly authorizes creating one focused new task.
+- Invoking `$focus` explicitly authorizes creating one focused new task.
   Do not ask for an additional creation confirmation.
 
 ## Workflow
