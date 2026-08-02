@@ -89,6 +89,13 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   or explicitly abandoned workers, then leaves the orchestrator open as the
   single visible summary task. Neither the
   orchestrator nor a worker may ever invoke Study or create a nested Study run.
+  Study passes Sol/medium and Luna/max explicitly at creation; because the App
+  creation API has no title field, it initializes each visible title
+  immediately after the real task ID is returned and independently verifies it.
+  When no worker count is specified, Study normally chooses 1–2 workers for a
+  focused investigation, 3 for a multi-dimensional comparison, and 4–5 only
+  for broad investigations with genuinely independent tracks; five is a cap,
+  not the default.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - `se:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$se:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.

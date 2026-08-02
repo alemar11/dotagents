@@ -109,6 +109,28 @@ Set `full_capacity_mode=yes` whenever `planned_worker_count=5`, whether the
 source was an exact request, a capped request, or an orchestrator-selected
 unspecified count. Record that source separately as `full_capacity_source`.
 
+### Default worker-count heuristic
+
+Apply this heuristic only when `original_requested_count=unspecified`; explicit
+worker-count requests and the cap rules above take precedence. Choose the
+smallest band that gives every worker a distinct, bounded assignment with its
+own evidence and acceptance criteria:
+
+- **1–2 workers:** use for a focused question, one repository or source family,
+  or one or two clearly separable investigation surfaces.
+- **3 workers:** use as the normal default for a multi-dimensional comparison
+  or study, typically splitting local contract, external subject, and
+  comparative fit or recommendation.
+- **4–5 workers:** use only for a broad investigation with four or five
+  genuinely independent tracks, such as separate runtime, architecture,
+  maintenance, validation, and UX/security questions. Do not add workers merely
+  to reduce latency or duplicate the same source review.
+
+If no meaningful parallel split exists, choose zero and let the orchestrator
+perform the analysis. When the evidence is borderline between bands, prefer the
+lower band. A plan of five is full-capacity mode and must be justified in the
+report; five is a cap, not the default.
+
 Use these routing terms consistently:
 
 - `parent session`: the task where the user invoked Study; it creates and
