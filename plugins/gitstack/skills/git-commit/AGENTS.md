@@ -15,7 +15,7 @@ the shared GitStack options reference.
 ## Maintenance rules
 
 - Preserve explicit path staging, exact fixup target resolution, and the
-  boundary between commit-only work and `$gitstack:submit` publication.
+  boundary between commit-only work and `$gitstack:send` publication.
 - Do not add automatic autosquash, infer fixups from review prose, or duplicate
   shared option definitions in this skill.
 - Validate adapter changes with syntax/fixture checks and the shared GitStack

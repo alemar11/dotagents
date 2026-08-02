@@ -34,7 +34,8 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
 | `gitstack:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
+| `gitstack:send` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, link it to an existing target PR when applicable, and request a current-head Codex review. |
+| `gitstack:github-stack` | Manage stacked branches and dependent pull requests through the GitStack stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 
 Software Project is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to GitStack:
 

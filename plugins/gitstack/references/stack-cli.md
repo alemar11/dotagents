@@ -67,7 +67,7 @@ GitStack envelope:
 ```json
 {
   "ok": true,
-  "version": "8.2.1",
+  "version": "9.0.0",
   "command": ["stack", "view"],
   "data": {}
 }

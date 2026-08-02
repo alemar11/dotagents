@@ -42,8 +42,8 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | Request | Bundled skill |
 | --- | --- |
 | Local staging or commit, optionally push without PR | `$gitstack:git-commit` |
-| Publish local work as a branch and draft PR | `$gitstack:submit` |
-| Stacked PR branch/stack lifecycle | `<plugin-root>/scripts/gitstack stack ...` and `../../references/stack-cli.md` |
+| Send local work as a branch and draft PR, linking it to an existing target PR when applicable | `$gitstack:send` |
+| Stacked PR branch/stack lifecycle | `$gitstack:github-stack` |
 | Issue and PR queue triage for one or more repositories | `$gitstack:github-repository-triage` |
 | GitHub issue lifecycle and relationships | `$gitstack:github-issues` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$gitstack:github-investigation` |
@@ -59,5 +59,7 @@ if the work crosses domains.
 
 - [`../../references/stack-cli.md`](../../references/stack-cli.md): stacked-PR
   wrapper contract and maintenance commands.
+- [`../github-stack/SKILL.md`](../github-stack/SKILL.md): stack-level routing,
+  lifecycle, and recovery guidance.
 - [`../../references/network-execution.md`](../../references/network-execution.md):
   shell network and authentication boundaries.

@@ -1,4 +1,4 @@
-# Submit Maintenance
+# Send Maintenance
 
 This bundled skill owns publication orchestration over the focused GitStack
 commit and GitHub workflows. Keep the executable publish contract in `SKILL.md`
@@ -11,8 +11,13 @@ and `references/workflows.md`.
   review skill. Do not duplicate those transports here.
 - `scripts/gitstack publish` owns structured local preflight and PR creation;
   connector-backed operations own supported existing-PR lifecycle changes.
-- Keep closing-issue references and PR body construction in the submit workflow
-  references. Merge and post-merge work remain outside this skill.
+- `scripts/gitstack stack link` owns the explicit two-PR stack relationship;
+  Send retains ownership of the current branch push, PR body, draft-state
+  preservation, and review handoff. Do not route this path through
+  `gh stack submit`, which publishes every branch in a local stack.
+- Keep closing-issue references, target-PR detection, and PR body construction
+  in the send workflow references. Merge and post-merge work remain outside
+  this skill.
 
 ## Validation
 

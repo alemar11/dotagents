@@ -1,4 +1,4 @@
-# Submit Workflows
+# Send Workflows
 
 ## Publish New Work
 
@@ -34,8 +34,42 @@ Apply all of these gates before continuing:
   more than one or if its head branch/repository does not match the verified
   push target.
 - When one PR exists, record its `isDraft` value. Updating its branch, title, or
-  body must preserve that exact value; Submit never changes an existing PR
+  body must preserve that exact value; Send never changes an existing PR
   between draft and ready.
+
+### Target PR And Stack Detection
+
+Resolve the intended PR base branch before commit or push. Use the explicit base
+branch supplied by the composing caller; otherwise use `defaultBranchRef.name`.
+The current implementation or feature head branch is not a PR base merely
+because another contract calls it `target_branch_name`.
+
+When the selected base is not the default branch, identify whether it is already
+represented by a PR in this repository. Query the selected branch as the PR head,
+not as the PR base:
+
+```bash
+gh pr list --repo <owner/repo> --state open \
+  --head <owner>:<pr-base-branch> --limit 2 \
+  --json number,url,state,headRefName,headRepositoryOwner,headRepository,baseRefName,isDraft
+```
+
+Capture the result as `target_pr` only when there is exactly one PR and its
+`headRefName`, head repository owner/name, open state, and repository identity
+match the selected target. Zero results keep the normal single-PR path. More
+than one result or any mismatch is an ambiguity and blocks mutation; never pick
+a parent from title, creation time, branch similarity, or stack display order.
+
+Repeat this lookup after commit preparation and the second publish preflight.
+The selected base and exact `target_pr` identity must still match before push
+and again before the stack link. A newly appearing target PR is handled by the
+same stacked path; a changed or disappeared target is reported as remote-state
+drift and stops the operation.
+
+The target branch is an already published PR only when this lookup succeeds.
+Do not make `gh stack submit` the fallback: it pushes every local stack branch
+and creates or updates every PR in that stack, which bypasses Send's one-branch
+push, body, draft-state, and review contracts.
 
 ### Closing Issue References
 
@@ -72,7 +106,8 @@ execution evidence still identifies it as resolved by this PR.
 When the verified set is nonempty, require the PR base to equal the current
 `defaultBranchRef.name`. GitHub interprets closing keywords only for PRs
 targeting the default branch. Stop on a non-default existing PR and request
-explicit retargeting authority; Submit never silently retargets it.
+explicit retargeting authority; Send never silently retargets it or moves the
+references into `target_pr`.
 
 Render one line per issue under this exact PR-description section:
 
@@ -105,9 +140,9 @@ After preflight and scope verification, reuse a suitable existing commit or run
 the complete `$gitstack:git-commit` workflow with
 `commit_operation=commit-only`, even when the
 overall user request includes publishing. Do not stage or commit directly in
-Submit: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
+Send: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the
-delegated `$gitstack:git-commit` call push; Submit retains sole ownership of push after its
+delegated `$gitstack:git-commit` call push; Send retains sole ownership of push after its
 second publish preflight. Do not force `commit_kind=regular`: let Git Commit
 apply its canonical default and honor an explicit or target-repository fixup
 requirement only with an exact target.
@@ -122,7 +157,7 @@ git push -u origin HEAD          # only when the preflight found no upstream
 gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
   --json number,title,url,isDraft,headRefName,headRepositoryOwner
 <plugin-root>/scripts/gitstack --json repo snapshot
-<plugin-root>/scripts/gitstack --json publish open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --base <default-branch> --draft --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json publish open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --base <pr-base-branch> --draft --expected-worktree-fingerprint <sha256>
 ```
 
 Use explicit pathspecs for staging. Run only one of the two push commands. Run
@@ -134,22 +169,43 @@ ambiguous response. Do not retry it blindly.
 Before `publish open`, require the body file to contain the complete canonical
 `## Issues` section whenever `closing_issue_refs` is nonempty. After creation,
 read back the PR description and require every expected `Closes` line exactly
-once. The base read-back must still equal the current default branch.
+once. When `closing_issue_refs` is nonempty, the base read-back must still equal
+the current default branch. Otherwise it must equal the selected
+`<pr-base-branch>`.
 
 When the post-push lookup returns an existing PR, do not run `publish open
 --draft` and do not invoke any draft-state lifecycle mutation. Require its
 post-update `isDraft` value to equal the pre-push value. An existing ready PR
 therefore remains ready while its branch and optional title/body are updated.
+When `target_pr` exists, require this existing child PR's `baseRefName` to equal
+the selected target branch; Send never silently retargets an existing PR.
 
 After the post-push lookup returns the exact existing PR or `publish open`
 returns the exact newly created PR, require the PR head to equal the full
-published commit SHA. Then invoke `$gitstack:github-review-threads` for the
-exact repository and PR with `review_operation=request`,
-`mutation_mode=apply`, `provider=codex`, that full head SHA, and a fresh
-Submit-owned request key for this logical publish invocation. Preserve the key
-for reconciliation and persist the complete typed request receipt. This step
-is required for both new and existing PR paths. It must use the typed request
-operation, not a plain discussion comment.
+published commit SHA. If `target_pr` exists, read back the target and child PRs
+and link them before requesting review:
+
+```bash
+<plugin-root>/scripts/gitstack --json stack ensure
+<plugin-root>/scripts/gitstack --json stack link <target-pr-number> <current-pr-number>
+```
+
+Use PR numbers in bottom-to-top order; branch arguments would give `gh-stack`
+permission to push branches outside Send's ownership. Omit `--open` so the
+target and child retain their exact `isDraft` values. Read back both PRs after
+the link, confirm the target is still the immediate base of the child, and
+persist the command output or stack identity as `stack_link_receipt`. Do not
+call `stack submit`, `stack push`, `stack sync`, `stack rebase`, or `stack merge`
+from this flow. `stack ensure --install` is never implicit.
+
+Only after the optional link succeeds and the child PR still has the full
+published head SHA, invoke `$gitstack:github-review-threads` for the exact
+repository and PR with `review_operation=request`, `mutation_mode=apply`,
+`provider=codex`, that full head SHA, and a fresh Send-owned request key for this
+logical publish invocation. Preserve the key for reconciliation and persist
+the complete typed request receipt. This step is required for both new and
+existing PR paths. It must use the typed request operation, not a plain
+discussion comment.
 
 Do not wait by default. If the user or a composing caller also requested
 monitoring, invoke `$gitstack:github-review-threads` again with
@@ -158,7 +214,7 @@ bounded duration. Keep the request and wait as separate operations.
 
 ## No Publishable Local Work
 
-Use this branch when the user invokes `submit` but the task is issue-only hygiene
+Use this branch when the user invokes `send` but the task is issue-only hygiene
 or the checkout has no intended code/docs changes to publish.
 
 ```bash
@@ -176,7 +232,7 @@ relationships, or closure to `$gitstack:github-issues` with
 
 Close out by saying explicitly:
 
-- full `submit` was not applicable because there was no publishable local change;
+- full `send` was not applicable because there was no publishable local change;
 - which GitHub issue mutations were performed;
 - current branch/worktree state;
 - any untracked files intentionally left alone.
@@ -199,9 +255,10 @@ default branch, merge the canonical issue lines into the existing body, and
 read back every expected line exactly once. Preserve every previously valid
 closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
 keep it draft. After the normal push updates this PR, verify its full head SHA,
-unchanged draft state, unchanged base, and complete issue linkage, then perform
-the same required typed current-head Codex review request described in
-`Publish New Work`.
+unchanged draft state, unchanged base, and complete issue linkage. If the PR's
+base branch is the head of exactly one `target_pr`, perform the two-PR stack
+link after that read-back and before the required typed current-head Codex
+review request described in `Publish New Work`.
 
 ## Safe Retry
 
@@ -213,6 +270,10 @@ the same required typed current-head Codex review request described in
 - If `publish open` reports an ambiguous write, preserve its read-back evidence
   and stop. It already performed the only automatic exact-head read-back; do
   not issue another create attempt.
+- If `stack link` fails or returns an ambiguous result after a confirmed child
+  PR, preserve the child publication evidence and report the stack relationship
+  as unverified. Re-read the target and child PRs before any explicitly
+  authorized repair; do not repeat the child push or PR creation.
 - If the typed Codex review request fails after a confirmed push or PR
   creation, preserve and report the successful publish evidence and the exact
   review-request failure separately. Do not repeat the push, PR creation, or
@@ -229,6 +290,7 @@ Return:
 - PR URL
 - whether the PR is draft or ready
 - PR base and current default branch
+- `target_pr` and `stack_link_receipt` when a target PR existed
 - canonical `closing_issue_refs` and exact PR-body read-back
 - current-head Codex review request status and typed receipt identity
 - validation performed before publishing

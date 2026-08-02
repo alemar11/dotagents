@@ -1,6 +1,6 @@
 {
   "name": "gitstack",
-  "version": "8.2.1",
+  "version": "9.0.0",
   "description": "Use focused Git and GitHub workflows to create commits, manage issues and reviews, diagnose Actions failures, publish releases, manage stacked PR plumbing, and open draft pull requests.",
   "author": {
     "name": "alemar11",
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "GitStack",
     "shortDescription": "Focused Git and GitHub workflows.",
-    "longDescription": "GitStack provides focused workflows for Git commits, GitHub issues, single- and multi-repository triage, technical investigations, pull request review threads, Actions failures, releases, stars, stacked PR plumbing, and draft pull request publication. It uses direct git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps or the explicit gh-stack extension wrapper.",
+    "longDescription": "GitStack provides focused workflows for Git commits, GitHub issues, single- and multi-repository triage, technical investigations, pull request review threads, Actions failures, releases, stars, stacked PR plumbing, and single-PR or stacked-PR sending. It uses direct git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps or the explicit gh-stack extension wrapper.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
