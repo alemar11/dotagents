@@ -158,9 +158,18 @@ Choose one visual `run_tag` before the orchestrator is created:
   from 1 through 5.
 - Keep titles concise, specific, and stable for the entire run. Do not include
   progress, status, dates, model settings, or changing worker counts.
-- Pass the title in the initial `codex_app__create_thread` call. Do not use
-  `codex_app__set_thread_title` later and do not repair a title by renaming the
-  task.
+- `codex_app__create_thread` does not accept a `title` parameter. Do not pass a
+  title to it, and do not treat a title embedded in its prompt as the visible
+  task title.
+- After a real `threadId` is returned, initialize the title exactly once with
+  `codex_app__set_thread_title`, passing the requested title and the returned
+  `hostId` when available. This is immediate title initialization, not a later
+  progress rename. Independently read or list the task and record the request
+  receipt, observed title, and evidence source before continuing.
+- Never rename a task again to repair drift. If title initialization fails,
+  independent verification is unavailable, or the observed title differs,
+  preserve the task identity, report `title-setup-failed` or `title-drift`,
+  and do not silently continue as if the title were correct.
 - Treat the run tag and titles as display metadata only. Never use either as
   identity, state, a branch name, a correlation key, or a recovery key. Bind
   identity and lineage only to real thread IDs recorded in the ledger.
@@ -197,19 +206,34 @@ Choose one visual `run_tag` before the orchestrator is created:
    target: the resolved parent project with environment.type=local
    model: gpt-5.6-sol
    thinking: medium
-   title: Study: [<run-tag>] <short title>
    prompt: the complete read-only handoff plus the orchestrator protocol
    ```
+
+   `model` and `thinking` are optional in the App API, but they are mandatory
+   for Study. Treat the explicit `$study` invocation as authorization for
+   these fixed Study settings; never omit them and never inherit the calling
+   task's model or reasoning. After the real `threadId` is available, set and
+   independently verify `Study: [<run-tag>] <short title>` exactly as required
+   above. Do not create workers until the orchestrator title is verified.
+   The creation request proves only the requested settings. Compare active
+   model and reasoning telemetry independently when the App exposes it; if it
+   differs, report `settings-drift` and stop before creating workers. If it is
+   unavailable, record that limitation and never claim applied Sol settings
+   from the prompt or creation request alone.
 
    Include the parent task ID and host ID in the handoff when the App exposes
    them. The orchestrator uses them for milestone and final messages. Never
    invent an ID; the parent task can still monitor the orchestrator through
    `codex_app__wait_threads` when a parent ID is unavailable.
-5. Keep the parent turn open after creation. Use bounded
+5. If title initialization or verification fails for the orchestrator, stop
+   before creating workers and report the exact failure as an incomplete Study
+   setup. Preserve the real task ID; never create a replacement to work around
+   the failure.
+6. Keep the parent turn open after creation. Use bounded
    `codex_app__wait_threads` calls on the returned orchestrator `threadId` and
    relay meaningful progress to the user as it arrives. Do not claim the
    analysis is complete until the orchestrator returns a terminal result.
-6. When the user requested more than five workers, the orchestrator owns the
+7. When the user requested more than five workers, the orchestrator owns the
    canonical counts. Relay its original/planned-count milestone in the parent
    before monitoring begins; if direct parent messaging is unavailable, state
    the same counts from the parent handoff and reconcile them with the final
@@ -251,13 +275,20 @@ The orchestrator must execute the following protocol from its initial prompt:
    target: the exact same projectId and environment.type=local as the parent
    model: gpt-5.6-luna
    thinking: max
-   title: Worker N: [<run-tag>] <short title>
    prompt: the complete read-only assignment and the worker protocol below
    ```
 
+   Never omit `model` or `thinking` and never rely on the orchestrator's
+   settings being inherited. After each real `threadId` is returned, call
+   `codex_app__set_thread_title` exactly once for
+   `Worker N: [<run-tag>] <short title>` and independently verify the observed
+   title before treating that worker as configured. Do not use the prompt as
+   title evidence. Compare active model and reasoning telemetry when exposed;
+   record `settings-drift` for any mismatch and do not create a replacement.
+
    Do not use `multi_agent_v1__spawn_agent`, a CLI process, a worktree, or a
    different project as a substitute for a visible worker task.
-5. Record each returned real `threadId`, `hostId`, immutable title, assignment,
+5. Record each returned real `threadId`, `hostId`, initialized title, assignment,
    shared `run_tag`, and dependency order in the orchestrator's working
    context. If a creation result is uncertain, reconcile it with the App before
    retrying; never create a duplicate merely because an immediate response was
@@ -303,8 +334,8 @@ or silently restart a task that may already exist.
 ## Monitoring and recovery state machine
 
 Track each planned worker slot separately from any task it creates. Slot states
-are `not-started`, `pending-setup`, `created`, `creation-failed`, and
-`unresolved-setup`:
+are `not-started`, `pending-setup`, `created`, `creation-failed`,
+`title-setup-failed`, `settings-drift`, and `unresolved-setup`:
 
 - Reserve the slot before calling `create_thread`; never renumber, free, or
   reuse it during the run.
@@ -317,6 +348,15 @@ are `not-started`, `pending-setup`, `created`, `creation-failed`, and
   passed to thread-ID tools or counted in `created_worker_count`. Use up to
   three bounded `list_threads` snapshots and correlate only through an explicit
   matching client-ID field, never title or preview.
+- A real task whose title cannot be initialized or independently verified sets
+  `title-setup-failed`. Preserve its real ID and evidence, do not retry or
+  create a replacement, and report the run as partial unless the orchestrator
+  itself failed title setup before any worker was created.
+- A real task whose observed model or reasoning differs from the requested
+  creation settings sets `settings-drift`. Preserve its real ID and evidence,
+  do not retry or create a replacement, and report the run as partial unless
+  the orchestrator itself failed settings verification before any worker was
+  created.
 - If reconciliation fails, set `unresolved-setup`; leave every later planned
   slot `not-started` with reason `creation halted after uncertain slot`, and
   report a partial run. Never create replacements.
@@ -369,8 +409,8 @@ Use these final outcome definitions:
   memo was captured; archival acceptance or verification is reported
   separately.
 - `partial`: the orchestrator returned a usable synthesis, but a planned slot
-  is failed, abandoned, unresolved, or missing, or terminal evidence could not
-  be captured.
+  is failed, abandoned, title-setup-failed, settings-drift, unresolved, or
+  missing, or terminal evidence could not be captured.
 - `failed`: the orchestrator could not return a usable synthesis. This takes
   precedence over `partial` even when some worker results exist.
 
@@ -445,11 +485,12 @@ account, or destructive operations.
 ## App tool boundary
 
 Use the Codex App task tools for orchestration: `list_projects`,
-`create_thread`, `list_threads`, `wait_threads`, `read_thread`, and
-`send_message_to_thread` as needed. Use `set_thread_archived` only for the
-post-result worker archival phase. Use other tools only for read-only research
-or inspection. Keep `model` and `thinking` fixed at creation time. Never switch
-to worktrees, generic subagents, raw shell task launchers, or a second
+`create_thread`, `set_thread_title`, `list_threads`, `wait_threads`,
+`read_thread`, and `send_message_to_thread` as needed. Use
+`set_thread_archived` only for the post-result worker archival phase. Use other
+tools only for read-only research or inspection. Keep `model` and `thinking`
+fixed and explicit in every `create_thread` request. Never switch to
+worktrees, generic subagents, raw shell task launchers, or a second
 orchestration mechanism.
 
 The authorized App task-management calls above are the only exceptions to the
@@ -466,6 +507,11 @@ no-side-effect rule. Apply this availability matrix before and during a run:
 - `send_message_to_thread` is optional when the parent task ID is unavailable
   or monitoring already exposes milestones; report that direct messaging was
   not exercised.
+- `set_thread_title` is required immediately after every real task creation.
+  If it is unavailable or the independent readback does not confirm the exact
+  requested title, preserve the task identity, stop orchestrator setup before
+  creating workers, or mark the affected worker slot
+  `title-setup-failed`; never repair the mismatch by creating a replacement.
 - `list_threads` is optional except for explicit client-ID reconciliation. A
   missing tool makes the reserved slot `unresolved-setup` as described above.
 - `set_thread_archived` is post-result cleanup. Its absence or failure is an

@@ -6,7 +6,8 @@
 - **Shared run tag:** `[<run-tag>]`
 - **Requested orchestrator title:** `Study: [<run-tag>] <short title>`
 - **Observed orchestrator title:** `<observed title or unavailable>`
-- **Title evidence source:** `<creation receipt/read/list/unavailable>`
+- **Title initialization receipt:** `<set_thread_title receipt or unavailable>`
+- **Title evidence source:** `<independent read/list/unavailable>`
 - **Orchestrator thread ID:** `<thread ID>`
 - **Host/project/environment:** `<host ID / project ID and path / local>`
 - **Requested model/reasoning:** `gpt-5.6-sol / medium`
@@ -77,9 +78,9 @@ preview.
 
 ## Task telemetry ledger
 
-| Task | Requested title | Observed title and source | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Orchestrator |  |  |  |  |  |  |  |  |  |  |  |  |  |  | not-requested | not-applicable |
+| Task | Requested title | Title initialization receipt | Observed title and source | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Orchestrator |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | not-requested | not-applicable |
 | Worker N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 For terminal evidence, cite the final memo message/turn ID or the structured
