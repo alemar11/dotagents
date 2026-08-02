@@ -3,7 +3,8 @@
 ## Scope
 
 - **Mode:** Read-only planning, research, or analysis
-- **Requested orchestrator title:** `Boost: <short title>`
+- **Shared run tag:** `[<run-tag>]`
+- **Requested orchestrator title:** `Boost: [<run-tag>] <short title>`
 - **Observed orchestrator title:** `<observed title or unavailable>`
 - **Title evidence source:** `<creation receipt/read/list/unavailable>`
 - **Orchestrator thread ID:** `<thread ID>`

@@ -82,6 +82,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   keeps its orchestrator and workers there without worktrees, and is strictly
   read-only: it returns a Markdown analysis instead of writing code. Five is
   an absolute worker cap; larger requests are capped and reported automatically.
+  One shared visual run tag links the orchestrator and worker titles while real
+  thread IDs remain the only identity and recovery keys.
   After capturing terminal results, it requests archival of completed, failed,
   or explicitly abandoned workers, then leaves the orchestrator open as the
   single visible summary task. Neither the
