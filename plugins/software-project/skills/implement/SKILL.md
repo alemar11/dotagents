@@ -247,7 +247,7 @@ more Feature Specs. A discovery-only request never enters this flow.
    worker or grant cross-worktree access.
    If a worker reports a required path outside the durable envelope, follow
    `references/scope-repair-orchestration.md`: retain the original worker and
-   claim, delegate the portable repair to a separate Plan Feature task when
+   claim, delegate the portable repair to a separate Software Project Plan task when
    authorized and supported, recompute same-root overlap, then send the
    crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,

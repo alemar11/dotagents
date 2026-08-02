@@ -79,7 +79,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- `software-project:improve-codebase-architecture` uses `$software-project:project-context` after its internal pressure-test to capture accepted durable domain or architecture decisions.
+- `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:project-context` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
 - `software-project:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
 - `software-project:plan` uses the plugin's internal clarification protocol for context-backed questions and `$software-project:project-context` for context or ADR routing plus implementation-closeout handoff. Plan owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes plus published tracker mutations.
 - `software-project:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Software Project workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/software-project/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
@@ -123,11 +123,13 @@ codex plugin add gitstack@alemar11
 codex plugin add software-project@alemar11
 ```
 
-During local development, rebuild, test, and reinstall after each versioned
-change with the explicit maintenance helper:
+During local development, validate the changed plugin and reinstall each
+versioned plugin from the repository source. GitStack has a dedicated helper;
+Software Project is reinstalled directly:
 
 ```sh
 plugins/gitstack/projects/gitstack/scripts/reinstall-local
+codex plugin add software-project@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
@@ -136,6 +138,16 @@ For a Git-backed marketplace checkout, refresh the marketplace before reinstalli
 codex plugin marketplace upgrade alemar11
 codex plugin remove gitstack@alemar11
 codex plugin add gitstack@alemar11
+codex plugin remove software-project@alemar11
+codex plugin add software-project@alemar11
+```
+
+When migrating from the retired Feature Flow plugin identity, remove the old
+installation before installing Software Project:
+
+```sh
+codex plugin remove feature-flow@alemar11
+codex plugin add software-project@alemar11
 ```
 
 Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.

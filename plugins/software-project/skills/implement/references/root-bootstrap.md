@@ -99,7 +99,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "4.0.0",
-  "runtime_contract_version": "8.0.0",
+  "runtime_contract_version": "9.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",

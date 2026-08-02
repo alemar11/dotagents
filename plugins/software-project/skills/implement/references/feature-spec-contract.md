@@ -33,7 +33,7 @@ role and does not grant planning authority.
 
 The only active-run exception is the externally owned monotonic
 `allowed_paths` repair in `scope-repair-orchestration.md`. Root may invoke a
-separate Plan Feature task with the portable request, but root and worker still
+separate Software Project Plan task with the portable request, but root and worker still
 cannot author the change. A successful planner result is rebound onto the same
 assignment only through the crash-safe scope-revision protocol and increments
 its contract generation.

@@ -1,7 +1,7 @@
 # Software Project Workflow Contract
 
-This reference is the canonical owner of semantic GitHub metadata for Feature
-Flow. GitStack owns GitHub transport, label administration, pagination,
+This reference is the canonical owner of semantic GitHub metadata for Software
+Project. GitStack owns GitHub transport, label administration, pagination,
 mutation safety, and read-after-write verification. The bundled skills own when
 metadata is read or changed and must not edit this contract at runtime.
 
@@ -20,9 +20,9 @@ from the workflow-state matrix.
 
 | Semantic type | GitHub transport | GitHub value |
 | --- | --- | --- |
-| `bug` | native issue type or label | `bug` |
-| `feature` | native issue type or label | `enhancement` |
-| `task` | native issue type or label | `task` |
+| `bug` | `label` | `bug` |
+| `feature` | `label` | `enhancement` |
+| `task` | `label` | `task` |
 
 ### Workflow states
 

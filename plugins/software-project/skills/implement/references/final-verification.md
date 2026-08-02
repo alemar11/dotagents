@@ -27,6 +27,9 @@ For each assignment, root rereads:
 - exact target branch and head SHA;
 - base branch, base SHA, and proven ancestry;
 - current-head validation evidence;
+- when the issue contains `## Domain Knowledge Closeout`, the exact accepted
+  `knowledge_delta`, `capture_outcome=captured`, named destinations, reconciled
+  item/target evidence, and the verified documentation diff on the same HEAD;
 - current-head native Codex review evidence with its worker-derived
   `review_profile=standard|high-risk`; both profiles require `codex review` on
   the candidate, and its final `codex_review_head_sha` must bind the current
@@ -43,6 +46,8 @@ snapshot, then pass the unchanged file and expected revision to plain
 mutation from the payload, revalidates it in the sole state-mutating
 transaction, and releases only this Feature Spec claim. If evidence does not
 agree, report coarse mismatch to the same worker and let the worker own repair.
+Missing or non-captured domain closeout evidence is durable-contract drift and
+must not produce a terminal readiness observation.
 If stable durable contract drift caused the mismatch, record `assignment block`
 and retain claims.
 

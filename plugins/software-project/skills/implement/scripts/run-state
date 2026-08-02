@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "1.0.0"
+CLI_VERSION = "1.0.1"
 RUNTIME_CONTRACT_VERSION = "9.0.0"
 DATABASE_SCHEMA_VERSION = 1
 SQLITE_BUSY_TIMEOUT_MS = 5_000
@@ -1682,6 +1682,33 @@ def active_assignment_conflict(
         (
             claim_spec_identity, repository, claim_spec_identity,
             target_branch_name, claim_spec_identity,
+        ),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def recorded_waiting_owner(
+    connection: sqlite3.Connection,
+    waiter: sqlite3.Row,
+) -> dict[str, Any] | None:
+    owner_run_id = waiter["waiting_owner_run_id"]
+    owner_assignment_id = waiter["waiting_owner_assignment_id"]
+    if not owner_run_id or not owner_assignment_id:
+        return None
+    row = connection.execute(
+        """SELECT c.repository_identity,c.claim_spec_identity,c.target_branch_name,
+                  c.run_id,c.assignment_id,r.root_task_id,a.thread_id,a.state,
+                  CASE WHEN c.claim_spec_identity=? THEN 'feature-spec' ELSE 'head-branch' END AS conflict_kind
+           FROM spec_claims c
+           JOIN runs r ON r.run_id=c.run_id
+           JOIN assignments a ON a.run_id=c.run_id AND a.assignment_id=c.assignment_id
+           WHERE c.active=1 AND c.run_id=? AND c.assignment_id=?
+             AND c.repository_identity=?
+             AND (c.claim_spec_identity=? OR c.target_branch_name=?)""",
+        (
+            waiter["claim_spec_identity"], owner_run_id, owner_assignment_id,
+            waiter["repository_identity"], waiter["claim_spec_identity"],
+            waiter["target_branch_name"],
         ),
     ).fetchone()
     return dict(row) if row else None
@@ -4366,19 +4393,15 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
             "abandoned-recovery-required",
         }:
             raise StateError("assignment-not-waiting", f"assignment is {waiter['state']}", 4)
-        if (
-            waiter["repository_identity"] != observed["repository_identity"]
-            or waiter["claim_spec_identity"] != observed["claim_spec_identity"]
-        ):
-            raise StateError("claim-identity-drift", "recovery evidence belongs to another Feature Spec", 4)
-        owner = active_spec_owner(
-            connection, waiter["repository_identity"], waiter["claim_spec_identity"]
-        )
+        if waiter["repository_identity"] != observed["repository_identity"]:
+            raise StateError("claim-identity-drift", "recovery evidence belongs to another repository", 4)
+        owner = recorded_waiting_owner(connection, waiter)
         if owner is None:
             raise StateError("claim-owner-changed", "the observed owner no longer holds the claim", 4)
         if (
             owner["run_id"] != observed["owner_run_id"]
             or owner["assignment_id"] != observed["owner_assignment_id"]
+            or owner["claim_spec_identity"] != observed["claim_spec_identity"]
         ):
             raise StateError("claim-owner-changed", "the active claim owner differs from the observation", 4)
         owner_run = get_run(connection, owner["run_id"])
@@ -4472,6 +4495,35 @@ def command_claim_reconcile(args: argparse.Namespace) -> dict[str, Any]:
         recompute_run_status(connection, owner["run_id"])
         owner_revision = advance(connection, owner_run)
 
+        next_conflict = active_assignment_conflict(
+            connection,
+            waiter["repository_identity"],
+            waiter["claim_spec_identity"],
+            waiter["target_branch_name"],
+        )
+        if next_conflict:
+            connection.execute(
+                """UPDATE assignments SET state='waiting-for-spec',unchanged_wait_sweeps=0,
+                   waiting_owner_run_id=?,waiting_owner_assignment_id=?,
+                   waiting_owner_root_task_id=?,updated_at=?
+                   WHERE run_id=? AND assignment_id=?""",
+                (
+                    next_conflict["run_id"], next_conflict["assignment_id"],
+                    next_conflict["root_task_id"], now, run_id, assignment_id,
+                ),
+            )
+            status = recompute_run_status(connection, run_id)
+            revision = advance(connection, waiter_run)
+            connection.commit()
+            return {
+                "run_id": run_id, "revision": revision,
+                "assignment_id": assignment_id, "state": "waiting-for-spec",
+                "run_status": status, "outcome": release_reason,
+                "claim_acquired": False, "owner_run_id": owner["run_id"],
+                "owner_revision": owner_revision,
+                "conflicting_owner": next_conflict,
+            }
+
         acquired = connection.execute(
             """UPDATE spec_claims SET active=1,acquired_at=?,released_at=NULL,
                release_reason=NULL,recovery_readback_ref=NULL
@@ -4521,9 +4573,7 @@ def command_claim_abandon(args: argparse.Namespace) -> dict[str, Any]:
             )
         owner_run = get_run(connection, owner_run_id)
         require_revision(owner_run, args.owner_expected_revision)
-        owner = active_spec_owner(
-            connection, waiter["repository_identity"], waiter["claim_spec_identity"]
-        )
+        owner = recorded_waiting_owner(connection, waiter)
         if owner is None or (owner["run_id"], owner["assignment_id"]) != (owner_run_id, owner_assignment_id):
             raise StateError("claim-owner-changed", "the active claim owner differs from the explicit override", 4)
         now = utc_now()
@@ -4538,6 +4588,34 @@ def command_claim_abandon(args: argparse.Namespace) -> dict[str, Any]:
         )
         recompute_run_status(connection, owner_run_id)
         owner_revision = advance(connection, owner_run)
+        next_conflict = active_assignment_conflict(
+            connection,
+            waiter["repository_identity"],
+            waiter["claim_spec_identity"],
+            waiter["target_branch_name"],
+        )
+        if next_conflict:
+            connection.execute(
+                """UPDATE assignments SET state='waiting-for-spec',unchanged_wait_sweeps=0,
+                   waiting_owner_run_id=?,waiting_owner_assignment_id=?,
+                   waiting_owner_root_task_id=?,updated_at=?
+                   WHERE run_id=? AND assignment_id=?""",
+                (
+                    next_conflict["run_id"], next_conflict["assignment_id"],
+                    next_conflict["root_task_id"], now, run_id, assignment_id,
+                ),
+            )
+            status = recompute_run_status(connection, run_id)
+            revision = advance(connection, waiter_run)
+            connection.commit()
+            return {
+                "run_id": run_id, "revision": revision,
+                "assignment_id": assignment_id, "state": "waiting-for-spec",
+                "run_status": status, "outcome": "manual-abandon",
+                "claim_acquired": False, "owner_run_id": owner_run_id,
+                "owner_revision": owner_revision,
+                "conflicting_owner": next_conflict,
+            }
         connection.execute(
             """UPDATE spec_claims SET active=1,acquired_at=?,released_at=NULL,release_reason=NULL
                WHERE run_id=? AND assignment_id=? AND active=0""",

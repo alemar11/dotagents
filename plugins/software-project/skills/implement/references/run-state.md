@@ -1,7 +1,7 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.0.0` implements the breaking runtime
+uses the shipped artifact. CLI release `1.0.1` implements the breaking runtime
 contract `9.0.0` over database schema `1`. Worker creation now atomically
 verifies the final task title and rejects the retired post-creation rename
 operation. Externally owned scope repair and contract generations remain in
@@ -16,7 +16,7 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `1.0.0` | User-facing commands and executable behavior |
+| CLI | `1.0.1` | User-facing commands and executable behavior |
 | Runtime contract | `9.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
@@ -511,6 +511,12 @@ authoritative evidence.
 
 `worker_state` is one of `active`, `archived`, `completed`, `not-found`, or
 `unknown`; `checkout_state` is `present`, `released`, `not-found`, or `unknown`.
+The observation's `source_spec_ref` names the recorded active owner. For a
+head-branch collision it therefore differs from the waiting assignment's
+Feature Spec. The CLI requires the same recorded owner run, assignment,
+repository, and owner Spec identity atomically. After a proven owner release it
+rechecks the waiter's complete Spec-or-branch conflict set; a remaining owner
+becomes the new recorded wait target instead of activating a conflicting claim.
 An active worker or present checkout retains the owner. Terminal worker proof
 transfers the claim only when the checkout is released or absent and the owner
 has no pending or unknown assignment operation. Unknown or unresolved evidence
@@ -542,7 +548,7 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` is `1.0.0`,
+or build output. `CLI_VERSION` is `1.0.1`,
 `RUNTIME_CONTRACT_VERSION` is `9.0.0`;
 `DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,

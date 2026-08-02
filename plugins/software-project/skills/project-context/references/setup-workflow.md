@@ -137,8 +137,8 @@ For an explicit setup or update request:
   only after approval, and update the `CONTEXT.md` index in the same change.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
-- Do not duplicate moved project context in both `AGENTS.md` and project
-  memory.
+- Do not duplicate moved project context in both `AGENTS.md` and the routed
+  `CONTEXT.md` or `project-context/` target.
 
 ## AGENTS.md Pointer Block
 

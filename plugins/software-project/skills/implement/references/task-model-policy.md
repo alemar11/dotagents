@@ -22,9 +22,11 @@ selection or run-state option.
 
 Never pass `none`, `minimal`, `low`, `max`, `ultra`, or another thinking value.
 Before startup authorization, verify that the destination Codex host supports
-`gpt-5.6-sol` with all three allowed thinking values through `create_thread`.
-If that support is absent or unverifiable, stop as `unsupported-runtime` before
-run state, claims, tasks, or worktrees.
+`gpt-5.6-sol` with all three allowed thinking values from the discovered
+`create_thread` tool contract or another read-only host capability surface. Do
+not call `create_thread` as a probe: it creates a visible task and worktree. If
+support is absent or unverifiable from read-only capability evidence, stop as
+`unsupported-runtime` before run state, claims, tasks, or worktrees.
 
 The startup disclosure names this exact model and adaptive thinking policy.
 `visible_app_task_permission=granted` is therefore the authorized user's

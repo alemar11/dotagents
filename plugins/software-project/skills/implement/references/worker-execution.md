@@ -64,7 +64,7 @@ block on the mismatch, and wait for the same root to resume the assignment only
 after an external planning owner publishes a correction and authoritative
 readback proves it restores the exact stable contract already accepted by the
 run. The narrow monotonic path repair may be delivered by root as the next
-contract generation after a separately owned Plan Feature change. Any other
+contract generation after a separately owned `$software-project:plan` change. Any other
 changed stable contract requires a new run and claim; it cannot be rebound
 onto this assignment.
 
@@ -75,8 +75,25 @@ Respect the accepted material attempt budget and required validation result.
 
 Use target-repository instructions for commits and validation. Use current
 GitStack workflows only for required GitHub operations. Finish implementation,
-focused validation, tracker checkbox/readback work, and the coherent committed
-candidate HEAD before starting the review handoff. The worker derives
+focused validation, domain-knowledge closeout when required, tracker
+checkbox/readback work, and the coherent committed candidate HEAD before
+starting the review handoff.
+
+When the current issue contains `## Domain Knowledge Closeout`, treat its exact
+`knowledge_delta` as a stable Plan-to-Implement handoff. After integrated
+behavior is proven and before checking the closeout criterion or starting native
+review, invoke `$software-project:project-context` with
+`memory_slice=domain-memory` and `domain_operation=implementation-closeout`.
+Pass the accepted delta, its named repository-local targets and evidence, and
+state that the accepted issue contract plus the user's Implement startup grant
+provide scoped capture authority for those targets only. Require
+`capture_outcome=captured`, reconcile every accepted item and named target, name
+the destinations, verify the documentation diff and links, and include those
+changes in the same coherent candidate HEAD. A `deferred`,
+`no-durable-change`, rejected item, out-of-scope target, or unverified docs diff
+is `blocked-durable-contract`, never PR-ready evidence.
+
+The worker derives
 `review_profile=standard|high-risk`, runs native `codex review` against the
 candidate's base branch, verifies and aggregates its findings, owns every fix
 and revalidation, and reruns the same command whenever a fix changes HEAD.
@@ -112,7 +129,8 @@ tracker-only post-review HEAD.
 The successful result is `pr-ready-for-merge` with GitHub PR/provider/CI and
 mergeability proof, exact repository and checkout identity, named target branch
 and HEAD, base branch and base SHA ancestry, clean worktree, current-head
-validation and reviews, committed GitHub issue readback, and no unresolved
+validation and reviews, committed GitHub issue readback, required
+`capture_outcome=captured` and documentation-diff evidence, and no unresolved
 recorded task changes. Coherent progress needs no root intervention.
 
 ## Peer Collaboration And Combined Proof

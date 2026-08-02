@@ -6,7 +6,7 @@ The behavior-affecting startup fields are:
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories have no separate repo-specific saved Git project, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
 | `visible_app_task_permission` | `granted`, `denied` | Permit the disclosed visible Codex worker tasks and ChatGPT-created worktrees for this run. |
-| `scope_repair_task_permission` | `granted`, `denied` | Permit a separate visible Plan Feature task only when an active worker later needs a monotonic `allowed_paths` repair. |
+| `scope_repair_task_permission` | `granted`, `denied` | Permit a separate visible Software Project Plan task only when an active worker later needs a monotonic `allowed_paths` repair. |
 
 After validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
@@ -25,7 +25,7 @@ mutation.
 When no project is missing, use this exact question so permission cannot be
 mistaken for an immediate task launch:
 
-> May I create one separate visible Plan Feature task later, only if an
+> May I create one separate visible Software Project Plan task later, only if an
 > implementation worker proves that a required path is missing from
 > `allowed_paths`? Granting this permission does not create that task now. No
 > planner task will be created unless a scope miss occurs.

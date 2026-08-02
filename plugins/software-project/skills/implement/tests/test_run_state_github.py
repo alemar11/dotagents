@@ -88,6 +88,42 @@ class RunStateGitHubScenarios(unittest.TestCase):
             str(self.write_json(f"{run_id}.json", self.manifest(run_id))),
         )
 
+    def start_same_branch(self, run_id: str, issue_number: int) -> dict[str, object]:
+        manifest = self.manifest(run_id)
+        manifest["assignments"][0]["source_spec_ref"] = f"owner/repository#{issue_number}"
+        return self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json(f"{run_id}.json", manifest)),
+        )
+
+    def recovery_observation(
+        self,
+        name: str,
+        owner_run_id: str,
+        owner_revision: int,
+        *,
+        worker_state: str,
+        checkout_state: str,
+        issue_number: int = 42,
+    ) -> Path:
+        return self.write_json(
+            name,
+            {
+                "schema": "implement-feature/recovery-observation",
+                "schema_version": "3.0.0",
+                "owner_run_id": owner_run_id,
+                "owner_assignment_id": "spec-01",
+                "owner_expected_revision": owner_revision,
+                "repository_identity": "github:owner/repository",
+                "source_spec_ref": f"owner/repository#{issue_number}",
+                "worker_state": worker_state,
+                "checkout_state": checkout_state,
+                "readback_ref": f"readback:{name}",
+            },
+        )
+
     def activate_assignment(self, run_id: str) -> tuple[str, Path]:
         thread_id = f"thread-{run_id}"
         checkout = self.base / f"checkout-{run_id}"
@@ -237,6 +273,14 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "invalid-input")
 
+    def test_bootstrap_manifest_example_matches_runtime_contract(self) -> None:
+        capabilities = self.invoke("capabilities")
+        bootstrap = (ROOT / "references" / "root-bootstrap.md").read_text(encoding="utf-8")
+        self.assertIn(
+            f'"runtime_contract_version": "{capabilities["runtime_contract_version"]}"',
+            bootstrap,
+        )
+
     def test_task_titles_use_implement_feature_vocabulary(self) -> None:
         started = self.start("title-flow")
         operation = self.invoke(
@@ -288,6 +332,144 @@ class RunStateGitHubScenarios(unittest.TestCase):
             str(observation),
         )
         self.assertEqual(finished["status"], "succeeded")
+
+    def test_same_branch_conflict_can_be_reconciled(self) -> None:
+        owner = self.start("branch-owner")
+        waiter = self.start_same_branch("branch-waiter", 43)
+        self.assertEqual(waiter["status"], "waiting-for-spec")
+        self.assertEqual(waiter["waiting_assignments"][0]["owner"]["conflict_kind"], "head-branch")
+
+        reconciled = self.invoke(
+            "claim",
+            "reconcile",
+            "--run-id",
+            "branch-waiter",
+            "--expected-revision",
+            str(waiter["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--observation",
+            str(
+                self.recovery_observation(
+                    "branch-reconcile.json",
+                    "branch-owner",
+                    int(owner["revision"]),
+                    worker_state="completed",
+                    checkout_state="not-found",
+                )
+            ),
+        )
+
+        self.assertTrue(reconciled["claim_acquired"])
+        self.assertEqual(reconciled["state"], "planned")
+        owner_state = self.invoke("run", "show", "--run-id", "branch-owner")
+        self.assertEqual(owner_state["assignments"][0]["state"], "preimplementation-aborted")
+
+    def test_same_branch_conflict_can_be_manually_abandoned(self) -> None:
+        owner = self.start("branch-abandon-owner")
+        waiter = self.start_same_branch("branch-abandon-waiter", 43)
+        unresolved = self.invoke(
+            "claim",
+            "reconcile",
+            "--run-id",
+            "branch-abandon-waiter",
+            "--expected-revision",
+            str(waiter["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--observation",
+            str(
+                self.recovery_observation(
+                    "branch-unresolved.json",
+                    "branch-abandon-owner",
+                    int(owner["revision"]),
+                    worker_state="unknown",
+                    checkout_state="unknown",
+                )
+            ),
+        )
+        self.assertEqual(unresolved["state"], "abandoned-recovery-required")
+
+        abandoned = self.invoke(
+            "claim",
+            "abandon",
+            "--run-id",
+            "branch-abandon-waiter",
+            "--expected-revision",
+            str(unresolved["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--owner-run-id",
+            "branch-abandon-owner",
+            "--owner-assignment-id",
+            "spec-01",
+            "--owner-expected-revision",
+            str(owner["revision"]),
+        )
+
+        self.assertTrue(abandoned["claim_acquired"])
+        self.assertEqual(abandoned["outcome"], "manual-abandon")
+
+    def test_reconcile_rechecks_remaining_spec_and_branch_conflicts(self) -> None:
+        branch_owner = self.start("branch-first-owner")
+        waiter = self.start_same_branch("branch-multi-waiter", 43)
+        spec_owner_manifest = self.manifest("spec-second-owner")
+        spec_owner_manifest["assignments"][0]["source_spec_ref"] = "owner/repository#43"
+        spec_owner_manifest["assignments"][0]["target_branch_name"] = "feature/other"
+        spec_owner = self.invoke(
+            "run",
+            "start",
+            "--manifest",
+            str(self.write_json("spec-second-owner.json", spec_owner_manifest)),
+        )
+
+        still_waiting = self.invoke(
+            "claim",
+            "reconcile",
+            "--run-id",
+            "branch-multi-waiter",
+            "--expected-revision",
+            str(waiter["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--observation",
+            str(
+                self.recovery_observation(
+                    "branch-first-release.json",
+                    "branch-first-owner",
+                    int(branch_owner["revision"]),
+                    worker_state="completed",
+                    checkout_state="not-found",
+                )
+            ),
+        )
+        self.assertFalse(still_waiting["claim_acquired"])
+        self.assertEqual(still_waiting["state"], "waiting-for-spec")
+        self.assertEqual(still_waiting["conflicting_owner"]["run_id"], "spec-second-owner")
+
+        acquired = self.invoke(
+            "claim",
+            "reconcile",
+            "--run-id",
+            "branch-multi-waiter",
+            "--expected-revision",
+            str(still_waiting["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--observation",
+            str(
+                self.recovery_observation(
+                    "spec-second-release.json",
+                    "spec-second-owner",
+                    int(spec_owner["revision"]),
+                    worker_state="completed",
+                    checkout_state="not-found",
+                    issue_number=43,
+                )
+            ),
+        )
+        self.assertTrue(acquired["claim_acquired"])
+        self.assertEqual(acquired["state"], "planned")
 
     def test_single_use_operations_have_durable_reservations(self) -> None:
         started = self.start("marker-flow")
@@ -354,7 +536,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
 
     def test_review_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "1.0.0")
+        self.assertEqual(capabilities["cli_version"], "1.0.1")
         self.assertEqual(capabilities["runtime_contract_version"], "9.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],

@@ -1,6 +1,6 @@
 {
   "name": "software-project",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Maintain project context, improve architecture, capture ideas, plan feature bundles, and coordinate reviewed implementation delivery.",
   "author": {
     "name": "alemar11",

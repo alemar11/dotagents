@@ -105,12 +105,13 @@ Recommended answer: [the evidence-backed default and why, in one short sentence]
 ```
 
 After an answer establishes a durable project-specific term, rule, boundary, or
-architecture decision, use `$software-project:project-context` with
-`memory_slice=domain-memory` and `domain_operation=inline-update` to capture the
-smallest evidence-backed update. Do not capture rejected, tentative, or
-unresolved points. When the user explicitly prohibits documentation writes,
-keep accepted durable decisions as a deferred handoff with intended targets and
-evidence instead of invoking a write.
+architecture decision, prepare the smallest evidence-backed handoff with the
+accepted knowledge, intended named targets, and evidence. Invoke
+`$software-project:project-context` with `memory_slice=domain-memory` and
+`domain_operation=inline-update` only when the current request or caller handoff
+also supplies explicit scoped capture authority. Otherwise report the decision
+as deferred with its intended targets and evidence. Do not capture rejected,
+tentative, or unresolved points.
 
 Use it to resolve:
 

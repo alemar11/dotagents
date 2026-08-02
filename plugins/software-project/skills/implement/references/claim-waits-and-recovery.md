@@ -108,7 +108,11 @@ owner revision and typed observation.
 - Archived, completed, or authoritatively missing worker plus released/absent
   checkout and no unresolved recorded changes: mark the owner
   `preimplementation-aborted` if bootstrap never succeeded, otherwise
-  `abandoned`; release that exact claim and acquire it for the waiter.
+  `abandoned`, then release that exact claim. Acquire the waiter only when the
+  command returns `claim_acquired=true`. When it returns
+  `claim_acquired=false` with a new `conflicting_owner`, keep the waiter in
+  `waiting-for-spec` and reconcile that newly recorded owner before worker
+  creation.
 - Unknown or contradictory evidence: record
   `abandoned-recovery-required`, retain the claim, and stop.
 

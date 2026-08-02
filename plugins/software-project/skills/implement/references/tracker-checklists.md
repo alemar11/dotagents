@@ -16,11 +16,15 @@ editing stable fields. GitStack access does not grant planning authority.
 For each issue:
 
 1. Implement and validate the current accepted contract.
-2. Bind proof to the current Git head and GitHub PR/provider observation.
-3. Check an issue criterion only after that current-head proof exists.
-4. Read the authoritative issue again and require the checkbox change to be
+2. If `## Domain Knowledge Closeout` is present, complete its Project Context
+   handoff and require `capture_outcome=captured`, named destinations, and a
+   verified documentation diff in the same candidate HEAD.
+3. Bind proof to the current Git head and GitHub PR/provider observation.
+4. Check an issue criterion only after that current-head proof exists, including
+   the closeout proof when required.
+5. Read the authoritative issue again and require the checkbox change to be
    visible.
-5. If later work invalidates the proof, uncheck it immediately and read it back.
+6. If later work invalidates the proof, uncheck it immediately and read it back.
 
 Update parent Feature Spec criteria only after the complete Spec-level behavior
 is proven. Read the parent again after every change. GitHub mutations go through

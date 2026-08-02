@@ -25,7 +25,7 @@ scope_repair_request:
 
 Paths are repository-relative, portable, and limited to the assignment's
 repository. The request may identify current runtime facts, but root must strip
-them before invoking Plan Feature. Never put assignment IDs, task IDs,
+them before invoking `$software-project:plan`. Never put assignment IDs, task IDs,
 worktrees, generations, claims, or worker state in the planning request.
 
 Root rejects a request when it changes outcome, repository, source, target
@@ -70,7 +70,7 @@ scope_repair_request:
    only the monotonic `allowed_paths` expansion and then returns its result to
    root.
 5. Wait for the planner task. Accept only the exact `scope_repair_result`
-   contract from Plan Feature with `repair_outcome=applied|no-op`, matching refs and
+   contract from `$software-project:plan` with `repair_outcome=applied|no-op`, matching refs and
    repair ID, and a fresh authoritative readback proving the complete Spec and
    issue graph. `blocked` and `full-replan-required` leave the assignment
    blocked.
