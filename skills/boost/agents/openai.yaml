@@ -1,7 +1,7 @@
 interface:
   display_name: "Boost"
-  short_description: "Plan, research, and analyze without edits."
-  default_prompt: "Use $boost to plan, research, or analyze the current task with read-only App task orchestration and a final Markdown report. Never write or edit code."
+  short_description: "Plan or research read-only with up to five workers."
+  default_prompt: "Use $boost to plan, research, or analyze in an exact saved local project with an absolute five-worker cap, no nested Boost runs or project edits, archival requests for terminal workers, and one visible Markdown-summary orchestrator."
   brand_color: "#0E7490"
 policy:
   allow_implicit_invocation: false

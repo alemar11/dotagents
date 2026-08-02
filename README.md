@@ -78,9 +78,14 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `boost` requires the ChatGPT App task tools, keeps its orchestrator and
-  workers in the same local project without worktrees, and is strictly
-  read-only: it returns a Markdown analysis instead of writing code.
+- `boost` requires an exact saved local project and the ChatGPT App task tools,
+  keeps its orchestrator and workers there without worktrees, and is strictly
+  read-only: it returns a Markdown analysis instead of writing code. Five is
+  an absolute worker cap; larger requests are capped and reported automatically.
+  After capturing terminal results, it requests archival of completed, failed,
+  or explicitly abandoned workers, then leaves the orchestrator open as the
+  single visible summary task. Neither the
+  orchestrator nor a worker may ever invoke Boost or create a nested Boost run.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
