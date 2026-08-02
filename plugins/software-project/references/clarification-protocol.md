@@ -1,6 +1,6 @@
 # Clarification Protocol
 
-Load this internal protocol only when Idea or Plan cannot proceed faithfully
+Load this internal protocol only when Idea or Feature cannot proceed faithfully
 from the evidence already available to that caller. It is not a public skill,
 a selectable mode, or an independent workflow. The calling phase derives the
 profile and remains responsible for every artifact, mutation, and handoff.
@@ -53,10 +53,10 @@ opportunity, expected value, or proposal boundary is materially unclear.
 Return only refined Idea capture facts and unresolved open questions. Idea
 owns rendering, duplicate checks, publication, and reporting.
 
-## Plan Profile
+## Feature Profile
 
-Use the Plan profile only on `source_route=new-source` when supplied intent plus
-the repository and project-context evidence already loaded by Plan cannot
+Use the Feature profile only on `source_route=new-source` when supplied intent plus
+the repository and project-context evidence already loaded by Feature cannot
 support a complete Feature Spec and safe implementation issue graph. The
 `existing-source` and `scope_repair_request` branches keep their own immutable
 source rules and do not enter this profile.
@@ -73,14 +73,14 @@ source rules and do not enter this profile.
   has portable evidence, and has an intended repository-owned target surface.
 
 Return resolved planning decisions, remaining `planning_blockers`, and any
-durable knowledge candidates to Plan. Plan validates those candidates against
+durable knowledge candidates to Feature. Feature validates those candidates against
 the accepted scope and current Project Context, then owns whether to construct
 an optional `knowledge_delta` with `decisions`, `target_surfaces`, and
 `evidence`. Omit the delta when clarification introduced no durable project
 knowledge.
 
-Plan never writes the delta into a Feature Spec or updates Project Context
+Feature never writes the delta into a Feature Spec or updates Project Context
 during planning. Its issue phase owns placing each validated repository shard
 only on the final integration closeout issue that Implement will reconcile
-through `$software-project:project-context` with `domain_operation=implementation-closeout`
+through `$software-project:learn` with `domain_operation=implementation-closeout`
 after integrated behavior is proven.

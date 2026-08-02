@@ -1,5 +1,0 @@
-interface:
-  display_name: "Project Context"
-  short_description: "Maintain durable project context, ADRs, and evidence-backed Code Review Rules."
-  brand_color: "#3B5BDB"
-  default_prompt: "Use $software-project:project-context with the smallest requested memory_slice. Keep always-active rules in AGENTS.md, route conditional detail through CONTEXT.md and indexed project-context topic files, require confirmation for durable-capture, and preserve the exact Code Review Rules section."

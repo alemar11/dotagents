@@ -265,7 +265,7 @@ If `knowledge_delta` is present:
    missing path only when it is already inside the accepted Feature Spec scope;
    otherwise withhold the issue as blocked. Never rely on another context
    workflow or worker to write another repository.
-5. Require `$software-project:project-context domain-memory` with
+5. Require `$software-project:learn domain-memory` with
    `memory_slice=domain-memory` and
    `domain_operation=implementation-closeout` only after integrated behavior
    is proven. The issue completes this step only with
@@ -365,7 +365,7 @@ different contract type is a conflict. Only on an open issue that has not
 progressed beyond planning is an absent contract `ready-for-agent` label
 repairable; a conflicting canonical workflow state is a conflict. Resolve the
 `workflow contract` values before recording the repair and use
-`add-label` for each missing label. Unrelated repository labels are not Plan
+`add-label` for each missing label. Unrelated repository labels are not Feature
 Feature metadata. A closed issue with a contract-equivalent body is valid
 progressed lifecycle state owned by the executor: after any safe type-label
 repair, retain it without restoring `ready-for-agent` or reopening it.
@@ -378,13 +378,13 @@ parent/sub-issue operations after the comparison passes.
 ### 7. Harden Every Missing Issue
 
 After structural compression, graph ownership, and durable-state reconciliation
-have stabilized, Plan performs one internal codebase-grounded hardening pass for
+have stabilized, Feature performs one internal codebase-grounded hardening pass for
 each missing final issue. Keep the pass bounded to the issue's accepted
 repositories, paths, dependencies, and vertical outcome. Inspect the relevant
 source files, architecture patterns, contracts, nearby tests, and documentation;
 fetch official documentation when current external behavior materially affects
 the plan. Resolve what can be established from that evidence and return a
-planning blocker through the Plan profile in the Software Project clarification
+planning blocker through the Feature profile in the Software Project clarification
 protocol when a material unknown would change scope, ownership, acceptance, or
 validation. Never silently widen the Feature Spec or issue graph.
 
@@ -533,7 +533,7 @@ when a delta exists.
 
 `run_mode=preview` never invokes GitStack for publication or mutation. It may
 use pure read operations with mutation fields omitted to prove current hosted
-state and convergence safety. GitStack does not interpret Plan's tracker
+state and convergence safety. GitStack does not interpret Feature's tracker
 or write policy.
 
 In multi-repository work, publish each issue through GitHub in its owning
@@ -542,7 +542,7 @@ cross-repository integration gates. Do not create a separate scheduling
 artifact; the issue graph is authoritative.
 
 Use transient body transport outside repositories for hosted writes and remove
-it after verified mutation. Plan owns only the planning-artifact writes
+it after verified mutation. Feature owns only the planning-artifact writes
 performed in this phase.
 
 Immediately before each hosted create, re-read the exact target plus the owning

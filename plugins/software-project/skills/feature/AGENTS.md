@@ -1,6 +1,6 @@
-# Plan Maintenance
+# Feature Planning Maintenance
 
-`plugins/software-project/skills/plan/` is the single public planning surface for converging a
+`plugins/software-project/skills/feature/` is the single public planning surface for converging a
 complete Feature Spec bundle and its implementation issue graph. Runtime
 planning behavior stays in `SKILL.md` and phase-owned references.
 
@@ -11,8 +11,8 @@ planning behavior stays in `SKILL.md` and phase-owned references.
   recoverable publication transactions.
 - `references/spec-phase.md`, `issue-phase.md`, and `vertical-slices.md` own
   phase behavior and their templates own rendered artifact shapes.
-- GitHub issue transport is delegated to `$gitstack:github-issues`. Project
-  Context owns durable context routing and closeout, while Plan owns the
+- GitHub issue transport is delegated to `$gitstack:github-issues`. Learn owns
+  Project Context routing and closeout, while Feature owns the
   focused repository research, issue hardening, and artifact merge required
   before an issue is agent-ready.
 - `tests/` protects graph compression, scope repair, and validator behavior.
@@ -37,8 +37,8 @@ planning behavior stays in `SKILL.md` and phase-owned references.
   data. Planning must not write it into a Feature Spec, ordinary issue, or
   domain memory; only the repository-owned final `Domain Knowledge Closeout`
   issue may persist its exact shard for Implement to reconcile through
-  `$software-project:project-context` after integrated behavior is proven.
-- Keep issue hardening as an internal Plan phase. Research only the relevant
+  `$software-project:learn` after integrated behavior is proven.
+- Keep issue hardening as an internal Feature phase. Research only the relevant
   codebase files, contracts, documentation, and tests; preserve caller-owned
   scope and dependencies; and persist only the final stable issue body.
 

@@ -1,6 +1,6 @@
 ---
 name: idea
-description: Manually capture one or more discussed proposals as durable GitHub Ideas for later planning, clarifying only material intake gaps.
+description: "Capture one or more discussed proposals as durable GitHub Ideas for later Feature planning, clarifying at most one material intake gap. Use when the user explicitly asks to save or select Ideas; do not use for ordinary brainstorming."
 ---
 
 # Idea
@@ -11,7 +11,7 @@ Use this capture-only skill to save tentative proposals after a discussion so
 they can be selected later as explicit input to a planning workflow. The public
 pipeline is:
 
-`Idea -> Plan -> Implement Feature`
+`Idea -> Feature -> Implement Feature`
 
 Use this skill only when the user invokes `$software-project:idea`, asks to run Idea, or a
 manually invoked parent workflow explicitly routes here. Do not
@@ -52,7 +52,7 @@ slugs, and refs are execution facts or data, not options.
   result, but unresolved input must not.
 - In `run_mode=preview`, return proposed bodies, intended targets and
   metadata, and deterministic `proposed-idea:` refs without mutating GitHub.
-  Proposed refs are non-durable and must never be presented as valid Plan
+Proposed refs are non-durable and must never be presented as valid Feature
   Feature input.
 - Capture only the accepted proposal. Do not add a planning analysis, domain
   knowledge handoff, Feature Spec fields, acceptance criteria invented by the
@@ -178,4 +178,4 @@ mark proposals as non-durable. On partial failure, list the exact verified refs
 already created and the remaining safe resume work.
 
 End after capture reporting. Planning and source-Idea lifecycle transitions
-belong to Plan, not Idea.
+belong to Feature, not Idea.

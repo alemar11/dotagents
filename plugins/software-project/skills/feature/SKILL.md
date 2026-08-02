@@ -1,9 +1,9 @@
 ---
-name: plan
-description: Manually converge feature intent or a durable Feature Spec into a complete Feature Spec bundle with hardened agent-ready implementation issues.
+name: feature
+description: "Plan and converge feature intent or an existing durable Feature Spec into one complete Feature Spec bundle with hardened agent-ready implementation issues, tracker metadata, and relationships. Use for explicit feature-planning, Feature Spec, preview, publication, or scope-repair requests; never implement the feature."
 ---
 
-# Plan Spec
+# Feature Planning
 
 ## Purpose And Invocation
 
@@ -12,22 +12,22 @@ Spec into one complete, internally consistent bundle: the Feature Spec set,
 hardened vertical implementation issues, tracker metadata, and relationships.
 A Feature Spec is the durable parent contract for one bounded product or system
 change. GitHub Issues are the authoritative tracker and pull requests are the
-fixed delivery boundary; Plan does not select executor publication or
+fixed delivery boundary; Feature does not select executor publication or
 completion behavior.
 
 The public pipeline is:
 
 `Project context routing -> source-route resolution -> optional Idea discovery and validation -> repo-backed clarification -> Feature Spec phase -> issue-graph convergence -> source reconciliation -> deferred domain-memory closeout`
 
-Use it only when the user invokes `$software-project:plan`, asks to run Plan, or
-a manually invoked parent workflow routes here. Do not auto-select it for an
+Use it only when the user invokes `$software-project:feature`, asks to plan a
+Feature, or a manually invoked parent workflow routes here. Do not auto-select it for an
 ordinary planning, implementation, issue-splitting, or triage request. Never
 implement the planned feature.
 
 ## Structured Option Contract
 
 Load the shared `../../references/options.md` before the first phase. It defines the complete
-default-path run registry. Reject every unregistered field or value. Plan
+default-path run registry. Reject every unregistered field or value. Feature
 resolves each GitHub target from the current Git remote; the Software Project
 workflow contract owns feature
 issue types, workflow states, and their transports. Explicit intake or a
@@ -48,15 +48,15 @@ Resolve `run_mode` once:
   `references/issue-phase.md` plus `references/vertical-slices.md` before issue
   work. Load each template only with its owning phase. Those references own
   branch-specific validation, publication, recovery, and reporting detail.
-- Load `references/scope-repair.md` only when a separately invoked Plan
+- Load `references/scope-repair.md` only when a separately invoked Feature
   task receives its exact structured request. Scope repair remains an internal
   branch of `existing-source`, never a selectable option or a third source
   route.
 - Treat the current Git remote and affected repository identities as explicit
-  Plan facts. Treat feature issue types, workflow states, and their
+  Feature facts. Treat feature issue types, workflow states, and their
   transports as `workflow contract` facts. Reject missing, stale,
   contradictory, or GitHub-incompatible facts instead of turning them into
-  Plan options.
+  Feature options.
 - Keep one run bounded to one feature and derive one `source_route` from intake
   evidence. No durable Spec selects `new-source`; one canonical durable Spec
   selects `existing-source`; an exact recognized incomplete publication
@@ -78,7 +78,7 @@ Resolve `run_mode` once:
   equivalent tests, compatible clarifications, progress, and evidence remain
   executor-owned. Compare stable content directly; never fingerprint a body.
 - The sole stable-source mutation exception is `scope-repair.md`: a separately
-  invoked Plan task may add only the smallest evidence-backed monotonic
+  invoked Feature task may add only the smallest evidence-backed monotonic
   `allowed_paths` envelope to the owning Spec and named issue. It preserves
   every other stable field and executor-owned update, records an audit, and
   never consumes or persists Codex runtime identity.
@@ -88,7 +88,7 @@ Resolve `run_mode` once:
 - Feature Spec and issue acceptance criteria are independent contracts. Before
   publication, require a transient complete, non-contradictory map from every
   Spec criterion to one or more final issues. Checkbox state never changes
-  criterion identity and Plan never edits executor-owned markers.
+criterion identity and Feature never edits executor-owned markers.
 - Give every issue one six-field `## Execution Contract` owned by
   `references/issue-body-template.md`. Keep intra-Spec ordering only in
   `dependency_ids`; keep cross-Spec ordering only in the Spec's mandatory
@@ -117,7 +117,7 @@ Resolve `run_mode` once:
   backlinks, never duplicate canonical records. `references/issue-phase.md`
   owns sharding, terminal dependency derivation, and continuation evidence.
 - Compress the candidate graph before freezing new IDs. Issue count is
-  observation, not a cap. Plan then internally hardens every missing final
+observation, not a cap. Feature then internally hardens every missing final
   issue only after graph, scope, and ownership stabilize; retain matching
   durable issues and persist only the final hardening result.
 - Prefer concise behavioral prose for decisions and failure policy; reserve
@@ -129,13 +129,13 @@ Resolve `run_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$software-project:project-context` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Context never supplies GitHub routing or publication behavior. |
-| Software Project workflow contract | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Plan owns when they are published, and never edits the contract at runtime. |
-| Software Project clarification protocol | Repo-backed clarification is materially needed on `new-source`. | Load `../../references/clarification-protocol.md`, run its Plan profile, and keep mutation plus knowledge-handoff authority in Plan. |
+| `$software-project:learn` | Context or ADR routing is missing, stale, or contradictory, or an explicit context closeout is carried by the implementation handoff. | Use only context-related slices; Project Context never supplies GitHub routing or publication behavior. |
+| Software Project workflow contract | Feature Spec or implementation-issue metadata must be read, validated, proposed, or mutated. | Load the exact feature metadata values and transports; Feature owns when they are published, and never edits the contract at runtime. |
+| Software Project clarification protocol | Repo-backed clarification is materially needed on `new-source`. | Load `../../references/clarification-protocol.md`, run its Feature profile, and keep mutation plus knowledge-handoff authority in Feature. |
 | `$gitstack:github-issues` | Idea or planning-bundle convergence needs exact reads, or `run_mode=publish` authorizes a tracker write. | Discovery, source validation, and convergence inspection are pure reads in either planning mode and omit mutation fields; require complete all-state pagination through connector pagination or GitStack's read-only direct-`gh` gap fallback, never a fixed-limit listing, or block. For writes, translate each supported operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, contract metadata, parent/sub-issue attachment, verification, cleanup, and partial recovery. Preview mode never requests dry-run mutations or returns executable commands. |
 
 After implementation begins, generated implementation-issue lifecycle
-mutations belong to the selected executor, not Plan. Terminal
+mutations belong to the selected executor, not Feature. Terminal
 source-Idea reconciliation remains planning closeout and occurs before
 implementation begins.
 
@@ -179,7 +179,7 @@ every linked Spec.
 When intake includes `scope_repair_request`, require one durable
 `source_spec_ref` and implementation issue ref, derive ordinary
 `source_route=existing-source`, load `references/scope-repair.md`, and reject
-proposed sources or runtime coordination fields. Do not add a Plan
+proposed sources or runtime coordination fields. Do not add a Feature
 option for the repair.
 GitHub Issues and pull-request delivery are fixed; no delivery choice is
 resolved or persisted.
@@ -236,11 +236,11 @@ Proposed refs remain non-executable.
 ### 2. Clarify Only Material Unknowns
 
 On the new-source route, load
-`../../references/clarification-protocol.md` and run its Plan profile only when
+`../../references/clarification-protocol.md` and run its Feature profile only when
 supplied intent plus repository and project-context evidence cannot support a
 complete Feature Spec and safe issue graph. Resolve one blocking decision at a
 time. Treat accepted durable terms, rules, boundaries, or decisions only as
-candidates until Plan validates their portable evidence, repository-owned
+candidates until Feature validates their portable evidence, repository-owned
 target surfaces, and fit inside accepted scope. Construct optional
 `knowledge_delta` phase data only from validated candidates; otherwise omit it.
 Keep `planning_blockers` separate and never update Project Context during
@@ -406,13 +406,13 @@ Return:
 When `knowledge_delta` is present, report `capture_outcome=deferred` plus every
 actual or proposed repository-owned final issue ref. Otherwise report
 `capture_outcome=no-durable-change`. This result is report-only and never
-persisted in the Feature Spec. Plan never reports domain knowledge as
+persisted in the Feature Spec. Feature never reports domain knowledge as
 captured.
 
 ## References
 
 - `../../references/clarification-protocol.md`: the shared internal question
-  loop; load only its Plan profile for material `new-source` unknowns.
+  loop; load only its Feature profile for material `new-source` unknowns.
 - `references/options.md`: the complete default-path selectable run registry.
 - `references/idea-discovery.md`: explicitly requested read-only backlog
   discovery and selection before durable Idea-source intake.

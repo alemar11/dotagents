@@ -1,6 +1,6 @@
 # Scope Repair
 
-Load this reference only when a separately invoked Plan task receives
+Load this reference only when a separately invoked Feature task receives
 an exact `scope_repair_request` for a durable `existing-source` bundle.
 `scope-repair` is a narrow internal branch of that route, not a selectable
 option or a third `source_route`.
@@ -13,7 +13,7 @@ criterion, or validation obligation. It does not authorize a new outcome,
 repository, branch, dependency, acceptance criterion, safety policy, validation
 policy, issue slice, or implementation approach.
 
-Plan owns the planning mutation. It remains unaware of Codex task IDs,
+Feature owns the planning mutation. It remains unaware of Codex task IDs,
 workers, worktrees, claims, queues, assignment generations, runtime collisions,
 and implementation progress. Reject a request containing those runtime fields
 instead of persisting them in a Feature Spec, issue, audit record, or result.
@@ -137,4 +137,4 @@ scope_repair_result:
 
 `applied` and `no-op` are resumable evidence only after the final complete-bundle
 readback succeeds. The invoking runtime independently rereads authoritative
-sources and decides scheduling; Plan never declares a worker runnable.
+sources and decides scheduling; Feature never declares a worker runnable.

@@ -1,6 +1,6 @@
 # Captured Idea Discovery
 
-Run discovery only when the user explicitly asks Plan to find, list,
+Run discovery only when the user explicitly asks Feature to find, list,
 or plan from captured Ideas and exact `source_idea_refs` are absent. Never scan
 an Idea backlog during an ordinary planning request.
 
@@ -31,7 +31,7 @@ tracker mutation.
 6. Require an explicit selection before drafting. The selected durable refs
    become the existing `source_idea_refs` execution data. If the user only
    asked to inspect the backlog, report the candidates and stop.
-7. When selected Ideas do not form one bounded feature, require separate Plan
+7. When selected Ideas do not form one bounded feature, require separate Feature
    Feature runs rather than silently producing an unrelated batch of Specs.
 
 Discovery uses current tracker state even with `run_mode=preview`, but it
@@ -42,4 +42,4 @@ never requests a GitStack dry-run mutation or returns executable commands.
 Return the resolved tracker owners, eligible candidates, excluded-candidate
 reasons, and selected refs when selection occurred. Once selection produces
 `source_idea_refs`, continue through `idea-source.md`; do not preserve a
-parallel discovery selector or add a Plan option.
+parallel discovery selector or add a Feature option.

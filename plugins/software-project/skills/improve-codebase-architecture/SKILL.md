@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation.
+description: "Find evidence-backed architecture improvements and pressure-test one selected refactor before implementation. Use for module-boundary, coupling, testability, or codebase-health work; do not use for ordinary bug fixes, formatting, or code review."
 ---
 
 # Improve Codebase Architecture
@@ -11,7 +11,7 @@ Surface architecture improvements that would make a codebase easier to
 understand, test, and change. Present concrete candidates first. Only after the
 user chooses a candidate, pressure-test the selected direction one decision at
 a time and capture accepted durable domain or architecture decisions through
-`$software-project:project-context`.
+`$software-project:learn`.
 
 This is a discovery and decision-shaping skill, not an automatic refactor.
 
@@ -107,7 +107,7 @@ Recommended answer: [the evidence-backed default and why, in one short sentence]
 After an answer establishes a durable project-specific term, rule, boundary, or
 architecture decision, prepare the smallest evidence-backed handoff with the
 accepted knowledge, intended named targets, and evidence. Invoke
-`$software-project:project-context` with `memory_slice=domain-memory` and
+`$software-project:learn` with `memory_slice=domain-memory` and
 `domain_operation=inline-update` only when the current request or caller handoff
 also supplies explicit scoped capture authority. Otherwise report the decision
 as deferred with its intended targets and evidence. Do not capture rejected,
@@ -129,7 +129,7 @@ Summarize:
 
 - selected candidate,
 - resolved architecture decisions,
-- `capture_outcome` plus docs updated through `$software-project:project-context`, or explicitly
+- `capture_outcome` plus docs updated through `$software-project:learn`, or explicitly
   deferred decisions with their intended targets and evidence,
 - implementation path,
 - tests to add or preserve,

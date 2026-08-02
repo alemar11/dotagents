@@ -9,7 +9,7 @@ it as a public skill.
 Produce, publish, or validate a Feature Spec that can feed the issue phase. An
 existing source preserves stable fields while accepting current executor-owned
 acceptance checkbox markers. If new-source intent is too vague, return the next
-material blocker through Plan's clarification protocol. Never return a batch of
+material blocker through Feature's clarification protocol. Never return a batch of
 questions.
 
 ## Boundaries
@@ -127,7 +127,7 @@ with the bound refs. Any mismatch blocks. Missing Idea metadata does not
 block planning runs whose Spec set contains no Idea refs.
 
 Do not apply that ordinary consumed-source rejection to source-only recovery.
-Plan must route reconciliation-only recovery before this phase; a
+Feature must route reconciliation-only recovery before this phase; a
 recovery invocation never drafts or republishes a Feature Spec.
 
 When root context routes multiple products or packages, resolve the selected
@@ -537,7 +537,7 @@ intended projection with `intended_coverage`, `intended_covered_scope`, and
 
 `run_mode=preview` never invokes GitStack for publication or mutation. Exact
 GitHub Idea discovery and source validation may still use read-only GitStack
-operations with mutation fields omitted. GitStack does not interpret Plan
+operations with mutation fields omitted. GitStack does not interpret Feature
 Feature's tracker or write policy.
 
 For hosted publication, use transient transport outside the repository and

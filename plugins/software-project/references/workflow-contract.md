@@ -37,9 +37,9 @@ from the workflow-state matrix.
   implementation issue.
 - A captured Idea has no workflow-state label by default.
 - `needs-info` is the only workflow-state label allowed on an Idea and is
-  applied only when Plan has unresolved information required to continue
+  applied only when Feature has unresolved information required to continue
   planning.
-- `ready-for-agent` belongs only to implementation issues after Plan has
+- `ready-for-agent` belongs only to implementation issues after Feature has
   produced a complete, hardened issue contract.
 - Every final implementation issue must carry `ready-for-agent` before
   `implement` may claim or schedule the Feature Spec.

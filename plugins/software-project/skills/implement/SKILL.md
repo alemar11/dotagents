@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Discover or implement durable GitHub Feature Specs in the ChatGPT App, using collaborating visible Codex tasks for execution and delivering reviewed GitHub PRs. Use only when explicitly invoked.
+description: "Discover or explicitly implement durable GitHub Feature Specs in the ChatGPT App through visible Codex tasks, validation, review, and PR-ready delivery. Use only for explicit discovery, start, or resume requests; do not use it to plan features or merge pull requests."
 ---
 
 # Implement Feature Spec
@@ -38,7 +38,7 @@ The detailed contracts remain in the directly routed references below.
 
 For the out-of-envelope path branch, the worker stops before using the missing
 path and reports the repository-relative path plus the evidence that it is
-needed. Root then spawns one separate visible Software Project Plan task, when the
+needed. Root then spawns one separate visible Software Project Feature task, when the
 startup permission allows it, to update the GitHub Feature Spec's
 `allowed_paths`. That planner task only changes the durable planning contract;
 it never implements code, edits the worker, or replaces the worker task. After
@@ -100,7 +100,7 @@ any startup authorization, run-state preparation, claim, worker, or worktree
 mutation, the root must read the complete implementation issue graph and
 verify the exact `ready-for-agent` label on every final implementation issue.
 The parent Feature Spec is not a substitute for its child issue labels. A
-missing label blocks that Spec before state and is routed back to Plan;
+missing label blocks that Spec before state and is routed back to Feature;
 Implement never adds or repairs the label.
 
 The root coordinates; each visible Codex worker task executes one Feature Spec
@@ -247,7 +247,7 @@ more Feature Specs. A discovery-only request never enters this flow.
    worker or grant cross-worktree access.
    If a worker reports a required path outside the durable envelope, follow
    `references/scope-repair-orchestration.md`: retain the original worker and
-   claim, delegate the portable repair to a separate Software Project Plan task when
+claim, delegate the portable repair to a separate Software Project Feature task when
    authorized and supported, recompute same-root overlap, then send the
    crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,

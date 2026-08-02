@@ -36,14 +36,14 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `gitstack:submit` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and request a current-head Codex review. |
 
-Software Project is the repo-local project-lifecycle plugin. It keeps durable context, architecture discovery, Idea capture, Plan convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to GitStack:
+Software Project is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to GitStack:
 
 | Skill | Purpose |
 | --- | --- |
-| `software-project:project-context` | Maintain durable project context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
+| `software-project:learn` | Maintain durable Project Context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
 | `software-project:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
 | `software-project:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
-| `software-project:plan` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
+| `software-project:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
 | `software-project:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
 
 ## Reusable Skills
@@ -79,9 +79,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:project-context` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
+- `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
 - `software-project:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
-- `software-project:plan` uses the plugin's internal clarification protocol for context-backed questions and `$software-project:project-context` for context or ADR routing plus implementation-closeout handoff. Plan owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both run modes plus published tracker mutations.
+- `software-project:feature` uses the plugin's internal clarification protocol for context-backed questions and `$software-project:learn` for context or ADR routing plus implementation-closeout handoff. Feature owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and Feature-bundle convergence reads in both run modes plus published tracker mutations.
 - `software-project:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Software Project workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/software-project/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 

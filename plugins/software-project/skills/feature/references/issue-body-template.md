@@ -41,7 +41,7 @@ contracts, integration order, and named gates.]
 
 ## Implementation Plan
 
-Plan-hardening: final stable implementation-hardening pass completed for this issue.
+Implementation-hardening: final stable implementation-hardening pass completed for this issue.
 
 This is the planning-time recommended approach. The implementing Codex task may
 replace it with a simpler or safer design when the accepted goal, scope,
@@ -108,11 +108,11 @@ member's repository-owned shard. One exact `canonical_decision_target` owns a
 cross-repository decision; a non-owner shard may carry a qualified backlink but
 not duplicate the record. Every target surface below must resolve to this
 issue's sole Git repository and a path equal to or contained by one of this
-issue's `allowed_paths`. This section is a Plan-to-Implement handoff, not
+issue's `allowed_paths`. This section is a Feature-to-Implement handoff, not
 evidence that the knowledge has already been captured.]
 
 - Required workflow:
-  - Invoke `$software-project:project-context` with `memory_slice=domain-memory` and
+  - Invoke `$software-project:learn` with `memory_slice=domain-memory` and
     `domain_operation=implementation-closeout` after integrated behavior is
     proven. Project Context runs its internal domain-modeling workflow.
 knowledge_delta:
@@ -138,7 +138,7 @@ knowledge_delta:
 - GitHub tracker: after current-head evidence proves the issue criteria, update
   the issue checkboxes and tracker lifecycle truthfully. The selected executor
   owns whether completion is represented by a closing reference, explicit
-  close operation, or another supported tracker transition; Plan does
+  close operation, or another supported tracker transition; Feature does
   not choose that delivery mechanism.
 ```
 

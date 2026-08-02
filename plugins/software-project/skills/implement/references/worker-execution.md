@@ -64,7 +64,7 @@ block on the mismatch, and wait for the same root to resume the assignment only
 after an external planning owner publishes a correction and authoritative
 readback proves it restores the exact stable contract already accepted by the
 run. The narrow monotonic path repair may be delivered by root as the next
-contract generation after a separately owned `$software-project:plan` change. Any other
+contract generation after a separately owned `$software-project:feature` change. Any other
 changed stable contract requires a new run and claim; it cannot be rebound
 onto this assignment.
 
@@ -80,9 +80,9 @@ checkbox/readback work, and the coherent committed candidate HEAD before
 starting the review handoff.
 
 When the current issue contains `## Domain Knowledge Closeout`, treat its exact
-`knowledge_delta` as a stable Plan-to-Implement handoff. After integrated
+`knowledge_delta` as a stable Feature-to-Implement handoff. After integrated
 behavior is proven and before checking the closeout criterion or starting native
-review, invoke `$software-project:project-context` with
+review, invoke `$software-project:learn` with
 `memory_slice=domain-memory` and `domain_operation=implementation-closeout`.
 Pass the accepted delta, its named repository-local targets and evidence, and
 state that the accepted issue contract plus the user's Implement startup grant

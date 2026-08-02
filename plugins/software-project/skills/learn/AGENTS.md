@@ -1,6 +1,6 @@
-# Project Context Maintenance
+# Learn Project Context Maintenance
 
-`plugins/software-project/skills/project-context/` owns durable project context, ADR routing, optional
+`plugins/software-project/skills/learn/` owns durable project context, ADR routing, optional
 localization memory, confirmed durable capture, Code Review Rules, and
 explicit `AGENTS.md` compaction proposals. Runtime behavior stays in `SKILL.md`
 and routed references.

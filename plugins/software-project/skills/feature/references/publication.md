@@ -1,7 +1,7 @@
-# Plan Publication Contract
+# Feature Publication Contract
 
-Use this reference when Plan publishes planning artifacts or returns a
-non-mutating preview. Plan resolves each target from the current Git
+Use this reference when Feature publishes planning artifacts or returns a
+non-mutating preview. Feature resolves each target from the current Git
 remote; GitHub is the authoritative artifact store and `$gitstack:github-issues`
 owns transport, mutation safety, and hosted-state verification.
 
@@ -41,7 +41,7 @@ a repository-local planning mirror.
 
 ## Recoverable Multi-Repository Publication
 
-For any new multi-repository bundle, Plan owns one recoverable
+For any new multi-repository bundle, Feature owns one recoverable
 publication transaction across all roles: predeclare every role, the
 parameterized final-body template, and each allowed ref slot. Create uniquely
 marked non-executable staging issues for hosted roles whose refs are unknown;

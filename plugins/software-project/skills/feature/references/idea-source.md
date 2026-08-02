@@ -12,7 +12,7 @@ Validation-only discovery may use only durable identity, current-state, and
 prior-outcome classification. It must stop before intent normalization,
 drafting, coverage projection, or lifecycle reconciliation. An Idea is
 tentative source intent for a new Feature Spec, not a Feature Spec itself, an
-implementation issue, or another Plan mode.
+implementation issue, or another Feature mode.
 
 ## Activation And Eligibility
 
@@ -30,7 +30,7 @@ implementation issue, or another Plan mode.
   durable, marker-valid artifact can be selected.
 - Require explicit user selection before combining multiple Ideas, and require
   their accepted scope to describe one bounded feature. Split unrelated Ideas
-  into separate Plan runs.
+into separate Feature runs.
 
 ## Durable Identity And Validation
 
@@ -65,7 +65,7 @@ commands.
 The `workflow contract` marker and its compatible transport are required
 only for Idea capture, discovery, or consumption. A missing or incompatible
 contract blocks only those Idea paths. Stop with the exact companion-contract
-prerequisite; do not invalidate an unrelated Plan run or silently
+prerequisite; do not invalidate an unrelated Feature run or silently
 rewrite project context.
 
 ## Prior Outcomes And Consumed State
@@ -186,7 +186,7 @@ never projects or edits a Feature Spec from bound Idea evidence.
 
 For `run_mode=publish`, determine durable coverage independently for each
 selected new-source Idea or bound existing-source Idea and reconcile state once
-when the Plan run exits. For
+when the Feature run exits. For
 `run_mode=preview`, derive only the independent intended projection. Do not
 add or remove workflow labels while an interactive clarification question is
 still active.

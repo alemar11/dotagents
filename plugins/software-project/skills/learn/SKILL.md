@@ -1,13 +1,13 @@
 ---
-name: project-context
-description: Maintain durable project context, ADRs, optional localization memory, Code Review Rules, confirmed corrections, and explicit AGENTS.md compaction proposals in Git repositories.
+name: learn
+description: "Maintain evidence-backed durable repository knowledge—Project Context, ADRs, localization conventions, confirmed corrections, Code Review Rules, and explicit AGENTS.md compaction proposals—in Git repositories. Use for explicit repository-knowledge inspection, capture, updates, or routing, including architecture and feature handoffs; never infer durable learning from ordinary conversation."
 ---
 
-# Project Context
+# Learn Project Context
 
 ## Purpose
 
-Use `$software-project:project-context` as the single public entry point for durable repository
+Use `$software-project:learn` as the single public entry point for durable repository
 context:
 
 - always-active operating rules, ownership boundaries, and the exact

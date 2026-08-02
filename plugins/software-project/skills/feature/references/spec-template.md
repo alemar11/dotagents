@@ -150,7 +150,7 @@ For a GitHub `run_mode=publish` publication, resolve the contract's exact
 `run_mode=preview`, omit publish-only metadata from the body and report the
 intended contract value separately.
 
-When Plan receives `source_idea_refs`, render their exact durable refs
+When Feature receives `source_idea_refs`, render their exact durable refs
 only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no
 Idea is consumed, and never copy Idea refs into generated implementation issue
 Execution Contracts.

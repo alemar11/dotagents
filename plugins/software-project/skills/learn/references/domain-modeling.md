@@ -2,7 +2,7 @@
 
 Use this internal reference whenever `memory_slice=domain-memory` creates,
 updates, reviews, or reconciles `CONTEXT.md`, relevant domain docs, or ADRs.
-`$software-project:project-context domain-memory` is the public invocation; this reference owns
+`$software-project:learn domain-memory` is the public invocation; this reference owns
 the internal semantic workflow.
 
 ## Goal
@@ -14,7 +14,7 @@ before there is evidence from the user, repository, or existing docs.
 
 ## Operation Boundary
 
-Honor the `domain_operation` option resolved by `$software-project:project-context`. Use its
+Honor the `domain_operation` option resolved by `$software-project:learn`. Use its
 evidence-derived `execution_context`; never accept that classification as a
 caller-selected option:
 
@@ -161,7 +161,7 @@ Omit empty sections unless `No Durable Change` is the only correct result.
 
 ### 5. Return the capture result
 
-Return to `$software-project:project-context`:
+Return to `$software-project:learn`:
 
 - docs created or updated,
 - terms, rules, boundaries, or decisions captured,
