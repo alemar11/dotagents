@@ -1,0 +1,7 @@
+interface:
+  display_name: "Boost"
+  short_description: "Plan, research, and analyze without edits."
+  default_prompt: "Use $boost to plan, research, or analyze the current task with read-only App task orchestration and a final Markdown report. Never write or edit code."
+  brand_color: "#0E7490"
+policy:
+  allow_implicit_invocation: false
