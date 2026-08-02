@@ -125,6 +125,14 @@ observation, not a cap. Feature then internally hardens every missing final
   provable. Constrained validation requires an explicit prose failure policy
   before `ready-for-agent`.
 
+## Runtime Dependency
+
+Feature uses `$g:github-issues` for authoritative Idea and Feature-bundle
+reads and for authorized tracker writes. Before the first G handoff, load
+[codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
+If it blocks, stop before GitHub inspection, convergence, or publication and
+report the exact runtime dependency blocker.
+
 ## Composed Skills
 
 | Skill | Load when | Boundary |

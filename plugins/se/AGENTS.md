@@ -14,6 +14,9 @@ this file governs package ownership and maintenance.
   the phase-derived lightweight Idea and context-backed Feature profiles.
 - `references/workflow-contract.md` owns semantic GitHub metadata and label
   values; G owns GitHub transport and verification.
+- `references/codex-dependency-preflight.md` owns the read-only SE-to-G runtime
+  availability gate and manual remediation guidance; it never installs or
+  enables plugins.
 - `references/ready-gate.md` owns the execution-readiness gate consumed by
   `implement`.
 - `skills/idea/` owns Idea capture, including conditional lightweight intake

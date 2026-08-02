@@ -70,6 +70,11 @@ it is an optional accelerator for multi-candidate selection; load
 semantics exactly. In runtimes without that tool, use the documented plain
 one-question-at-a-time fallback.
 
+Before the first `$g:github-issues` handoff, load
+[codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
+If the preflight blocks, stop before any GitHub read or write and report its
+exact runtime dependency blocker.
+
 ## Composed Skills
 
 | Skill | Load when | Boundary |

@@ -47,6 +47,15 @@ next contract generation to the same worker. A denied or unavailable planner
 leaves the original assignment blocked; a second path miss requires a new
 planning run.
 
+## Runtime Dependency
+
+Both discovery and execution use `$g:github-issues` for authoritative GitHub
+reads. Before the first G handoff, load
+[codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
+If it blocks, stop before the GitHub query, ready gate, run-state mutation,
+claim, task, or worktree creation that depends on G. Discovery-only remains
+read-only, but it does not bypass this dependency gate.
+
 ## Request Routing
 
 After explicit invocation, classify the request before loading startup
@@ -64,14 +73,17 @@ references:
 
 For `discovery-only`:
 
-1. Query GitHub Issues for authoritative Feature Specs. Do not load or validate execution
+1. Load and pass the SE-to-G runtime dependency preflight, then query GitHub
+   Issues for authoritative Feature Specs. Do not load or validate execution
    contracts, issue graphs, repository-to-project mappings, branches, worker
-   profiles, runtime capabilities, run state, or startup authorization.
+   profiles, runtime capabilities, run state, or startup authorization beyond
+   that required G availability check.
 2. Return the candidate Feature Spec references, links when available, and
    brief tracker summaries. Include child issue references only when the
    tracker exposes them without execution preflight.
-3. State that this was discovery only and that execution eligibility and
-   startup preflight were not evaluated.
+3. State that this was discovery only: the G availability preflight was
+   evaluated, but execution eligibility and the execution startup preflight
+   were not.
 4. Stop. Do not invoke `scripts/run-state`, create or modify run state, acquire
    claims, ask for startup authorization, create tasks or worktrees, or mutate
    repositories or trackers.
