@@ -23,9 +23,14 @@ selection or run-state option.
 Never pass `none`, `minimal`, `low`, `max`, `ultra`, or another thinking value.
 Before startup authorization, verify that the destination Codex host supports
 `gpt-5.6-sol` with all three allowed thinking values from the discovered
-`create_thread` tool contract or another read-only host capability surface. Do
-not call `create_thread` as a probe: it creates a visible task and worktree. If
-support is absent or unverifiable from read-only capability evidence, stop as
+`create_thread` tool contract or another read-only host capability surface. The
+inspection must also verify the exact fields available for title initialization.
+This protocol keeps that initialization in the separately recorded
+`set_thread_title` operation; an optional `create_thread.title` field may be
+present, but must never be assumed or passed without checking the live
+declaration. Do not call `create_thread` as a probe: it creates a visible task
+and worktree. If model, thinking, title initialization, or any required
+argument is absent or unverifiable from read-only capability evidence, stop as
 `unsupported-runtime` before run state, claims, tasks, or worktrees.
 
 The startup disclosure names this exact model and adaptive thinking policy.

@@ -1,10 +1,11 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.0.1` implements the breaking runtime
-contract `9.0.0` over database schema `1`. Worker creation now atomically
-verifies the final task title and rejects the retired post-creation rename
-operation. Externally owned scope repair and contract generations remain in
+uses the shipped artifact. CLI release `1.1.0` implements the breaking runtime
+contract `1.0.0` over database schema `1`. Worker creation records the task
+binding first; title initialization is a separate recorded
+`set-worker-title` operation using the App's `set_thread_title` API and an
+independent readback. Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
 runtime does not add per-file claims. The
 controller's saved project remains explicit control-plane identity, each
@@ -16,8 +17,8 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `1.0.1` | User-facing commands and executable behavior |
-| Runtime contract | `9.0.0` | Coordination semantics required by an active run |
+| CLI | `1.1.0` | User-facing commands and executable behavior |
+| Runtime contract | `1.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
@@ -30,7 +31,7 @@ machine-readable registry for these identities and protocols:
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
 | Run manifest | `implement-feature/run-manifest` | `4.0.0` |
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `2.0.0` |
-| Codex task-operation observation | `implement-feature/app-operation-observation` | `4.0.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `1.0.0` |
 | Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` | `3.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `3.0.0` |
@@ -136,6 +137,9 @@ scripts/run-state --json claim abandon \
 scripts/run-state --json app-operation begin \
   --run-id RUN --expected-revision N \
   --action create-worker --subject-id ASSIGNMENT
+scripts/run-state --json app-operation begin \
+  --run-id RUN --expected-revision N \
+  --action set-worker-title --subject-id ASSIGNMENT
 scripts/run-state --json app-operation observation template \
   --action send-bootstrap --status unknown
 scripts/run-state --json app-operation observation create \
@@ -213,7 +217,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="4.0.0"`, `runtime_contract_version="9.0.0"`, and the
+`schema_version="4.0.0"`, `runtime_contract_version="1.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -282,16 +286,17 @@ The builder derives `bootstrap_id`; for `send-scope-revision` it derives
 `scope_revision_id` and `contract_generation`.
 
 For a successful `create-worker`, `observed_state` is the literal Codex task
-state and accepts `active` or `idle`. Exact `observed_title` equality proves
-that the created task is titled atomically and permits bootstrap. A different
-title still records the truthful successful creation receipt and worker binding,
-but `finish` returns `effect_warning=worker-title-drift` and
-`cleanup_required=archive-worker`; bootstrap is rejected so root can archive
-the pre-bootstrap task. Successful `archive-worker` readback includes the exact
-recorded `checkout_path` and proves that no file, directory, or symlink remains
-there before `assignment abort` may release only its claim. Only `ENOENT` or
-`ENOTDIR` proves absence; permission, I/O, and every other inspection error
-blocks cleanup and retains the claim.
+state and accepts `active` or `idle`; creation does not require or infer a
+title. `set-worker-title` carries the exact task ID and independently observed
+title after the App's `set_thread_title` call. Exact expected-title equality
+permits bootstrap. A missing or different title still records the truthful
+successful title effect, but `finish` returns
+`effect_warning=worker-title-drift` and `cleanup_required=archive-worker`;
+bootstrap is rejected so root can archive the pre-bootstrap task. Successful
+`archive-worker` readback includes the exact recorded `checkout_path` and proves
+that no file, directory, or symlink remains there before `assignment abort` may
+release only its claim. Only `ENOENT` or `ENOTDIR` proves absence; permission,
+I/O, and every other inspection error blocks cleanup and retains the claim.
 When every assignment remains pre-bootstrap, the all-aborted run finishes as
 `preimplementation-aborted`. When a sibling already started, every sibling must
 reach a terminal delivery or abandoned state and the mixed run finishes as
@@ -328,10 +333,13 @@ Every result authorizes only its reported generation.
 
 `create-scope-repair-task` binds the assignment's current repair ID and contract
 generation and returns the exact expected planner title
-`🧭 Scope Repair · <Feature Spec title>`. `send-scope-revision` consumes the
-verified scope-repair observation, stores the next generation, and derives a stable
-`scope_revision_id` from the operation ID and target generation. Replays keep
-all three identities unchanged.
+`🧭 Scope Repair · <Feature Spec title>`. `set-scope-repair-title` initializes
+that title through `set_thread_title`; `send-scope-revision` consumes the
+planner task only after the title readback is exact. A planner title mismatch
+returns `effect_warning=scope-repair-title-drift` and
+`cleanup_required=archive-scope-repair-task`. `send-scope-revision` stores the
+next generation and derives a stable `scope_revision_id` from the operation ID
+and target generation. Replays keep all three identities unchanged.
 
 An app-operation observation uses the named app-operation protocol and carries
 exactly its `operation_id`, current `launch_count`, and
@@ -345,13 +353,16 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 
 | Action | Additional fields |
 | --- | --- |
-| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_title`, `observed_state` |
-| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`, `observed_title` |
+| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
+| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
 | `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
+| `set-worker-title` | `thread_id`, `observed_title` |
+| `set-scope-repair-title` | `thread_id`, `observed_title` |
 | `set-root-title` | `observed_title` |
 | `archive-worker` | `thread_id`, `checkout_path`, `observed_state` |
+| `archive-scope-repair-task` | `thread_id`, `observed_state` |
 
 Unknown or failed observations may carry only the authoritative action subset
 actually observed. A bootstrap observation always identifies the derived
@@ -385,8 +396,11 @@ generation. Its action-specific gates are:
 | `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
 | `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
+| `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker title was not changed |
+| `set-scope-repair-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner title was not changed |
 | `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
+| `archive-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner task was not archived or completed |
 | `send-worker-message` | Never replayable |
 
 Bootstrap and scope revision have exactly-once logical effect end to end: their
@@ -548,8 +562,8 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` is `1.0.1`,
-`RUNTIME_CONTRACT_VERSION` is `9.0.0`;
+or build output. `CLI_VERSION` is `1.1.0`,
+`RUNTIME_CONTRACT_VERSION` is `1.0.0`;
 `DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `state prepare`, plus

@@ -210,6 +210,14 @@ more Feature Specs. A discovery-only request never enters this flow.
    interaction, including the bounded planner-task permission from
    `references/scope-repair-orchestration.md`, only after this read-only
    preflight.
+   Before any task mutation, inspect the live Codex App declarations for every
+   operation used by this flow and verify every argument that will be passed.
+   Do not infer support from a previous runtime or from prompt text. This
+   protocol records title initialization separately: use `title` in
+   `create_thread` only when the inspected declaration and protocol permit it;
+   otherwise omit it and use the verified `set_thread_title` operation after a
+   real task ID exists. Missing or unverifiable operations or arguments stop
+   the run as `unsupported-runtime` before any task mutation.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Prepare shared run state through read-only `capabilities` and `doctor`, then
@@ -224,7 +232,8 @@ more Feature Specs. A discovery-only request never enters this flow.
    repository. Keep a conflicting assignment in its bounded Spec wait without
    blocking claims already acquired by peer assignments.
 4. When at least one assignment owns its claim, set and verify the immutable
-   root title once, then schedule every claimed Feature Spec allowed by path and
+   root title once through the recorded App title operation, then schedule every
+   claimed Feature Spec allowed by path and
    dependency serialization, with no numeric worker cap. Dependency-related
    peers may start before their input HEADs stabilize so they can collaborate,
    but final proof must bind the exact prerequisite revisions. Never create a

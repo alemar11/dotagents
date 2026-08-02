@@ -56,7 +56,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         return {
             "schema": "implement-feature/run-manifest",
             "schema_version": "4.0.0",
-            "runtime_contract_version": "9.0.0",
+            "runtime_contract_version": "1.0.0",
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "controller_project_id": "controller-project",
@@ -333,6 +333,268 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(finished["status"], "succeeded")
 
+    def test_worker_title_is_initialized_after_creation_before_bootstrap(self) -> None:
+        started = self.start("worker-title-flow")
+        create = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--action",
+            "create-worker",
+            "--subject-id",
+            "spec-01",
+        )
+        checkout = self.base / "worker-title-checkout"
+        checkout.mkdir()
+        creation_observation = self.base / "worker-creation-observation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(create["revision"]),
+            "--operation-id",
+            str(create["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:worker-create",
+            "--readback-ref",
+            "readback:worker-create",
+            "--thread-id",
+            "worker-title-thread",
+            "--project-id",
+            "repository-project",
+            "--checkout-path",
+            str(checkout),
+            "--git-common-dir",
+            str(self.repo),
+            "--observed-state",
+            "idle",
+            "--output",
+            str(creation_observation),
+        )
+        created = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(create["revision"]),
+            "--operation-id",
+            str(create["operation_id"]),
+            "--observation",
+            str(creation_observation),
+        )
+
+        before_title = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(created["revision"]),
+            "--action",
+            "send-bootstrap",
+            "--subject-id",
+            "spec-01",
+            expected=4,
+        )
+        self.assertEqual(before_title["error"]["code"], "worker-title-not-verified")
+
+        title = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(created["revision"]),
+            "--action",
+            "set-worker-title",
+            "--subject-id",
+            "spec-01",
+        )
+        self.assertEqual(title["expected_title"], "🛠️ Implement Feature · Example")
+        title_observation = self.base / "worker-title-observation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:worker-title",
+            "--readback-ref",
+            "readback:worker-title",
+            "--thread-id",
+            "worker-title-thread",
+            "--observed-title",
+            "🛠️ Implement Feature · Example",
+            "--output",
+            str(title_observation),
+        )
+        titled = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--observation",
+            str(title_observation),
+        )
+        self.assertEqual(titled["status"], "succeeded")
+
+        bootstrap = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-flow",
+            "--expected-revision",
+            str(titled["revision"]),
+            "--action",
+            "send-bootstrap",
+            "--subject-id",
+            "spec-01",
+        )
+        self.assertTrue(bootstrap["launch_authorized"])
+
+    def test_scope_repair_title_is_initialized_after_planner_creation(self) -> None:
+        started = self.start("scope-title-flow")
+        self.activate_assignment("scope-title-flow")
+        blocked = self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--assignment-id",
+            "spec-01",
+        )
+        planner = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(blocked["revision"]),
+            "--action",
+            "create-scope-repair-task",
+            "--subject-id",
+            "spec-01",
+        )
+        planner_observation = self.base / "scope-planner-observation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(planner["revision"]),
+            "--operation-id",
+            str(planner["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:scope-planner",
+            "--readback-ref",
+            "readback:scope-planner",
+            "--thread-id",
+            "scope-planner-thread",
+            "--project-id",
+            "repository-project",
+            "--observed-state",
+            "idle",
+            "--output",
+            str(planner_observation),
+        )
+        created = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(planner["revision"]),
+            "--operation-id",
+            str(planner["operation_id"]),
+            "--observation",
+            str(planner_observation),
+        )
+
+        title = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(created["revision"]),
+            "--action",
+            "set-scope-repair-title",
+            "--subject-id",
+            "spec-01",
+        )
+        self.assertEqual(title["expected_title"], "🧭 Scope Repair · Example")
+        title_observation = self.base / "scope-planner-title-observation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:scope-title",
+            "--readback-ref",
+            "readback:scope-title",
+            "--thread-id",
+            "scope-planner-thread",
+            "--observed-title",
+            "🧭 Scope Repair · Example",
+            "--output",
+            str(title_observation),
+        )
+        titled = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-title-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--observation",
+            str(title_observation),
+        )
+        self.assertEqual(titled["status"], "succeeded")
+
     def test_same_branch_conflict_can_be_reconciled(self) -> None:
         owner = self.start("branch-owner")
         waiter = self.start_same_branch("branch-waiter", 43)
@@ -536,11 +798,11 @@ class RunStateGitHubScenarios(unittest.TestCase):
 
     def test_review_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "1.0.1")
-        self.assertEqual(capabilities["runtime_contract_version"], "9.0.0")
+        self.assertEqual(capabilities["cli_version"], "1.1.0")
+        self.assertEqual(capabilities["runtime_contract_version"], "1.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],
-            "4.0.0",
+            "1.0.0",
         )
 
         removed_option = self.invoke(

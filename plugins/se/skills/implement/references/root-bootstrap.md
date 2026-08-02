@@ -99,7 +99,7 @@ Root is a lightweight control plane. Before mutation:
 {
   "schema": "implement-feature/run-manifest",
   "schema_version": "4.0.0",
-  "runtime_contract_version": "9.0.0",
+  "runtime_contract_version": "1.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",
@@ -190,24 +190,33 @@ implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task with
 `environment=worktree`, `model=gpt-5.6-sol`, and the assignment's resolved
-`thinking=medium|high|xhigh`, plus the assignment's complete canonical title as
-the `create_thread` title. The ChatGPT App creates the worktree and assigns it
-to that task. Root verifies the task, checkout directory, Git common directory,
-literal `active|idle` state, and exact title in the same `create-worker`
-observation; it never runs `git worktree add` or performs a follow-up worker
-rename. SQLite keeps only checkout identity and typed task readback needed for
+`thinking=medium|high|xhigh`. Before calling it, root inspects the live
+declaration and passes only verified fields. This protocol does not depend on
+an optional creation-time title: it records `set-worker-title` separately and
+does not treat the preparation prompt as title evidence. The ChatGPT App creates
+the worktree and assigns it to that task. Root verifies the task, checkout
+directory, Git common directory, and literal `active|idle` state in the
+`create-worker` observation, then records `set-worker-title`, calls
+`set_thread_title` with the exact canonical title and only the arguments exposed
+by the inspected declaration, and independently verifies the title before
+bootstrap. This is the normal title
+initialization sequence, not a fallback or a later progress rename. Root never
+runs `git worktree add`.
+
+SQLite keeps only checkout identity and typed task readback needed for
 coordination, not the worker's technical contents or task profile. The
 operation always targets the assignment's recorded repo-specific `project_id`,
 never the multi-folder controller project. If task readback does not resolve to
 that project or repository identity, reconcile or fail the operation before
-bootstrap. A title mismatch preserves the successful creation receipt and
-binding, returns `cleanup_required=archive-worker`, forbids bootstrap, and lets
-root archive the pre-bootstrap task and prove that its exact recorded checkout
-path is absent before aborting only that assignment and releasing its claim. An
-inspection error never proves absence and retains the claim. An
-all-aborted pre-bootstrap run finishes as `preimplementation-aborted`; if a
-sibling implementation already started, every sibling must become terminal and
-the mixed run finishes as `abandoned`, not as successful delivery.
+bootstrap. A missing, normalized-to-different, or unverifiable title returns
+`cleanup_required=archive-worker`, forbids bootstrap, and lets root archive the
+pre-bootstrap task and prove that its exact recorded checkout path is absent
+before aborting only that assignment and releasing its claim. Root does not
+retry the title operation to repair drift. An inspection error never proves
+absence and retains the claim. An all-aborted pre-bootstrap run finishes as
+`preimplementation-aborted`; if a sibling implementation already started,
+every sibling must become terminal and the mixed run finishes as `abandoned`,
+not as successful delivery.
 
 Each full bootstrap has one fixed execution policy: the worker owns native
 Codex review. After read-only checkout identity preflight and before branch or

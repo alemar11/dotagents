@@ -46,8 +46,12 @@ one automatic repair is allowed per assignment. A second scope miss returns
    remain blocked. Do not ask another question.
 4. Record and execute
    `create-scope-repair-task`. Create one separate visible Codex task in the
-   assignment's saved repository project without a worktree. Set and verify its
-   exact title as `🧭 Scope Repair · <Feature Spec title>`. Invoke
+   assignment's saved repository project without a worktree. Inspect the live
+   `create_thread` declaration and pass only its verified fields; do not use the
+   prompt as title evidence. Then record `set-scope-repair-title`, call
+   `set_thread_title` with the exact title `🧭 Scope Repair · <Feature Spec title>`
+   and only the arguments exposed by its inspected declaration, and independently
+   verify that readback before invoking
 `$se:feature` as the separate Feature task against the authoritative
    `source_spec_ref` and
    implementation issue using only this portable packet:
@@ -69,19 +73,24 @@ scope_repair_request:
    Root does not edit the Spec or issue itself. The planner task may publish
    only the monotonic `allowed_paths` expansion and then returns its result to
    root.
-5. Wait for the planner task. Accept only the exact `scope_repair_result`
+5. If title initialization is missing, drifts, or cannot be independently
+   verified, do not invoke `$se:feature`. Reconcile the recorded title
+   operation; when `cleanup_required=archive-scope-repair-task`, archive the
+   planner task through `set_thread_archived` and keep the worker assignment
+   blocked. Never retry a title mutation to repair drift.
+6. Wait for the planner task. Accept only the exact `scope_repair_result`
    contract from `$se:feature` with `repair_outcome=applied|no-op`, matching refs and
    repair ID, and a fresh authoritative readback proving the complete Spec and
    issue graph. `blocked` and `full-replan-required` leave the assignment
    blocked.
-6. Recompute overlap from the newly read durable `allowed_paths`. When another
+7. Recompute overlap from the newly read durable `allowed_paths`. When another
    same-root assignment still overlaps, wait for that assignment to finish and
    rerun the overlap check. Do not mutate the planning artifact again.
-7. Build a typed scope-repair observation, then record and execute
+8. Build a typed scope-repair observation, then record and execute
    `send-scope-revision`. The follow-up targets the original worker task and
    contains the new complete stable contract, the planner result and readback
    refs, `contract_generation=N+1`, and the derived `scope_revision_id`.
-8. Finish the recorded operation only after independent conversation readback
+9. Finish the recorded operation only after independent conversation readback
    proves the worker accepted that exact revision. The runtime atomically
    increments the assignment generation and restores its pre-block state.
 
@@ -109,12 +118,12 @@ generation.
 
 ## Recovery
 
-`create-scope-repair-task` and `send-scope-revision` are protected recorded app
-operations. After interruption, root reads the task or conversation before
-finishing or replaying the same logical operation. A scope revision replay
-keeps the same operation ID, repair ID, revision ID, and target generation.
-Never create a replacement planner task or replacement revision operation for
-the same repair.
+`create-scope-repair-task`, `set-scope-repair-title`, `archive-scope-repair-task`,
+and `send-scope-revision` are protected recorded app operations. After
+interruption, root reads the task or conversation before finishing or replaying
+the same logical operation. A scope revision replay keeps the same operation
+ID, repair ID, revision ID, and target generation. Never create a replacement
+planner task, title operation, or revision operation for the same repair.
 
 `assignment resume` remains limited to restoring the exact contract already
 accepted by a blocked assignment. It never applies a scope expansion and never

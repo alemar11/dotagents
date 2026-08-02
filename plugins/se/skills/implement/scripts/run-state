@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "1.0.1"
-RUNTIME_CONTRACT_VERSION = "9.0.0"
+CLI_VERSION = "1.1.0"
+RUNTIME_CONTRACT_VERSION = "1.0.0"
 DATABASE_SCHEMA_VERSION = 1
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 SQLITE_JOURNAL_MODE = "WAL"
@@ -43,7 +43,7 @@ PROTOCOLS = {
     },
     "app_operation_observation": {
         "schema": "implement-feature/app-operation-observation",
-        "schema_version": "4.0.0",
+        "schema_version": "1.0.0",
     },
     "scope_repair_observation": {
         "schema": "implement-feature/scope-repair-observation",
@@ -104,16 +104,22 @@ APP_ACTIONS = {
     "send-bootstrap",
     "send-scope-revision",
     "send-worker-message",
+    "set-worker-title",
+    "set-scope-repair-title",
     "set-root-title",
     "archive-worker",
+    "archive-scope-repair-task",
 }
 SINGLE_USE_ACTIONS = {
     "create-worker",
     "create-scope-repair-task",
     "send-bootstrap",
     "send-scope-revision",
+    "set-worker-title",
+    "set-scope-repair-title",
     "set-root-title",
     "archive-worker",
+    "archive-scope-repair-task",
 }
 PROTECTED_REPLAY_ACTIONS = SINGLE_USE_ACTIONS | {
     "create-scope-repair-task",
@@ -134,14 +140,12 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "project_id",
         "checkout_path",
         "git_common_dir",
-        "observed_title",
         "observed_state",
     },
     "create-scope-repair-task": {
         "thread_id",
         "project_id",
         "observed_state",
-        "observed_title",
     },
     "send-bootstrap": {"thread_id", "bootstrap_id"},
     "send-scope-revision": {
@@ -150,8 +154,11 @@ APP_OPERATION_FIELDS_BY_ACTION = {
         "contract_generation",
     },
     "send-worker-message": {"thread_id"},
+    "set-worker-title": {"thread_id", "observed_title"},
+    "set-scope-repair-title": {"thread_id", "observed_title"},
     "set-root-title": {"observed_title"},
     "archive-worker": {"thread_id", "checkout_path", "observed_state"},
+    "archive-scope-repair-task": {"thread_id", "observed_state"},
 }
 READY_COMMON_FIELDS = {
     "schema",
@@ -2163,7 +2170,9 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         raise StateError("invalid-app-action", f"unsupported Codex task action: {action}")
     scope_repair_action = action in {
         "create-scope-repair-task",
+        "set-scope-repair-title",
         "send-scope-revision",
+        "archive-scope-repair-task",
     }
     if run["status"] != "active" and not (
         scope_repair_action and run["status"] == "blocked"
@@ -2176,7 +2185,10 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         "send-bootstrap",
         "send-scope-revision",
         "send-worker-message",
+        "set-worker-title",
+        "set-scope-repair-title",
         "archive-worker",
+        "archive-scope-repair-task",
     }:
         assignment = get_assignment(connection, run["run_id"], subject_id)
         assignment_id = assignment["assignment_id"]
@@ -2190,11 +2202,52 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         if action == "create-worker":
             if assignment["state"] != "planned":
                 raise StateError("invalid-assignment-transition", "worker creation requires a planned assignment", 4)
+        elif action == "set-worker-title":
+            if assignment["state"] != "worker-created":
+                raise StateError(
+                    "invalid-assignment-transition",
+                    "worker title initialization requires a created worker",
+                    4,
+                )
+            created = connection.execute(
+                """SELECT thread_id FROM app_operations
+                   WHERE run_id=? AND assignment_id=?
+                     AND action='create-worker' AND status='succeeded'
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id),
+            ).fetchone()
+            if created is None or created["thread_id"] != assignment["thread_id"]:
+                raise StateError(
+                    "worker-not-created",
+                    "worker title initialization requires the recorded created worker",
+                    4,
+                )
         elif action == "create-scope-repair-task":
             if assignment["state"] != "blocked-scope-repair":
                 raise StateError(
                     "invalid-assignment-transition",
                     "planner task creation requires a scope-repair-blocked assignment",
+                    4,
+                )
+        elif action == "set-scope-repair-title":
+            if assignment["state"] != "blocked-scope-repair":
+                raise StateError(
+                    "invalid-assignment-transition",
+                    "scope-repair title initialization requires a created planner task",
+                    4,
+                )
+            planner = connection.execute(
+                """SELECT thread_id FROM app_operations
+                   WHERE run_id=? AND assignment_id=?
+                     AND action='create-scope-repair-task'
+                     AND scope_repair_id=? AND status='succeeded'
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id, assignment["scope_repair_id"]),
+            ).fetchone()
+            if planner is None:
+                raise StateError(
+                    "scope-repair-planner-not-created",
+                    "scope-repair title initialization requires the recorded planner task",
                     4,
                 )
         elif action == "send-bootstrap":
@@ -2203,13 +2256,15 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             created = connection.execute(
                 """SELECT observed_title FROM app_operations
                    WHERE run_id=? AND assignment_id=?
-                     AND action='create-worker' AND status='succeeded'""",
-                (run["run_id"], assignment_id),
+                     AND action='set-worker-title' AND thread_id=?
+                     AND status='succeeded'
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id, assignment["thread_id"]),
             ).fetchone()
             if created is None or created["observed_title"] != assignment["title"]:
                 raise StateError(
                     "worker-title-not-verified",
-                    "bootstrap requires atomic worker creation with verified title readback",
+                    "bootstrap requires a separately recorded title initialization with verified readback",
                     4,
                 )
         elif action == "send-scope-revision":
@@ -2225,6 +2280,12 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
             raise StateError("invalid-assignment-transition", "worker messages require an active worker", 4)
         elif action == "archive-worker" and assignment["state"] != "worker-created":
             raise StateError("implementation-already-started", "archive is allowed only before this assignment's bootstrap authority", 4)
+        elif action == "archive-scope-repair-task" and assignment["state"] != "blocked-scope-repair":
+            raise StateError(
+                "invalid-assignment-transition",
+                "scope-repair planner archival requires a blocked assignment",
+                4,
+            )
         if action == "archive-worker":
             bootstrap = connection.execute(
                 """SELECT status FROM app_operations
@@ -2237,6 +2298,31 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                 raise StateError(
                     "bootstrap-reconciliation-required",
                     "archive requires proof that bootstrap was never delivered",
+                    4,
+                )
+            title = connection.execute(
+                """SELECT status FROM app_operations
+                   WHERE run_id=? AND assignment_id=? AND action='set-worker-title'
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id),
+            ).fetchone()
+            if title is None or title["status"] in {"pending", "unknown"}:
+                raise StateError(
+                    "title-reconciliation-required",
+                    "archive requires reconciliation of worker title initialization",
+                    4,
+                )
+        elif action == "archive-scope-repair-task":
+            title = connection.execute(
+                """SELECT status FROM app_operations
+                   WHERE run_id=? AND assignment_id=? AND action='set-scope-repair-title'
+                   ORDER BY sequence DESC LIMIT 1""",
+                (run["run_id"], assignment_id),
+            ).fetchone()
+            if title is None or title["status"] in {"pending", "unknown"}:
+                raise StateError(
+                    "title-reconciliation-required",
+                    "archive requires reconciliation of scope-repair title initialization",
                     4,
                 )
     elif subject_id != run["root_task_id"]:
@@ -2350,6 +2436,24 @@ def validate_scope_repair_observation(
             "scope revision requires the successful recorded planner task",
             4,
         )
+    planner_title = connection.execute(
+        """SELECT observed_title FROM app_operations
+           WHERE run_id=? AND assignment_id=?
+             AND action='set-scope-repair-title'
+             AND thread_id=? AND status='succeeded'
+           ORDER BY sequence DESC LIMIT 1""",
+        (
+            assignment["run_id"],
+            assignment["assignment_id"],
+            normalized["planning_thread_id"],
+        ),
+    ).fetchone()
+    if planner_title is None or planner_title["observed_title"] != scope_repair_task_title(assignment["title"]):
+        raise StateError(
+            "scope-repair-title-not-verified",
+            "scope revision requires the planner title initialization with verified readback",
+            4,
+        )
     return normalized
 
 
@@ -2456,6 +2560,10 @@ def command_app_operation_begin(args: argparse.Namespace) -> dict[str, Any]:
         elif action == "create-scope-repair-task":
             result["repair_id"] = operation_repair_id
             result["contract_generation"] = operation_generation
+            result["expected_title"] = scope_repair_task_title(assignment["title"])
+        elif action == "set-worker-title":
+            result["expected_title"] = assignment["title"]
+        elif action == "set-scope-repair-title":
             result["expected_title"] = scope_repair_task_title(assignment["title"])
         elif action == "send-scope-revision":
             result["repair_id"] = operation_repair_id
@@ -2664,7 +2772,7 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
         field_constraints["observed_state"] = {
             "allowed_values": ["active", "idle"],
         }
-    elif status == "succeeded" and action == "archive-worker":
+    elif status == "succeeded" and action in {"archive-worker", "archive-scope-repair-task"}:
         field_constraints["observed_state"] = {
             "allowed_values": ["archived", "completed"],
         }
@@ -2850,12 +2958,10 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
             or operation["contract_generation"] != assignment["contract_generation"]
             or observed["project_id"] != assignment["project_id"]
             or observed["observed_state"] not in {"active", "idle"}
-            or observed["observed_title"]
-            != scope_repair_task_title(assignment["title"])
         ):
             raise StateError(
                 "scope-repair-planner-drift",
-                "planner task readback differs from the blocked assignment",
+                "planner task identity or state differs from the blocked assignment",
                 4,
             )
         collision = connection.execute(
@@ -2878,6 +2984,37 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "planner task is already bound to another runtime subject",
                 4,
             )
+    elif action == "set-worker-title":
+        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
+        if (
+            assignment["state"] != "worker-created"
+            or observed["thread_id"] != assignment["thread_id"]
+        ):
+            raise StateError(
+                "worker-identity-drift",
+                "worker title readback belongs to another or unavailable worker",
+                4,
+            )
+    elif action == "set-scope-repair-title":
+        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
+        planner = connection.execute(
+            """SELECT thread_id FROM app_operations
+               WHERE run_id=? AND assignment_id=?
+                 AND action='create-scope-repair-task'
+                 AND scope_repair_id=? AND status='succeeded'
+               ORDER BY sequence DESC LIMIT 1""",
+            (run["run_id"], assignment["assignment_id"], assignment["scope_repair_id"]),
+        ).fetchone()
+        if (
+            assignment["state"] != "blocked-scope-repair"
+            or planner is None
+            or observed["thread_id"] != planner["thread_id"]
+        ):
+            raise StateError(
+                "scope-repair-planner-drift",
+                "scope-repair title readback belongs to another or unavailable planner task",
+                4,
+            )
     elif action == "set-root-title":
         assignment_count = connection.execute(
             "SELECT COUNT(*) FROM assignments WHERE run_id=?",
@@ -2889,16 +3026,18 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:
             raise StateError("worker-identity-drift", "bootstrap receipt belongs to another worker", 4)
-        created = connection.execute(
+        titled = connection.execute(
             """SELECT observed_title FROM app_operations
                WHERE run_id=? AND assignment_id=?
-                 AND action='create-worker' AND status='succeeded'""",
-            (run["run_id"], assignment["assignment_id"]),
+                 AND action='set-worker-title' AND thread_id=?
+                 AND status='succeeded'
+               ORDER BY sequence DESC LIMIT 1""",
+            (run["run_id"], assignment["assignment_id"], assignment["thread_id"]),
         ).fetchone()
-        if created is None or created["observed_title"] != assignment["title"]:
+        if titled is None or titled["observed_title"] != assignment["title"]:
             raise StateError(
                 "worker-title-not-verified",
-                "bootstrap requires atomic worker creation with verified title readback",
+                "bootstrap requires a separately recorded title initialization with verified readback",
                 4,
             )
         updated = connection.execute(
@@ -3027,6 +3166,26 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
                 "archive state changed before guarded update",
                 4,
             )
+    elif action == "archive-scope-repair-task":
+        assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
+        planner = connection.execute(
+            """SELECT thread_id FROM app_operations
+               WHERE run_id=? AND assignment_id=?
+                 AND action='create-scope-repair-task' AND status='succeeded'
+               ORDER BY sequence DESC LIMIT 1""",
+            (run["run_id"], assignment["assignment_id"]),
+        ).fetchone()
+        if (
+            assignment["state"] != "blocked-scope-repair"
+            or observed["observed_state"] not in {"archived", "completed"}
+            or planner is None
+            or observed["thread_id"] != planner["thread_id"]
+        ):
+            raise StateError(
+                "scope-repair-planner-identity-drift",
+                "archive readback is not terminal for the exact scope-repair planner task",
+                4,
+            )
 
 
 def app_operation_replay_authorized(
@@ -3047,16 +3206,31 @@ def app_operation_effect_warning(
     operation: sqlite3.Row,
     observed: dict[str, Any],
 ) -> str | None:
-    if operation["action"] != "create-worker" or observed["status"] != "succeeded":
+    if operation["action"] not in {"set-worker-title", "set-scope-repair-title"} or observed["status"] != "succeeded":
         return None
     assignment = get_assignment(
         connection,
         run["run_id"],
         operation["assignment_id"],
     )
-    if observed.get("observed_title") != assignment["title"]:
-        return "worker-title-drift"
+    expected_title = (
+        assignment["title"]
+        if operation["action"] == "set-worker-title"
+        else scope_repair_task_title(assignment["title"])
+    )
+    if observed.get("observed_title") != expected_title:
+        return (
+            "worker-title-drift"
+            if operation["action"] == "set-worker-title"
+            else "scope-repair-title-drift"
+        )
     return None
+
+
+def app_operation_cleanup_action(action: str) -> str:
+    if action == "set-scope-repair-title":
+        return "archive-scope-repair-task"
+    return "archive-worker"
 
 
 def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
@@ -3136,7 +3310,9 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
                 }
                 if effect_warning:
                     result["effect_warning"] = effect_warning
-                    result["cleanup_required"] = "archive-worker"
+                    result["cleanup_required"] = app_operation_cleanup_action(
+                        operation["action"]
+                    )
                 return result
         require_revision(run, args.expected_revision)
         if terminal_or_reconciled:
@@ -3204,7 +3380,9 @@ def command_app_operation_finish(args: argparse.Namespace) -> dict[str, Any]:
         }
         if effect_warning:
             result["effect_warning"] = effect_warning
-            result["cleanup_required"] = "archive-worker"
+            result["cleanup_required"] = app_operation_cleanup_action(
+                operation["action"]
+            )
         return result
     except Exception:
         connection.rollback()
@@ -3305,6 +3483,20 @@ def command_app_operation_replay(args: argparse.Namespace) -> dict[str, Any]:
                 operation["assignment_id"],
             )
             result["expected_title"] = scope_repair_task_title(assignment["title"])
+        elif action == "set-worker-title":
+            assignment = get_assignment(
+                connection,
+                run_id,
+                operation["assignment_id"],
+            )
+            result["expected_title"] = assignment["title"]
+        elif action == "set-scope-repair-title":
+            assignment = get_assignment(
+                connection,
+                run_id,
+                operation["assignment_id"],
+            )
+            result["expected_title"] = scope_repair_task_title(assignment["title"])
         elif action == "send-scope-revision":
             result["repair_id"] = operation["scope_repair_id"]
             result["contract_generation"] = operation["contract_generation"]
@@ -3328,6 +3520,20 @@ def app_operation_projection(
     if value["action"] == "send-bootstrap":
         value["bootstrap_id"] = bootstrap_id_for(value["operation_id"])
     elif value["action"] == "create-scope-repair-task":
+        assignment = get_assignment(
+            connection,
+            value["run_id"],
+            value["assignment_id"],
+        )
+        value["expected_title"] = scope_repair_task_title(assignment["title"])
+    elif value["action"] == "set-worker-title":
+        assignment = get_assignment(
+            connection,
+            value["run_id"],
+            value["assignment_id"],
+        )
+        value["expected_title"] = assignment["title"]
+    elif value["action"] == "set-scope-repair-title":
         assignment = get_assignment(
             connection,
             value["run_id"],

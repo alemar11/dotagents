@@ -36,12 +36,16 @@ If root was interrupted after requesting a visible worker but before recording
 the result, read the ChatGPT App task list and the candidate Codex task. Verify
 its stable task ID, selected project, checkout directory, Git common directory,
 and current state. If the exact worker exists, finish the already recorded
-operation and reuse it. If authoritative evidence proves no task was created,
-finish that launch as `failed` with its `readback_ref`; the resulting
-`replay_authorized=true` permits `app-operation replay` with the same
-`operation_id` and incremented `launch_count`. Ambiguous evidence stays
-`unknown`, is not replayable for worker creation, and forbids a duplicate
-worker.
+`create-worker` operation and reuse it. Then reconcile the separately recorded
+`set-worker-title` operation: call `set_thread_title` only for its authorized
+launch, read back the exact title, and bootstrap only after that operation is
+verified. If the exact worker exists but title initialization did not happen,
+do not treat the creation prompt or an incidental title as sufficient evidence.
+If authoritative evidence proves no task was created, finish that launch as
+`failed` with its `readback_ref`; the resulting `replay_authorized=true` permits
+`app-operation replay` with the same `operation_id` and incremented
+`launch_count`. Ambiguous evidence stays `unknown`, is not replayable for
+worker creation, and forbids a duplicate worker.
 
 ### A message may already have been sent
 
