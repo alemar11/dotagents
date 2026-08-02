@@ -191,17 +191,17 @@ implementation head branch is exclusive.
 The root creates each worker as a visible Codex task with
 `environment=worktree`, `model=gpt-5.6-sol`, and the assignment's resolved
 `thinking=medium|high|xhigh`. Before calling it, root inspects the live
-declaration and passes only verified fields. This protocol does not depend on
-an optional creation-time title: it records `set-worker-title` separately and
-does not treat the preparation prompt as title evidence. The ChatGPT App creates
-the worktree and assigns it to that task. Root verifies the task, checkout
-directory, Git common directory, and literal `active|idle` state in the
-`create-worker` observation, then records `set-worker-title`, calls
-`set_thread_title` with the exact canonical title and only the arguments exposed
-by the inspected declaration, and independently verifies the title before
-bootstrap. This is the normal title
-initialization sequence, not a fallback or a later progress rename. Root never
-runs `git worktree add`.
+declaration and passes only verified fields. When the declaration exposes a
+`title` field, root passes the exact canonical worker title in the creation
+call. The ChatGPT App creates the worktree and assigns it to that task. Root
+independently reads the created task and verifies the task, checkout directory,
+Git common directory, literal `active|idle` state, and exact title in the
+`create-worker` observation. If creation does not yield the exact title, root
+records `set-worker-title`, calls `set_thread_title` exactly once with the real
+task ID, exact canonical title, and only the arguments exposed by the inspected
+declaration, then independently verifies the title again before bootstrap.
+This is a creation-first title initialization sequence; the separate operation
+is a fallback, not a later progress rename. Root never runs `git worktree add`.
 
 SQLite keeps only checkout identity and typed task readback needed for
 coordination, not the worker's technical contents or task profile. The

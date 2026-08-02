@@ -53,11 +53,29 @@ title with one relevant leading emoji, and leave the calling task unchanged.
    - For work with no repository context, use a `projectless` target.
    - If repository-backed work has no unique saved-project match, stop and
      report the mismatch. Do not create a projectless substitute.
-6. Call `create_thread` with the compact handoff as its prompt. Omit `model` and
-   `thinking` so the user's configured defaults apply.
-7. When creation returns a real `threadId`, call `set_thread_title` with that
-   ID and the chosen title. Never rename the calling task.
-8. Return the exact title and the App's native created-task link or card.
+6. Before any task mutation, inspect the live declarations for `list_projects`,
+   `create_thread`, `set_thread_title`, and the `read_thread` or `list_threads`
+   operation that will provide title readback. Pass only fields exposed by
+   those declarations. If a required operation or argument is unavailable or
+   unverifiable, stop before creation and report `unsupported-runtime`.
+7. Call `create_thread` with the compact handoff as its prompt. Omit `model` and
+   `thinking` so the user's configured defaults apply. When the inspected
+   declaration exposes `title`, pass the chosen title in that creation call;
+   otherwise omit it and use the verified fallback below. Do not rely on a
+   creation response or prompt text as visible-title evidence. If creation
+   returns only a client-side identifier, report the setup as pending and do
+   not attempt to title the task.
+8. When creation returns a real `threadId`, independently read or list the
+   created task. If its observed title exactly matches the requested title,
+   keep that creation-time result and do not rename the task. If the title is
+   missing or different, call `set_thread_title` exactly once with that ID and
+   the chosen title, plus only fields exposed by its live declaration, then
+   independently read or list the task again. Never rename the calling task.
+9. Treat missing final readback as `title-setup-failed` and a different or
+   normalized final title as `title-drift`; preserve the created task and
+   report the partial result. Declare completion only after the exact title is
+   observed, then return the observed title and the App's native created-task
+   link or card.
 
 If several topics remain active, choose the most recently discussed unresolved
 outcome. Do not copy the full conversation, browse, inspect repository files,
@@ -72,5 +90,6 @@ or ask a clarifying question before creation.
 - Do not send a second follow-up message to the new task after creation.
 - Treat the title as display metadata only. Never use it as task identity,
   durable state, a branch name, or a recovery key.
-- If creation or renaming fails, report the partial result accurately and do
-  not claim the intended final state.
+- If creation, title initialization, or independent title verification fails,
+  report the partial result accurately and do not claim the intended final
+  state.

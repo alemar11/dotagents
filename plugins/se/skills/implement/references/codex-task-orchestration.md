@@ -52,23 +52,25 @@ Use the current ChatGPT App tool declarations as the runtime capability
 contract. Inspect the exact signatures of `codex_app__create_thread`,
 `codex_app__set_thread_title`, and `codex_app__set_thread_archived` before any
 startup mutation, and pass only fields present in those declarations. The
-creation declaration may expose an optional `title`; this protocol intentionally
-keeps canonical title initialization in its separately recorded title operation,
-so it must not claim that `title` is unsupported or add it without verification.
-The title operation must use the real `threadId`, the requested `title`, and no
-other field unless the inspected declaration explicitly exposes it. The
-cleanup operation is likewise valid only with its declared fields. If title
-initialization, cleanup, or any required argument is unavailable or unverifiable,
-stop as `unsupported-runtime` before beginning a task operation or creating any
-task.
+creation declaration may expose an optional `title`; pass the canonical title
+in the creation call when that exact field is exposed. Do not claim that
+`title` is unsupported or add it without verification.
+Independently read or list the created task after the creation call. If creation
+did not set the exact title, use the separately recorded `set_thread_title`
+operation exactly once as the fallback, with the real `threadId`, requested
+`title`, and no other field unless the inspected declaration explicitly exposes
+it. Read or list the task again after the fallback. The cleanup operation is
+likewise valid only with its declared fields. If the title creation/fallback
+path, cleanup, or any required argument is unavailable or unverifiable, stop as
+`unsupported-runtime` before beginning a task operation or creating any task.
 A `create_thread` response is usable only when it yields or can be reconciled
 to the real `threadId`; a client-only identifier is not sufficient for title
 initialization or bootstrap.
 
-The title mutation below is the normal initialization step immediately after
-creation. The prompt is never title evidence, and a `create_thread` response is
-not evidence that an undocumented field was accepted. Do not pass undocumented
-fields to any App operation.
+The title check below is the normal readback immediately after creation. The
+prompt is never title evidence, and a `create_thread` response is not evidence
+that an undocumented field was accepted. Do not pass undocumented fields to
+any App operation.
 
 ## Root Title And Worker Creation
 
@@ -86,22 +88,22 @@ After at least one assignment owns its Feature Spec and head-branch claim:
 2. For each claimed assignment allowed by path and dependency serialization,
    create one visible Codex worker task with `environment=worktree` in the
    selected local Git project in the ChatGPT App. Pass
-   `model=gpt-5.6-sol` and the assignment's resolved
-   `thinking=medium|high|xhigh` from `task-model-policy.md`. Keep the canonical
-   title in the separately recorded title operation; if the implementation ever
-   passes `title` at creation, do so only after verifying that exact argument in
-   the live declaration. Use this exact no-authority
+   `model=gpt-5.6-sol`, the assignment's resolved
+   `thinking=medium|high|xhigh` from `task-model-policy.md`, and the canonical
+   worker `title` when the live declaration exposes it. Use this exact
+   no-authority
    preparation prompt: `This visible task is being prepared as an Implement
    Feature worker. Do not inspect, edit, branch, test, publish, or mutate
    anything yet. Wait for the controller's full bootstrap envelope.` Do not
    impose a numeric worker limit. The ChatGPT App creates the worktree and
    assigns it to the task; root never runs `git worktree add`.
 3. Independently verify the stable task ID, checkout directory, Git common
-   directory, and literal task state `active|idle` in the `create-worker`
-   observation. The initial title is not part of the creation proof. Both task
-   states mean that the exact task binding exists, not that implementation
-   progress has begun.
-4. Begin `set-worker-title` for the recorded worker, call
+   directory, literal task state `active|idle`, and the requested title when
+   the title is returned in the `create-worker` observation. Both task states
+   mean that the exact task binding exists, not that implementation progress
+   has begun.
+4. If the creation readback does not confirm the exact canonical title, begin
+   `set-worker-title` for the recorded worker, call
    `codex_app__set_thread_title` exactly once with the recorded `threadId` and
    exact canonical title, using no additional field unless the live declaration
    exposes it, and independently read back that exact title before finishing the

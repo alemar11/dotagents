@@ -1,13 +1,14 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.1.0` implements runtime contract
+uses the shipped artifact. CLI release `1.1.1` implements runtime contract
 `1.0.0` over database schema `1`. This is a fresh local baseline after an
 explicit run-state reset; manifests and databases from the previous contract
-epoch are not migrated. Worker creation records the task
-binding first; title initialization is a separate recorded
-`set-worker-title` operation using the App's `set_thread_title` API and an
-independent readback. Externally owned scope repair and contract generations remain in
+epoch are not migrated. Worker creation records the task binding first and may
+include an independently read-back creation title. When creation does not set
+the exact title, the separate recorded `set-worker-title` operation uses the
+App's `set_thread_title` API and an independent readback as the fallback.
+Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
 runtime does not add per-file claims. The
 controller's saved project remains explicit control-plane identity, each
@@ -19,7 +20,7 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `1.1.0` | User-facing commands and executable behavior |
+| CLI | `1.1.1` | User-facing commands and executable behavior |
 | Runtime contract | `1.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
@@ -288,10 +289,12 @@ The builder derives `bootstrap_id`; for `send-scope-revision` it derives
 `scope_revision_id` and `contract_generation`.
 
 For a successful `create-worker`, `observed_state` is the literal Codex task
-state and accepts `active` or `idle`; creation does not require or infer a
-title. `set-worker-title` carries the exact task ID and independently observed
-title after the App's `set_thread_title` call. Exact expected-title equality
-permits bootstrap. A missing or different title still records the truthful
+state and accepts `active` or `idle`; `observed_title` is optional and, when
+present, is the independently read-back creation title. `set-worker-title`
+carries the exact task ID and independently observed title after the App's
+`set_thread_title` fallback call. The latest successful creation or fallback
+title readback must exactly equal the expected title before bootstrap or
+archival. A missing or different final title still records the truthful
 successful title effect, but `finish` returns
 `effect_warning=worker-title-drift` and `cleanup_required=archive-worker`;
 bootstrap is rejected so root can archive the pre-bootstrap task. Successful
@@ -306,7 +309,9 @@ reach a terminal delivery or abandoned state and the mixed run finishes as
 it accepts `archived` or
 `completed`. The template exposes these closed values under
 `field_constraints`, so callers do not infer them from the UI label.
-`create-scope-repair-task` likewise accepts only `active|idle`.
+`create-scope-repair-task` likewise accepts only `active|idle` and may carry an
+optional independently read-back `observed_title`; its title follows the same
+creation-first, fallback-second rule before scope revision.
 
 Both ready-observation commands require
 `--readiness-mode terminal|peer-input`; the selected value is stored in the
@@ -335,9 +340,11 @@ Every result authorizes only its reported generation.
 
 `create-scope-repair-task` binds the assignment's current repair ID and contract
 generation and returns the exact expected planner title
-`🧭 Scope Repair · <Feature Spec title>`. `set-scope-repair-title` initializes
-that title through `set_thread_title`; `send-scope-revision` consumes the
-planner task only after the title readback is exact. A planner title mismatch
+`🧭 Scope Repair · <Feature Spec title>`. Creation may record an exact
+independent title readback; if it does not, `set-scope-repair-title` initializes
+that title through `set_thread_title` as the fallback. `send-scope-revision`
+consumes the planner task only after the latest title readback is exact. A
+planner title mismatch
 returns `effect_warning=scope-repair-title-drift` and
 `cleanup_required=archive-scope-repair-task`. `send-scope-revision` stores the
 next generation and derives a stable `scope_revision_id` from the operation ID
@@ -355,8 +362,8 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 
 | Action | Additional fields |
 | --- | --- |
-| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state` |
-| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state` |
+| `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state`; optional `observed_title` |
+| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`; optional `observed_title` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
 | `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
@@ -564,7 +571,7 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` is `1.1.0`,
+or build output. `CLI_VERSION` is `1.1.1`,
 `RUNTIME_CONTRACT_VERSION` is `1.0.0`;
 `DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,

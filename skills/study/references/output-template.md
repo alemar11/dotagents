@@ -6,7 +6,7 @@
 - **Shared run tag:** `[<run-tag>]`
 - **Requested orchestrator title:** `Study: [<run-tag>] <short title>`
 - **Observed orchestrator title:** `<observed title or unavailable>`
-- **Title initialization receipt:** `<set_thread_title receipt or unavailable>`
+- **Title creation/fallback receipt:** `<create_thread title readback and, if used, set_thread_title receipt>`
 - **Title evidence source:** `<independent read/list/unavailable>`
 - **Orchestrator thread ID:** `<thread ID>`
 - **Host/project/environment:** `<host ID / project ID and path / local>`
@@ -78,7 +78,7 @@ preview.
 
 ## Task telemetry ledger
 
-| Task | Requested title | Title initialization receipt | Observed title and source | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
+| Task | Requested title | Title creation/fallback receipt | Observed title and source | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Orchestrator |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | not-requested | not-applicable |
 | Worker N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |

@@ -161,16 +161,18 @@ Choose one visual `run_tag` before the orchestrator is created:
 - The live `codex_app__create_thread` declaration may expose an optional
   `title` parameter. Inspect the declaration before creating any task and pass
   only fields it exposes; do not infer title support from an older contract.
-  Study intentionally keeps canonical title initialization in the separate
-  `codex_app__set_thread_title` operation, so neither a creation response nor a
-  title embedded in the prompt is visible-title evidence.
-- After a real `threadId` is returned, initialize the title exactly once with
-  `codex_app__set_thread_title`, passing the requested title and only the
-  arguments exposed by its live declaration. The currently verified operation
-  accepts `threadId` and `title`; do not add the returned `hostId` to that call.
-  This is immediate title initialization, not a later progress rename.
-  Independently read or list the task and record the request receipt, observed
-  title, and evidence source before continuing.
+  When `title` is exposed, pass the canonical title in the creation call. Do
+  not treat the creation response or a title embedded in the prompt as
+  visible-title evidence.
+- After a real `threadId` is returned, independently read or list the task. If
+  the observed title exactly matches the requested title, keep the
+  creation-time result and do not rename the task. If the title is missing or
+  different, call `codex_app__set_thread_title` exactly once as the fallback,
+  passing the requested title and only the arguments exposed by its live
+  declaration. Independently read or list the task again and record the
+  creation receipt, any fallback receipt, observed title, and evidence source
+  before continuing. If `create_thread` does not expose `title`, use this
+  verified fallback path after the real task ID exists.
 - Never rename a task again to repair drift. If title initialization fails,
   independent verification is unavailable, or the observed title differs,
   preserve the task identity, report `title-setup-failed` or `title-drift`,
@@ -211,15 +213,18 @@ Choose one visual `run_tag` before the orchestrator is created:
    target: the resolved parent project with environment.type=local
    model: gpt-5.6-sol
    thinking: medium
+   title: Study: [<run-tag>] <short title> when exposed by the live declaration
    prompt: the complete read-only handoff plus the orchestrator protocol
    ```
 
    `model` and `thinking` are optional in the App API, but they are mandatory
    for Study. Treat the explicit `$study` invocation as authorization for
    these fixed Study settings; never omit them and never inherit the calling
-   task's model or reasoning. After the real `threadId` is available, set and
-   independently verify `Study: [<run-tag>] <short title>` exactly as required
-   above. Do not create workers until the orchestrator title is verified.
+   task's model or reasoning. After the real `threadId` is available, read or
+   list the task and independently verify `Study: [<run-tag>] <short title>`.
+   If creation did not set that exact title, call the verified
+   `codex_app__set_thread_title` fallback exactly once and verify it again. Do
+   not create workers until the orchestrator title is verified.
    The creation request proves only the requested settings. Compare active
    model and reasoning telemetry independently when the App exposes it; if it
    differs, report `settings-drift` and stop before creating workers. If it is
@@ -280,16 +285,18 @@ The orchestrator must execute the following protocol from its initial prompt:
    target: the exact same projectId and environment.type=local as the parent
    model: gpt-5.6-luna
    thinking: max
+   title: Worker N: [<run-tag>] <short title> when exposed by the live declaration
    prompt: the complete read-only assignment and the worker protocol below
    ```
 
    Never omit `model` or `thinking` and never rely on the orchestrator's
-   settings being inherited. After each real `threadId` is returned, call
-   `codex_app__set_thread_title` exactly once for
-   `Worker N: [<run-tag>] <short title>` and independently verify the observed
-   title before treating that worker as configured. Do not use the prompt as
-   title evidence. Compare active model and reasoning telemetry when exposed;
-   record `settings-drift` for any mismatch and do not create a replacement.
+   settings being inherited. After each real `threadId` is returned, read or
+   list the task and independently verify `Worker N: [<run-tag>] <short title>`.
+   If creation did not set that exact title, call the verified
+   `codex_app__set_thread_title` fallback exactly once and verify it again
+   before treating that worker as configured. Do not use the prompt as title
+   evidence. Compare active model and reasoning telemetry when exposed; record
+   `settings-drift` for any mismatch and do not create a replacement.
 
    Do not use `multi_agent_v1__spawn_agent`, a CLI process, a worktree, or a
    different project as a substitute for a visible worker task.
@@ -519,10 +526,13 @@ no-side-effect rule. Apply this availability matrix before and during a run:
 - `send_message_to_thread` is optional when the parent task ID is unavailable
   or monitoring already exposes milestones; report that direct messaging was
   not exercised.
-- `set_thread_title` is required immediately after every real task creation.
-  If it is unavailable or the independent readback does not confirm the exact
-  requested title, preserve the task identity, stop orchestrator setup before
-  creating workers, or mark the affected worker slot
+- `create_thread.title` is preferred for every task when the live declaration
+  exposes it. After creation, independently verify the exact requested title.
+  If creation did not set it, use `set_thread_title` exactly once as the
+  fallback, with only its live-declared arguments, and verify the title again.
+  If the fallback is unavailable or the final independent readback does not
+  confirm the exact requested title, preserve the task identity, stop
+  orchestrator setup before creating workers, or mark the affected worker slot
   `title-setup-failed`; never repair the mismatch by creating a replacement.
 - `list_threads` is optional except for explicit client-ID reconciliation. A
   missing tool makes the reserved slot `unresolved-setup` as described above.

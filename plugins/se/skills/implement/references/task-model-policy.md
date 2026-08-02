@@ -25,12 +25,14 @@ Before startup authorization, verify that the destination Codex host supports
 `gpt-5.6-sol` with all three allowed thinking values from the discovered
 `create_thread` tool contract or another read-only host capability surface. The
 inspection must also verify the exact fields available for title initialization.
-This protocol keeps that initialization in the separately recorded
-`set_thread_title` operation; an optional `create_thread.title` field may be
-present, but must never be assumed or passed without checking the live
-declaration. Do not call `create_thread` as a probe: it creates a visible task
-and worktree. If model, thinking, title initialization, or any required
-argument is absent or unverifiable from read-only capability evidence, stop as
+When the live declaration exposes `create_thread.title`, pass the canonical
+worker title in the creation call and independently read it back. If creation
+does not yield the exact title, use the verified `set_thread_title` operation
+once as the fallback and read the title back again. If `create_thread.title` is
+absent, use that same verified fallback after a real task ID exists. Do not call
+`create_thread` as a probe: it creates a visible task and worktree. If model,
+thinking, the title creation/fallback path, or any required argument is absent
+or unverifiable from read-only capability evidence, stop as
 `unsupported-runtime` before run state, claims, tasks, or worktrees.
 
 The startup disclosure names this exact model and adaptive thinking policy.

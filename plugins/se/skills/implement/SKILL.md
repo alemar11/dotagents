@@ -213,11 +213,13 @@ more Feature Specs. A discovery-only request never enters this flow.
    Before any task mutation, inspect the live Codex App declarations for every
    operation used by this flow and verify every argument that will be passed.
    Do not infer support from a previous runtime or from prompt text. This
-   protocol records title initialization separately: use `title` in
-   `create_thread` only when the inspected declaration and protocol permit it;
-   otherwise omit it and use the verified `set_thread_title` operation after a
-   real task ID exists. Missing or unverifiable operations or arguments stop
-   the run as `unsupported-runtime` before any task mutation.
+   Prefer `title` in every `create_thread` call when the inspected declaration
+   exposes that field, then independently read back the created title. If
+   creation does not yield the exact requested title, use the verified
+   `set_thread_title` operation exactly once after a real task ID exists and
+   independently read it back again. If `create_thread.title` is absent, use
+   that same verified fallback path. Missing or unverifiable operations or
+   arguments stop the run as `unsupported-runtime` before any task mutation.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Prepare shared run state through read-only `capabilities` and `doctor`, then

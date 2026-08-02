@@ -47,11 +47,13 @@ one automatic repair is allowed per assignment. A second scope miss returns
 4. Record and execute
    `create-scope-repair-task`. Create one separate visible Codex task in the
    assignment's saved repository project without a worktree. Inspect the live
-   `create_thread` declaration and pass only its verified fields; do not use the
-   prompt as title evidence. Then record `set-scope-repair-title`, call
-   `set_thread_title` with the exact title `🧭 Scope Repair · <Feature Spec title>`
-   and only the arguments exposed by its inspected declaration, and independently
-   verify that readback before invoking
+   `create_thread` declaration and pass only its verified fields, including the
+   exact title `🧭 Scope Repair · <Feature Spec title>` when `title` is exposed;
+   do not use the prompt as title evidence. Independently verify the created
+   title. If creation did not set the exact title, record and execute
+   `set-scope-repair-title`, call `set_thread_title` exactly once with the exact
+   title and only the arguments exposed by its inspected declaration, and
+   independently verify that readback before invoking
 `$se:feature` as the separate Feature task against the authoritative
    `source_spec_ref` and
    implementation issue using only this portable packet:

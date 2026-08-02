@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "1.1.0"
+CLI_VERSION = "1.1.1"
 RUNTIME_CONTRACT_VERSION = "1.0.0"
 DATABASE_SCHEMA_VERSION = 1
 SQLITE_BUSY_TIMEOUT_MS = 5_000
@@ -159,6 +159,10 @@ APP_OPERATION_FIELDS_BY_ACTION = {
     "set-root-title": {"observed_title"},
     "archive-worker": {"thread_id", "checkout_path", "observed_state"},
     "archive-scope-repair-task": {"thread_id", "observed_state"},
+}
+APP_OPERATION_OPTIONAL_FIELDS_BY_ACTION = {
+    "create-worker": {"observed_title"},
+    "create-scope-repair-task": {"observed_title"},
 }
 READY_COMMON_FIELDS = {
     "schema",
@@ -2165,6 +2169,31 @@ def command_claim_find(args: argparse.Namespace) -> dict[str, Any]:
         connection.close()
 
 
+def latest_verified_task_title(
+    connection: sqlite3.Connection,
+    run_id: str,
+    assignment_id: str,
+    thread_id: str,
+    expected_title: str,
+    creation_action: str,
+    fallback_action: str,
+) -> bool:
+    row = connection.execute(
+        """SELECT status,observed_title FROM app_operations
+           WHERE run_id=? AND assignment_id=? AND thread_id=?
+             AND action IN (?,?)
+           ORDER BY sequence DESC LIMIT 1""",
+        (
+            run_id,
+            assignment_id,
+            thread_id,
+            creation_action,
+            fallback_action,
+        ),
+    ).fetchone()
+    return row is not None and row["status"] == "succeeded" and row["observed_title"] == expected_title
+
+
 def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action: str, subject_id: str) -> str | None:
     if action not in APP_ACTIONS:
         raise StateError("invalid-app-action", f"unsupported Codex task action: {action}")
@@ -2253,18 +2282,18 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
         elif action == "send-bootstrap":
             if assignment["state"] != "worker-created":
                 raise StateError("invalid-assignment-transition", "bootstrap requires a created worker", 4)
-            created = connection.execute(
-                """SELECT observed_title FROM app_operations
-                   WHERE run_id=? AND assignment_id=?
-                     AND action='set-worker-title' AND thread_id=?
-                     AND status='succeeded'
-                   ORDER BY sequence DESC LIMIT 1""",
-                (run["run_id"], assignment_id, assignment["thread_id"]),
-            ).fetchone()
-            if created is None or created["observed_title"] != assignment["title"]:
+            if not latest_verified_task_title(
+                connection,
+                run["run_id"],
+                assignment_id,
+                assignment["thread_id"],
+                assignment["title"],
+                "create-worker",
+                "set-worker-title",
+            ):
                 raise StateError(
                     "worker-title-not-verified",
-                    "bootstrap requires a separately recorded title initialization with verified readback",
+                    "bootstrap requires an exact creation title readback or a verified fallback title operation",
                     4,
                 )
         elif action == "send-scope-revision":
@@ -2300,29 +2329,41 @@ def validate_app_begin(connection: sqlite3.Connection, run: sqlite3.Row, action:
                     "archive requires proof that bootstrap was never delivered",
                     4,
                 )
-            title = connection.execute(
-                """SELECT status FROM app_operations
-                   WHERE run_id=? AND assignment_id=? AND action='set-worker-title'
-                   ORDER BY sequence DESC LIMIT 1""",
-                (run["run_id"], assignment_id),
-            ).fetchone()
-            if title is None or title["status"] in {"pending", "unknown"}:
+            if not latest_verified_task_title(
+                connection,
+                run["run_id"],
+                assignment_id,
+                assignment["thread_id"],
+                assignment["title"],
+                "create-worker",
+                "set-worker-title",
+            ):
                 raise StateError(
                     "title-reconciliation-required",
-                    "archive requires reconciliation of worker title initialization",
+                    "archive requires an exact creation title readback or verified fallback title operation",
                     4,
                 )
         elif action == "archive-scope-repair-task":
-            title = connection.execute(
-                """SELECT status FROM app_operations
-                   WHERE run_id=? AND assignment_id=? AND action='set-scope-repair-title'
+            planner = connection.execute(
+                """SELECT thread_id FROM app_operations
+                   WHERE run_id=? AND assignment_id=?
+                     AND action='create-scope-repair-task'
+                     AND scope_repair_id=? AND status='succeeded'
                    ORDER BY sequence DESC LIMIT 1""",
-                (run["run_id"], assignment_id),
+                (run["run_id"], assignment_id, assignment["scope_repair_id"]),
             ).fetchone()
-            if title is None or title["status"] in {"pending", "unknown"}:
+            if planner is None or not latest_verified_task_title(
+                connection,
+                run["run_id"],
+                assignment_id,
+                planner["thread_id"],
+                scope_repair_task_title(assignment["title"]),
+                "create-scope-repair-task",
+                "set-scope-repair-title",
+            ):
                 raise StateError(
                     "title-reconciliation-required",
-                    "archive requires reconciliation of scope-repair title initialization",
+                    "archive requires an exact creation title readback or verified scope-repair fallback title operation",
                     4,
                 )
     elif subject_id != run["root_task_id"]:
@@ -2436,22 +2477,18 @@ def validate_scope_repair_observation(
             "scope revision requires the successful recorded planner task",
             4,
         )
-    planner_title = connection.execute(
-        """SELECT observed_title FROM app_operations
-           WHERE run_id=? AND assignment_id=?
-             AND action='set-scope-repair-title'
-             AND thread_id=? AND status='succeeded'
-           ORDER BY sequence DESC LIMIT 1""",
-        (
-            assignment["run_id"],
-            assignment["assignment_id"],
-            normalized["planning_thread_id"],
-        ),
-    ).fetchone()
-    if planner_title is None or planner_title["observed_title"] != scope_repair_task_title(assignment["title"]):
+    if not latest_verified_task_title(
+        connection,
+        assignment["run_id"],
+        assignment["assignment_id"],
+        normalized["planning_thread_id"],
+        scope_repair_task_title(assignment["title"]),
+        "create-scope-repair-task",
+        "set-scope-repair-title",
+    ):
         raise StateError(
             "scope-repair-title-not-verified",
-            "scope revision requires the planner title initialization with verified readback",
+            "scope revision requires an exact creation title readback or verified fallback title operation",
             4,
         )
     return normalized
@@ -2620,22 +2657,26 @@ def validate_operation_observation(operation: sqlite3.Row, value: dict[str, Any]
             "observation status must be unknown, succeeded, or failed",
         )
     expected_extra = APP_OPERATION_FIELDS_BY_ACTION[operation["action"]]
+    optional_extra = APP_OPERATION_OPTIONAL_FIELDS_BY_ACTION.get(operation["action"], set())
     actual_extra = set(value) - APP_OPERATION_COMMON_FIELDS
     if value["status"] == "succeeded":
-        exact_keys(
-            value,
-            APP_OPERATION_COMMON_FIELDS
-            | APP_OPERATION_RECONCILIATION_FIELDS
-            | expected_extra,
-            "Codex operation observation",
-        )
+        required_keys = APP_OPERATION_COMMON_FIELDS | APP_OPERATION_RECONCILIATION_FIELDS | expected_extra
+        allowed_keys = required_keys | optional_extra
+        missing = required_keys - set(value)
+        extra = set(value) - allowed_keys
+        if missing or extra:
+            raise StateError(
+                "invalid-input",
+                "Codex operation observation keys mismatch; "
+                f"missing={sorted(missing)}, extra={sorted(extra)}",
+            )
     elif not actual_extra.issubset(
-        APP_OPERATION_RECONCILIATION_FIELDS | expected_extra
+        APP_OPERATION_RECONCILIATION_FIELDS | expected_extra | optional_extra
     ):
         raise StateError(
             "invalid-input",
             "Codex operation observation has unsupported fields: "
-            f"{sorted(actual_extra - APP_OPERATION_RECONCILIATION_FIELDS - expected_extra)}",
+            f"{sorted(actual_extra - APP_OPERATION_RECONCILIATION_FIELDS - expected_extra - optional_extra)}",
         )
     if value["status"] == "failed" and "readback_ref" not in value:
         raise StateError(
@@ -2760,6 +2801,7 @@ def operation_observation_descriptor(action: str, status: str) -> dict[str, Any]
     possible_fields = (
         APP_OPERATION_RECONCILIATION_FIELDS
         | APP_OPERATION_FIELDS_BY_ACTION[action]
+        | APP_OPERATION_OPTIONAL_FIELDS_BY_ACTION.get(action, set())
     ) - set(constants)
     required = sorted(required_fields)
     optional = sorted(possible_fields - required_fields)
@@ -3026,18 +3068,18 @@ def apply_succeeded_app_effect(connection: sqlite3.Connection, run: sqlite3.Row,
         assignment = get_assignment(connection, run["run_id"], operation["assignment_id"])
         if observed["thread_id"] != assignment["thread_id"]:
             raise StateError("worker-identity-drift", "bootstrap receipt belongs to another worker", 4)
-        titled = connection.execute(
-            """SELECT observed_title FROM app_operations
-               WHERE run_id=? AND assignment_id=?
-                 AND action='set-worker-title' AND thread_id=?
-                 AND status='succeeded'
-               ORDER BY sequence DESC LIMIT 1""",
-            (run["run_id"], assignment["assignment_id"], assignment["thread_id"]),
-        ).fetchone()
-        if titled is None or titled["observed_title"] != assignment["title"]:
+        if not latest_verified_task_title(
+            connection,
+            run["run_id"],
+            assignment["assignment_id"],
+            assignment["thread_id"],
+            assignment["title"],
+            "create-worker",
+            "set-worker-title",
+        ):
             raise StateError(
                 "worker-title-not-verified",
-                "bootstrap requires a separately recorded title initialization with verified readback",
+                "bootstrap requires an exact creation title readback or a verified fallback title operation",
                 4,
             )
         updated = connection.execute(
