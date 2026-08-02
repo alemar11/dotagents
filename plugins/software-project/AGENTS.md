@@ -58,6 +58,6 @@ this file governs package ownership and maintenance.
 
 - Validate the manifest with the plugin validator.
 - Validate all five bundled skill metadata files with the skill validator.
-- Run the focused `plan`, `implement`, and `project-context` test suites plus
-  repository-wide stale-reference scans.
+- Run the focused `plan` and `implement` test suites plus Project Context
+  documentation/link checks and repository-wide stale-reference scans.
 - Run `git diff --check` before handoff.

@@ -170,12 +170,6 @@ workflow. Determine the narrowest repository scope, classify the destination,
 propose exact wording, wait for affirmative confirmation, handle duplicates or
 conflicts, update required indexes or pointers, and verify the final diff.
 
-The optional shipped helper
-`scripts/extract_recent_transcript.py` resolves an explicit Codex session or
-rollout path when current conversation evidence is insufficient. It is an
-accelerator, not a source of authority, and must never persist raw transcript
-content.
-
 ## AGENTS Compaction
 
 Use `references/agents-compaction.md` only for an explicit compaction request
@@ -184,15 +178,6 @@ chain deterministically, classify sections, preserve always-active invariants
 and the minimal Code Review Rules block, and propose conditional material as
 flat topic files with `Read when` pointers. Never compact automatically merely
 because a threshold is crossed.
-
-## CLI Maintenance
-
-The shipped helper lives at
-`plugins/software-project/skills/project-context/scripts/extract_recent_transcript.py`. Run it through
-that artifact, not from a temporary copy. It uses only the Python standard
-library and does not create config or caches. Validate `--help`, `--version`,
-`--json doctor`, explicit `--session-id`/`--rollout-path` resolution, stdout
-JSON, stderr diagnostics, and missing-path exit behavior.
 
 ## Reference Responsibilities
 

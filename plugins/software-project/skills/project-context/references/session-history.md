@@ -16,6 +16,10 @@ If session history is missing, unreadable, encrypted beyond useful summaries, or
 does not contain matching repo evidence, continue with repo-only evidence and
 report the limitation.
 
+Use only read-only history surfaces available in the current runtime. Do not
+require a bundled resolver or treat inability to inspect local session files as
+a bootstrap blocker.
+
 ## Matching sessions to the repo
 
 Resolve the current repository's git root first. A session matches when any of

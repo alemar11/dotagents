@@ -76,7 +76,3 @@ After authorization:
 5. scan for duplicate normative wording and run `git diff --check`;
 6. report `captured`, `deferred`, or `no-durable-change` with destinations and
    reasons separated from the knowledge data.
-
-The helper `scripts/extract_recent_transcript.py` may resolve the current
-session only when the durable candidate is not available in the current
-conversation. It supplies evidence paths, not durable content or authority.

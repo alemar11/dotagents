@@ -17,9 +17,6 @@ and routed references.
   `TRANSLATION.md`, `project-context/`, and the closest applicable
   `AGENTS.md`. This package must not invent repository paths or copy facts
   without evidence and authority.
-- `scripts/extract_recent_transcript.py` is an optional session-evidence
-  helper. It emits JSON, writes no configuration, and is not durable truth.
-
 ## Maintenance contract
 
 - The skill has no persistent configuration and no tracker, publication,
@@ -44,8 +41,5 @@ and routed references.
 ## Validation
 
 - Run focused Markdown, link, stale-vocabulary, and documentation-diff checks
-  for reference changes, plus the package tests when executable behavior
-  changes.
-- Verify the helper's JSON contract and no-write behavior when touching the
-  transcript helper. Validate context pointers, ADR indexes, and absence of
-  duplicate normative rules for surface changes.
+  for reference changes. Validate context pointers, ADR indexes, and absence
+  of duplicate normative rules for surface changes.
