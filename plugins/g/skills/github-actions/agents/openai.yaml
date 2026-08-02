@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Actions"
+  short_description: "Diagnose and fix GitHub Actions failures"
+  brand_color: "#DC2626"
+  default_prompt: "Use $g:github-actions to inspect failing GitHub Actions checks, diagnose the root cause, and implement a verified fix only when explicitly requested."

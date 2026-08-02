@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "gitstack",
+      "name": "g",
       "source": {
         "source": "local",
-        "path": "./plugins/gitstack"
+        "path": "./plugins/g"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -17,10 +17,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "software-project",
+      "name": "se",
       "source": {
         "source": "local",
-        "path": "./plugins/software-project"
+        "path": "./plugins/se"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Releases"
-  short_description: "Plan, publish, and validate GitHub releases"
-  brand_color: "#7C3AED"
-  default_prompt: "Use $gitstack:github-releases to inspect, plan, draft, publish, or validate GitHub releases, tags, notes, assets, and packages."

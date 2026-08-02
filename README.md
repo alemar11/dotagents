@@ -21,31 +21,31 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 
 ## Repo-Local Plugins
 
-GitStack is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps, and direct `git` for local repository work. It bundles:
+G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps, and direct `git` for local repository work. It bundles:
 
 | Skill | Purpose |
 | --- | --- |
-| `gitstack:github` | Handle general or mixed GitHub requests through the appropriate focused workflows. |
-| `gitstack:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
-| `gitstack:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
-| `gitstack:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
-| `gitstack:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
-| `gitstack:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
-| `gitstack:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
-| `gitstack:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
-| `gitstack:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `gitstack:send` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, link it to an existing target PR when applicable, and request a current-head Codex review. |
-| `gitstack:github-stack` | Manage stacked branches and dependent pull requests through the GitStack stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
+| `g:github` | Handle general or mixed GitHub requests through the appropriate focused workflows. |
+| `g:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
+| `g:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
+| `g:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
+| `g:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
+| `g:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
+| `g:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
+| `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
+| `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
+| `g:send` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, link it to an existing target PR when applicable, and request a current-head Codex review. |
+| `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 
-Software Project is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to GitStack:
+SE is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to G:
 
 | Skill | Purpose |
 | --- | --- |
-| `software-project:learn` | Maintain durable Project Context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
-| `software-project:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
-| `software-project:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
-| `software-project:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
-| `software-project:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
+| `se:learn` | Maintain durable Project Context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
+| `se:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
+| `se:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
+| `se:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
+| `se:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
 
 ## Reusable Skills
 
@@ -91,10 +91,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   orchestrator nor a worker may ever invoke Study or create a nested Study run.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
-- `software-project:idea` loads the plugin workflow contract and uses `$gitstack:github-issues` for exact GitHub preflight reads and Idea mutations.
-- `software-project:feature` uses the plugin's internal clarification protocol for context-backed questions and `$software-project:learn` for context or ADR routing plus implementation-closeout handoff. Feature owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$gitstack:github-issues` for exact paginated GitHub Idea and Feature-bundle convergence reads in both run modes plus published tracker mutations.
-- `software-project:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the Software Project workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/software-project/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
+- `se:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$se:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
+- `se:idea` loads the plugin workflow contract and uses `$g:github-issues` for exact GitHub preflight reads and Idea mutations.
+- `se:feature` uses the plugin's internal clarification protocol for context-backed questions and `$se:learn` for context or ADR routing plus implementation-closeout handoff. Feature owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$g:github-issues` for exact paginated GitHub Idea and Feature-bundle convergence reads in both run modes plus published tracker mutations.
+- `se:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the SE workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/se/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 
 ## Project-Local Skills
@@ -115,15 +115,15 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
-codex plugin add gitstack@alemar11
-codex plugin add software-project@alemar11
+codex plugin add g@alemar11
+codex plugin add se@alemar11
 ```
 
-If the `alemar11` marketplace is already registered, install GitStack directly:
+If the `alemar11` marketplace is already registered, install G directly:
 
 ```sh
-codex plugin add gitstack@alemar11
-codex plugin add software-project@alemar11
+codex plugin add g@alemar11
+codex plugin add se@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -131,35 +131,35 @@ of the GitHub source, then install the same plugin:
 
 ```sh
 codex plugin marketplace add /path/to/dotagents
-codex plugin add gitstack@alemar11
-codex plugin add software-project@alemar11
+codex plugin add g@alemar11
+codex plugin add se@alemar11
 ```
 
 During local development, validate the changed plugin and reinstall each
-versioned plugin from the repository source. GitStack has a dedicated helper;
-Software Project is reinstalled directly:
+versioned plugin from the repository source. G has a dedicated helper;
+SE is reinstalled directly:
 
 ```sh
-plugins/gitstack/projects/gitstack/scripts/reinstall-local
-codex plugin add software-project@alemar11 --json
+plugins/g/projects/g/scripts/reinstall-local
+codex plugin add se@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
 
 ```sh
 codex plugin marketplace upgrade alemar11
-codex plugin remove gitstack@alemar11
-codex plugin add gitstack@alemar11
-codex plugin remove software-project@alemar11
-codex plugin add software-project@alemar11
+codex plugin remove g@alemar11
+codex plugin add g@alemar11
+codex plugin remove se@alemar11
+codex plugin add se@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old
-installation before installing Software Project:
+installation before installing SE:
 
 ```sh
 codex plugin remove feature-flow@alemar11
-codex plugin add software-project@alemar11
+codex plugin add se@alemar11
 ```
 
 Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.

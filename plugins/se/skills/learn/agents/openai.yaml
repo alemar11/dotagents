@@ -1,0 +1,5 @@
+interface:
+  display_name: "Learn Project Context"
+  short_description: "Maintain durable project knowledge and ADRs."
+  brand_color: "#3B5BDB"
+  default_prompt: "Use $se:learn with the smallest requested memory_slice; keep always-active rules in AGENTS.md, route conditional detail through CONTEXT.md and indexed project-context topic files, require confirmation for durable capture, and preserve the exact Code Review Rules section."

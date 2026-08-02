@@ -1,0 +1,7 @@
+interface:
+  display_name: "Implement Feature Spec"
+  short_description: "Discover or deliver reviewed Feature Specs."
+  brand_color: "#6A7F3F"
+  default_prompt: "Use $se:implement to discover GitHub Feature Specs or explicitly run selected Feature Specs through isolated implementation, validation, review, and PR-ready closeout; planning and merging remain outside the skill."
+policy:
+  allow_implicit_invocation: false

@@ -1,5 +1,0 @@
-interface:
-  display_name: "Send"
-  short_description: "Commit, push, link issues, and send a PR"
-  brand_color: "#EA580C"
-  default_prompt: "Use $gitstack:send to confirm the intended local changes and fully resolved GitHub issues, commit them, push the branch, open a draft or update an existing pull request without changing its draft state, link it to an existing target pull request when applicable, and request a current-head Codex review."

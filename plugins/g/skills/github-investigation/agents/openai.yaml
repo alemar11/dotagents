@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Investigation"
+  short_description: "Investigate GitHub issues, pull requests, and fixes"
+  brand_color: "#005F73"
+  default_prompt: "Use $g:github-investigation to investigate a GitHub issue, pull request, or proposed fix and explain its behavior, root cause, fix quality, evidence, and remaining risk."

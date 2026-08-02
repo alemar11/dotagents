@@ -14,7 +14,7 @@ scripts/codex-cli artifact.
   resolution. Do not duplicate or silently alter that matrix in unrelated
   skills.
 - codex-cli owns execution transport and result reporting only. Review
-  semantics remain with callers such as `software-project:implement`.
+  semantics remain with callers such as `se:implement`.
 
 ## Validation
 

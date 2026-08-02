@@ -1,0 +1,25 @@
+{
+  "name": "se",
+  "version": "1.0.0",
+  "description": "Maintain durable project knowledge, improve architecture, capture Ideas, converge Features, and deliver reviewed implementation work.",
+  "author": {
+    "name": "alemar11",
+    "url": "https://github.com/alemar11"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SE",
+    "shortDescription": "Maintain knowledge, shape features, and deliver reviewed work.",
+    "longDescription": "SE provides five separate skills for durable repository knowledge, evidence-backed architecture improvement, Idea capture, Feature Spec convergence, and reviewed implementation delivery. Learn owns Project Context and ADR routing; Improve Codebase Architecture discovers and pressure-tests refactors; Idea, Feature, and Implement share one feature workflow contract while delegating GitHub transport to G.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Use $se:learn to maintain durable project knowledge and ADRs.",
+      "Use $se:improve-codebase-architecture to find and pressure-test architecture improvements.",
+      "Use $se:feature to turn an Idea into an agent-ready Feature Spec bundle."
+    ],
+    "brandColor": "#2F6F8F"
+  }
+}

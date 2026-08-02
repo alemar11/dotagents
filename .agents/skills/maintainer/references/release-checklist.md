@@ -57,8 +57,8 @@ changing Git history.
 - With PR or other publication authority, use the matching publication workflow
   and its own scope rules. Do not infer commit authority from a bare PR request,
   or PR/publication authority from commit or push authority.
-- Prefer the matching GitStack workflow when installed. Direct scoped `git` is
-  the fallback for explicitly authorized commit/push operations when GitStack is
+- Prefer the matching G workflow when installed. Direct scoped `git` is
+  the fallback for explicitly authorized commit/push operations when G is
   unavailable.
 - After an authorized commit or push, verify the exact commit range, branch
   divergence, and that authorized paths plus the staged set are clean. Confirm

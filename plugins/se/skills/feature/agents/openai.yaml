@@ -1,0 +1,7 @@
+interface:
+  display_name: "Feature Planning"
+  short_description: "Converge Feature Specs and agent-ready issues."
+  brand_color: "#10B981"
+  default_prompt: "Use $se:feature to converge feature intent or a durable Feature Spec into one complete bundle of hardened implementation issues, tracker metadata, and relationships; clarify only material unknowns and never implement the feature."
+policy:
+  allow_implicit_invocation: false

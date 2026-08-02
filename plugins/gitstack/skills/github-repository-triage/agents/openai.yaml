@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Repository Triage"
-  short_description: "Triage one or more GitHub repositories"
-  brand_color: "#0369A1"
-  default_prompt: "Use $gitstack:github-repository-triage to inspect one repository's issue and pull request queues or compare multiple explicit repositories read-only, routing disposition judgment to $gitstack:github-investigation and mutations to $gitstack:github-issues."

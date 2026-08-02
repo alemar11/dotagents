@@ -1,0 +1,7 @@
+interface:
+  display_name: "Idea"
+  short_description: "Capture Ideas for later Feature planning."
+  brand_color: "#D97706"
+  default_prompt: "Use $se:idea to save the distinct proposals from this discussion as durable Ideas for later Feature planning, clarifying at most one material intake gap when needed and asking me which proposals to keep when there is more than one."
+policy:
+  allow_implicit_invocation: false
