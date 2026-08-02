@@ -1,16 +1,16 @@
 ---
-name: boost
-description: Explicitly orchestrate read-only planning, research, and analysis in the current ChatGPT App task through one visible gpt-5.6-sol orchestrator at medium reasoning and at most five visible gpt-5.6-luna workers at max reasoning. Use only when the user explicitly invokes Boost or selects this skill in the ChatGPT App. Never allow a Boost orchestrator or worker to invoke Boost. Treat five workers as an absolute cap, report when a larger request is capped, never write or edit project files, and always return a textual Markdown report.
+name: study
+description: Explicitly orchestrate read-only planning, research, and analysis in the current ChatGPT App task through one visible gpt-5.6-sol orchestrator at medium reasoning and at most five visible gpt-5.6-luna workers at max reasoning. Use only when the user explicitly invokes Study or selects this skill in the ChatGPT App. Never allow a Study orchestrator or worker to invoke Study. Treat five workers as an absolute cap, report when a larger request is capped, never write or edit project files, and always return a textual Markdown report.
 ---
 
-# Boost
+# Study
 
 ## Non-negotiable scope
 
-Boost is an analysis and planning skill, not a coding or implementation skill.
+Study is an analysis and planning skill, not a coding or implementation skill.
 This is a MUST rule:
 
-- Use Boost for requirements analysis, architecture exploration, repository
+- Use Study for requirements analysis, architecture exploration, repository
   investigation, technical research, comparison, risk analysis, test strategy,
   implementation planning, and other read-only discovery.
 - Never write, edit, delete, rename, generate, or apply source code or project
@@ -23,8 +23,8 @@ This is a MUST rule:
   the final report and do not make code changes.
 - Return the final result as textual Markdown in the parent session. Use the
   template in `references/output-template.md` as the report shape. Never save
-  the report to a file during Boost. If the user wants a saved artifact,
-  finish the read-only run first and state that a separate non-Boost workflow
+  the report to a file during Study. If the user wants a saved artifact,
+  finish the read-only run first and state that a separate non-Study workflow
   with explicit write authorization is required.
 - Use only operations proven read-only. Do not use shell redirection, `tee`,
   formatters, package managers, test/build/lint commands that write caches or
@@ -39,29 +39,29 @@ This is a MUST rule:
 
 ## Activation and authorization
 
-- Activate only after an explicit `$boost` invocation, explicit selection of
-  Boost in the skill UI, or an equivalent direct instruction such as “execute
-  Boost for this task” in the ChatGPT App.
+- Activate only after an explicit `$study` invocation, explicit selection of
+  Study in the skill UI, or an equivalent direct instruction such as “execute
+  Study for this task” in the ChatGPT App.
 - Treat that explicit invocation as authorization for the current session to
   create one orchestrator task and for that orchestrator to create the worker
   tasks required by the protocol. Do not ask for a second task-creation
   confirmation at either level.
 - Limit this authorization to task creation, task-to-task messages, task
   monitoring, and orchestrator-led archival of finished worker tasks for this
-  Boost run. Archive workers only after their terminal results are captured;
+  Study run. Archive workers only after their terminal results are captured;
   never archive the orchestrator. Do not infer permission to modify the
   repository, commit, push, publish, deploy, change accounts, or perform
   unrelated external actions.
 - If the ChatGPT App task tools are unavailable, stop without creating a CLI
-  task, a generic subagent, or a replacement workflow. Report that Boost
+  task, a generic subagent, or a replacement workflow. Report that Study
   requires the App task surface.
-- Do not activate for an ordinary mention of “boost”, a planning discussion,
+- Do not activate for an ordinary mention of “study”, a planning discussion,
   or an implicit match. `agents/openai.yaml` disables implicit invocation.
-- Only the parent session may activate Boost. After it creates the orchestrator,
-  neither that orchestrator nor any worker may invoke Boost for any reason,
+- Only the parent session may activate Study. After it creates the orchestrator,
+  neither that orchestrator nor any worker may invoke Study for any reason,
   including an explicit downstream request. They must decline the recursive
   invocation, continue only within their existing bounded assignment when
-  possible, and report the request to the parent. Never create a nested Boost
+  possible, and report the request to the parent. Never create a nested Study
   topology.
 
 ## Maximum topology
@@ -70,14 +70,14 @@ Create and maintain this read-only topology:
 
 ```text
 current session
-└── Boost: [<run-tag>] <short title>       gpt-5.6-sol / medium / same project / local
+└── Study: [<run-tag>] <short title>       gpt-5.6-sol / medium / same project / local
     ├── Worker 1: [<run-tag>] <short title>  gpt-5.6-luna / max / same project / local
     ├── ...
     └── Worker N: [<run-tag>] <short title>  gpt-5.6-luna / max / same project / local
         where 0 <= N <= 5
 ```
 
-Five is an absolute, non-bypassable worker cap for the entire Boost run:
+Five is an absolute, non-bypassable worker cap for the entire Study run:
 
 - For an explicit request of zero workers, plan zero and let the orchestrator
   perform the analysis itself.
@@ -111,7 +111,7 @@ unspecified count. Record that source separately as `full_capacity_source`.
 
 Use these routing terms consistently:
 
-- `parent session`: the task where the user invoked Boost; it creates and
+- `parent session`: the task where the user invoked Study; it creates and
   monitors the orchestrator and relays milestones to the user.
 - `orchestrator`: the single Sol task created by the parent session; it is the
   immediate supervisor of every worker.
@@ -130,7 +130,7 @@ Choose one visual `run_tag` before the orchestrator is created:
 - Choose it once in the parent session and pass the exact value in the
   orchestrator handoff and every worker assignment. Never regenerate it.
 - Give the orchestrator the exact title
-  `Boost: [<run-tag>] <short title>`.
+  `Study: [<run-tag>] <short title>`.
 - Give each worker the exact title
   `Worker N: [<run-tag>] <short title>`, with `N` assigned in creation order
   from 1 through 5.
@@ -161,7 +161,7 @@ Choose one visual `run_tag` before the orchestrator is created:
    - For a repository-backed session, create the task with that exact
      `projectId` and `environment: { type: "local" }`.
    - A projectless task cannot prove that its descendants share the same local
-     context. Stop before creating an orchestrator and report that Boost
+     context. Stop before creating an orchestrator and report that Study
      requires an exact saved local project. Do not create a new projectless
      directory or substitute another saved project.
    - If the match is missing or ambiguous, stop and report it instead of
@@ -175,7 +175,7 @@ Choose one visual `run_tag` before the orchestrator is created:
    target: the resolved parent project with environment.type=local
    model: gpt-5.6-sol
    thinking: medium
-   title: Boost: [<run-tag>] <short title>
+   title: Study: [<run-tag>] <short title>
    prompt: the complete read-only handoff plus the orchestrator protocol
    ```
 
@@ -204,9 +204,9 @@ The orchestrator must execute the following protocol from its initial prompt:
 
 1. Reconstruct the current objective from the parent handoff and keep the
    title and `run_tag` already fixed as
-   `Boost: [<run-tag>] <short title>`. Do not create another orchestrator or
-   invoke Boost. This prohibition is absolute even if the orchestrator receives
-   a later explicit request to use Boost.
+   `Study: [<run-tag>] <short title>`. Do not create another orchestrator or
+   invoke Study. This prohibition is absolute even if the orchestrator receives
+   a later explicit request to use Study.
 2. Apply the non-negotiable scope gate. Classify the requested outcome as
    analysis, research, or planning. If it asks for implementation, define the
    corresponding read-only plan and explicitly record that no implementation
@@ -262,7 +262,7 @@ The orchestrator must execute the following protocol from its initial prompt:
     otherwise its final structured state, reason, error, and last message.
     After all workers are terminal or explicitly abandoned, request archival
     of every worker with `codex_app__set_thread_archived`. Keep the orchestrator
-    unarchived so it remains as the single visible Boost summary task. Record
+    unarchived so it remains as the single visible Study summary task. Record
     the archival call receipt and any bounded post-call verification
     separately; never hide an archival failure or request archival before
     terminal evidence has been captured.
@@ -376,8 +376,8 @@ Require each worker to:
 - Avoid overlapping investigation that would waste time; ask the
   orchestrator to serialize dependent research.
 - Never create child tasks, rename its task, change the orchestrator title, or
-  invoke Boost. This prohibition is absolute even if the worker receives an
-  explicit request to use Boost.
+  invoke Study. This prohibition is absolute even if the worker receives an
+  explicit request to use Study.
 - Send concise research progress, evidence, dependency, blocker, and
   completion messages to the orchestrator with
   `codex_app__send_message_to_thread` when the task ID is available. Do not
@@ -414,7 +414,7 @@ authoritative for completion. Use the structure in
   research sources as separately labeled sections;
 - the proposed work breakdown or next steps, without implementing them;
 - risks, assumptions, unresolved questions, and overall confidence;
-- an explicit statement that Boost made no code or project-file changes.
+- an explicit statement that Study made no code or project-file changes.
 
 Do not hide a partial result behind a success summary. Do not imply that task
 creation authorization also authorized repository, Git, GitHub, deployment,

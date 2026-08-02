@@ -1,10 +1,10 @@
-# Boost Analysis Report
+# Study Analysis Report
 
 ## Scope
 
 - **Mode:** Read-only planning, research, or analysis
 - **Shared run tag:** `[<run-tag>]`
-- **Requested orchestrator title:** `Boost: [<run-tag>] <short title>`
+- **Requested orchestrator title:** `Study: [<run-tag>] <short title>`
 - **Observed orchestrator title:** `<observed title or unavailable>`
 - **Title evidence source:** `<creation receipt/read/list/unavailable>`
 - **Orchestrator thread ID:** `<thread ID>`
@@ -24,7 +24,7 @@
 - **Worker archival requests:** `<accepted/partial/failed/unavailable>`
 - **Independent archival verification:** `<confirmed/unavailable/failed>`
 - **Orchestrator remains unarchived:** `<yes/no>`
-- **Changes made:** None — Boost never writes code or project files
+- **Changes made:** None — Study never writes code or project files
 
 ## Executive summary
 
@@ -32,7 +32,7 @@ Summarize the answer and the most important conclusion in a few sentences.
 
 ## Objective
 
-State the question, planning goal, or research target that Boost analyzed.
+State the question, planning goal, or research target that Study analyzed.
 
 ## Observations
 

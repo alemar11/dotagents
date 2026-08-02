@@ -59,7 +59,7 @@ Software Project is the repo-local project-lifecycle plugin. It keeps durable pr
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
-| `boost` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
+| `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
@@ -78,7 +78,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `boost` requires an exact saved local project and the ChatGPT App task tools,
+- `study` requires an exact saved local project and the ChatGPT App task tools,
   keeps its orchestrator and workers there without worktrees, and is strictly
   read-only: it returns a Markdown analysis instead of writing code. Five is
   an absolute worker cap; larger requests are capped and reported automatically.
@@ -87,7 +87,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   After capturing terminal results, it requests archival of completed, failed,
   or explicitly abandoned workers, then leaves the orchestrator open as the
   single visible summary task. Neither the
-  orchestrator nor a worker may ever invoke Boost or create a nested Boost run.
+  orchestrator nor a worker may ever invoke Study or create a nested Study run.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - `software-project:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$software-project:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
@@ -178,7 +178,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/boost skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -212,7 +212,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill focus \
-  --skill boost \
+  --skill study \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \
