@@ -1,5 +1,8 @@
 interface:
   display_name: "Skill Audit"
-  short_description: "Audit installed Codex skills and plugins from historical evidence or live App task monitoring."
+  short_description: "Explicit-only read-only audit of Codex skills and plugins."
   brand_color: "#C06C84"
-  default_prompt: "Use $skill-audit to audit the named installed skills or plugins read-only. For active tasks, monitor current App evidence and annotate contract-backed defects; otherwise return a prioritized evidence-backed improvement roadmap."
+  default_prompt: "Use $skill-audit only when explicitly requested to audit named Codex skills or plugins read-only; return evidence-backed findings."
+
+policy:
+  allow_implicit_invocation: false

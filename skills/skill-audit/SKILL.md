@@ -1,9 +1,17 @@
 ---
 name: skill-audit
-description: Audit installed Codex skills, plugins, and bundled plugin skills from historical evidence or by monitoring their behavior in active Codex App tasks.
+description: Read-only audit of explicitly named installed Codex skills, plugins, and bundled plugin skills using historical evidence or active Codex App task monitoring. Use only when explicitly invoked as $skill-audit.
 ---
 
 # Skill Audit
+
+## Activation
+
+Use this skill only after an explicit `$skill-audit` invocation or explicit
+selection from the skill UI. Do not activate it merely because a request
+mentions skill health, cost, usage, plugins, or auditing. If it was not
+explicitly selected, keep the request on the normal workflow and do not load
+this skill.
 
 ## Overview
 
@@ -74,15 +82,28 @@ Return a compact audit using the format in
 `references/output-format.md`. Live runs use its live-monitor format and retain
 stable defect IDs for the duration of the monitor.
 
-## CLI Maintenance
+## Conditional Evidence Helpers
 
-- Keep normal runtime execution on `scripts/session-evidence` and
-  `scripts/portfolio-health`.
+Do not run either helper for every audit. Select the smallest evidence route
+that answers the explicit request:
+
+- Use `scripts/session-evidence` for historical claims about actual invocation,
+  runtime use, missed or false triggers, or orchestration behavior.
+- Use `scripts/portfolio-health` only for portfolio-level health or cost
+  questions such as inventory budget, entrypoint size, duplicates, descriptions,
+  or heuristic recent usage.
+- For static contract, trigger, ownership, or writing review, inspect the
+  target files and references directly without a helper.
+- For live audits, read current App task evidence directly; do not substitute
+  either helper for live monitoring.
+
+Treat helper output as evidence, not as permission to edit, delete, disable, or
+publish. Run `--help`, `--version`, and `--json doctor` only when validating a
+touched helper or diagnosing its availability.
+
 - Both helpers are Python standard-library scripts shipped directly under
   `scripts/`.
 - Keep each helper's `--version` output as its semver source of truth.
-- Re-verify touched helpers with `--help`, `--version`, and `--json doctor`
-  before relying on them in an audit.
 - Both helpers use the JSON envelope `{ok, version, command, data}`. Their v1
   contracts have no retired option or field aliases.
 - Bump major for breaking flags or fields, minor for backward-compatible

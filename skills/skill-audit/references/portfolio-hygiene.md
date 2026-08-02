@@ -94,7 +94,8 @@ scripts/portfolio-health --json scan --inventory-source filesystem --root ~/.cod
 
 ## CLI Maintenance
 
-- Keep normal runtime execution on `scripts/portfolio-health`.
+- Use `scripts/portfolio-health` only when the selected audit needs
+  portfolio-level health or cost signals.
 - The helper is local/offline and Python standard-library only.
 - `scripts/portfolio-health --version` is the semver source of truth.
 - With `--json`, successful commands emit `{ok, version, command, data}` and
