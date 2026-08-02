@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import Any, Sequence
 
-from .common import GitStackError, Result, envelope, run
+from .common import REPO_PATTERN, GitStackError, Result, envelope, run, safe_diagnostic
 
 
 EXTENSION_REPOSITORY = "github/gh-stack"
@@ -129,9 +129,16 @@ def extension_status(gh_path: str | None = None) -> dict[str, Any]:
 
     stack_entries = [entry for entry in entries if entry["command"] == EXTENSION_COMMAND]
     if stack_entries:
+        detected = stack_entries[0]["repository"]
+        if not detected or not REPO_PATTERN.fullmatch(detected):
+            status = _empty_status(status="unverified", gh_path=resolved_gh_path)
+            status["reason"] = "missing-repository" if not detected else "invalid-repository"
+            status["detected_repository"] = detected
+            status["upstream_command"] = list(EXTENSION_LIST_COMMAND)
+            return status
         conflict = _empty_status(status="conflict", gh_path=resolved_gh_path)
         conflict["installed"] = True
-        conflict["repository"] = stack_entries[0]["repository"]
+        conflict["repository"] = detected
         conflict["version"] = stack_entries[0]["version"]
         conflict["publisher_verification"] = "not-verified"
         conflict["expected_repository"] = EXTENSION_REPOSITORY
@@ -147,7 +154,7 @@ def extension_status(gh_path: str | None = None) -> dict[str, Any]:
 
 
 def _print_provider_diagnostic(result: Result) -> None:
-    diagnostic = (result.stderr or result.stdout).strip()
+    diagnostic = safe_diagnostic(result.stderr or result.stdout, limit=2000)
     if diagnostic:
         print(diagnostic, file=sys.stderr)
 
@@ -159,16 +166,22 @@ def _raise_process_failure(
     message: str,
     command: Sequence[str],
     exit_code: int | None = None,
+    json_mode: bool = False,
 ) -> None:
-    _print_provider_diagnostic(result)
+    if not json_mode:
+        _print_provider_diagnostic(result)
+    diagnostic = safe_diagnostic(result.stderr or result.stdout)
+    details: dict[str, Any] = {
+        "upstream_exit_code": result.returncode,
+        "upstream_command": list(command),
+    }
+    if diagnostic and not json_mode:
+        details["diagnostic"] = diagnostic
     raise GitStackError(
         message,
         code=code,
         exit_code=exit_code if exit_code is not None else (result.returncode or 1),
-        details={
-            "upstream_exit_code": result.returncode,
-            "upstream_command": list(command),
-        },
+        details=details,
     )
 
 
@@ -213,7 +226,7 @@ def _status_error(status: dict[str, Any]) -> GitStackError:
     )
 
 
-def ensure(*, install: bool = False) -> dict[str, Any]:
+def ensure(*, install: bool = False, json_mode: bool = False) -> dict[str, Any]:
     """Verify or explicitly install the official gh-stack extension."""
 
     status = extension_status()
@@ -236,6 +249,7 @@ def ensure(*, install: bool = False) -> dict[str, Any]:
             code="extension_install_failed",
             message=f"Could not install '{EXTENSION_REPOSITORY}'.",
             command=EXTENSION_INSTALL_COMMAND,
+            json_mode=json_mode,
         )
 
     verified = extension_status()
@@ -344,7 +358,7 @@ def _validate_noninteractive(command: str, args: Sequence[str]) -> None:
 
 def _json_output(command: str, stdout: str, stderr: str, *, parse: bool) -> Any:
     if not parse:
-        return {"stdout": stdout, "stderr": stderr}
+        return {"stdout": stdout, "stderr": safe_diagnostic(stderr)}
     try:
         return json.loads(stdout)
     except json.JSONDecodeError as exc:
@@ -376,7 +390,7 @@ def execute(command: str, args: Sequence[str], *, json_mode: bool, raw: bool = F
         command, *forwarded = forwarded
 
     _validate_noninteractive(command, forwarded)
-    ensure()
+    ensure(json_mode=json_mode)
 
     if json_mode and command == "view" and not _has_enabled_flag(forwarded, "--json"):
         forwarded.append("--json")
@@ -393,6 +407,7 @@ def execute(command: str, args: Sequence[str], *, json_mode: bool, raw: bool = F
             code="stack_command_failed",
             message=f"The 'gh stack {command}' command failed.",
             command=["gh", "stack", command],
+            json_mode=json_mode,
         )
 
     if json_mode:

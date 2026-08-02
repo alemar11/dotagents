@@ -80,6 +80,30 @@ class StackContractTests(unittest.TestCase):
         self.assertFalse(status["installed"])
         self.assertEqual(status["reason"], "unparseable-output")
 
+    def test_extension_status_fails_closed_on_partial_stack_listing(self) -> None:
+        with mock.patch.object(stack.shutil, "which", return_value="/usr/local/bin/gh"), mock.patch.object(
+            stack,
+            "run",
+            return_value=Result(0, "gh stack\n", ""),
+        ):
+            status = stack.extension_status()
+
+        self.assertEqual(status["status"], "unverified")
+        self.assertEqual(status["reason"], "missing-repository")
+        self.assertEqual(status["repository"], stack.EXTENSION_REPOSITORY)
+        self.assertIsNone(status["detected_repository"])
+
+    def test_extension_status_rejects_invalid_stack_repository_as_unverified(self) -> None:
+        with mock.patch.object(stack.shutil, "which", return_value="/usr/local/bin/gh"), mock.patch.object(
+            stack,
+            "run",
+            return_value=Result(0, "gh stack not-a-repository v1.0.0\n", ""),
+        ):
+            status = stack.extension_status()
+
+        self.assertEqual(status["status"], "unverified")
+        self.assertEqual(status["reason"], "invalid-repository")
+
     def test_extension_status_preserves_safe_listing_failure_details(self) -> None:
         with mock.patch.object(stack.shutil, "which", return_value="/usr/local/bin/gh"), mock.patch.object(
             stack,
@@ -255,7 +279,7 @@ class StackContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(output.getvalue())
-        self.assertEqual(payload["data"], {"stdout": "done\n", "stderr": "notice\n"})
+        self.assertEqual(payload["data"], {"stdout": "done\n", "stderr": "notice"})
         self.assertEqual(run.call_args.args[0], ["gh", "stack", "push"])
 
     def test_interactive_paths_are_rejected_before_extension_execution(self) -> None:
@@ -318,6 +342,41 @@ class StackContractTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "stack_command_failed")
         self.assertEqual(raised.exception.exit_code, 3)
 
+    def test_json_failure_does_not_emit_untrusted_provider_diagnostic(self) -> None:
+        output = io.StringIO()
+        errors = io.StringIO()
+        with mock.patch.object(stack, "ensure", return_value={"status": "ready"}), mock.patch.object(
+            stack,
+            "run",
+            return_value=Result(7, "", "TOKEN=secret-value"),
+        ), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            with self.assertRaises(GitStackError) as raised:
+                stack.execute("push", [], json_mode=True)
+
+        self.assertEqual(raised.exception.code, "stack_command_failed")
+        self.assertNotIn("secret-value", str(raised.exception))
+        self.assertNotIn("secret-value", json.dumps(raised.exception.details))
+        self.assertEqual(errors.getvalue(), "")
+
+    def test_cli_json_failure_has_a_structured_secret_safe_envelope(self) -> None:
+        output = io.StringIO()
+        errors = io.StringIO()
+        with mock.patch.object(stack, "extension_status", return_value={"status": "missing"}), mock.patch.object(
+            stack,
+            "run",
+            return_value=Result(12, "", "Authorization: Bearer secret-value"),
+        ), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            code = __import__("gitstack.cli", fromlist=["main"]).main(
+                ["--json", "stack", "ensure", "--install"]
+            )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 12)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "extension_install_failed")
+        self.assertNotIn("secret-value", output.getvalue())
+        self.assertNotIn("secret-value", errors.getvalue())
+
     def test_shipped_artifact_uses_fake_gh_without_installing_or_contacting_github(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -334,10 +393,13 @@ class StackContractTests(unittest.TestCase):
                 "    json.dump({'args': args, 'cwd': os.getcwd(), 'pager': os.environ.get('PAGER'), 'git_pager': os.environ.get('GIT_PAGER'), 'gh_pager': os.environ.get('GH_PAGER'), 'git_prompt': os.environ.get('GIT_TERMINAL_PROMPT')}, stream)\n"
                 "    stream.write('\\n')\n"
                 "if args == ['extension', 'list']:\n"
-                "    if (root / 'installed').exists():\n"
+                "    if (root / 'installed').exists() and os.environ.get('FAKE_GH_MODE') != 'install-failure':\n"
                 "        print('gh\\tstack\\tgithub/gh-stack\\tv0.0.9')\n"
                 "    raise SystemExit(0)\n"
                 "if args == ['extension', 'install', 'github/gh-stack']:\n"
+                "    if os.environ.get('FAKE_GH_MODE') == 'install-failure':\n"
+                "        print('Authorization: Bearer shipped-secret', file=sys.stderr)\n"
+                "        raise SystemExit(12)\n"
                 "    (root / 'installed').write_text('installed', encoding='utf-8')\n"
                 "    print('installed')\n"
                 "    raise SystemExit(0)\n"
@@ -369,6 +431,16 @@ class StackContractTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
+            failure_environment = environment.copy()
+            failure_environment["FAKE_GH_MODE"] = "install-failure"
+            failed_install = subprocess.run(
+                [str(SCRIPT), "--json", "stack", "ensure", "--install"],
+                cwd=root,
+                env=failure_environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
             calls = [
                 json.loads(line)
@@ -381,6 +453,10 @@ class StackContractTests(unittest.TestCase):
         self.assertEqual(installed_payload["data"]["publisher_verification"], "not-verified")
         self.assertEqual(viewed.returncode, 0, viewed.stderr)
         self.assertEqual(json.loads(viewed.stdout)["data"], {"branches": []})
+        self.assertEqual(failed_install.returncode, 12)
+        self.assertEqual(json.loads(failed_install.stdout)["error"]["code"], "extension_install_failed")
+        self.assertNotIn("shipped-secret", failed_install.stdout)
+        self.assertNotIn("shipped-secret", failed_install.stderr)
         self.assertIn(
             ["extension", "install", "github/gh-stack"],
             [call["args"] for call in calls],

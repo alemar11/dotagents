@@ -142,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.domain == "stars":
             return _forward(stars, args.args, args.json, "")
         if args.domain == "stack" and args.verb == "ensure":
-            data = stack.ensure(install=args.install)
+            data = stack.ensure(install=args.install, json_mode=args.json)
             _emit(data, ["stack", "ensure"], args.json)
             return 0
         if args.domain == "stack" and args.verb == "raw":
