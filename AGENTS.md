@@ -81,6 +81,21 @@ when the package is intended for Codex.
 
 ## Repository-Wide Rules
 
+### Codex Integration
+
+- Before integrating with Codex through App tools, the CLI, MCP servers, or
+  another exposed interface, verify the current runtime contract. Confirm that
+  every operation, parameter, enum, and nested field used by the integration
+  is actually exposed and accepted in the environment where it will run.
+- Do not infer API or argument support from a skill, an older tool schema,
+  cached metadata, documentation, UI wording, or a related endpoint. Treat
+  those sources as clues until the current interface confirms the behavior.
+- Send only verified fields and handle missing or changed capabilities
+  explicitly. If the contract does not match the intended call, stop or report
+  the incompatibility instead of guessing, silently substituting another
+  operation, or claiming that the request was applied. Re-check dynamic
+  interfaces when needed and distinguish requested state from observed state.
+
 ### Documentation and Contract Ownership
 
 - Keep `AGENTS.md` files focused on repository structure, ownership boundaries,
