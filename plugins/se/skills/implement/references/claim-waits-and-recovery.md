@@ -40,9 +40,10 @@ and current state. If the exact worker exists, finish the already recorded
 back creation title. If that title is not exact, reconcile the separately
 recorded `set-worker-title` fallback: call `set_thread_title` only for its
 authorized launch, read back the exact title, and bootstrap only after that
-creation-or-fallback path is verified. If the exact worker exists but title
+creation-or-fallback path is attempted. If the exact worker exists but title
 initialization did not happen, do not treat the creation prompt or an
-incidental title as sufficient evidence.
+incidental title as sufficient evidence; record `title-unverified` or
+`title-drift` and bootstrap once the structural worker evidence is verified.
 If authoritative evidence proves no task was created, finish that launch as
 `failed` with its `readback_ref`; the resulting `replay_authorized=true` permits
 `app-operation replay` with the same `operation_id` and incremented

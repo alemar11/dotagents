@@ -8,6 +8,7 @@
 - **Observed orchestrator title:** `<observed title or unavailable>`
 - **Title creation/fallback receipt:** `<create_thread title readback and, if used, set_thread_title receipt>`
 - **Title evidence source:** `<independent read/list/unavailable>`
+- **Title status/warning:** `<title-verified/title-unverified/title-drift or not-applicable>`
 - **Orchestrator thread ID:** `<thread ID>`
 - **Host/project/environment:** `<host ID / project ID and path / local>`
 - **Requested model/reasoning:** `gpt-5.6-sol / medium`
@@ -78,8 +79,8 @@ preview.
 
 ## Task telemetry ledger
 
-| Task | Requested title | Title creation/fallback receipt | Observed title and source | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Task | Requested title | Title creation/fallback receipt | Observed title and source | Title status/warning | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Orchestrator |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | not-requested | not-applicable |
 | Worker N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 

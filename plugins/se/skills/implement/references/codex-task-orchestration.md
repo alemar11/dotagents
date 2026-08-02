@@ -26,9 +26,10 @@ For every such change, root follows one crash-safe sequence:
 
 Bootstrap may replay after `unknown` or `failed` readback because the worker
 deduplicates its stable `bootstrap_id`; this provides exactly-once bootstrap
-effect, not exactly-once delivery. The protected task-creation, title-
-initialization, and archive actions may replay only from `failed` with readback
-that authoritatively proves that launch had no effect.
+effect, not exactly-once delivery. Protected task-creation and archive actions
+may replay only from `failed` with readback that authoritatively proves that
+launch had no effect. Title operations are single-launch best-effort mutations;
+never replay them to repair a warning or drift.
 `send-worker-message` has no replay path. A pending operation is never
 replayable, an immediate tool error is not proof of no effect, and no operation
 is relaunched under a new logical identifier. SQLite stores only identity and
@@ -46,7 +47,7 @@ implied by that action, status, and launch generation. When refining an
 `unknown` observation, carry every previously recorded fact forward unchanged
 and add only newly authoritative evidence.
 
-## App Task API And Title Initialization
+## App Task API And Best-Effort Title Metadata
 
 Use the current ChatGPT App tool declarations as the runtime capability
 contract. Inspect the exact signatures of `codex_app__create_thread`,
@@ -55,14 +56,18 @@ startup mutation, and pass only fields present in those declarations. The
 creation declaration may expose an optional `title`; pass the canonical title
 in the creation call when that exact field is exposed. Do not claim that
 `title` is unsupported or add it without verification.
-Independently read or list the created task after the creation call. If creation
-did not set the exact title, use the separately recorded `set_thread_title`
-operation exactly once as the fallback, with the real `threadId`, requested
-`title`, and no other field unless the inspected declaration explicitly exposes
-it. Read or list the task again after the fallback. The cleanup operation is
-likewise valid only with its declared fields. If the title creation/fallback
-path, cleanup, or any required argument is unavailable or unverifiable, stop as
-`unsupported-runtime` before beginning a task operation or creating any task.
+Independently read or list the created task after the creation call and verify
+the real task ID, project, environment/worktree, and operational state. If the
+title is missing, unavailable, or different, use the separately recorded
+`set_thread_title` operation at most once as the fallback, with the real
+`threadId`, requested `title`, and no other field unless the inspected
+declaration explicitly exposes it. Read or list the task again when possible.
+Record `title-unverified` or `title-drift` in the operation result and
+telemetry, but do not block a structurally verified worker, bootstrap, or scope
+repair. The cleanup operation is likewise valid only with its declared fields.
+Only an explicit exact-title request makes a title warning blocking;
+unverifiable structural identity or required structural arguments remain
+`unsupported-runtime` failures.
 A `create_thread` response is usable only when it yields or can be reconciled
 to the real `threadId`; a client-only identifier is not sufficient for title
 initialization or bootstrap.
@@ -78,13 +83,16 @@ This section is reachable only after the worker-project preflight and any
 explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
-1. Begin `set-root-title`, call `codex_app__set_thread_title` for the root, and
-   independently read back the exact immutable title once. For one assignment
-   use `🤖 Implement Feature · 1 Spec`. For two or more use
+1. If the live declaration exposes the root title operation, begin
+   `set-root-title`, call `codex_app__set_thread_title` at most once for the
+   root, and independently read back the title when possible. If it does not,
+   record `root-title-unverified` in the run report and continue. For one
+   assignment use `🤖 Implement Feature · 1 Spec`. For two or more use
    `🤖 Implement Feature · N Specs`, where `N` is the immutable total
    assignment count, including waiting or blocked assignments. Never update the
-   root title as assignments progress. The title is UI evidence, never identity
-   or durable state.
+   root title as assignments progress. A missing or different root title emits
+   `root-title-unverified` or `root-title-drift` telemetry but does not block
+   worker creation. The title is UI evidence, never identity or durable state.
 2. For each claimed assignment allowed by path and dependency serialization,
    create one visible Codex worker task with `environment=worktree` in the
    selected local Git project in the ChatGPT App. Pass
@@ -98,28 +106,28 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    impose a numeric worker limit. The ChatGPT App creates the worktree and
    assigns it to the task; root never runs `git worktree add`.
 3. Independently verify the stable task ID, checkout directory, Git common
-   directory, literal task state `active|idle`, and the requested title when
-   the title is returned in the `create-worker` observation. Both task states
-   mean that the exact task binding exists, not that implementation progress
-   has begun.
+   directory, literal task state `active|idle`, and project binding in the
+   `create-worker` observation. Both task states mean that the exact task
+   binding exists, not that implementation progress has begun. Record the
+   returned title separately when available.
 4. If the creation readback does not confirm the exact canonical title, begin
    `set-worker-title` for the recorded worker, call
-   `codex_app__set_thread_title` exactly once with the recorded `threadId` and
+   `codex_app__set_thread_title` at most once with the recorded `threadId` and
    exact canonical title, using no additional field unless the live declaration
-   exposes it, and independently read back that exact title before finishing the
-   operation. A missing or
-   normalized-to-different title returns `effect_warning=worker-title-drift`
-   with `cleanup_required=archive-worker`; bootstrap remains forbidden. Do not
-   repair drift with another title operation. The successful creation and
-   title receipts remain recorded so root can archive the pre-bootstrap task,
-   independently prove the exact recorded checkout path is absent, call
-   `assignment abort`, and release only that claim. If the checkout still exists
-   as a file, directory, or symlink, retain the claim and block cleanup. Treat
-   permission, I/O, or any other inspection error as unknown presence and retain
-   the claim; only `ENOENT` or `ENOTDIR` proves absence. If no assignment
-   started, finish an all-aborted run as `preimplementation-aborted`. If a
-   sibling already started, wait until every sibling is terminal and finish the
-   mixed run as `abandoned`, never as a successful delivery.
+   exposes it, and independently read back the title when possible before
+   finishing the operation. A missing or normalized-to-different title returns
+   `effect_warning=worker-title-unverified` or
+   `effect_warning=worker-title-drift`; it does not set cleanup or forbid
+   bootstrap. Do not repair drift with another title operation. Keep the
+   successful creation, fallback, and warning receipts in telemetry, then
+   continue with bootstrap once the structural worker evidence is valid. If
+   the checkout still exists as a file, directory, or symlink, retain the claim
+   and block cleanup. Treat permission, I/O, or any other inspection error as
+   unknown presence and retain the claim; only `ENOENT` or `ENOTDIR` proves
+   absence. If no assignment started, finish an all-aborted run as
+   `preimplementation-aborted`. If a sibling already started, wait until every
+   sibling is terminal and finish the mixed run as `abandoned`, never as a
+   successful delivery.
 5. Begin `send-bootstrap` and copy its returned `bootstrap_id` into the full
    envelope with the GitHub Issue source ref, Feature ID, repository key,
    repository, branch, allowed paths, issue graph, acceptance and validation

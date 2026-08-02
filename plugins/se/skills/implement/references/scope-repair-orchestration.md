@@ -50,10 +50,11 @@ one automatic repair is allowed per assignment. A second scope miss returns
    `create_thread` declaration and pass only its verified fields, including the
    exact title `🧭 Scope Repair · <Feature Spec title>` when `title` is exposed;
    do not use the prompt as title evidence. Independently verify the created
-   title. If creation did not set the exact title, record and execute
-   `set-scope-repair-title`, call `set_thread_title` exactly once with the exact
-   title and only the arguments exposed by its inspected declaration, and
-   independently verify that readback before invoking
+   task ID, project, environment, and operational state. If creation did not
+   set the exact title, record and execute `set-scope-repair-title`, call
+   `set_thread_title` at most once with the exact title and only the arguments
+   exposed by its inspected declaration, and independently verify that readback
+   when possible before invoking
 `$se:feature` as the separate Feature task against the authoritative
    `source_spec_ref` and
    implementation issue using only this portable packet:
@@ -76,10 +77,12 @@ scope_repair_request:
    only the monotonic `allowed_paths` expansion and then returns its result to
    root.
 5. If title initialization is missing, drifts, or cannot be independently
-   verified, do not invoke `$se:feature`. Reconcile the recorded title
-   operation; when `cleanup_required=archive-scope-repair-task`, archive the
-   planner task through `set_thread_archived` and keep the worker assignment
-   blocked. Never retry a title mutation to repair drift.
+   verified, record `scope-repair-title-unverified` or
+   `scope-repair-title-drift` and continue invoking `$se:feature` once the
+   planner task identity, project, environment, and operational state are
+   verified. Do not archive or keep the assignment blocked solely for title
+   metadata. Require an exact title only when the user explicitly requested
+   one, and never retry a title mutation to repair drift.
 6. Wait for the planner task. Accept only the exact `scope_repair_result`
    contract from `$se:feature` with `repair_outcome=applied|no-op`, matching refs and
    repair ID, and a fresh authoritative readback proving the complete Spec and

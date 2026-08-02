@@ -315,7 +315,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--readback-ref",
             "readback:title",
             "--observed-title",
-            "🤖 Implement Feature · 1 Spec",
+            "🤖 Implement Feature · 1 Spec (normalized)",
             "--output",
             str(observation),
         )
@@ -332,6 +332,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             str(observation),
         )
         self.assertEqual(finished["status"], "succeeded")
+        self.assertEqual(finished["effect_warning"], "root-title-drift")
 
     def test_worker_title_is_initialized_after_creation_before_bootstrap(self) -> None:
         started = self.start("worker-title-flow")
@@ -393,21 +394,6 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--observation",
             str(creation_observation),
         )
-
-        before_title = self.invoke(
-            "app-operation",
-            "begin",
-            "--run-id",
-            "worker-title-flow",
-            "--expected-revision",
-            str(created["revision"]),
-            "--action",
-            "send-bootstrap",
-            "--subject-id",
-            "spec-01",
-            expected=4,
-        )
-        self.assertEqual(before_title["error"]["code"], "worker-title-not-verified")
 
         title = self.invoke(
             "app-operation",
@@ -552,7 +538,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertTrue(bootstrap["launch_authorized"])
 
-    def test_worker_title_drift_is_recorded_and_blocks_bootstrap(self) -> None:
+    def test_worker_title_drift_is_recorded_without_blocking_bootstrap(self) -> None:
         started = self.start("worker-title-drift-flow")
         create = self.invoke(
             "app-operation",
@@ -612,6 +598,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--observation",
             str(creation_observation),
         )
+        self.assertEqual(created["effect_warning"], "worker-title-unverified")
 
         title = self.invoke(
             "app-operation",
@@ -665,7 +652,16 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(titled["status"], "succeeded")
         self.assertEqual(titled["effect_warning"], "worker-title-drift")
-        self.assertEqual(titled["cleanup_required"], "archive-worker")
+        telemetry = self.invoke(
+            "app-operation",
+            "list",
+            "--run-id",
+            "worker-title-drift-flow",
+        )
+        self.assertIn(
+            "worker-title-drift",
+            [operation["effect_warning"] for operation in telemetry["operations"] if "effect_warning" in operation],
+        )
 
         bootstrap = self.invoke(
             "app-operation",
@@ -678,9 +674,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "send-bootstrap",
             "--subject-id",
             "spec-01",
-            expected=4,
         )
-        self.assertEqual(bootstrap["error"]["code"], "worker-title-not-verified")
+        self.assertTrue(bootstrap["launch_authorized"])
 
     def test_scope_repair_title_is_initialized_after_planner_creation(self) -> None:
         started = self.start("scope-title-flow")
@@ -894,7 +889,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         self.assertEqual(scope_observation["observation_kind"], "scope-repair")
         self.assertTrue(scope_observation["artifact_written"])
 
-    def test_scope_repair_title_drift_blocks_scope_revision(self) -> None:
+    def test_scope_repair_title_drift_does_not_block_scope_revision(self) -> None:
         started = self.start("scope-title-drift-flow")
         self.activate_assignment("scope-title-drift-flow")
         blocked = self.invoke(
@@ -1012,8 +1007,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(titled["status"], "succeeded")
         self.assertEqual(titled["effect_warning"], "scope-repair-title-drift")
-        self.assertEqual(titled["cleanup_required"], "archive-scope-repair-task")
 
+        scope_observation_path = self.base / "scope-title-drift-observation.json"
         scope_observation = self.invoke(
             "assignment",
             "scope-repair-observation",
@@ -1035,10 +1030,24 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--authoritative-readback-ref",
             "readback:scope-title-drift-source",
             "--output",
-            str(self.base / "scope-title-drift-observation.json"),
-            expected=4,
+            str(scope_observation_path),
         )
-        self.assertEqual(scope_observation["error"]["code"], "scope-repair-title-not-verified")
+        self.assertTrue(scope_observation["artifact_written"])
+        revision = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(titled["revision"]),
+            "--action",
+            "send-scope-revision",
+            "--subject-id",
+            "spec-01",
+            "--scope-repair-observation",
+            str(scope_observation_path),
+        )
+        self.assertTrue(revision["launch_authorized"])
 
     def test_same_branch_conflict_can_be_reconciled(self) -> None:
         owner = self.start("branch-owner")
@@ -1226,6 +1235,19 @@ class RunStateGitHubScenarios(unittest.TestCase):
         self.assertEqual(duplicate["error"]["code"], "protected-operation-already-started")
         self.assertIn(str(operation["operation_id"]), duplicate["error"]["message"])
 
+        replay = self.invoke(
+            "app-operation",
+            "replay",
+            "--run-id",
+            "marker-flow",
+            "--expected-revision",
+            str(operation["revision"]),
+            "--operation-id",
+            str(operation["operation_id"]),
+            expected=4,
+        )
+        self.assertEqual(replay["error"]["code"], "operation-replay-unsupported")
+
         stale = self.invoke(
             "app-operation",
             "begin",
@@ -1243,7 +1265,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
 
     def test_review_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "1.1.1")
+        self.assertEqual(capabilities["cli_version"], "1.1.2")
         self.assertEqual(capabilities["runtime_contract_version"], "1.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],

@@ -181,10 +181,13 @@ canonical Feature Spec and head branch and leaves only conflicting assignments
 in `waiting-for-spec`. GitHub issue URLs and `owner/repository#number` normalize
 to the same claim identity.
 
-When at least one assignment acquires its claim, set and verify the immutable
-root title once and schedule every claimed assignment allowed by path and
-dependency serialization, without a numeric worker cap. When every assignment
-waits, create no worker, worktree, branch, or provider mutation. Never use a
+When at least one assignment acquires its claim, attempt the immutable root
+title once when the live title operation is exposed, record any title warning
+in the run report, and schedule every claimed assignment allowed by path and
+dependency serialization, without a numeric worker cap. If that operation is
+not exposed, record `root-title-unverified` and continue.
+When every assignment waits, create no worker, worktree, branch, or provider
+mutation. Never use a
 default PR base such as `main` as a head-branch collision: only the
 implementation head branch is exclusive.
 
@@ -195,24 +198,25 @@ declaration and passes only verified fields. When the declaration exposes a
 `title` field, root passes the exact canonical worker title in the creation
 call. The ChatGPT App creates the worktree and assigns it to that task. Root
 independently reads the created task and verifies the task, checkout directory,
-Git common directory, literal `active|idle` state, and exact title in the
-`create-worker` observation. If creation does not yield the exact title, root
-records `set-worker-title`, calls `set_thread_title` exactly once with the real
+Git common directory, project binding, and literal `active|idle` state in the
+`create-worker` observation. Title evidence is recorded separately from the
+structural worker proof. If creation does not yield the exact title, root
+records `set-worker-title`, calls `set_thread_title` at most once with the real
 task ID, exact canonical title, and only the arguments exposed by the inspected
-declaration, then independently verifies the title again before bootstrap.
-This is a creation-first title initialization sequence; the separate operation
-is a fallback, not a later progress rename. Root never runs `git worktree add`.
+declaration, then independently verifies the title again when possible. A
+missing or different title records `title-unverified` or `title-drift` and does
+not prevent bootstrap once task identity, project, checkout, Git common
+directory, and operational state are verified. Root never runs `git worktree
+add` and never retries a title mutation blindly.
 
 SQLite keeps only checkout identity and typed task readback needed for
 coordination, not the worker's technical contents or task profile. The
 operation always targets the assignment's recorded repo-specific `project_id`,
 never the multi-folder controller project. If task readback does not resolve to
 that project or repository identity, reconcile or fail the operation before
-bootstrap. A missing, normalized-to-different, or unverifiable title returns
-`cleanup_required=archive-worker`, forbids bootstrap, and lets root archive the
-pre-bootstrap task and prove that its exact recorded checkout path is absent
-before aborting only that assignment and releasing its claim. Root does not
-retry the title operation to repair drift. An inspection error never proves
+bootstrap. A missing, normalized-to-different, or unverifiable title is a
+telemetry warning only; it does not authorize cleanup or block bootstrap. Root
+does not retry the title operation to repair drift. An inspection error never proves
 absence and retains the claim. An all-aborted pre-bootstrap run finishes as
 `preimplementation-aborted`; if a sibling implementation already started,
 every sibling must become terminal and the mixed run finishes as `abandoned`,

@@ -27,13 +27,14 @@ Before startup authorization, verify that the destination Codex host supports
 inspection must also verify the exact fields available for title initialization.
 When the live declaration exposes `create_thread.title`, pass the canonical
 worker title in the creation call and independently read it back. If creation
-does not yield the exact title, use the verified `set_thread_title` operation
-once as the fallback and read the title back again. If `create_thread.title` is
-absent, use that same verified fallback after a real task ID exists. Do not call
-`create_thread` as a probe: it creates a visible task and worktree. If model,
-thinking, the title creation/fallback path, or any required argument is absent
-or unverifiable from read-only capability evidence, stop as
-`unsupported-runtime` before run state, claims, tasks, or worktrees.
+does not yield the exact title, use the verified `set_thread_title` operation at
+most once as the fallback and read the title back again when possible. If
+`create_thread.title` is absent, use that same verified fallback when available.
+Do not call `create_thread` as a probe: it creates a visible task and worktree.
+If model, thinking, or any structural argument is absent or unverifiable from
+read-only capability evidence, stop as `unsupported-runtime` before run state,
+claims, tasks, or worktrees. Missing title support is a best-effort warning,
+unless the user explicitly requires an exact title.
 
 The startup disclosure names this exact model and adaptive thinking policy.
 `visible_app_task_permission=granted` is therefore the authorized user's

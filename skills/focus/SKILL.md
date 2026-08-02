@@ -54,28 +54,36 @@ title with one relevant leading emoji, and leave the calling task unchanged.
    - If repository-backed work has no unique saved-project match, stop and
      report the mismatch. Do not create a projectless substitute.
 6. Before any task mutation, inspect the live declarations for `list_projects`,
-   `create_thread`, `set_thread_title`, and the `read_thread` or `list_threads`
-   operation that will provide title readback. Pass only fields exposed by
-   those declarations. If a required operation or argument is unavailable or
-   unverifiable, stop before creation and report `unsupported-runtime`.
+   `create_thread`, and the `read_thread` or `list_threads` operation that will
+   verify the created task's identity, project, environment, and state. Pass
+   only fields exposed by those declarations. Inspect `set_thread_title` when
+   available so it can be used once as a title fallback; missing title support
+   is a warning capability, not a structural runtime failure. Stop before
+   creation only when a structural operation or argument is unavailable or
+   unverifiable, and report `unsupported-runtime`.
 7. Call `create_thread` with the compact handoff as its prompt. Omit `model` and
    `thinking` so the user's configured defaults apply. When the inspected
    declaration exposes `title`, pass the chosen title in that creation call;
-   otherwise omit it and use the verified fallback below. Do not rely on a
-   creation response or prompt text as visible-title evidence. If creation
+   otherwise omit it and continue to the verified fallback below when that
+   operation is available. Do not rely
+   on a creation response or prompt text as visible-title evidence. If creation
    returns only a client-side identifier, report the setup as pending and do
-   not attempt to title the task.
+   not attempt to title the task; a real task ID remains structurally required.
 8. When creation returns a real `threadId`, independently read or list the
-   created task. If its observed title exactly matches the requested title,
-   keep that creation-time result and do not rename the task. If the title is
-   missing or different, call `set_thread_title` exactly once with that ID and
-   the chosen title, plus only fields exposed by its live declaration, then
-   independently read or list the task again. Never rename the calling task.
-9. Treat missing final readback as `title-setup-failed` and a different or
-   normalized final title as `title-drift`; preserve the created task and
-   report the partial result. Declare completion only after the exact title is
-   observed, then return the observed title and the App's native created-task
-   link or card.
+   created task and verify its identity, project, local environment, and
+   operational state. Compare the observed title separately. If it is missing
+   or different and the live declaration exposes `set_thread_title`, call it
+   at most once with that ID and the chosen title, plus only fields exposed by
+   its declaration, then read or list the task again. If the setter or title
+   readback is unavailable, retain the real task and record
+   `title-unverified`. Never rename the calling task and never retry a title
+   mutation.
+9. Treat an unavailable or missing title as `title-unverified` and a different
+   or normalized title as `title-drift`. Preserve the real task and continue
+   after structural verification, returning the warning, observed title, and
+   App's native created-task link or card. Require an exact title only when the
+   user explicitly requested one; otherwise title warnings must not block task
+   creation or completion.
 
 If several topics remain active, choose the most recently discussed unresolved
 outcome. Do not copy the full conversation, browse, inspect repository files,
@@ -90,6 +98,7 @@ or ask a clarifying question before creation.
 - Do not send a second follow-up message to the new task after creation.
 - Treat the title as display metadata only. Never use it as task identity,
   durable state, a branch name, or a recovery key.
-- If creation, title initialization, or independent title verification fails,
-  report the partial result accurately and do not claim the intended final
-  state.
+- If structural creation or independent identity verification fails, report
+  the partial result accurately and do not claim the task is ready. Title
+  initialization and title readback are best-effort metadata: retain the
+  warning in the result without blocking the structurally verified task.

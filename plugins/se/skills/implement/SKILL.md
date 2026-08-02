@@ -212,14 +212,17 @@ more Feature Specs. A discovery-only request never enters this flow.
    preflight.
    Before any task mutation, inspect the live Codex App declarations for every
    operation used by this flow and verify every argument that will be passed.
-   Do not infer support from a previous runtime or from prompt text. This
-   Prefer `title` in every `create_thread` call when the inspected declaration
+   Do not infer support from a previous runtime or from prompt text. Prefer
+   `title` in every `create_thread` call when the inspected declaration
    exposes that field, then independently read back the created title. If
    creation does not yield the exact requested title, use the verified
-   `set_thread_title` operation exactly once after a real task ID exists and
+   `set_thread_title` operation at most once after a real task ID exists and
    independently read it back again. If `create_thread.title` is absent, use
-   that same verified fallback path. Missing or unverifiable operations or
-   arguments stop the run as `unsupported-runtime` before any task mutation.
+   that same fallback when available. Missing or unverifiable structural
+   operations or arguments stop the run as `unsupported-runtime`; missing or
+   unverifiable title support produces `title-unverified` telemetry and does
+   not stop workers, bootstrap, or implementation unless the user explicitly
+   requires an exact title.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Prepare shared run state through read-only `capabilities` and `doctor`, then
@@ -233,8 +236,10 @@ more Feature Specs. A discovery-only request never enters this flow.
    Different Specs and head branches may run under different roots in the same
    repository. Keep a conflicting assignment in its bounded Spec wait without
    blocking claims already acquired by peer assignments.
-4. When at least one assignment owns its claim, set and verify the immutable
-   root title once through the recorded App title operation, then schedule every
+4. When at least one assignment owns its claim, attempt the immutable root
+   title once through the recorded App title operation when that operation is
+   exposed; otherwise record `root-title-unverified` in the run report. Record
+   any `root-title-unverified` or `root-title-drift` warning, then schedule every
    claimed Feature Spec allowed by path and
    dependency serialization, with no numeric worker cap. Dependency-related
    peers may start before their input HEADs stabilize so they can collaborate,

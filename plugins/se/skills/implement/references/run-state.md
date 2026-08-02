@@ -1,13 +1,15 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.1.1` implements runtime contract
+uses the shipped artifact. CLI release `1.1.2` implements runtime contract
 `1.0.0` over database schema `1`. This is a fresh local baseline after an
 explicit run-state reset; manifests and databases from the previous contract
 epoch are not migrated. Worker creation records the task binding first and may
 include an independently read-back creation title. When creation does not set
 the exact title, the separate recorded `set-worker-title` operation uses the
-App's `set_thread_title` API and an independent readback as the fallback.
+App's `set_thread_title` API at most once and an independent readback as the
+fallback. Title outcomes are best-effort telemetry; structural task identity,
+project, checkout, and operational state remain the gates for downstream work.
 Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
 runtime does not add per-file claims. The
@@ -20,7 +22,7 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `1.1.1` | User-facing commands and executable behavior |
+| CLI | `1.1.2` | User-facing commands and executable behavior |
 | Runtime contract | `1.0.0` | Coordination semantics required by an active run |
 | Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
@@ -293,11 +295,11 @@ state and accepts `active` or `idle`; `observed_title` is optional and, when
 present, is the independently read-back creation title. `set-worker-title`
 carries the exact task ID and independently observed title after the App's
 `set_thread_title` fallback call. The latest successful creation or fallback
-title readback must exactly equal the expected title before bootstrap or
-archival. A missing or different final title still records the truthful
-successful title effect, but `finish` returns
-`effect_warning=worker-title-drift` and `cleanup_required=archive-worker`;
-bootstrap is rejected so root can archive the pre-bootstrap task. Successful
+title readback is surfaced as `effect_warning=worker-title-unverified` or
+`effect_warning=worker-title-drift` when the title is missing or different.
+These warnings do not block bootstrap or archival after the structural worker
+evidence is valid, and they never authorize cleanup. A missing or different
+title still records the truthful successful title effect. Successful
 `archive-worker` readback includes the exact recorded `checkout_path` and proves
 that no file, directory, or symlink remains there before `assignment abort` may
 release only its claim. Only `ENOENT` or `ENOTDIR` proves absence; permission,
@@ -311,7 +313,10 @@ it accepts `archived` or
 `field_constraints`, so callers do not infer them from the UI label.
 `create-scope-repair-task` likewise accepts only `active|idle` and may carry an
 optional independently read-back `observed_title`; its title follows the same
-creation-first, fallback-second rule before scope revision.
+creation-first, at-most-one-fallback rule before scope revision. A missing or
+different planner title is reported as `scope-repair-title-unverified` or
+`scope-repair-title-drift` telemetry and does not block the scope revision once
+planner identity and structural state are verified.
 
 Both ready-observation commands require
 `--readiness-mode terminal|peer-input`; the selected value is stored in the
@@ -342,13 +347,14 @@ Every result authorizes only its reported generation.
 generation and returns the exact expected planner title
 `🧭 Scope Repair · <Feature Spec title>`. Creation may record an exact
 independent title readback; if it does not, `set-scope-repair-title` initializes
-that title through `set_thread_title` as the fallback. `send-scope-revision`
-consumes the planner task only after the latest title readback is exact. A
-planner title mismatch
-returns `effect_warning=scope-repair-title-drift` and
-`cleanup_required=archive-scope-repair-task`. `send-scope-revision` stores the
-next generation and derives a stable `scope_revision_id` from the operation ID
-and target generation. Replays keep all three identities unchanged.
+that title through `set_thread_title` at most once as the fallback.
+`send-scope-revision` consumes the planner task after structural identity and
+state are verified, regardless of the title warning. A planner title mismatch
+returns `effect_warning=scope-repair-title-unverified` or
+`effect_warning=scope-repair-title-drift`; it never sets cleanup or blocks the
+revision. `send-scope-revision` stores the next generation and derives a stable
+`scope_revision_id` from the operation ID and target generation. Replays keep
+all three identities unchanged.
 
 An app-operation observation uses the named app-operation protocol and carries
 exactly its `operation_id`, current `launch_count`, and
@@ -372,6 +378,15 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | `set-root-title` | `observed_title` |
 | `archive-worker` | `thread_id`, `checkout_path`, `observed_state` |
 | `archive-scope-repair-task` | `thread_id`, `observed_state` |
+
+For title-bearing actions, `finish` and `app-operation list` derive an
+`effect_warning` from the recorded status and `observed_title`: use
+`worker-title-unverified|worker-title-drift`,
+`scope-repair-title-unverified|scope-repair-title-drift`, or
+`root-title-unverified|root-title-drift` as applicable. These warnings are
+telemetry, not cleanup requests or downstream gates. The task identity,
+project, checkout/worktree, and operational-state fields remain independently
+validated and mandatory where the action requires them.
 
 Unknown or failed observations may carry only the authoritative action subset
 actually observed. A bootstrap observation always identifies the derived
@@ -405,12 +420,13 @@ generation. Its action-specific gates are:
 | `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
 | `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
-| `set-worker-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker title was not changed |
-| `set-scope-repair-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner title was not changed |
-| `set-root-title` | Prior generation is `failed` and `readback_ref` authoritatively proves the title was not changed |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
 | `archive-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner task was not archived or completed |
 | `send-worker-message` | Never replayable |
+
+`set-worker-title`, `set-scope-repair-title`, and `set-root-title` are also
+never replayable: each title mutation is attempted at most once, and an
+unresolved result remains a telemetry warning.
 
 Bootstrap and scope revision have exactly-once logical effect end to end: their
 transport calls may be repeated while the worker accepts the stable logical
@@ -418,9 +434,8 @@ identity once by the rules in `worker-execution.md`. Other replayed operations d
 authoritative proof that the preceding generation had no effect; they do not
 claim downstream deduplication.
 
-`set-root-title` has one logical `operation_id` for each run; an authorized
-failed/no-effect replay is another launch generation of that same operation.
-Its expected title is derived from the immutable assignment count:
+`set-root-title` has one logical `operation_id` for each run and one title
+mutation attempt. Its expected title is derived from the immutable assignment count:
 `🤖 Implement Feature · 1 Spec` for one assignment and
 `🤖 Implement Feature · N Specs` for two or more.
 
@@ -571,7 +586,7 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` is `1.1.1`,
+or build output. `CLI_VERSION` is `1.1.2`,
 `RUNTIME_CONTRACT_VERSION` is `1.0.0`;
 `DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
