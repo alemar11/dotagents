@@ -158,14 +158,19 @@ Choose one visual `run_tag` before the orchestrator is created:
   from 1 through 5.
 - Keep titles concise, specific, and stable for the entire run. Do not include
   progress, status, dates, model settings, or changing worker counts.
-- `codex_app__create_thread` does not accept a `title` parameter. Do not pass a
-  title to it, and do not treat a title embedded in its prompt as the visible
-  task title.
+- The live `codex_app__create_thread` declaration may expose an optional
+  `title` parameter. Inspect the declaration before creating any task and pass
+  only fields it exposes; do not infer title support from an older contract.
+  Study intentionally keeps canonical title initialization in the separate
+  `codex_app__set_thread_title` operation, so neither a creation response nor a
+  title embedded in the prompt is visible-title evidence.
 - After a real `threadId` is returned, initialize the title exactly once with
-  `codex_app__set_thread_title`, passing the requested title and the returned
-  `hostId` when available. This is immediate title initialization, not a later
-  progress rename. Independently read or list the task and record the request
-  receipt, observed title, and evidence source before continuing.
+  `codex_app__set_thread_title`, passing the requested title and only the
+  arguments exposed by its live declaration. The currently verified operation
+  accepts `threadId` and `title`; do not add the returned `hostId` to that call.
+  This is immediate title initialization, not a later progress rename.
+  Independently read or list the task and record the request receipt, observed
+  title, and evidence source before continuing.
 - Never rename a task again to repair drift. If title initialization fails,
   independent verification is unavailable, or the observed title differs,
   preserve the task identity, report `title-setup-failed` or `title-drift`,
@@ -492,6 +497,13 @@ tools only for read-only research or inspection. Keep `model` and `thinking`
 fixed and explicit in every `create_thread` request. Never switch to
 worktrees, generic subagents, raw shell task launchers, or a second
 orchestration mechanism.
+
+Before any task mutation, inspect the live declaration for every App operation
+used by the flow and verify every field that will be passed. In particular, do
+not infer creation-time title support from documentation or prompt text, and
+do not treat a creation response as title evidence. If a required operation or
+argument is unavailable or unverifiable, stop as `unsupported-runtime` before
+creating the topology.
 
 The authorized App task-management calls above are the only exceptions to the
 no-side-effect rule. Apply this availability matrix before and during a run:

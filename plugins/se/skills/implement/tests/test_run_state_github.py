@@ -476,6 +476,136 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertTrue(bootstrap["launch_authorized"])
 
+    def test_worker_title_drift_is_recorded_and_blocks_bootstrap(self) -> None:
+        started = self.start("worker-title-drift-flow")
+        create = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--action",
+            "create-worker",
+            "--subject-id",
+            "spec-01",
+        )
+        checkout = self.base / "worker-title-drift-checkout"
+        checkout.mkdir()
+        creation_observation = self.base / "worker-title-drift-creation.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(create["revision"]),
+            "--operation-id",
+            str(create["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:worker-create-drift",
+            "--readback-ref",
+            "readback:worker-create-drift",
+            "--thread-id",
+            "worker-title-drift-thread",
+            "--project-id",
+            "repository-project",
+            "--checkout-path",
+            str(checkout),
+            "--git-common-dir",
+            str(self.repo),
+            "--observed-state",
+            "idle",
+            "--output",
+            str(creation_observation),
+        )
+        created = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(create["revision"]),
+            "--operation-id",
+            str(create["operation_id"]),
+            "--observation",
+            str(creation_observation),
+        )
+
+        title = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(created["revision"]),
+            "--action",
+            "set-worker-title",
+            "--subject-id",
+            "spec-01",
+        )
+        title_observation = self.base / "worker-title-drift-title.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:worker-title-drift",
+            "--readback-ref",
+            "readback:worker-title-drift",
+            "--thread-id",
+            "worker-title-drift-thread",
+            "--observed-title",
+            "🛠️ Implement Feature · Example (normalized)",
+            "--output",
+            str(title_observation),
+        )
+        titled = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--observation",
+            str(title_observation),
+        )
+        self.assertEqual(titled["status"], "succeeded")
+        self.assertEqual(titled["effect_warning"], "worker-title-drift")
+        self.assertEqual(titled["cleanup_required"], "archive-worker")
+
+        bootstrap = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "worker-title-drift-flow",
+            "--expected-revision",
+            str(titled["revision"]),
+            "--action",
+            "send-bootstrap",
+            "--subject-id",
+            "spec-01",
+            expected=4,
+        )
+        self.assertEqual(bootstrap["error"]["code"], "worker-title-not-verified")
+
     def test_scope_repair_title_is_initialized_after_planner_creation(self) -> None:
         started = self.start("scope-title-flow")
         self.activate_assignment("scope-title-flow")
@@ -594,6 +724,152 @@ class RunStateGitHubScenarios(unittest.TestCase):
             str(title_observation),
         )
         self.assertEqual(titled["status"], "succeeded")
+
+    def test_scope_repair_title_drift_blocks_scope_revision(self) -> None:
+        started = self.start("scope-title-drift-flow")
+        self.activate_assignment("scope-title-drift-flow")
+        blocked = self.invoke(
+            "assignment",
+            "scope-block",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(started["revision"]),
+            "--assignment-id",
+            "spec-01",
+        )
+        planner = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(blocked["revision"]),
+            "--action",
+            "create-scope-repair-task",
+            "--subject-id",
+            "spec-01",
+        )
+        planner_observation = self.base / "scope-title-drift-planner.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(planner["revision"]),
+            "--operation-id",
+            str(planner["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:scope-planner-drift",
+            "--readback-ref",
+            "readback:scope-planner-drift",
+            "--thread-id",
+            "scope-title-drift-thread",
+            "--project-id",
+            "repository-project",
+            "--observed-state",
+            "idle",
+            "--output",
+            str(planner_observation),
+        )
+        created = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(planner["revision"]),
+            "--operation-id",
+            str(planner["operation_id"]),
+            "--observation",
+            str(planner_observation),
+        )
+
+        title = self.invoke(
+            "app-operation",
+            "begin",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(created["revision"]),
+            "--action",
+            "set-scope-repair-title",
+            "--subject-id",
+            "spec-01",
+        )
+        title_observation = self.base / "scope-title-drift-title.json"
+        self.invoke(
+            "app-operation",
+            "observation",
+            "create",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--launch-count",
+            "1",
+            "--status",
+            "succeeded",
+            "--receipt-ref",
+            "receipt:scope-title-drift",
+            "--readback-ref",
+            "readback:scope-title-drift",
+            "--thread-id",
+            "scope-title-drift-thread",
+            "--observed-title",
+            "🧭 Scope Repair · Example (normalized)",
+            "--output",
+            str(title_observation),
+        )
+        titled = self.invoke(
+            "app-operation",
+            "finish",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(title["revision"]),
+            "--operation-id",
+            str(title["operation_id"]),
+            "--observation",
+            str(title_observation),
+        )
+        self.assertEqual(titled["status"], "succeeded")
+        self.assertEqual(titled["effect_warning"], "scope-repair-title-drift")
+        self.assertEqual(titled["cleanup_required"], "archive-scope-repair-task")
+
+        scope_observation = self.invoke(
+            "assignment",
+            "scope-repair-observation",
+            "create",
+            "--run-id",
+            "scope-title-drift-flow",
+            "--expected-revision",
+            str(titled["revision"]),
+            "--assignment-id",
+            "spec-01",
+            "--repair-outcome",
+            "no-op",
+            "--implementation-issue-ref",
+            "owner/repository#43",
+            "--planning-thread-id",
+            "scope-title-drift-thread",
+            "--planning-result-ref",
+            "planning:scope-title-drift",
+            "--authoritative-readback-ref",
+            "readback:scope-title-drift-source",
+            "--output",
+            str(self.base / "scope-title-drift-observation.json"),
+            expected=4,
+        )
+        self.assertEqual(scope_observation["error"]["code"], "scope-repair-title-not-verified")
 
     def test_same_branch_conflict_can_be_reconciled(self) -> None:
         owner = self.start("branch-owner")

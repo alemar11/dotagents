@@ -1,8 +1,10 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.1.0` implements the breaking runtime
-contract `1.0.0` over database schema `1`. Worker creation records the task
+uses the shipped artifact. CLI release `1.1.0` implements runtime contract
+`1.0.0` over database schema `1`. This is a fresh local baseline after an
+explicit run-state reset; manifests and databases from the previous contract
+epoch are not migrated. Worker creation records the task
 binding first; title initialization is a separate recorded
 `set-worker-title` operation using the App's `set_thread_title` API and an
 independent readback. Externally owned scope repair and contract generations remain in
