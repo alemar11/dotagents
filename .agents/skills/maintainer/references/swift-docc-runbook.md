@@ -45,6 +45,7 @@ asset tree and maintaining the local fast-path reference layer from within the
 ## Refresh Flow
 1. Check bundled asset freshness:
    - `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py --check-stale`
+   - Add `--fail-if-stale` when the check is being used as a CI freshness gate.
 2. If stale, refresh the bundle and regenerate `source-map.md`:
    - `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py`
 3. Validate the runtime package shape and link integrity:
@@ -70,6 +71,6 @@ asset tree and maintaining the local fast-path reference layer from within the
 ## Notes
 - `swift_docc_refresh.py` only downloads a new upstream DocC tree when the
   manifest is stale or a refresh is forced; otherwise it keeps the current
-  bundle and regenerates `source-map.md` from the current catalog.
+  bundle and updates `source-map.md` only when the generated content changed.
 - `swift_docc_check.py` is the architectural guardrail: it verifies the runtime
   skill stays free of maintainer internals and that local reference links remain valid.

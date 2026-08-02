@@ -32,6 +32,7 @@ Do not switch source repositories unless the official OKF project moves.
 
 1. Check freshness:
    - `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py --check-stale`
+   - Add `--fail-if-stale` when the check is being used as a CI freshness gate.
 2. If stale, refresh:
    - `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py`
 3. Validate runtime package shape:

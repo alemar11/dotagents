@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import shutil
 import tarfile
 import tempfile
@@ -53,6 +54,11 @@ def parse_args() -> argparse.Namespace:
         help="Report whether the bundled DocC tree is stale without changing files.",
     )
     parser.add_argument(
+        "--fail-if-stale",
+        action="store_true",
+        help="With --check-stale, return non-zero when the asset tree is stale.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Force a bundled-asset refresh even if the manifest matches upstream.",
@@ -89,10 +95,25 @@ def resolve_commit(repo: str, ref: str) -> str:
     return payload["sha"]
 
 
-def download_archive(repo: str, ref: str, destination: Path) -> Path:
-    archive_bytes = download_bytes(f"https://api.github.com/repos/{repo}/tarball/{ref}")
+def safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
+    destination = destination.resolve()
+    for member in archive.getmembers():
+        member_path = (destination / member.name).resolve()
+        if member_path != destination and destination not in member_path.parents:
+            raise ValueError(f"Unsafe archive member path: {member.name!r}")
+        if member.issym() or member.islnk():
+            raise ValueError(f"Archive links are not allowed: {member.name!r}")
+        if not (member.isdir() or member.isfile()):
+            raise ValueError(f"Unsupported archive member type: {member.name!r}")
+    archive.extractall(destination)
+
+
+def download_archive(repo: str, revision: str, destination: Path) -> Path:
+    archive_bytes = download_bytes(
+        f"https://api.github.com/repos/{repo}/tarball/{urllib.parse.quote(revision, safe='')}"
+    )
     with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as archive:
-        archive.extractall(destination)
+        safe_extract(archive, destination)
     extracted = [child for child in destination.iterdir() if child.is_dir()]
     if len(extracted) != 1:
         raise RuntimeError(f"Expected exactly one extracted root, found {len(extracted)}")
@@ -145,39 +166,125 @@ def asset_stale_reasons(manifest: dict | None, repo: str, ref: str, latest_commi
     return reasons
 
 
-def clean_generated_output() -> None:
-    for path in [ASSET_DOCC_DIR, LEGACY_OFFICIAL_DIR, LEGACY_UPSTREAM_DIR]:
-        if path.exists():
-            shutil.rmtree(path)
-    for path in [ASSET_MANIFEST_PATH, SOURCE_MAP_PATH, LEGACY_MANIFEST_PATH]:
-        if path.exists():
-            path.unlink()
+def stale_exit_code(reasons: list[str], fail_if_stale: bool) -> int:
+    return 1 if fail_if_stale and reasons else 0
 
 
-def refresh_assets(catalog: dict, repo: str, ref: str) -> int:
+def path_exists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def remove_path(path: Path) -> None:
+    if not path_exists(path):
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def reserve_backup_path(path: Path) -> Path:
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.backup-",
+        dir=path.parent,
+    )
+    os.close(file_descriptor)
+    temporary_path = Path(temporary_name)
+    temporary_path.unlink()
+    return temporary_path
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+        text=True,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.chmod(temporary_path, mode)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+        os.replace(temporary_path, path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def write_text_if_changed(path: Path, text: str) -> bool:
+    if path.exists() and path.read_text(encoding="utf-8") == text:
+        return False
+    atomic_write_text(path, text)
+    return True
+
+
+def commit_staged_outputs(outputs: list[tuple[Path, Path]]) -> None:
+    backups: list[tuple[Path, Path | None]] = []
+    installed: list[Path] = []
+    try:
+        for _, target in outputs:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            backup = None
+            if path_exists(target):
+                backup = reserve_backup_path(target)
+                os.replace(target, backup)
+            backups.append((target, backup))
+
+        for staged, target in outputs:
+            os.replace(staged, target)
+            installed.append(target)
+    except Exception:
+        for target in reversed(installed):
+            remove_path(target)
+        for target, backup in reversed(backups):
+            if backup is not None and path_exists(backup):
+                os.replace(backup, target)
+        raise
+
+    for _, backup in backups:
+        if backup is not None:
+            remove_path(backup)
+
+
+def cleanup_legacy_outputs() -> None:
+    for path in [LEGACY_OFFICIAL_DIR, LEGACY_UPSTREAM_DIR, LEGACY_MANIFEST_PATH]:
+        remove_path(path)
+
+
+def refresh_assets(
+    catalog: dict,
+    repo: str,
+    revision: str,
+    staging_root: Path,
+) -> tuple[Path, int]:
+    staged_asset_dir = staging_root / ASSET_DOCC_DIR.name
     with tempfile.TemporaryDirectory() as temp_dir:
-        extracted_root = download_archive(repo, ref, Path(temp_dir))
+        extracted_root = download_archive(repo, revision, Path(temp_dir))
         upstream_root = extracted_root / SOURCE_SUBPATH
         if not upstream_root.exists():
             raise FileNotFoundError(f"Missing upstream DocCDocumentation.docc at {upstream_root}")
-        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(upstream_root, ASSET_DOCC_DIR)
-        ensure_media_source_parameter_docs()
+        shutil.copytree(upstream_root, staged_asset_dir)
+        ensure_media_source_parameter_docs(staged_asset_dir / SYMBOLS_PATH.name)
 
     for topic in catalog["topics"]:
-        asset_path = SKILL_DIR / topic["asset_path"]
+        relative_asset_path = Path(topic["asset_path"]).relative_to(
+            "assets/DocCDocumentation.docc"
+        )
+        asset_path = staged_asset_dir / relative_asset_path
         if not asset_path.exists():
             raise FileNotFoundError(
                 f"Missing bundled asset for topic {topic['id']}: {asset_path}"
             )
 
-    return sum(1 for path in ASSET_DOCC_DIR.rglob("*") if path.is_file())
+    return staged_asset_dir, sum(1 for path in staged_asset_dir.rglob("*") if path.is_file())
 
 
-def ensure_media_source_parameter_docs() -> bool:
-    if not SYMBOLS_PATH.exists():
+def ensure_media_source_parameter_docs(symbols_path: Path) -> bool:
+    if not symbols_path.exists():
         return False
-    data = json.loads(SYMBOLS_PATH.read_text(encoding="utf-8"))
+    data = json.loads(symbols_path.read_text(encoding="utf-8"))
     changed = False
     for symbol in data.get("symbols", []):
         precise = symbol.get("identifier", {}).get("precise")
@@ -192,21 +299,26 @@ def ensure_media_source_parameter_docs() -> bool:
                 changed = True
                 break
     if changed:
-        SYMBOLS_PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        atomic_write_text(symbols_path, json.dumps(data, indent=2) + "\n")
     return changed
 
 
+def render_manifest(repo: str, ref: str, commit: str) -> str:
+    return json.dumps(
+        {
+            "repo": repo,
+            "ref": ref,
+            "resolved_commit": commit,
+            "source_subpath": SOURCE_SUBPATH.as_posix(),
+            "downloaded_at": datetime.now(timezone.utc).isoformat(),
+            "official_base_url": OFFICIAL_BASE_URL,
+        },
+        indent=2,
+    ) + "\n"
+
+
 def write_manifest(repo: str, ref: str, commit: str) -> None:
-    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    manifest = {
-        "repo": repo,
-        "ref": ref,
-        "resolved_commit": commit,
-        "source_subpath": SOURCE_SUBPATH.as_posix(),
-        "downloaded_at": datetime.now(timezone.utc).isoformat(),
-        "official_base_url": OFFICIAL_BASE_URL,
-    }
-    ASSET_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(ASSET_MANIFEST_PATH, render_manifest(repo, ref, commit))
 
 
 def main() -> int:
@@ -226,14 +338,37 @@ def main() -> int:
         if reasons:
             for reason in reasons:
                 print(f"- {reason}")
-        return 0
+        return stale_exit_code(reasons, args.fail_if_stale)
 
     source_map_text = render_source_map(catalog)
     if args.force or reasons:
-        clean_generated_output()
-        asset_file_count = refresh_assets(catalog, args.repo, args.ref)
-        SOURCE_MAP_PATH.write_text(source_map_text, encoding="utf-8")
-        write_manifest(args.repo, args.ref, latest_commit)
+        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=".swift-docc-refresh-",
+            dir=REPO_ROOT,
+        ) as temporary_dir:
+            staging_root = Path(temporary_dir)
+            staged_asset_dir, asset_file_count = refresh_assets(
+                catalog,
+                args.repo,
+                latest_commit,
+                staging_root,
+            )
+            staged_source_map = staging_root / SOURCE_MAP_PATH.name
+            staged_source_map.write_text(source_map_text, encoding="utf-8")
+            staged_manifest = staging_root / ASSET_MANIFEST_PATH.name
+            staged_manifest.write_text(
+                render_manifest(args.repo, args.ref, latest_commit),
+                encoding="utf-8",
+            )
+            commit_staged_outputs(
+                [
+                    (staged_asset_dir, ASSET_DOCC_DIR),
+                    (staged_source_map, SOURCE_MAP_PATH),
+                    (staged_manifest, ASSET_MANIFEST_PATH),
+                ]
+            )
+        cleanup_legacy_outputs()
         print("Bundled Swift-DocC assets refreshed.")
         print(f"- Asset root: {ASSET_DOCC_DIR}")
         print(f"- Asset files: {asset_file_count}")
@@ -242,11 +377,12 @@ def main() -> int:
         print(f"- Upstream: {args.repo}@{args.ref} ({latest_commit})")
         return 0
 
-    SOURCE_MAP_PATH.write_text(source_map_text, encoding="utf-8")
+    source_map_changed = write_text_if_changed(SOURCE_MAP_PATH, source_map_text)
     print("Bundled Swift-DocC assets already up to date.")
     print(f"- Manifest: {ASSET_MANIFEST_PATH}")
     print(f"- Upstream: {args.repo}@{args.ref} ({latest_commit})")
-    print(f"- Source map regenerated: {SOURCE_MAP_PATH}")
+    if source_map_changed:
+        print(f"- Source map updated: {SOURCE_MAP_PATH}")
     return 0
 
 

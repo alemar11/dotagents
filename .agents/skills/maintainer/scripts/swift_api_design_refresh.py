@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -34,6 +36,11 @@ def parse_args() -> argparse.Namespace:
         help="Report whether the bundled source asset is stale without changing files.",
     )
     parser.add_argument(
+        "--fail-if-stale",
+        action="store_true",
+        help="With --check-stale, return non-zero when the asset is stale.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Force a bundled-asset refresh even if the manifest matches upstream.",
@@ -57,6 +64,25 @@ def download_text(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read().decode("utf-8")
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+        text=True,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.chmod(temporary_path, mode)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+        os.replace(temporary_path, path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def resolve_commit(repo: str, ref: str) -> str:
@@ -97,6 +123,10 @@ def asset_stale_reasons(manifest: dict | None, repo: str, ref: str, latest_commi
     return reasons
 
 
+def stale_exit_code(reasons: list[str], fail_if_stale: bool) -> int:
+    return 1 if fail_if_stale and reasons else 0
+
+
 def write_manifest(repo: str, ref: str, commit: str) -> None:
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -107,7 +137,7 @@ def write_manifest(repo: str, ref: str, commit: str) -> None:
         "downloaded_at": datetime.now(timezone.utc).isoformat(),
         "official_base_url": OFFICIAL_BASE_URL,
     }
-    ASSET_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(ASSET_MANIFEST_PATH, json.dumps(manifest, indent=2) + "\n")
 
 
 def main() -> int:
@@ -126,13 +156,13 @@ def main() -> int:
         if reasons:
             for reason in reasons:
                 print(f"- {reason}")
-        return 0
+        return stale_exit_code(reasons, args.fail_if_stale)
 
     if args.force or reasons:
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        ASSET_SOURCE_PATH.write_text(
-            download_text(raw_source_url(args.repo, args.ref)),
-            encoding="utf-8",
+        atomic_write_text(
+            ASSET_SOURCE_PATH,
+            download_text(raw_source_url(args.repo, latest_commit)),
         )
         write_manifest(args.repo, args.ref, latest_commit)
         print("Bundled Swift API Design source refreshed.")

@@ -59,6 +59,7 @@ from within the `Maintainer` project skill.
 
 1. Check bundled asset freshness:
    - `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py --check-stale`
+   - Add `--fail-if-stale` when the check is being used as a CI freshness gate.
 2. If stale, refresh the bundle:
    - `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py`
 3. Validate the runtime package shape and link integrity:

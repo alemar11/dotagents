@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import tempfile
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -34,6 +36,11 @@ def parse_args() -> argparse.Namespace:
         help="Report whether the bundled OKF spec is stale without changing files.",
     )
     parser.add_argument(
+        "--fail-if-stale",
+        action="store_true",
+        help="With --check-stale, return non-zero when the spec is stale.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Force a refresh even if the local manifest matches upstream.",
@@ -51,6 +58,25 @@ def download_text(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read().decode("utf-8")
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+        text=True,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.chmod(temporary_path, mode)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+        os.replace(temporary_path, path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def resolve_commit(repo: str, ref: str) -> str:
@@ -114,9 +140,13 @@ def stale_reasons(manifest: dict | None, repo: str, ref: str, commit: str, text:
     return reasons
 
 
+def stale_exit_code(reasons: list[str], fail_if_stale: bool) -> int:
+    return 1 if fail_if_stale and reasons else 0
+
+
 def write_bundle(repo: str, ref: str, commit: str, text: str) -> None:
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    SPEC_PATH.write_text(text, encoding="utf-8")
+    atomic_write_text(SPEC_PATH, text)
     manifest = {
         "repo": repo,
         "ref": ref,
@@ -127,7 +157,7 @@ def write_bundle(repo: str, ref: str, commit: str, text: str) -> None:
         "downloaded_at": datetime.now(timezone.utc).isoformat(),
         "official_tree_url": OFFICIAL_TREE_URL,
     }
-    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(MANIFEST_PATH, json.dumps(manifest, indent=2) + "\n")
 
 
 def main() -> int:
@@ -148,7 +178,7 @@ def main() -> int:
             print(f"- Local manifest commit: {manifest['resolved_commit']}")
         for reason in reasons:
             print(f"- {reason}")
-        return 0
+        return stale_exit_code(reasons, args.fail_if_stale)
 
     if args.force or reasons:
         write_bundle(args.repo, args.ref, commit, text)
