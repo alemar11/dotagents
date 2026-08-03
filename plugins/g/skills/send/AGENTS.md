@@ -13,7 +13,8 @@ and `references/workflows.md`.
   connector-backed operations own supported existing-PR lifecycle changes.
 - `scripts/g stack link` owns the explicit two-PR stack relationship;
   Send retains ownership of the current branch push, PR body, draft-state
-  preservation, and review handoff. Do not route this path through
+  preservation, and publication handoff. Review requests remain owned by the
+  focused review skill and its composing caller. Do not route this path through
   `gh stack submit`, which publishes every branch in a local stack.
 - Keep closing-issue references, target-PR detection, and PR body construction
   in the send workflow references. Merge and post-merge work remain outside

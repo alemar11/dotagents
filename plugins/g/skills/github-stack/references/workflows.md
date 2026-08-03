@@ -61,7 +61,7 @@ it is not atomic and may leave earlier branches published if a later push fails.
 
 Do not use this path for a normal `$g:send` request. It does not create
 the Send-owned issue linkage, body verification, draft-preservation evidence,
-or Codex review receipt.
+or the one-branch publication evidence.
 
 ## Modify a middle layer
 

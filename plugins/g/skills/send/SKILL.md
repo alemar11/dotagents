@@ -1,6 +1,6 @@
 ---
 name: send
-description: Send local work for review. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, link every confirmed resolved issue for automatic closure, open a draft or update an existing pull request without changing its draft state, link the new PR to an existing target PR when applicable, and request a current-head Codex review.
+description: Send local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, link every confirmed resolved issue for automatic closure, open a draft or update an existing pull request without changing its draft state, and link the new PR to an existing target PR when applicable.
 ---
 
 # Send
@@ -47,8 +47,8 @@ Prefer the shortest publish path that matches the state in front of you:
 - If a good local commit already exists, reuse it instead of reopening commit
   authoring.
 - If the branch already has a PR, update that PR instead of treating the run as
-  a fresh publish. Preserve its current draft or ready state, then request a
-  Codex review for the newly published head.
+  a fresh publish. Preserve its current draft or ready state and return the
+  exact publication read-back.
 - If the selected PR base branch is itself the head of exactly one open PR in
   this repository, publish or update the current PR against that branch and
   link the target and current PR as one stacked pair after the child PR is
@@ -170,25 +170,18 @@ closeout. See `references/workflows.md` for body construction and verification.
    base to equal the selected target branch; never retarget it implicitly. Read
    back the target identity and child base before linking, then run the typed
    `stack link` flow above and verify both PRs after the link.
-8. For both a newly created PR and an existing PR, hand a current-head Codex
-   review request to `$g:github-review-threads` with the exact repository
-   and PR, `provider=codex`, and the full published head SHA. Use
-   `review_operation=request` with `mutation_mode=apply` and a fresh
-   Send-owned request key for this logical publish invocation; preserve that
-   key for reconciliation, then persist the complete typed request receipt.
-   This request is part of Send's authorized publish flow; do not require a
-   separate caller gate. Do not substitute an untyped PR comment.
-9. Use one operation per invocation. Run
-   `review_operation=wait` with the persisted complete receipt only when the
-   user or composing caller also requested bounded review monitoring. Do not
-   duplicate provider detection or polling inside Send.
-10. Return branch, PR URL, commit hash, PR base, canonical
-   `closing_issue_refs`, issue-linkage verification, Codex review request
-   status and receipt identity, stacked target PR identity and
-   `stack_link_receipt` when applicable, and verification performed. If the
-   review request or stack link fails after the push or PR mutation succeeded,
-   preserve and report the successful publish evidence separately; do not
-   repeat the push, PR creation, link, or review request blindly.
+8. Stop after publication and its read-backs. Send must not request or wait for
+   an automated Codex review. If a composing workflow needs one, it must invoke
+   `$g:github-review-threads` as a separate operation using the exact repository,
+   PR, and full published head SHA from Send's publication evidence. The ready
+   transition and any automatic provider review remain outside Send.
+9. Return branch, PR URL, commit hash, PR base, canonical
+   `closing_issue_refs`, issue-linkage verification, exact published head and
+   draft-state read-back, stacked target PR identity and `stack_link_receipt`
+   when applicable, and verification performed. If the
+   post-publication verification or stack link fails after the push or PR
+   mutation succeeded, preserve and report the successful publish evidence
+   separately; do not repeat the push, PR creation, or link blindly.
 
 ## References
 

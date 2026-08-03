@@ -27,16 +27,15 @@ operation.
 ## Boundaries
 
 - Use `$g:send` for publishing or updating one PR, including its title,
-  body, closing issue references, draft state, push ownership, and Codex review
-  receipt.
+  body, closing issue references, draft state, and push ownership.
 - `send` may invoke `stack link` for one target/current PR pair. Do not replace
   that flow with `stack submit`.
 - Use this skill when the user explicitly asks for stack-wide publication,
   navigation, rebase, sync, restructuring, merge, or recovery.
 - Do not silently turn a single-PR request into a stack-wide operation.
 - `stack submit` is an explicit multi-branch publication mode. It does not
-  inherit `send`'s issue-linkage, body, draft-preservation, or review-receipt
-  contract; route those responsibilities separately when required.
+  inherit `send`'s issue-linkage, body, or draft-preservation contract; route
+  those responsibilities separately when required.
 
 ## Readiness and authorization
 

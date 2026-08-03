@@ -69,7 +69,7 @@ drift and stops the operation.
 The target branch is an already published PR only when this lookup succeeds.
 Do not make `gh stack submit` the fallback: it pushes every local stack branch
 and creates or updates every PR in that stack, which bypasses Send's one-branch
-push, body, draft-state, and review contracts.
+push, body, and draft-state contracts.
 
 ### Closing Issue References
 
@@ -183,7 +183,7 @@ the selected target branch; Send never silently retargets an existing PR.
 After the post-push lookup returns the exact existing PR or `publish open`
 returns the exact newly created PR, require the PR head to equal the full
 published commit SHA. If `target_pr` exists, read back the target and child PRs
-and link them before requesting review:
+and link them before final publication verification:
 
 ```bash
 <plugin-root>/scripts/g --json stack ensure
@@ -198,19 +198,12 @@ persist the command output or stack identity as `stack_link_receipt`. Do not
 call `stack submit`, `stack push`, `stack sync`, `stack rebase`, or `stack merge`
 from this flow. `stack ensure --install` is never implicit.
 
-Only after the optional link succeeds and the child PR still has the full
-published head SHA, invoke `$g:github-review-threads` for the exact
-repository and PR with `review_operation=request`, `mutation_mode=apply`,
-`provider=codex`, that full head SHA, and a fresh Send-owned request key for this
-logical publish invocation. Preserve the key for reconciliation and persist
-the complete typed request receipt. This step is required for both new and
-existing PR paths. It must use the typed request operation, not a plain
-discussion comment.
-
-Do not wait by default. If the user or a composing caller also requested
-monitoring, invoke `$g:github-review-threads` again with
-`review_operation=wait`, the persisted complete receipt, and the caller-owned
-bounded duration. Keep the request and wait as separate operations.
+After the optional link succeeds, verify the exact repository, PR, base, full
+published head SHA, draft state, issue linkage, and `stack_link_receipt` when a
+target PR exists. Send stops after this publication evidence. It must not
+request or wait for an automated Codex review. A composing workflow may invoke
+`$g:github-review-threads` separately using this exact publication evidence;
+the ready transition and any automatic provider review remain outside Send.
 
 ## No Publishable Local Work
 
@@ -256,9 +249,9 @@ read back every expected line exactly once. Preserve every previously valid
 closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
 keep it draft. After the normal push updates this PR, verify its full head SHA,
 unchanged draft state, unchanged base, and complete issue linkage. If the PR's
-base branch is the head of exactly one `target_pr`, perform the two-PR stack
-link after that read-back and before the required typed current-head Codex
-review request described in `Publish New Work`.
+base branch is the head of exactly one `target_pr`, perform the two-PR stack link
+after that read-back and before final publication verification described in
+`Publish New Work`.
 
 ## Safe Retry
 
@@ -274,10 +267,6 @@ review request described in `Publish New Work`.
   PR, preserve the child publication evidence and report the stack relationship
   as unverified. Re-read the target and child PRs before any explicitly
   authorized repair; do not repeat the child push or PR creation.
-- If the typed Codex review request fails after a confirmed push or PR
-  creation, preserve and report the successful publish evidence and the exact
-  review-request failure separately. Do not repeat the push, PR creation, or
-  review request blindly.
 - On any changed branch, remote, upstream, authentication, or PR state, stop and
   rerun the full preflight rather than continuing from stale assumptions.
 
@@ -292,11 +281,11 @@ Return:
 - PR base and current default branch
 - `target_pr` and `stack_link_receipt` when a target PR existed
 - canonical `closing_issue_refs` and exact PR-body read-back
-- current-head Codex review request status and typed receipt identity
+- exact published head SHA and draft-state read-back
 - validation performed before publishing
 
 If CI fails or review comments need follow-up, route to
 `$g:github-actions` or `$g:github-review-threads` after the
-publish and required review-request steps. Supply the exact repository and PR
+publish step. Supply the exact repository and PR
 plus one `review_operation`; add `mutation_mode=apply` only for an authorized
 reply, request, review submission, or resolution.
