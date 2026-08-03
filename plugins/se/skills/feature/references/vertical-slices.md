@@ -238,6 +238,9 @@ weaker agent-ready variant.
 
 ## Repair Order
 
+Contract Repair reruns this complete order after applying its evidence-backed
+semantic correction; it does not stop after validating the changed clause.
+
 When validation fails, repair in this order:
 
 1. feature scope and acceptance ambiguity;

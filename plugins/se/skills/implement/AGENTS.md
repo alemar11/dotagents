@@ -19,7 +19,7 @@ file records maintenance contracts for the package.
   never write run state.
 - `tests/test_run_state_github.py` and `tests/test_verify_ready.py` are the
   focused executable regression surfaces. The other references own startup,
-  worker, recovery, scope-repair, and closeout details.
+  worker, recovery, contract-repair, and closeout details.
 
 ## Maintenance contract
 
@@ -48,7 +48,7 @@ file records maintenance contracts for the package.
 - Keep worker implementation and review evidence worker-owned, root follow-up
   evidence-only, and cross-worktree access forbidden. Do not persist raw
   Feature Spec or issue bodies in run state.
-- Treat worker/task identity, exact HEAD evidence, scope revision, and
+- Treat worker/task identity, exact HEAD evidence, contract revision, and
   recovery observations as typed protocol data. Reject stale generations and
   unknown fields instead of adding compatibility readers.
 
@@ -57,5 +57,5 @@ file records maintenance contracts for the package.
 - Run the focused run-state and `verify-ready` suites for helper or protocol
   changes.
 - Verify each shipped command's help/version and read-only or doctor checks;
-  exercise recovery or scope repair with a bounded fixture when those paths
+  exercise recovery or contract repair with a bounded fixture when those paths
   change.

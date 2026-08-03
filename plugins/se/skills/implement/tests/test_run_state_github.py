@@ -55,8 +55,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
     def manifest(self, run_id: str) -> dict[str, object]:
         return {
             "schema": "implement-feature/run-manifest",
-            "schema_version": "4.0.0",
-            "runtime_contract_version": "1.0.0",
+            "schema_version": "5.0.0",
+            "runtime_contract_version": "2.0.0",
             "run_id": run_id,
             "root_task_id": f"root-{run_id}",
             "controller_project_id": "controller-project",
@@ -235,8 +235,8 @@ class RunStateGitHubScenarios(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(metadata_columns, {"singleton", "schema_version"})
-        self.assertEqual(reservation_columns, {"run_id", "action", "subject_id", "operation_id", "created_at"})
-        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 1)
+        self.assertEqual(reservation_columns, {"run_id", "action", "operation_key", "operation_id", "created_at"})
+        self.assertEqual(self.invoke("capabilities")["database_schema_version"], 2)
         self.assertEqual(journal_mode, "wal")
         self.assertNotIn("regenerated", prepared)
         self.assertNotIn("tracker_backend", assignment_columns)
@@ -677,12 +677,12 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertTrue(bootstrap["launch_authorized"])
 
-    def test_scope_repair_title_is_initialized_after_planner_creation(self) -> None:
+    def test_contract_repair_title_is_initialized_after_planner_creation(self) -> None:
         started = self.start("scope-title-flow")
         self.activate_assignment("scope-title-flow")
         blocked = self.invoke(
             "assignment",
-            "scope-block",
+            "contract-block",
             "--run-id",
             "scope-title-flow",
             "--expected-revision",
@@ -698,7 +698,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(blocked["revision"]),
             "--action",
-            "create-scope-repair-task",
+            "create-contract-repair-task",
             "--subject-id",
             "spec-01",
         )
@@ -751,11 +751,11 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(created["revision"]),
             "--action",
-            "set-scope-repair-title",
+            "set-contract-repair-title",
             "--subject-id",
             "spec-01",
         )
-        self.assertEqual(title["expected_title"], "🧭 Scope Repair · Example")
+        self.assertEqual(title["expected_title"], "🧭 Contract Repair · Example")
         title_observation = self.base / "scope-planner-title-observation.json"
         self.invoke(
             "app-operation",
@@ -778,7 +778,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--thread-id",
             "scope-planner-thread",
             "--observed-title",
-            "🧭 Scope Repair · Example",
+            "🧭 Contract Repair · Example",
             "--output",
             str(title_observation),
         )
@@ -796,12 +796,12 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         self.assertEqual(titled["status"], "succeeded")
 
-    def test_scope_repair_creation_title_readback_allows_scope_observation(self) -> None:
+    def test_contract_repair_creation_title_readback_allows_scope_observation(self) -> None:
         started = self.start("scope-creation-title-flow")
         self.activate_assignment("scope-creation-title-flow")
         blocked = self.invoke(
             "assignment",
-            "scope-block",
+            "contract-block",
             "--run-id",
             "scope-creation-title-flow",
             "--expected-revision",
@@ -817,7 +817,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(blocked["revision"]),
             "--action",
-            "create-scope-repair-task",
+            "create-contract-repair-task",
             "--subject-id",
             "spec-01",
         )
@@ -845,7 +845,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--project-id",
             "repository-project",
             "--observed-title",
-            "🧭 Scope Repair · Example",
+            "🧭 Contract Repair · Example",
             "--observed-state",
             "idle",
             "--output",
@@ -865,7 +865,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         )
         scope_observation = self.invoke(
             "assignment",
-            "scope-repair-observation",
+            "contract-repair-observation",
             "create",
             "--run-id",
             "scope-creation-title-flow",
@@ -886,15 +886,15 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--output",
             str(self.base / "scope-creation-title-observation.json"),
         )
-        self.assertEqual(scope_observation["observation_kind"], "scope-repair")
+        self.assertEqual(scope_observation["observation_kind"], "contract-repair")
         self.assertTrue(scope_observation["artifact_written"])
 
-    def test_scope_repair_title_drift_does_not_block_scope_revision(self) -> None:
+    def test_contract_repair_title_drift_does_not_block_contract_revision(self) -> None:
         started = self.start("scope-title-drift-flow")
         self.activate_assignment("scope-title-drift-flow")
         blocked = self.invoke(
             "assignment",
-            "scope-block",
+            "contract-block",
             "--run-id",
             "scope-title-drift-flow",
             "--expected-revision",
@@ -910,7 +910,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(blocked["revision"]),
             "--action",
-            "create-scope-repair-task",
+            "create-contract-repair-task",
             "--subject-id",
             "spec-01",
         )
@@ -963,7 +963,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(created["revision"]),
             "--action",
-            "set-scope-repair-title",
+            "set-contract-repair-title",
             "--subject-id",
             "spec-01",
         )
@@ -989,7 +989,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--thread-id",
             "scope-title-drift-thread",
             "--observed-title",
-            "🧭 Scope Repair · Example (normalized)",
+            "🧭 Contract Repair · Example (normalized)",
             "--output",
             str(title_observation),
         )
@@ -1006,12 +1006,12 @@ class RunStateGitHubScenarios(unittest.TestCase):
             str(title_observation),
         )
         self.assertEqual(titled["status"], "succeeded")
-        self.assertEqual(titled["effect_warning"], "scope-repair-title-drift")
+        self.assertEqual(titled["effect_warning"], "contract-repair-title-drift")
 
         scope_observation_path = self.base / "scope-title-drift-observation.json"
         scope_observation = self.invoke(
             "assignment",
-            "scope-repair-observation",
+            "contract-repair-observation",
             "create",
             "--run-id",
             "scope-title-drift-flow",
@@ -1041,13 +1041,106 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "--expected-revision",
             str(titled["revision"]),
             "--action",
-            "send-scope-revision",
+            "send-contract-revision",
             "--subject-id",
             "spec-01",
-            "--scope-repair-observation",
+            "--contract-repair-observation",
             str(scope_observation_path),
         )
         self.assertTrue(revision["launch_authorized"])
+
+    def test_contract_repairs_may_open_serially_at_later_generations(self) -> None:
+        started = self.start("serial-contract-repair")
+        self.activate_assignment("serial-contract-repair")
+        first = self.invoke(
+            "assignment", "contract-block",
+            "--run-id", "serial-contract-repair",
+            "--expected-revision", str(started["revision"]),
+            "--assignment-id", "spec-01",
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                """UPDATE assignments
+                   SET state='active',blocked_from_state=NULL,contract_generation=2,
+                       contract_repair_id=NULL,contract_repair_readback_ref='readback:first'
+                   WHERE run_id='serial-contract-repair' AND assignment_id='spec-01'"""
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        second = self.invoke(
+            "assignment", "contract-block",
+            "--run-id", "serial-contract-repair",
+            "--expected-revision", str(first["revision"]),
+            "--assignment-id", "spec-01",
+        )
+        self.assertEqual(second["contract_generation"], 2)
+        self.assertNotEqual(second["repair_id"], first["repair_id"])
+        self.assertTrue(second["claim_retained"])
+
+    def test_incompatible_contract_repair_supersedes_worker_for_replacement(self) -> None:
+        started = self.start("contract-supersession")
+        thread_id, checkout = self.activate_assignment("contract-supersession")
+        blocked = self.invoke(
+            "assignment", "contract-block",
+            "--run-id", "contract-supersession",
+            "--expected-revision", str(started["revision"]),
+            "--assignment-id", "spec-01",
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                """INSERT INTO app_operations(
+                       run_id,operation_id,action,subject_id,assignment_id,status,
+                       launch_count,created_at,updated_at,contract_generation,contract_repair_id
+                   ) VALUES (?,?,?,?,?,'succeeded',1,?,?,?,?)""",
+                (
+                    "contract-supersession", "op-planner", "create-contract-repair-task",
+                    "spec-01", "spec-01", "2026-08-03T00:00:00+00:00",
+                    "2026-08-03T00:00:00+00:00", 1, blocked["repair_id"],
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        superseded = self.invoke(
+            "assignment", "contract-supersede",
+            "--run-id", "contract-supersession",
+            "--expected-revision", str(blocked["revision"]),
+            "--assignment-id", "spec-01",
+            "--worker-head-sha", "a" * 40,
+            "--authoritative-readback-ref", "readback:incompatible-bundle",
+        )
+        self.assertEqual(superseded["state"], "planned")
+        self.assertEqual(superseded["replacement_worker_generation"], 2)
+        self.assertEqual(superseded["preserved_thread_id"], thread_id)
+        self.assertEqual(superseded["preserved_checkout_path"], str(checkout.resolve()))
+        connection = sqlite3.connect(self.database)
+        try:
+            recorded = connection.execute(
+                """SELECT worker_generation,thread_id,checkout_path,head_sha,readback_ref
+                   FROM assignment_supersessions
+                   WHERE run_id='contract-supersession' AND assignment_id='spec-01'"""
+            ).fetchone()
+            current = connection.execute(
+                """SELECT state,worker_generation,thread_id,checkout_path
+                   FROM assignments
+                   WHERE run_id='contract-supersession' AND assignment_id='spec-01'"""
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertEqual(recorded, (1, thread_id, str(checkout.resolve()), "a" * 40, "readback:incompatible-bundle"))
+        self.assertEqual(current, ("planned", 2, None, None))
+        replacement = self.invoke(
+            "app-operation", "begin",
+            "--run-id", "contract-supersession",
+            "--expected-revision", str(superseded["revision"]),
+            "--action", "create-worker",
+            "--subject-id", "spec-01",
+        )
+        self.assertTrue(replacement["launch_authorized"])
+        self.assertEqual(replacement["expected_title"], "🛠️ Implement Feature · Example")
 
     def test_same_branch_conflict_can_be_reconciled(self) -> None:
         owner = self.start("branch-owner")
@@ -1204,7 +1297,7 @@ class RunStateGitHubScenarios(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             reservation = connection.execute(
-                """SELECT run_id,action,subject_id,operation_id
+                """SELECT run_id,action,operation_key,operation_id
                    FROM app_operation_reservations""",
             ).fetchone()
         finally:
@@ -1265,11 +1358,11 @@ class RunStateGitHubScenarios(unittest.TestCase):
 
     def test_review_owner_is_fixed_to_worker(self) -> None:
         capabilities = self.invoke("capabilities")
-        self.assertEqual(capabilities["cli_version"], "1.1.2")
-        self.assertEqual(capabilities["runtime_contract_version"], "1.0.0")
+        self.assertEqual(capabilities["cli_version"], "2.0.0")
+        self.assertEqual(capabilities["runtime_contract_version"], "2.0.0")
         self.assertEqual(
             capabilities["protocols"]["app_operation_observation"]["version"],
-            "1.0.0",
+            "2.0.0",
         )
 
         removed_option = self.invoke(

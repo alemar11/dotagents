@@ -15,7 +15,8 @@ planning behavior stays in `SKILL.md` and phase-owned references.
   Project Context routing and closeout, while Feature owns the
   focused repository research, issue hardening, and artifact merge required
   before an issue is agent-ready.
-- `tests/` protects graph compression, scope repair, and validator behavior.
+- `tests/` protects graph compression and the plugin-level stateless Contract
+  Repair validator behavior.
 
 ## Maintenance contract
 
@@ -41,6 +42,9 @@ planning behavior stays in `SKILL.md` and phase-owned references.
 - Keep issue hardening as an internal Feature phase. Research only the relevant
   codebase files, contracts, documentation, and tests; preserve caller-owned
   scope and dependencies; and persist only the final stable issue body.
+- Keep Contract Repair semantic authority in Feature while the exact portable
+  boundary and stateless validator remain plugin-level. Preserve executor-owned
+  progress and evidence on every retained artifact.
 
 ## Validation
 

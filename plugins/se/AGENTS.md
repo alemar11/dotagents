@@ -20,6 +20,9 @@ maintenance.
   enables plugins.
 - `references/ready-gate.md` owns the execution-readiness gate consumed by
   `implement`.
+- `references/contract-repair.md` owns the portable Feature/Implement repair
+  boundary; `scripts/validate-contract-repair` enforces its structural
+  invariants without owning repair semantics or Codex effects.
 - `skills/idea/` owns Idea capture, including conditional lightweight intake
   clarification, and stops after capture reporting.
 - `skills/feature/` owns complete Feature Spec and implementation-issue planning,
@@ -46,6 +49,9 @@ maintenance.
   hardening skill or caller-result envelope.
 - Keep `implement` as a separate public bundled skill; do not merge execution
   orchestration into `feature`.
+- Keep Contract Repair as one general route. Feature owns contract semantics;
+  Implement owns suspension, task lifecycle, readback, continuation, and
+  supersession; the root never edits planning or repository artifacts.
 - Keep `run_mode: preview | publish` identical across `idea` and `feature`;
   `implement` retains its own startup-authorization contract.
 - Do not reintroduce retired public skill identifiers `project-context` or

@@ -5,8 +5,8 @@ The behavior-affecting startup fields are:
 | Field | Allowed values | Meaning |
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories have no separate repo-specific saved Git project, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
-| `visible_app_task_permission` | `granted`, `denied` | Permit every disclosed Codex App task required by this run, including the Implement root, workers, bounded scope-repair Feature tasks, and ChatGPT-created worktrees. |
-| `scope_repair_task_permission` | `granted`, `denied` | Internal derived control for the bounded scope-repair Feature task; it is resolved together with `visible_app_task_permission` and is not a separate user decision. |
+| `visible_app_task_permission` | `granted`, `denied` | Permit every disclosed Codex App task required by this run, including the Implement root, workers, necessary contract-repair Feature tasks, and ChatGPT-created worktrees. |
+| `contract_repair_task_permission` | `granted`, `denied` | Internal derived control for all necessary contract-repair Feature tasks; it is resolved together with `visible_app_task_permission` and is not a separate user decision. |
 
 Before creating the root, disclose the root controller task, its exact local
 project, and its fixed `gpt-5.6-sol` / `thinking: medium` profile. After
@@ -21,7 +21,7 @@ terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fix
 `$se:implement` request to start, implement, or resume the selected Specs
 explicitly requests the root and those exact worker task profiles and resolves
 `visible_app_task_permission=granted` and
-`scope_repair_task_permission=granted` without an additional root-, worker-,
+`contract_repair_task_permission=granted` without an additional root-, worker-,
 planner-, or task-creation question. An explicit denial overrides both grants
 and stops before mutation. When no project is missing, there is no startup
 authorization question.
@@ -37,7 +37,7 @@ authorization interaction:
 > - `<repository>` — `<absolute-path>`
 >
 > The explicit execution request already authorizes every Codex App task required
-> by the disclosed run, including the root, workers, and any bounded scope-repair
+> by the disclosed run, including the root, workers, and any necessary contract-repair
 > Feature task.
 > Do you also authorize me to create exactly these persistent projects in the
 > ChatGPT App through Computer Use? Project creation is distinct from task creation.
@@ -62,16 +62,16 @@ root or `/private/tmp`, never silently create another project, and
 never treat task permission as project-creation permission.
 
 `granted` covers every disclosed task lifecycle: root monitoring,
-implementation, compatible rewrites, bounded scope-repair planning, repairs,
+implementation, compatible rewrites, contract-repair planning, repairs,
 tests, command approvals through the ChatGPT App, publication, review fixes,
 tracker checkboxes, recovery, and final evidence. It does not authorize merge,
 deployment, release, post-merge closure, or work outside the durable contract.
 
-`scope_repair_task_permission=granted` is derived automatically by an explicit
-execution invocation and authorizes only the bounded, separate planner task
-described in `scope-repair-orchestration.md`; it grants no planning authority
+`contract_repair_task_permission=granted` is derived automatically by an explicit
+execution invocation and authorizes every necessary separate planner task
+described in `contract-repair-orchestration.md`; it grants no planning authority
 to root or workers. A `denied` value can only come from an explicit task-
-creation denial, leaves a later scope request declaratively blocked, and does
+creation denial, leaves a later contract-repair request declaratively blocked, and does
 not trigger another user question.
 
 After the preflight and any optional missing-project interaction, do not ask

@@ -255,12 +255,12 @@ decisions that materially change scope, acceptance, dependencies, validation,
 or repository ownership.
 
 On the existing-source route, do not draft or update the source unless the
-invocation contains the exact `scope_repair_request` accepted by
-`scope-repair.md`. For that one exception, delegate request validation,
-monotonic path expansion, mutation ordering, audit, recovery, and result to that
-reference and preserve every other stable and executor-owned field.
+invocation contains the exact `contract_repair_request` accepted by
+`contract-repair.md`. For that one exception, delegate request validation,
+semantic correction, mutation ordering, audit, recovery, and result to that
+reference and preserve executor-owned progress and evidence.
 
-Without `scope_repair_request`, carry the
+Without `contract_repair_request`, carry the
 current durable body and intake `source_spec_ref` through the dependency and
 body gates below. Compare stable fields directly while treating acceptance
 checkbox markers as executor-owned progress: preserve their current state, but

@@ -58,7 +58,7 @@ owns rendering, duplicate checks, publication, and reporting.
 Use the Feature profile only on `source_route=new-source` when supplied intent plus
 the repository and project-context evidence already loaded by Feature cannot
 support a complete Feature Spec and safe implementation issue graph. The
-`existing-source` and `scope_repair_request` branches keep their own immutable
+`existing-source` and `contract_repair_request` branches keep their own immutable
 source rules and do not enter this profile.
 
 - Inspect relevant code, documentation, tests, root and matched scoped

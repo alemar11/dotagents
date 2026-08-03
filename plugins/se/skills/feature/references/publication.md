@@ -115,5 +115,10 @@ contract, body, relationship, or candidate absence changed, discard the stale
 projection and restart or block. Verify every successful mutation before
 moving to the next operation.
 
+For Contract Repair, preserve the same safeguards across updates, creations,
+supersessions, relationships, metadata, and audit. Parent contracts precede
+dependent issue mutations. A retry rereads the complete bundle and performs
+only operations proven missing from the identical repair request.
+
 Lower-kebab-case values are canonical. Reject noncanonical option values
 instead of rewriting them.

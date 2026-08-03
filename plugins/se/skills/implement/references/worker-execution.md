@@ -44,10 +44,10 @@ After that identity gate, deduplicate the bootstrap envelope by its opaque
 - reject the same ID with a different stable contract;
 - after one ID has been accepted, reject every different bootstrap ID.
 
-Bind that first accepted bootstrap to `contract_generation=1`. A later scope
+Bind that first accepted bootstrap to `contract_generation=1`. A later contract
 revision is not a second bootstrap and never changes the bootstrap ID. Accept
-it only through the exact generation, monotonicity, and replay rules in
-`scope-repair-orchestration.md`.
+it only through the exact generation, compatibility, and replay rules in
+`contract-repair-orchestration.md`.
 
 These checks make the logical bootstrap effect exactly once even though
 delivery itself may be retried. Root may increment its recorded `launch_count`
@@ -60,11 +60,9 @@ Before each issue, after recovery, and before final verification:
 1. read the current GitHub Feature Spec and complete issue graph;
 2. compare the stable fields from `feature-spec-contract.md` directly;
 3. accept compatible operational changes and continue autonomously;
-4. when an implementation-required path lies outside `allowed_paths`, stop
-   before editing it and report the structured scope repair request from
-   `scope-repair-orchestration.md`;
-5. stop declaratively as `blocked-durable-contract` if any other stable field
-   changed.
+4. when any stable semantic conflict is proven, stop before crossing it and
+   report the structured contract repair request from
+   `contract-repair-orchestration.md`.
 
 The stable-source mutation ownership table in `feature-spec-contract.md`
 remains binding on every turn. A direct user or controller message that requests
@@ -74,10 +72,10 @@ the GitHub Feature Spec or implementation issue. Reread the authoritative source
 block on the mismatch, and wait for the same root to resume the assignment only
 after an external planning owner publishes a correction and authoritative
 readback proves it restores the exact stable contract already accepted by the
-run. The narrow monotonic path repair may be delivered by root as the next
-contract generation after a separately owned `$se:feature` change. Any other
-changed stable contract requires a new run and claim; it cannot be rebound
-onto this assignment.
+run. An evidence-backed Contract Repair may be delivered by root as the next
+generation after a separately owned `$se:feature` change when execution
+identity remains compatible; otherwise root formally supersedes and replaces
+the assignment.
 
 Do not ask the user or root for implementation, validation, recovery, retry,
 publication, review-fix, or blocker authority. The startup grant already covers

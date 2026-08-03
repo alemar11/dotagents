@@ -37,11 +37,10 @@ deferred domain-memory closeout.
   operational edits; never compare a whole tracker body or compute its digest.
 - Run structural graph compression before freezing IDs or hardening missing
   issues; issue count is report data only.
-- The only stable issue-scope mutation is the separately invoked
-  `scope_repair_request` branch owned by `scope-repair.md`. It may add a
-  monotonic `allowed_paths` envelope to the named durable issue while preserving
-  every other stable field and executor-owned update. It never synthesizes,
-  hardens, renumbers, or changes dependencies.
+- The only stable issue-contract mutation is the separately invoked
+  `contract_repair_request` branch owned by `contract-repair.md`. It may change,
+  create, or supersede the minimum issues and relationships required by the
+  evidence while preserving executor-owned updates on retained artifacts.
 
 ## Phase Inputs
 
@@ -79,12 +78,11 @@ that retry as `no-durable-change`.
 
 ## Workflow
 
-When `scope_repair_request` is present, first run the complete source and durable
-state reads below, then delegate the narrow before/after comparison, mutation
-order, audit, recovery, and result to `scope-repair.md`. Rerun verticality,
-overlap, dependency, acceptance coverage, and full-bundle validation after the
-repair. Stop before ordinary slice synthesis, graph compression, hardening,
-metadata repair, or issue creation.
+When `contract_repair_request` is present, first run the complete source and durable
+state reads below, then delegate semantic convergence, mutation order, audit,
+recovery, and result to `contract-repair.md`. Rerun verticality, overlap,
+dependency, acceptance coverage, graph compression, hardening, readiness,
+metadata, and full-bundle validation after the repair.
 
 ### 1. Validate The Source Contract
 
@@ -422,7 +420,7 @@ durable issue bodies independent from skill renames and plugin packaging.
 Run final verticality, scope-overlap, dependency, validation, and readiness
 gates. If hardening exposes a graph-level defect, discard affected results,
 return to step 5, restabilize the graph and IDs, and re-harden every materially
-changed issue. For a scope repair, run another hardening pass on that
+changed issue. For a contract repair, run another hardening pass on that
 issue before output. Never use hardening to rewrite an existing durable issue.
 Supersede earlier transient results and persist only final stable results; pass
 count is derived work, not an option or artifact field.

@@ -129,11 +129,11 @@ accepted by the run. A changed stable contract cannot be rebound onto the
 retained assignment or claim and requires a new run after existing-owner
 reconciliation.
 
-An assignment in `blocked-scope-repair` does not use `assignment resume`.
-Recover the recorded planner-task and scope-revision operations through
-`scope-repair-orchestration.md`. Root retains the Feature Spec claim and the
+An assignment in `blocked-contract-repair` does not use `assignment resume`.
+Recover the recorded planner-task and contract-revision operations through
+`contract-repair-orchestration.md`. Root retains the Feature Spec claim and the
 original worker task, and the contract generation changes only after verified
-delivery of the exact scope revision.
+delivery of the exact contract revision.
 
 ## Terminal Owner Reconciliation
 

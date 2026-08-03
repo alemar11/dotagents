@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Discover or explicitly implement durable GitHub Feature Specs in the ChatGPT App through visible Codex tasks, validation, review, and PR-ready delivery. Use only for explicit discovery, start, or resume requests; do not use it to plan features or merge pull requests."
+description: "Discover or explicitly implement durable GitHub Feature Specs in the ChatGPT App through visible Codex tasks, delegated Contract Repair, validation, review, and PR-ready delivery. Use only for explicit discovery, start, or resume requests; do not use it to plan features or merge pull requests."
 ---
 
 # Implement Feature Spec
@@ -39,22 +39,18 @@ The detailed contracts remain in the directly routed references below.
   `references/claim-waits-and-recovery.md`.
 - An interrupted or ambiguous App action is reconciled before any replay through
   `references/codex-task-orchestration.md`.
-- Durable-contract drift blocks the assignment; it does not trigger planning or
-  an ad hoc repair.
-- An out-of-envelope path uses the one bounded branch in
-  `references/scope-repair-orchestration.md`.
+- A stable semantic conflict in the durable contract uses the single branch in
+  `references/contract-repair-orchestration.md`.
 - Final evidence mismatch returns evidence only to the worker, which owns repair.
 
-For the out-of-envelope path branch, the worker stops before using the missing
-path and reports the repository-relative path plus the evidence that it is
-needed. Root then spawns one separate visible SE Feature task under the
-explicit task-creation grant to update the GitHub Feature Spec's
-`allowed_paths`. That planner task only changes the durable planning contract;
-it never implements code, edits the worker, or replaces the worker task. After
-the published contract is read back, root recomputes overlap and sends the
-next contract generation to the same worker. A denied or unavailable planner
-leaves the original assignment blocked; a second path miss requires a new
-planning run.
+For Contract Repair, the worker stops at the proven conflict and reports
+portable clauses plus contract and implementation evidence. Root creates one
+separate visible SE Feature task under the invocation's automatic grant. Root
+is exclusively control plane and never edits contracts, issues, repositories,
+or code. After authoritative complete-bundle readback, root resumes the same
+compatible worker or formally supersedes its assignment and follows normal
+replacement claim/bootstrap. Repairs may repeat serially with new identities
+and monotonically increasing contract generations.
 
 ## Runtime Dependency
 
@@ -78,7 +74,7 @@ references:
   start, implement, or resume one or more Feature Specs. That explicit
   `$se:implement` execution request authorizes every Codex App task required by
   the disclosed topology: the visible root, worker tasks, any bounded
-  scope-repair Feature task, and the workers' ChatGPT-created worktrees. Do not
+  contract-repair Feature task, and the workers' ChatGPT-created worktrees. Do not
   ask for an additional root-, worker-, planner-, or task-creation
   confirmation. An explicit denial of task creation still overrides this
   grant and stops before mutation.
@@ -113,12 +109,11 @@ merge, enqueue, deploy, release, or perform post-merge closure.
 The root and workers may read stable fields, detect drift, and block. They may
 resume the existing assignment only after an externally authored correction is
 independently read back and restores the exact stable contract already accepted
-by that run. The sole mutation exception is a separately owned monotonic
-`allowed_paths` expansion executed through
-`references/scope-repair-orchestration.md`. Any other changed stable contract
-requires a new run and claim after the
-existing owner is reconciled; root and workers must never create the change,
-even when a user directly requests it inside the active run.
+by that run. The sole mutation route is a separately owned semantic correction
+executed through `references/contract-repair-orchestration.md`. Root and workers
+never create that change. Authoritative readback decides whether the same
+assignment remains compatible or must be superseded and replaced through the
+normal claim/bootstrap path.
 
 `../../references/ready-gate.md` owns the execution-readiness boundary. Before
 any startup authorization, run-state preparation, claim, worker, or worktree
@@ -211,9 +206,9 @@ project whose reported primary folder is the exact repository root, the only
 remaining startup interaction either authorizes creation of the exact listed
 projects or stops before state. The explicit execution request resolves both
 `visible_app_task_permission=granted` and
-`scope_repair_task_permission=granted` for every task-management operation
+`contract_repair_task_permission=granted` for every task-management operation
 required by the disclosed run: the root controller, selected workers, bounded
-scope-repair Feature tasks, ChatGPT-created worktrees, normal command
+contract-repair Feature tasks, ChatGPT-created worktrees, normal command
 approvals, validation, publication, review fixes, tracker updates, and
 recovery. Do not ask a separate planner-task permission question. An explicit
 denial of task creation overrides both grants and stops before mutation.
@@ -373,8 +368,8 @@ more Feature Specs. A discovery-only request never enters this flow.
    worktree and exposes its own component to the peer that owns combined proof,
    with exact pre/post HEAD evidence. Never create a dedicated integration
    worker or grant cross-worktree access.
-   If a worker reports a required path outside the durable envelope, follow
-   `references/scope-repair-orchestration.md`: retain the original worker and
+   If a worker reports any stable semantic conflict in the durable contract, follow
+   `references/contract-repair-orchestration.md`: retain the original worker and
    claim, delegate the portable repair to a separate SE Feature task under the
    explicit task-creation grant when the runtime supports it, recompute
    same-root overlap, then send the crash-safe next contract generation.
@@ -396,8 +391,8 @@ own Feature Spec claim; independent assignments continue.
   `references/feature-spec-contract.md`, `references/root-bootstrap.md`,
   `references/task-model-policy.md`, and
   `references/codex-task-orchestration.md` before startup mutation.
-- Load `references/scope-repair-orchestration.md` when startup authorization is
-  resolved or a worker reports an out-of-envelope path.
+- Load `references/contract-repair-orchestration.md` when startup authorization is
+  resolved or a worker reports a stable semantic conflict.
 - Workers load `references/worker-execution.md` and `references/tracker-checklists.md`.
 - Load `references/claim-waits-and-recovery.md` for claim waits, compaction,
   interrupted root or worker tasks, title, message, or archive changes, or

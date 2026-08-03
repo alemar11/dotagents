@@ -50,7 +50,7 @@ unless the user explicitly requires an exact title.
 The startup disclosure names the controller profile and the adaptive worker
 policy. `visible_app_task_permission=granted` is therefore the authorized
 user's explicit request to create the disclosed root, workers, and bounded
-scope-repair planner tasks with those exact profiles where applicable.
+contract-repair planner tasks with those exact profiles where applicable.
 
 ## Native review profile
 

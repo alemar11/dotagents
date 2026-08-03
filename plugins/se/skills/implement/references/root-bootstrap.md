@@ -113,8 +113,8 @@ Before mutation, root follows this numbered preflight:
    startup disclosure, but do not write them to the run manifest or SQLite.
 9. Resolve the startup fields from `options.md`. The explicit execution request
    resolves both `visible_app_task_permission=granted` and
-   `scope_repair_task_permission=granted` for the disclosed root, workers, and
-   bounded scope-repair Feature tasks unless the user explicitly denies task
+   `contract_repair_task_permission=granted` for the disclosed root, workers, and
+   necessary contract-repair Feature tasks unless the user explicitly denies task
    creation. If mappings are missing, list the exact repository roots in the
    standard question and resolve only `missing_project_action` in the one
    project-creation interaction.
@@ -128,8 +128,8 @@ Before mutation, root follows this numbered preflight:
 ```json
 {
   "schema": "implement-feature/run-manifest",
-  "schema_version": "4.0.0",
-  "runtime_contract_version": "1.0.0",
+  "schema_version": "5.0.0",
+  "runtime_contract_version": "2.0.0",
   "run_id": "run-019f",
   "root_task_id": "019f-root-task",
   "controller_project_id": "controller-task-project-id",

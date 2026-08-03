@@ -31,27 +31,24 @@ planning workflow operating outside the active `$se:implement` run. A
 direct user message to the active root or worker does not change that actor's
 role and does not grant planning authority.
 
-The only active-run exception is the externally owned monotonic
-`allowed_paths` repair in `scope-repair-orchestration.md`. Root may invoke a
-separate SE Feature task with the portable request, but root and worker still
-cannot author the change. A successful planner result is rebound onto the same
-assignment only through the crash-safe scope-revision protocol and increments
-its contract generation.
+The only active-run mutation route is the externally owned semantic repair in
+`contract-repair-orchestration.md`. Root may invoke a separate SE Feature task
+with the portable request, but root and worker still cannot author the change.
+A successful result resumes the same assignment only when execution identity
+remains compatible; otherwise that assignment is superseded and replaced.
 
-When any other stable field must change, the root and worker stop as
-`blocked-durable-contract` and report the exact conflicting source and field.
+When a stable field conflict is proven, root and worker stop as
+`blocked-contract-repair` and report the exact conflicting source and field.
 They must not edit the GitHub Feature Spec, implementation issue, or stable section,
 including through G. The same root retains the run and claim while the
 assignment is blocked. After an external planning owner publishes a correction,
 the root rereads the complete authoritative Spec and issue graph and records the
 exact durable-source readback. It may resume the existing assignment through the
 normal recovery transition only when that readback restores the exact stable
-contract already accepted by the run. Any changed stable contract other than
-that exact monotonic path repair—including repository or source identity,
-GitHub PR delivery, target branch, non-monotonic allowed paths, dependencies,
-acceptance, safety, or material validation constraints—cannot be
-rebound onto the retained assignment or claim; it requires a new run and claim
-after the existing owner is reconciled through the normal terminal lifecycle.
+contract already accepted by the run. A repaired contract that changes
+repository, source identity, target branch, or claim compatibility cannot be
+rebound to the retained assignment; it uses formal supersession and normal
+replacement claim/bootstrap after the worker preserves useful HEAD evidence.
 The recovery follow-up carries source identity and readback evidence only; it
 does not draft, reinterpret, or prescribe the planning change.
 
@@ -138,10 +135,9 @@ operational changes when the stable fields above remain intact:
 - checkbox markers whose underlying acceptance text, count, and order did not
   change.
 
-For a required out-of-envelope path, stop editing and report the structured
-request from `scope-repair-orchestration.md`. Stop as
-`blocked-durable-contract` without asking when outcome, GitHub PR delivery,
-repository/source/branch authority, a non-monotonic path change, dependency
-structure, acceptance text or shape, safety, or material validation budget/terminal result changes.
+For any stable semantic conflict, stop editing at the conflict boundary and
+report the structured request from `contract-repair-orchestration.md`. This
+includes path, outcome, delivery, repository/source/branch authority,
+dependency, acceptance, safety, and material validation contradictions.
 Compare authoritative stable sections directly. Do not create body, contract,
 result, assignment-packet, or message hashes.

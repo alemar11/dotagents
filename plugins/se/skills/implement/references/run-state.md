@@ -1,8 +1,8 @@
 # Implement Run State CLI
 
 `scripts/run-state` is a standard-library Python CLI. Normal execution always
-uses the shipped artifact. CLI release `1.1.2` implements runtime contract
-`1.0.0` over database schema `1`. This is a fresh local baseline after an
+uses the shipped artifact. CLI release `2.0.0` implements runtime contract
+`2.0.0` over database schema `2`. This is a fresh local baseline after an
 explicit run-state reset; manifests and databases from the previous contract
 epoch are not migrated. Worker creation records the task binding first and may
 include an independently read-back creation title. When creation does not set
@@ -10,7 +10,7 @@ the exact title, the separate recorded `set-worker-title` operation uses the
 available title mutation capability at most once and an independent readback
 as the fallback. Title outcomes are best-effort telemetry; structural task
 identity, project, checkout, and operational state remain the gates for downstream work.
-Externally owned scope repair and contract generations remain in
+Externally owned contract repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
 runtime does not add per-file claims. The
 controller's saved project remains explicit control-plane identity, each
@@ -22,9 +22,9 @@ Four version domains are deliberately independent:
 
 | Domain | Current identity | Meaning |
 | --- | --- | --- |
-| CLI | `1.1.2` | User-facing commands and executable behavior |
-| Runtime contract | `1.0.0` | Coordination semantics required by an active run |
-| Database schema | integer `1` | Exact SQLite tables, columns, indexes, and constraints |
+| CLI | `2.0.0` | User-facing commands and executable behavior |
+| Runtime contract | `2.0.0` | Coordination semantics required by an active run |
+| Database schema | integer `2` | Exact SQLite tables, columns, indexes, and constraints |
 | JSON protocols | independently named and versioned | Exact machine payload or envelope shape |
 
 SemVer identities are bare values without a `v` prefix. Database schema numbers
@@ -34,10 +34,10 @@ machine-readable registry for these identities and protocols:
 | Protocol | `schema` | Version |
 | --- | --- | --- |
 | CLI envelope | `implement-feature/cli-envelope` | `3.0.0` |
-| Run manifest | `implement-feature/run-manifest` | `4.0.0` |
+| Run manifest | `implement-feature/run-manifest` | `5.0.0` |
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `2.0.0` |
-| Codex task-operation observation | `implement-feature/app-operation-observation` | `1.0.0` |
-| Scope-repair observation | `implement-feature/scope-repair-observation` | `1.0.0` |
+| Codex task-operation observation | `implement-feature/app-operation-observation` | `2.0.0` |
+| Contract-repair observation | `implement-feature/contract-repair-observation` | `1.0.0` |
 | Delivery-ready observation | `implement-feature/delivery-ready-observation` | `3.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `3.0.0` |
 | Assignment-resume observation | `implement-feature/assignment-resume-observation` | `2.0.0` |
@@ -62,12 +62,12 @@ single-row `runtime_metadata` table is the sole schema source of truth:
 ```sql
 CREATE TABLE runtime_metadata (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 1)
+    schema_version INTEGER NOT NULL CHECK (schema_version = 2)
 );
 ```
 
 Exactly one `singleton = 1` row must exist. Normal current state is
-`(schema_version=1)`. The integer stored here is not the CLI, runtime-contract,
+`(schema_version=2)`. The integer stored here is not the CLI, runtime-contract,
 or JSON protocol version. Schema number `1` does not authorize an alternate
 shape: every table, column, index, and constraint must match exactly or the CLI
 returns `invalid-state-schema` without deleting or rewriting the DB. `PRAGMA
@@ -89,7 +89,7 @@ retain durable source refs, linked
 `feature_id` membership, assignment
 prerequisites, Codex controller/repository project identity, thread/worktree
 identity, exact `receipt_ref`/`readback_ref` machine fields, release reason,
-normal Git head/base/ancestry facts, contract generation, opaque scope repair
+normal Git head/base/ancestry facts, contract generation, opaque contract repair
 identity and authoritative repair readback, and PR/provider refs only when
 applicable. GitHub Issues and GitHub PRs are fixed workflow boundaries, not
 stored provider or delivery selectors.
@@ -181,24 +181,24 @@ scripts/run-state --json assignment block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json assignment capability-block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
-scripts/run-state --json assignment scope-block \
+scripts/run-state --json assignment contract-block \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT
 scripts/run-state --json app-operation begin \
   --run-id RUN --expected-revision N \
-  --action create-scope-repair-task --subject-id ASSIGNMENT
-scripts/run-state --json assignment scope-repair-observation template
-scripts/run-state --json assignment scope-repair-observation create \
+  --action create-contract-repair-task --subject-id ASSIGNMENT
+scripts/run-state --json assignment contract-repair-observation template
+scripts/run-state --json assignment contract-repair-observation create \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
   --repair-outcome applied \
   --implementation-issue-ref owner/repository#43 \
   --planning-thread-id PLANNER_THREAD \
   --planning-result-ref PLANNER_RESULT \
   --authoritative-readback-ref SOURCE_READBACK \
-  --output /absolute/new-scope-repair-observation.json
+  --output /absolute/new-contract-repair-observation.json
 scripts/run-state --json app-operation begin \
   --run-id RUN --expected-revision N \
-  --action send-scope-revision --subject-id ASSIGNMENT \
-  --scope-repair-observation /absolute/scope-repair-observation.json
+  --action send-contract-revision --subject-id ASSIGNMENT \
+  --contract-repair-observation /absolute/contract-repair-observation.json
 scripts/run-state --json assignment resume \
   --run-id RUN --expected-revision N --assignment-id ASSIGNMENT \
   --observation /absolute/assignment-resume-observation.json
@@ -222,7 +222,7 @@ error envelope instead of unstructured argparse usage output.
 
 The manifest accepted by `run start` has exactly the protocol fields
 `schema="implement-feature/run-manifest"` and
-`schema_version="4.0.0"`, `runtime_contract_version="1.0.0"`, and the
+`schema_version="5.0.0"`, `runtime_contract_version="2.0.0"`, and the
 `run_id`, `root_task_id`, `controller_project_id`, `repositories`,
 `assignments`, and `feature_sets` described in
 `root-bootstrap.md`. The CLI rejects integer protocol versions and unknown or
@@ -250,7 +250,7 @@ creates or mutates the database, and neither the bodies, normalized table,
 responsibility text, criterion text, nor hashes enter persistent state.
 ## Observation Builders
 
-`app-operation observation template`, `assignment scope-repair-observation
+`app-operation observation template`, `assignment contract-repair-observation
 template`, and `assignment ready-observation template` return descriptors:
 protocol
 constants, required fields, optional fields, and the closed-key rule. They are
@@ -280,11 +280,11 @@ reconciliation facts to the app-operation builder. `run-state` does not mediate
 live Codex interaction. Rejection, timeout, or unknown readback remains subject
 to the existing `app-operation finish` and `app-operation replay` gates.
 
-The scope-repair builder requires a `blocked-scope-repair` assignment and the
+The contract-repair builder requires a `blocked-contract-repair` assignment and the
 successful recorded planner task. It derives run, assignment, current contract
 generation, repair ID, and source Spec ref. The caller supplies the exact
 `repair_outcome=applied|no-op`, implementation issue, planner task, planner
-result, and authoritative complete-source readback. `send-scope-revision begin`
+result, and authoritative complete-source readback. `send-contract-revision begin`
 is its sole consumer.
 
 The app-operation builder accepts only the action/status fields described by
@@ -293,8 +293,8 @@ its descriptor through `--receipt-ref`, `--readback-ref`, `--thread-id`,
 and `--observed-state`. It also requires `--launch-count` copied from the
 authorizing `begin` or `replay` result; it does not derive the launch
 generation. A stale count is rejected before any observation file is written.
-The builder derives `bootstrap_id`; for `send-scope-revision` it derives
-`scope_revision_id` and `contract_generation`.
+The builder derives `bootstrap_id`; for `send-contract-revision` it derives
+`contract_revision_id` and `contract_generation`.
 
 For a successful `create-worker`, `observed_state` is the literal Codex task
 state and accepts `active` or `idle`; `observed_title` is optional and, when
@@ -317,11 +317,11 @@ reach a terminal delivery or abandoned state and the mixed run finishes as
 it accepts `archived` or
 `completed`. The template exposes these closed values under
 `field_constraints`, so callers do not infer them from the UI label.
-`create-scope-repair-task` likewise accepts only `active|idle` and may carry an
+`create-contract-repair-task` likewise accepts only `active|idle` and may carry an
 optional independently read-back `observed_title`; its title follows the same
-creation-first, at-most-one-fallback rule before scope revision. A missing or
-different planner title is reported as `scope-repair-title-unverified` or
-`scope-repair-title-drift` telemetry and does not block the scope revision once
+creation-first, at-most-one-fallback rule before contract revision. A missing or
+different planner title is reported as `contract-repair-title-unverified` or
+`contract-repair-title-drift` telemetry and does not block the contract revision once
 planner identity and structural state are verified.
 
 Both ready-observation commands require
@@ -349,17 +349,17 @@ always worker-owned, while root remains an orchestrator and
 evidence verifier.
 Every result authorizes only its reported generation.
 
-`create-scope-repair-task` binds the assignment's current repair ID and contract
+`create-contract-repair-task` binds the assignment's current repair ID and contract
 generation and returns the exact expected planner title
-`🧭 Scope Repair · <Feature Spec title>`. Creation may record an exact
-independent title readback; if it does not, `set-scope-repair-title` initializes
+`🧭 Contract Repair · <Feature Spec title>`. Creation may record an exact
+independent title readback; if it does not, `set-contract-repair-title` initializes
 that title through the available title capability at most once as the fallback.
-`send-scope-revision` consumes the planner task after structural identity and
+`send-contract-revision` consumes the planner task after structural identity and
 state are verified, regardless of the title warning. A planner title mismatch
-returns `effect_warning=scope-repair-title-unverified` or
-`effect_warning=scope-repair-title-drift`; it never sets cleanup or blocks the
-revision. `send-scope-revision` stores the next generation and derives a stable
-`scope_revision_id` from the operation ID and target generation. Replays keep
+returns `effect_warning=contract-repair-title-unverified` or
+`effect_warning=contract-repair-title-drift`; it never sets cleanup or blocks the
+revision. `send-contract-revision` stores the next generation and derives a stable
+`contract_revision_id` from the operation ID and target generation. Replays keep
 all three identities unchanged.
 
 An app-operation observation uses the named app-operation protocol and carries
@@ -375,20 +375,20 @@ The exact common fields are `schema`, `schema_version`, `operation_id`,
 | Action | Additional fields |
 | --- | --- |
 | `create-worker` | `thread_id`, `project_id`, `checkout_path`, `git_common_dir`, `observed_state`; optional `observed_title` |
-| `create-scope-repair-task` | `thread_id`, `project_id`, `observed_state`; optional `observed_title` |
+| `create-contract-repair-task` | `thread_id`, `project_id`, `observed_state`; optional `observed_title` |
 | `send-bootstrap` | `thread_id`, `bootstrap_id` |
-| `send-scope-revision` | `thread_id`, `scope_revision_id`, `contract_generation` |
+| `send-contract-revision` | `thread_id`, `contract_revision_id`, `contract_generation` |
 | `send-worker-message` | `thread_id` |
 | `set-worker-title` | `thread_id`, `observed_title` |
-| `set-scope-repair-title` | `thread_id`, `observed_title` |
+| `set-contract-repair-title` | `thread_id`, `observed_title` |
 | `set-root-title` | `observed_title` |
 | `archive-worker` | `thread_id`, `checkout_path`, `observed_state` |
-| `archive-scope-repair-task` | `thread_id`, `observed_state` |
+| `archive-contract-repair-task` | `thread_id`, `observed_state` |
 
 For title-bearing actions, `finish` and `app-operation list` derive an
 `effect_warning` from the recorded status and `observed_title`: use
 `worker-title-unverified|worker-title-drift`,
-`scope-repair-title-unverified|scope-repair-title-drift`, or
+`contract-repair-title-unverified|contract-repair-title-drift`, or
 `root-title-unverified|root-title-drift` as applicable. These warnings are
 telemetry, not cleanup requests or downstream gates. The task identity,
 project, checkout/worktree, and operational-state fields remain independently
@@ -396,7 +396,7 @@ validated and mandatory where the action requires them.
 
 Unknown or failed observations may carry only the authoritative action subset
 actually observed. A bootstrap observation always identifies the derived
-`bootstrap_id`; a scope-revision observation always identifies the derived
+`bootstrap_id`; a contract-revision observation always identifies the derived
 revision ID and contract generation. `failed` requires authoritative
 `readback_ref`, while `unknown` may omit it until readback exists. Never invent
 reconciliation references or classify an immediate tool error alone as proof
@@ -423,18 +423,18 @@ generation. Its action-specific gates are:
 | Action | Replay gate |
 | --- | --- |
 | `send-bootstrap` | Prior generation is `unknown` or `failed` with `readback_ref`; the same `bootstrap_id` is preserved and worker deduplication contains ambiguity |
-| `send-scope-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
+| `send-contract-revision` | Prior generation is `unknown` or `failed` with `readback_ref`; the same repair, revision ID, and target generation are preserved and worker deduplication contains ambiguity |
 | `create-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves no worker was created |
-| `create-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
+| `create-contract-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves no planner task was created |
 | `archive-worker` | Prior generation is `failed` and `readback_ref` authoritatively proves the worker was not archived or completed |
-| `archive-scope-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner task was not archived or completed |
+| `archive-contract-repair-task` | Prior generation is `failed` and `readback_ref` authoritatively proves the planner task was not archived or completed |
 | `send-worker-message` | Never replayable |
 
-`set-worker-title`, `set-scope-repair-title`, and `set-root-title` are also
+`set-worker-title`, `set-contract-repair-title`, and `set-root-title` are also
 never replayable: each title mutation is attempted at most once, and an
 unresolved result remains a telemetry warning.
 
-Bootstrap and scope revision have exactly-once logical effect end to end: their
+Bootstrap and contract revision have exactly-once logical effect end to end: their
 transport calls may be repeated while the worker accepts the stable logical
 identity once by the rules in `worker-execution.md`. Other replayed operations depend on
 authoritative proof that the preceding generation had no effect; they do not
@@ -509,14 +509,23 @@ the affected claim. `run finish` completes aggregate run state after
 assignment-level release; claim release never proves upstream merge or combined
 behavior.
 
-`assignment scope-block` retains the worker and claim, records
-`blocked-scope-repair`, and creates one opaque repair ID at
-`contract_generation=1`. GitHub planning proceeds through the separate
-planner operation. A successful
-`send-scope-revision` restores the exact pre-block state and atomically advances
-to generation `2`; any later `scope-block` returns `full-replan-required`.
+`assignment contract-block` retains the worker and claim, records
+`blocked-contract-repair`, and creates one opaque repair ID at the assignment's
+current generation. GitHub planning proceeds through the separate planner
+operation. A successful `send-contract-revision` restores the exact pre-block
+state and atomically advances to `N+1`. Later stable conflicts may open serial
+repairs with new repair IDs; only one repair may be open per assignment.
 Overlap checks remain root-owned and are deliberately not stored as file
 claims.
+
+When repaired source, repository, branch, claim, bootstrap, or worktree identity
+is incompatible, `assignment contract-supersede` requires the verified Feature
+task, authoritative complete-bundle readback, and the worker-reported full HEAD.
+It records the superseded task, checkout, HEAD, repair, and generations without
+touching the worktree; then it advances `worker_generation`, retains the claim,
+and returns the assignment to `planned` for ordinary replacement creation and
+bootstrap. Worker operations are single-use per worker generation, while
+Contract Repair operations are single-use per repair ID.
 
 `assignment resume` is the same-root CAS transition for a recovered
 `blocked-durable-contract` or `blocked-app-capability` assignment. It restores
@@ -593,9 +602,9 @@ the typed observation required by the operation lifecycle above.
 ## CLI Maintenance
 
 Keep normal execution on `scripts/run-state`; there is no maintenance project
-or build output. `CLI_VERSION` is `1.1.2`,
-`RUNTIME_CONTRACT_VERSION` is `1.0.0`;
-`DATABASE_SCHEMA_VERSION` is integer `1`; each protocol entry remains at
+or build output. `CLI_VERSION` is `2.0.0`,
+`RUNTIME_CONTRACT_VERSION` is `2.0.0`;
+`DATABASE_SCHEMA_VERSION` is integer `2`; each protocol entry remains at
 the independently named identity declared above. Re-run `--help`, `--version`,
 read-only `capabilities`, `doctor`, and `state prepare`, plus
 `feature-spec-set validate`, Python compilation, and the remaining executable
