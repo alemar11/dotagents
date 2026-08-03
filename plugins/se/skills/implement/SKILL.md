@@ -228,20 +228,28 @@ request. A `discovery-only` request remains GitHub-only and creates no root.
 The session where `$se:implement` is invoked is the `parent session`. It is a
 relay and monitor, not the Implement controller:
 
-1. Build a complete handoff before creating a root. Include the request mode,
+1. Immediately before preparing the handoff, independently observe the current
+   parent task and derive its stable task identity, current host, and saved
+   project binding from that authoritative state. This fresh observation is the
+   sole source of parent identity. Never accept or reconstruct it from user
+   text, conversation history, a title, an earlier receipt, a remembered value,
+   or a manually copied UUID. If stable parent identity or its current binding
+   cannot be verified, stop before root creation as
+   `blocked-parent-identity-provenance`.
+2. Build a complete handoff before creating a root. Include the request mode,
    objective, selected or requested Feature Specs, repository context, current
    state, accepted constraints, expected terminal report, validation
    expectations, unresolved risks, and the rule that the root must not invoke
-   `$se:implement` or create another root. Include the parent task ID and host
-   when the App exposes them, and the exact authoritative local project/host
-   binding.
-2. Resolve the current session's exact authoritative saved local project by
+   `$se:implement` or create another root. Insert the freshly observed parent
+   identity and its authoritative host/project binding directly into the
+   handoff without retyping or transforming them.
+3. Resolve the current session's exact authoritative saved local project by
    matching the current path and host. A missing, standalone, cross-host, or
    ambiguous match stops before root creation; do not substitute a new project
    or an isolated checkout. The root and parent share this control-plane
    project, while implementation workers still use their independently
    verified repository-specific projects.
-3. Before mutation, require live capabilities that can create, observe,
+4. Before mutation, require live capabilities that can create, observe,
    monitor, and title the requested controller topology. Create exactly one
    root task once in the authoritative local project and host, with the required
    Sol/medium profile, complete handoff, root protocol, and canonical title when
@@ -251,23 +259,23 @@ relay and monitor, not the Implement controller:
    provisional title `🤖 Implement Feature`; the root owns the existing single
    count-based `set-root-title` fallback after `run start`. Creation-time title
    support is always independently read back and is never identity evidence.
-4. After creation, independently observe the task and verify its stable
+5. After creation, independently observe the task and verify its stable
    identity, exact project, host, local execution, operational state, and title.
    Verify the requested `gpt-5.6-sol` / medium-reasoning profile when telemetry
    is exposed. A title warning is non-blocking; structural or settings drift
    stops before workers. A provisional identity, timeout, or uncertain response
    is pending setup: reconcile the existing App task before any retry and never
    create a duplicate.
-5. For a `resume` request, resolve the unfinished run's recorded
+6. For a `resume` request, resolve the unfinished run's recorded
    `root_task_id`, read it back, and send the continuation only to that exact
    root. Never create a replacement root while the run is unfinished. If the
    root identity cannot be reconciled, stop and report the recovery blocker.
-6. Keep the parent turn open and monitor the root with bounded waits, using
+7. Keep the parent turn open and monitor the root with bounded waits, using
    direct root milestones when available and the root's final response as the
    authoritative report. Relay only preflight/run/worker/blocker milestones
    and the final Markdown report; do not relay routine worker collaboration or
    execute repository, Git, GitHub, or run-state work in the parent.
-7. The parent never archives the root. A root that completes, blocks, or
+8. The parent never archives the root. A root that completes, blocks, or
    becomes recoverable remains the visible controller task for its run.
 
 The parent-task identity and relay context are transient handoff data; the
@@ -278,9 +286,16 @@ current run manifest and SQLite protocol.
 ## Controller Flow
 
 This flow runs in the newly created or explicitly resumed root task, never in
-the parent session. The root first verifies the handoff, its own task identity,
-the local control-plane project, and the explicit `gpt-5.6-sol` /
-`thinking: medium` profile, then follows the existing controller flow.
+the parent session. Before monitoring, retry, run-state mutation, claims, or
+child-task creation, the root independently observes its own stable identity
+and the authoritative provenance of the incoming parent handoff. It requires
+the handoff parent identity to match the actual source parent and its current
+host/project binding. It must not infer either identity from prompt text,
+titles, timing, or remembered UUIDs. Missing, stale, contradictory, or
+mismatched provenance stops as `blocked-parent-identity-provenance`; the root
+returns the blocker without sending milestones or performing another effect.
+Only after this gate does the root verify its local control-plane project and
+explicit `gpt-5.6-sol` / `thinking: medium` profile and continue.
 
 This flow applies only after the user explicitly directs execution of one or
 more Feature Specs. A discovery-only request never enters this flow.

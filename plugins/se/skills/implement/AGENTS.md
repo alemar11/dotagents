@@ -35,6 +35,11 @@ file records maintenance contracts for the package.
   root report, and resume reuses the recorded root instead of creating a
   replacement. Keep parent relay context transient; `root_task_id` remains the
   durable controller identity.
+- Preserve control-plane identity provenance across every handoff. Parent,
+  root, worker, run, operation, and claim identities must come from fresh
+  authoritative observation or `run-state`, never user text, titles, prompt
+  history, remembered values, or manually copied UUIDs. An unverifiable or
+  mismatched identity fails closed before monitoring, retry, or mutation.
 - Keep GitHub Issues as the source tracker and GitHub PR as the delivery
   boundary. G owns Git/GitHub transport; this package owns orchestration
   and verification, not transport implementation.

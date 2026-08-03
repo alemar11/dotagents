@@ -26,7 +26,11 @@ If the parent session was interrupted after requesting the root but before
 receiving a stable task identity, reconcile authoritative App state using any
 provisional identity evidence when available. Verify the root's stable identity,
 exact local project, execution mode, state, and `gpt-5.6-sol` / medium-reasoning
-profile before continuing. A title warning is telemetry;
+profile before continuing. Reobserve the current parent identity and require it
+to match the parent provenance already carried by that same bootstrap attempt;
+never recover either identity from prompt text, a title, or a remembered UUID.
+A parent-provenance mismatch remains unresolved and forbids monitoring or retry.
+A title warning is telemetry;
 structural or settings drift stops before any worker or run-state mutation.
 
 If a real root exists, reuse it and continue monitoring; if authoritative
@@ -43,6 +47,10 @@ authorize a replacement root; resume is routed to the same visible root.
 
 An unfinished run keeps its exact `root_task_id` as the sole controller
 identity. Resume that same visible root task manually, read `run show`, and
+require the independently observed current root identity to equal the durable
+run identity before any task observation, replay, claim, or mutation. Also
+revalidate the incoming parent identity provenance before sending any relay.
+Any mismatch fails closed as `blocked-control-plane-identity`. Then
 reconcile every pending or unknown task operation against authoritative
 Codex task state in the ChatGPT App before scheduling or considering any authorized
 replay.
@@ -56,8 +64,10 @@ the result, read the ChatGPT App task list and the candidate Codex task.
 Reconcile the exact recorded operation ID and launch count against the live App
 state before accepting or replaying the operation. Independently verify the
 task's stable ID, selected project, host, environment, checkout directory, Git
-common directory, and current state. If the exact worker exists, finish the
-already recorded `create-worker` operation and reuse it. First reconcile its
+common directory, and current state. Require that stable worker identity to
+match the subject of the same recorded creation operation and retained claim;
+never substitute a title match or manually copied identity. If the exact worker
+exists, finish the already recorded `create-worker` operation and reuse it. First reconcile its
 independently observed creation title. If that title is not exact, reconcile
 the separately recorded `set-worker-title` fallback: apply the title only for
 its authorized launch, observe the exact title, and bootstrap only after that

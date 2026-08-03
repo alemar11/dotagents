@@ -81,10 +81,15 @@ prompt and immediate receipt are never title evidence.
 
 ## Parent Root Creation
 
-The parent creates one root only for a new explicit execution run. It resolves
-the exact current local project before creating the task. This policy supplies
-the required root outcome—authoritative local project and host, Sol/medium
-profile, canonical title when supported, complete handoff, and root protocol.
+The parent creates one root only for a new explicit execution run. Immediately
+before composing the handoff, it independently observes its current stable task
+identity, host, and project binding. It inserts those exact facts directly into
+the handoff and never sources or reconstructs them from prose, titles, earlier
+receipts, remembered state, or manually copied UUIDs. Unverifiable parent
+identity stops before root creation. The parent also resolves the exact current
+local project. This policy supplies the required root outcome—authoritative
+local project and host, Sol/medium profile, canonical title when supported,
+complete handoff, and root protocol.
 
 The parent binds the one creation call to its bootstrap attempt even though no
 SQLite run exists yet. It independently observes the stable task identity,
@@ -97,9 +102,15 @@ prevents worker creation. A provisional identity, timeout, or uncertain response
 pending setup; the parent reconciles the existing task and never creates a
 replacement root.
 
+The root independently verifies that the handoff parent identity matches the
+authoritative source parent and current host/project binding before any relay,
+monitoring effect, retry, or mutation. Missing or mismatched provenance is
+`blocked-parent-identity-provenance` and cannot be repaired from handoff text.
+
 The parent keeps the task open and monitors the root with bounded waits. Root
-sends concise parent milestones and the final report when the parent task ID is
-available; wait/read telemetry remains the fallback and authoritative source.
+sends concise parent milestones and the final report only to that verified
+parent identity; wait/read telemetry remains the fallback and authoritative
+source.
 Parent relay messages contain no worker instructions, diagnosis, or technical
 state and are not persisted in `run-state`.
 
@@ -152,16 +163,30 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    `preimplementation-aborted`. If a sibling already started, wait until every
    sibling is terminal and finish the mixed run as `abandoned`, never as a
    successful delivery.
-5. Begin `send-bootstrap` and copy its returned `bootstrap_id` into the full
-   envelope with the GitHub Issue source ref, Feature ID, repository key,
-   repository, branch, allowed paths, issue graph, acceptance and validation
-   budgets, safety,
-   worker autonomy, checklist rules, final evidence, and every known peer's
-   exact task, repository, branch, role, and checkout identity.
-6. Verify the message was delivered to that exact task and that the worker
-   accepted the same `bootstrap_id`. This starts complete implementation
-   authority. The creation prompt is transport-only and grants no implementation
-   authority; there is no baseline-only implementation phase or later GO.
+5. Immediately before worker bootstrap, reread authoritative run and assignment
+   state. Derive the run, root, assignment, operation, claim, and worker
+   identities directly from `run-state` and the independently observed worker
+   task. Never source, retype, transform, or reconstruct those values from
+   prose, titles, earlier messages, or memory. A mismatch between the current
+   root and the run's durable root identity, or between the observed worker and
+   the recorded creation operation, fails closed before bootstrap.
+6. Begin `send-bootstrap` and insert its returned `bootstrap_id` plus those
+   exact control-plane facts into the full envelope with the GitHub Issue source
+   ref, Feature ID, repository key, repository, branch, allowed paths, issue
+   graph, acceptance and validation budgets, safety, worker autonomy,
+   checklist rules, final evidence, and every known peer's exact task,
+   repository, branch, role, and checkout identity.
+7. The worker independently observes its own stable identity and the
+   authoritative source root before accepting bootstrap. Require those facts to
+   match the worker and root identities in the envelope, and require the run,
+   operation, assignment, and claim facts to be internally consistent. Missing
+   or mismatched provenance returns `blocked-control-plane-identity` before
+   branch, file, command, Git, GitHub, or implementation mutation.
+8. Verify the message was delivered to that exact task and that the worker
+   accepted the same `bootstrap_id` and identity facts. This starts complete
+   implementation authority. The creation prompt is transport-only and grants
+   no implementation authority; there is no baseline-only implementation phase
+   or later GO.
 
 After recovery, read the accepted bootstrap from the task conversation and
 compare its `bootstrap_id` and stable Spec and issue sections with the current

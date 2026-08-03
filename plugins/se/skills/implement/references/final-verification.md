@@ -65,10 +65,11 @@ already occurred; it does not perform a repository-wide release. No terminal
 result merges.
 
 After the root reaches any terminal boundary, it sends the same Markdown
-closeout report to the parent session when the parent task ID is available and
-returns that report as its own final response. The parent relays the root
-report without adding a second readiness judgment, and the root task remains
-unarchived.
+closeout report only to the parent identity whose provenance was verified at
+entry and returns that report as its own final response. If that identity can no
+longer be verified, retain the root result, report the relay blocker, and do not
+guess another destination. The parent relays the root report without adding a
+second readiness judgment, and the root task remains unarchived.
 
 For a linked multi-repository feature, require exactly one independently
 verified GitHub PR for every Feature Spec Set member. Report one

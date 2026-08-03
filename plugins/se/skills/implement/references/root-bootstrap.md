@@ -2,17 +2,26 @@
 
 The parent session creates the root/controller task before this protocol runs.
 The root is a lightweight control plane and must not invoke `$se:implement`,
-create another root, or replace itself. The parent-task ID, host, and relay
-instructions are transient handoff context; the real root task ID remains the
-only durable controller identity in `run-state`.
+create another root, or replace itself. The verified parent identity, host, and
+relay instructions are transient handoff context; the stable root task identity
+remains the only durable controller identity in `run-state`.
 
 On entry, before the numbered preflight below, the root must:
 
-- read the current task and verify its stable identity, local execution,
-  exact control-plane project, and the parent-provided handoff;
+- independently observe the current task and verify its stable identity, local
+  execution, and exact control-plane project;
+- independently establish the provenance of the incoming handoff and require
+  its parent identity and host/project binding to match the authoritative source
+  parent that created or resumed this exact root;
+- reject any parent or root identity derived from prompt prose, a title, timing,
+  user-supplied text, remembered state, or a manually copied UUID;
+- stop as `blocked-parent-identity-provenance` before monitoring, retry,
+  run-state access, claims, or any other mutation when source identity,
+  provenance, or binding is unavailable, stale, contradictory, or mismatched;
 - verify the `gpt-5.6-sol` / medium-reasoning profile when task telemetry exposes
   them; settings drift blocks before workers;
-- retain the parent task ID only for coarse milestone and final-report relay;
+- retain the verified parent task identity only for coarse milestone and
+  final-report relay;
   the parent is not a worker, repository, or run-state target;
 - keep the root task unarchived and keep the same root for resume/recovery;
 - treat the parent-facing final Markdown report as a relay of root evidence, not

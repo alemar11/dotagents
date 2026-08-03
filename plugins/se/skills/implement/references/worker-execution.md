@@ -24,8 +24,17 @@ configuration, or copy credentials. Root never takes over native review; the
 worker retains design, implementation, finding verification, fixes,
 validation, tracker, review, and delivery authority.
 
-Before accepting implementation authority, deduplicate the bootstrap envelope
-by its opaque `bootstrap_id`:
+Before accepting implementation authority, independently observe this worker's
+stable task identity and the authoritative source root. Require them to match
+the worker and root identities in the bootstrap, and require its run,
+assignment, operation, and claim identities to be complete and internally
+consistent. These are control-plane facts, never values to infer from prose,
+titles, UUID-like text, or memory. Missing or mismatched provenance stops as
+`blocked-control-plane-identity` before branch, file, command, Git, GitHub, or
+implementation mutation.
+
+After that identity gate, deduplicate the bootstrap envelope by its opaque
+`bootstrap_id`:
 
 - accept the first valid ID and bind it to the exact stable Feature Spec and
   issue contract received with it;
