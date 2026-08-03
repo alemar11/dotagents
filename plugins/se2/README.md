@@ -1,17 +1,22 @@
 # SE2
 
-SE2 is an experimental issue-first, graph-first plugin for Idea capture,
-Feature planning, and verified Task handoff.
+SE2 is an experimental issue-first, graph-first plugin for durable repository
+context, Idea capture, Feature planning, and verified Task handoff.
 
 Its skills are deliberately separated by responsibility:
 
-- SKILL.md is the graph manifest and Mermaid overview.
-- steps/*.md are workflow nodes with a shared front matter contract.
-- templates/ contains authoring resources, not executable nodes.
+- skills/feature/SKILL.md is the graph manifest and Mermaid overview.
+- skills/feature/steps/*.md are workflow nodes with a shared front matter
+  contract.
+- skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
 - references/workflow-contract.md and references/codex-dependency-preflight.md
   are the SE2-owned contracts for Idea metadata and the G dependency gate.
+- skills/learn/ is the explicit repository-knowledge entry point. It maintains
+  evidence-backed Project Context, ADRs, localization memory, Code Review
+  Rules, and proposal-first AGENTS.md compaction without tracker, publication,
+  task, or worker behavior. Invoke it explicitly as se2:learn.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
   to planner, orchestrator, and worker tasks; titles remain display metadata.
 - skills/implement/ is the Task execution entry point and owns its task

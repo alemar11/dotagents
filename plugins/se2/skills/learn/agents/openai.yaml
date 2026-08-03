@@ -1,0 +1,7 @@
+interface:
+  display_name: "Learn Project Context"
+  short_description: "Maintain durable repository context and ADRs."
+  brand_color: "#C2410C"
+  default_prompt: "Use $se2:learn with the smallest requested memory_slice; route conditional detail through CONTEXT.md and indexed project-context files, require confirmation for durable capture, and preserve the exact Code Review Rules section."
+policy:
+  allow_implicit_invocation: false

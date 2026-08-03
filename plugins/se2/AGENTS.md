@@ -17,6 +17,9 @@ the existing SE plugin.
   shape for SE2 Idea capture.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before an Idea publish run uses the G-owned issue workflow.
+- skills/learn/SKILL.md owns independent durable repository-context routing,
+  capture, localization, Code Review Rules, and AGENTS.md compaction
+  proposals; its references own the branch-specific detail.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
   registry, Feature/Task invariants, and terminal states.
 - skills/feature/references/task-profile.md owns the principal Feature planner
@@ -67,6 +70,10 @@ the existing SE plugin.
 - Validate that every registered local node exists, every local transition
   targets a registered node, and every step has the standard front matter.
 - Check that the marketplace path and plugin metadata point to this package.
+- Validate Learn front matter, UI metadata, routed references, explicit-only
+  invocation, and independence from the existing SE Learn package.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
+- Scan Learn sources for direct provider or tracker access, task/profile
+  selection, stale legacy invocation names, and unowned local references.
 - Run git diff --check before handoff.

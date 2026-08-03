@@ -54,6 +54,7 @@ planning and verified Task handoffs. It does not replace SE:
 
 | Skill | Purpose |
 | --- | --- |
+| `se2:learn` | Maintain evidence-backed Project Context, ADRs, localization memory, Code Review Rules, and proposal-first AGENTS.md compaction without tracker or worker behavior. |
 | `se2:feature` | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues and vertical Task graphs in the invoking local project without creating a worktree. |
 | `se2:idea` | Capture the current session locally in transient run state, then preview without GitHub or publish verified Ideas through the G-owned issue workflow. |
 | `se2:implement` | Execute agent-ready Tasks through skill-owned orchestrator/worker profiles and the shared task preflight and handoff contracts. |
@@ -116,6 +117,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `se:implement` keeps discovery GitHub-only and side-effect free. Explicit execution first creates or resumes one visible `gpt-5.6-sol`/`medium` root controller in the invoking session's exact local project; the parent relays coarse milestones and the final root report. The root then reads the SE workflow contract, requires `ready-for-agent` on every final implementation issue before claims or workers, preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/se/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
 - `se2:idea` builds an in-memory session capture bundle; preview stays entirely local, while explicitly authorized publish uses the bundle as the single source for verified GitHub Idea publication. Its durable output is the hosted issue, not project memory.
+- `se2:learn` runs in the invoking task and maintains evidence-backed repository context only; it has no task profile, GitHub transport, publication, or worker delegation contract.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 
 ## Project-Local Skills
