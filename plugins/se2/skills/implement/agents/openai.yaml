@@ -1,0 +1,7 @@
+interface:
+  display_name: "Implement Task"
+  short_description: "Execute verified SE2 Tasks through monitored handoffs."
+  brand_color: "#BE185D"
+  default_prompt: "Use $se2:implement only for an explicit SE2 Task implementation request; load the skill-owned profiles and shared task preflight/handoff contracts, request deterministic emoji titles for the orchestrator and workers, verify the repository project destination, and return independently observed progress or a fail-closed blocker."
+policy:
+  allow_implicit_invocation: false

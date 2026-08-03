@@ -50,11 +50,12 @@ SE is the repo-local project-lifecycle plugin. It keeps durable project knowledg
 | `se:audit` | Monitor active sessions using SE skills and return a prioritized read-only report. |
 
 SE2 is an experimental parallel plugin for issue-first, graph-declared Feature
-planning. It does not replace SE and its initial prototype is planning-only:
+planning and verified Task handoffs. It does not replace SE:
 
 | Skill | Purpose |
 | --- | --- |
-| se2:feature | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues, vertical Task graphs, and explicit Task dependency waves. |
+| `se2:feature` | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues, vertical Task graphs, and explicit Task dependency waves. |
+| `se2:implement` | Execute agent-ready Tasks through skill-owned orchestrator/worker profiles and the shared task preflight and handoff contracts. |
 
 ## Reusable Skills
 

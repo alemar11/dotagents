@@ -28,6 +28,29 @@ Keep planning and implementation separate. This skill never edits repository
 code, chooses implementation designs on behalf of the executor, schedules
 workers, merges changes, or decides delivery completion.
 
+## Task profile and application dependency
+
+For a task-managed Feature run, load the skill-owned
+[task-profile.md](references/task-profile.md). It requires one principal
+planner role with the declared Sol/medium profile and no fallback. Pass that
+complete profile to the shared [task-preflight.md](../../references/task-preflight.md)
+before creating, resuming, or monitoring the planner task, then use
+[task-handoff.md](../../references/task-handoff.md) for assignment and relay
+evidence.
+
+The profile's canonical emoji title is requested and read back as best-effort
+display metadata for the planner task; title uncertainty never changes the
+Feature graph or authorizes a duplicate task.
+
+The application task is an execution envelope for the current Feature graph
+run, not an additional Feature-graph node. The shared references own the live
+capability, destination, identity, authorization, update-relay, and
+reconciliation gates; this skill owns only the Feature profile.
+
+Task creation permission and GitHub issue mutation permission remain separate.
+The Feature graph may calculate its complete bundle without turning either
+permission into a graph transition.
+
 ## Source route and terminal operation
 
 Resolve `source_route` from Intake evidence:
