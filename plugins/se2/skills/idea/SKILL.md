@@ -23,6 +23,56 @@ not create an application task, select a model profile, or delegate to another
 task. Ordinary brainstorming must never create or prepare a durable Idea
 implicitly.
 
+## Workflow graph
+
+Read the shared [workflow-graph.md](../../references/workflow-graph.md) for the
+common graph vocabulary. Read
+[workflow-contract.md](../../references/workflow-contract.md) for the Idea
+marker and hosted shape. The registry below is the structural source of truth
+for Idea; Mermaid is its projection.
+
+| node_id | kind | entry condition | transitions | side effects | terminal state |
+| --- | --- | --- | --- | --- | --- |
+| capture | action | explicit capture request and session or supplied input | normalize, blocked | transient | none |
+| normalize | action | source evidence is available | clarify-select, reported, blocked | transient | none |
+| clarify-select | decision | candidate set is normalized | freeze, deferred, blocked | none | none |
+| freeze | action | selected candidates are complete locally | terminal-operation | transient | none |
+| terminal-operation | decision | frozen bundle and run mode are resolved | preview, publish | none | none |
+| preview | action | preview was explicitly resolved | reported | none | none |
+| publish | action | publish and authority were explicitly resolved | preflight | transient | none |
+| preflight | validation | publish branch is selected | hosted-checks, blocked | dependency-read | none |
+| hosted-checks | validation | publication dependency is available | mutate, blocked | hosted-read | none |
+| mutate | action | hosted operation is normalized | reconcile-verify | hosted-write | none |
+| reconcile-verify | validation | hosted result may be ambiguous or partial | complete, blocked | hosted-read | none |
+| reported | terminal | preview or no-candidate report is ready | none | none | reported |
+| deferred | terminal | user selection or clarification is required | none | none | deferred |
+| complete | terminal | hosted operations were verified | none | none | complete |
+| blocked | terminal | required evidence, authority, dependency, or reconciliation is unavailable | none | none | blocked |
+
+~~~mermaid
+flowchart TD
+    capture --> normalize
+    capture --> blocked
+    normalize --> clarify-select
+    normalize --> reported
+    normalize --> blocked
+    clarify-select --> freeze
+    clarify-select --> deferred
+    clarify-select --> blocked
+    freeze --> terminal-operation
+    terminal-operation --> preview
+    terminal-operation --> publish
+    preview --> reported
+    publish --> preflight
+    preflight --> hosted-checks
+    preflight --> blocked
+    hosted-checks --> mutate
+    hosted-checks --> blocked
+    mutate --> reconcile-verify
+    reconcile-verify --> complete
+    reconcile-verify --> blocked
+~~~
+
 The in-memory bundle is run state, not durable project memory. It may contain
 the selected source excerpts, normalized candidates, decisions, target
 repositories, rendered bodies, preflight observations, publication order, and
@@ -31,20 +81,10 @@ hosted issue itself is the explicitly authorized durable output.
 
 ## Workflow overview
 
-The first three stages are local. Only the `publish` terminal branch may load
-G or inspect and mutate GitHub state.
+Capture, normalization, clarification, freezing, and the terminal-operation
+decision are local. Only the publish branch may load the publication dependency
+or inspect and mutate hosted state.
 
-~~~mermaid
-flowchart LR
-    capture["Capture session"] --> normalize["Normalize candidates"]
-    normalize --> freeze["Freeze local bundle"]
-    freeze --> terminal{"Terminal operation"}
-    terminal -->|"preview"| report["Local report<br/>proposed-idea:"]
-    terminal -->|"publish"| preflight["G preflight"]
-    preflight --> hosted["Hosted duplicate and collision checks"]
-    hosted --> mutate["Create or reuse Idea"]
-    mutate --> verify["Readback and recovery"]
-~~~
 
 ## Run contract
 
@@ -63,6 +103,10 @@ The workflow contract in
 [`../../references/workflow-contract.md`](../../references/workflow-contract.md)
 owns the exact Idea marker and metadata. Load it before resolving hosted
 metadata; do not repair or redefine it during a run.
+
+The shared [workflow-graph.md](../../references/workflow-graph.md) owns the
+structural registry and terminal meanings. It does not replace the hosted Idea
+contract above.
 
 ## Dependency boundary
 
@@ -149,6 +193,9 @@ Complete the local capture bundle before choosing the terminal operation:
    publication identity as unresolved until publish;
 4. recheck all candidates after any user-directed rename, merge, or split.
 
+After the local bundle is frozen, enter the terminal-operation decision. Do not
+inspect hosted state or load the publication dependency before that decision.
+
 Do not inspect hosted issues, labels, native Issue Types, or current duplicate
 and collision state in this phase. Those checks belong to the publish terminal
 operation. Preview must report that hosted equivalence and collision evidence
@@ -156,13 +203,14 @@ was not consulted rather than claiming that no conflict exists.
 
 ### 4. Preview or publish
 
-For `run_mode=preview`, return the relevant in-memory bundle contents: each
+The terminal-operation node must resolve the run mode exactly once. For
+run_mode=preview, return the relevant in-memory bundle contents: each
 candidate's intended target, title, canonical body, metadata, publication
 order, and deterministic `proposed-idea:` ref. Mark every proposed ref
 non-durable. Do not load the G dependency preflight, read GitHub, request a
 dry-run mutation, or perform any hosted operation.
 
-For `run_mode=publish`, load
+For run_mode=publish, load
 [`references/publishing.md`](references/publishing.md). Hand off only the
 normalized issue operation owned by the G workflow. The publication reference
 performs the dependency preflight, current hosted duplicate/collision checks,
@@ -182,6 +230,19 @@ Report every selected candidate as `created`, `reused`, `proposed`, `skipped`,
 or `failed`, with its owner, name, and qualified durable or explicitly
 non-durable ref. Report blockers and safe resume work precisely. Stop after
 capture reporting.
+
+## Feature handoff
+
+When the user explicitly asks to continue a captured proposal into Feature
+planning, render the transient [Idea Source Handoff](references/idea-source.md).
+The handoff is a typed artifact, not an automatic invocation of Feature.
+
+Keep the handoff tentative: preserve the proposal summary, problem or
+opportunity, proposed direction, evidence, repository identity, and open
+questions. Do not add Feature requirements, acceptance criteria, allowed paths,
+Tasks, dependency IDs, implementation plans, or readiness claims. Feature Intake
+keeps source_route as new-source, reloads repository context, and derives its
+own Feature and Task fields.
 
 ## Safety and independence
 

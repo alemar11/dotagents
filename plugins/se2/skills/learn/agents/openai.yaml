@@ -1,7 +1,7 @@
 interface:
   display_name: "Learn Project Context"
-  short_description: "Maintain durable repository context and ADRs."
+  short_description: "Traverse a graph-first repository-context workflow."
   brand_color: "#C2410C"
-  default_prompt: "Use $se2:learn with the smallest requested memory_slice; route conditional detail through CONTEXT.md and indexed project-context files, require confirmation for durable capture, and preserve the exact Code Review Rules section."
+  default_prompt: "Use $se2:learn as an explicit graph-first repository-context workflow; resolve the smallest memory_slice, route conditional detail through CONTEXT.md and indexed project-context files, require confirmation for durable capture, and preserve the exact Code Review Rules section."
 policy:
   allow_implicit_invocation: false

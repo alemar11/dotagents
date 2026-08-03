@@ -31,6 +31,41 @@ structured fields or values. This is an independently maintained SE2 skill: it
 does not import, alias, synchronize with, or depend on the existing SE learn
 package.
 
+## Workflow graph
+
+Read the shared [workflow-graph.md](../../references/workflow-graph.md) before
+using this registry. Learn owns the registry below; its routed references own
+operation-specific detail. The registry is the structural source of truth and
+Mermaid is its projection.
+
+| node_id | kind | entry condition | transitions | terminal state |
+| --- | --- | --- | --- | --- |
+| scope | action | explicit repository-knowledge request | inspect, blocked | none |
+| inspect | action | repository scope and memory slice resolved | draft, blocked | none |
+| draft | decision | evidence and intended target are known | reported, confirm | none |
+| confirm | decision | durable write is requested | apply, deferred, blocked | none |
+| apply | action | exact target and authority confirmed | verify, blocked | none |
+| verify | validation | selected surface was applied | complete, blocked | none |
+| reported | terminal | read-only or non-durable result is ready | none | reported |
+| deferred | terminal | user decision or confirmation is required | none | deferred |
+| complete | terminal | authorized write was verified | none | complete |
+| blocked | terminal | required evidence, authority, or verification is unavailable | none | blocked |
+
+~~~mermaid
+flowchart TD
+    scope --> inspect --> draft
+    scope --> blocked
+    inspect --> blocked
+    draft --> reported
+    draft --> confirm
+    confirm --> apply --> verify
+    confirm --> deferred
+    confirm --> blocked
+    apply --> blocked
+    verify --> complete
+    verify --> blocked
+~~~
+
 ## Surfaces and ownership
 
 | Surface | Owns | Always active? |
@@ -131,11 +166,14 @@ defaults leave a material ambiguity.
    contexts, indexed topics, relevant ADRs, and only the evidence needed for
    the selected operation.
 3. Draft the exact intended targets, wording, evidence, unknowns, and links.
-4. Apply only explicitly authorized writes to the selected surfaces. Never turn
-   a proposal into an apply operation because the user did not object.
-5. Read targets back, verify links and indexes, scan for duplicate normative
-   wording, run git diff --check, and report the capture result separately
-   from the knowledge data.
+4. For inspection, review, proposal, or dry-run work, transition to reported.
+   For a durable write, transition to confirm and show the exact target,
+   section, wording, and before/after block. Never turn a proposal into an
+   apply operation because the user did not object.
+5. After affirmative confirmation, apply only the selected surfaces. Read
+   targets back, verify links and indexes, scan for duplicate normative
+   wording, run git diff --check, and transition to complete or blocked.
+   Report the capture result separately from the knowledge data.
 
 ## Durable capture and compaction
 
@@ -157,18 +195,6 @@ consumer-repository context only when the current request authorizes the
 selected surface. It must remain independent from the existing SE learn
 implementation and must report unavailable evidence or ambiguous authority
 instead of guessing.
-
-## Mermaid workflow
-
-~~~mermaid
-flowchart LR
-    scope["Resolve scope and memory slice"] --> inspect["Inspect repository evidence"]
-    inspect --> draft["Draft target and evidence"]
-    draft --> authority{"Explicit write authority?"}
-    authority -->|"no"| report["Return read-only report"]
-    authority -->|"yes"| apply["Apply selected surface"]
-    apply --> verify["Verify links, preservation, and diff"]
-~~~
 
 ## Reference responsibilities
 

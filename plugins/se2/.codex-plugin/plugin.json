@@ -1,7 +1,7 @@
 {
   "name": "se2",
-  "version": "0.5.0",
-  "description": "Maintain durable repository context, capture session proposals as Ideas, plan repository-scoped Features and vertical Tasks, then hand off verified Task execution through shared application contracts.",
+  "version": "0.6.0",
+  "description": "Traverse graph-first Learn, Idea, and Feature workflows while preserving durable context, transient capture, Feature/Task planning, and verified Task handoff contracts.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,7 +9,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SE2",
-    "shortDescription": "Capture Ideas, maintain context, and execute verified SE2 Tasks.",
+    "shortDescription": "Traverse graph-first Learn, Idea, and Feature workflows.",
     "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit durable-context, Idea capture, Feature planning, and Task implementation entry points. Its Learn skill maintains evidence-backed repository context, ADRs, localization memory, and proposal-first AGENTS.md compaction without tracker or worker behavior. Its Idea skill builds a transient session capture bundle, keeps preview entirely local, and publishes verified GitHub Ideas through the G-owned issue workflow only as an explicitly authorized terminal operation. Its Feature skill starts from repository AGENTS.md context, keeps a Mermaid overview, a canonical node registry, and one standard Markdown contract for every workflow step. It converges one repository-owned Feature issue containing the canonical Feature definition with vertical Task issues, an acyclic Task dependency graph, readiness evidence, coordinated multi-repository Feature links, and an internally verified GitHub publication step when explicitly authorized. Root plugin contracts standardize live task preflight, destination and identity observation, update relay, and reconciliation; each task-managed skill owns its task profile and topology.",
     "developerName": "alemar11",
     "category": "Developer Tools",

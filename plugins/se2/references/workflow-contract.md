@@ -6,6 +6,10 @@ pagination, label mechanics, mutation safety, and read-after-write
 verification. The Idea skill owns when this contract is read or applied; it
 must not edit the contract during a run.
 
+The shared workflow graph vocabulary is owned by workflow-graph.md. This
+reference remains limited to the Idea marker and hosted shape and must not
+duplicate graph-node or terminal-state definitions.
+
 ## Canonical Idea metadata
 
 | Semantic value | Hosted transport | Hosted value | Meaning |

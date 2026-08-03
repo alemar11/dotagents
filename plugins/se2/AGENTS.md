@@ -1,8 +1,9 @@
 # SE2 Plugin Maintenance
 
-plugins/se2/ is an experimental graph-first Feature planning package. It is
-independent from plugins/se/; do not silently merge its graph contract into
-the existing SE plugin.
+plugins/se2/ is an experimental graph-first workflow package. Learn, Idea, and
+Feature expose distinct workflow graphs; Feature additionally owns the
+Feature/Task graph. SE2 is independent from plugins/se/; do not silently merge
+its graph contract into the existing SE plugin.
 
 ## Ownership map
 
@@ -15,11 +16,15 @@ the existing SE plugin.
   terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea marker and hosted
   shape for SE2 Idea capture.
+- references/workflow-graph.md owns the shared workflow-graph vocabulary,
+  registry rules, terminal meanings, authority boundaries, and validation
+  expectations. It does not own Idea hosted metadata or Feature/Task semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before an Idea publish run uses the G-owned issue workflow.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
   capture, localization, Code Review Rules, and AGENTS.md compaction
-  proposals; its references own the branch-specific detail.
+  proposals and its workflow registry; its references own branch-specific
+  detail.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
   registry, Feature/Task invariants, and terminal states.
 - skills/feature/references/task-profile.md owns the principal Feature planner
@@ -33,8 +38,9 @@ the existing SE plugin.
   model, reasoning, and topology selection; they consume the Feature bundle
   and root task contracts without redefining them.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,
-  preview/publish routing, and the capture-only terminal boundary. Its
-  references own the canonical body and publication recovery details.
+  workflow registry, preview/publish routing, and the capture-only terminal
+  boundary. Its references own the canonical body, Idea source handoff, and
+  publication recovery details.
 - .agents/plugins/marketplace.json owns repo-local discovery registration.
 
 ## Maintenance contract
@@ -44,10 +50,10 @@ the existing SE plugin.
   silently change the Feature graph or inherit its task profile. External
   issue publication is allowed only through an explicit publish run and must
   remain separate from node planning semantics.
-- Keep Idea capture independent from Feature and Implement graph semantics.
-  Session context may be assembled in transient run state, but only an
-  explicitly published hosted issue is durable; Idea must not write project
-  memory or create application tasks.
+- Keep Idea capture independent from Feature/Task and Implement semantics while
+  using the shared workflow-graph vocabulary. Session context may be assembled
+  in transient run state, but only an explicitly published hosted issue is
+  durable; Idea must not write project memory or create application tasks.
 - Keep Idea hosted output behind the G-owned issue workflow and the shared
   fail-closed dependency gate. Never add a direct tracker transport or a
   compatibility alias for a missing dependency.
@@ -56,7 +62,7 @@ the existing SE plugin.
   graph nodes. Keep future tracker capabilities separate from the initial
   Feature, Task, relation, and dependency contract.
 - Keep node IDs lower-kebab-case, unique, and consistent across front matter,
-  the registry, Mermaid node names, and transition targets.
+  each skill registry, Mermaid node names, and transition targets.
 - Treat the node header and registry as the structural contract. Mermaid is a
   maintained projection of that contract, not an independent source of edges.
 - Any committed change under this plugin requires a semantic version update in
@@ -69,6 +75,8 @@ the existing SE plugin.
   explicit-only invocation, and independent hosted-output boundary.
 - Validate that every registered local node exists, every local transition
   targets a registered node, and every step has the standard front matter.
+- Validate Learn and Idea registry/projection reconciliation, terminal
+  reachability, and the absence of outgoing transitions from terminal nodes.
 - Check that the marketplace path and plugin metadata point to this package.
 - Validate Learn front matter, UI metadata, routed references, explicit-only
   invocation, and independence from the existing SE Learn package.

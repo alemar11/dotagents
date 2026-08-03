@@ -3,10 +3,11 @@ node_id: intake
 kind: action
 purpose: normalize-feature-intent-into-one-bounded-candidate
 entry_conditions:
-  - explicit-feature-intent-or-rehydrated-maintenance-bundle-is-available
+  - explicit-feature-intent-or-rehydrated-maintenance-bundle-or-idea-source-is-available
 inputs:
   - user-intent
   - rehydrated-bundle
+  - idea-source
   - maintenance-evidence
 outputs:
   - normalized-intent
@@ -36,6 +37,12 @@ terminal_states: []
 Normalize a new request or rehydrate the maintenance evidence into one bounded
 feature candidate. Preserve the desired outcome, non-goals, affected
 repository set and path scopes, constraints, and observable success signals.
+
+When idea-source is supplied, treat it as tentative source evidence. Keep
+source_route as new-source, preserve its open questions, independently reload
+repository context, and derive Feature requirements, acceptance criteria,
+allowed paths, validation, Tasks, and dependencies here. Do not promote
+idea-source fields into Feature planning fields without fresh evidence.
 
 For maintenance, compare the external indication with the rehydrated Feature,
 Task, and dependency state. Preserve stable identities and carry only a

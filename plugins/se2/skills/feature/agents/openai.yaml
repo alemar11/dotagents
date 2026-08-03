@@ -1,6 +1,6 @@
 interface:
   display_name: "Feature Graph"
-  short_description: "Traverse a Markdown-defined Feature workflow graph."
+  short_description: "Traverse a graph-first Feature workflow and Task DAG."
   brand_color: "#BE185D"
   default_prompt: "Use $se2:feature for an explicit repository-scoped Feature graph run; load the skill-owned task profile and shared task preflight before any task handoff, request its deterministic emoji title, converge Feature issues and vertical Task dependency graphs, support Feature maintenance through the same graph, and return the complete bundle without implementing code."
 policy:

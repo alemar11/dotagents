@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Converge feature intent into repository-scoped Feature issues and complete vertical Task dependency graphs with explicit dependencies, parallel or serial execution waves, repository context from AGENTS.md hierarchy, and readiness evidence; never implement code."
+description: "Traverse a graph-first repository-scoped Feature workflow that converges Feature issues and complete vertical Task dependency graphs with explicit dependencies, execution waves, repository context from AGENTS.md hierarchy, and readiness evidence; never implement code."
 ---
 
 # Feature Graph
@@ -11,7 +11,8 @@ Use this skill only for an explicit SE2 Feature-graph request. Accept either a
 new feature request or an explicit Feature maintenance indication for an
 existing bundle. For one repository, converge one bounded feature into:
 
-- one durable Feature issue that contains the canonical Feature definition;
+- one calculated or durable Feature issue that contains the canonical Feature
+  definition;
 - a nonempty set of vertical Task issues attached to that Feature;
 - an acyclic Task dependency graph whose edges represent real implementation
   prerequisites;
@@ -27,6 +28,15 @@ issue merely to coordinate them.
 Keep planning and implementation separate. This skill never edits repository
 code, chooses implementation designs on behalf of the executor, schedules
 workers, merges changes, or decides delivery completion.
+
+## Shared workflow graph contract
+
+Read the shared
+[workflow-graph.md](../../references/workflow-graph.md) for the common
+workflow-node vocabulary, registry rules, terminal meanings, and authority
+boundaries. Feature retains its existing step-file registry and its separate
+Feature/Task DAG invariants. The shared contract must not replace the Feature
+graph or turn Learn and Idea into Task graphs.
 
 ## Task profile and application dependency
 
@@ -116,27 +126,27 @@ Feature.
 
 ~~~mermaid
 flowchart TD
-    start((Start)) --> intake["Intake"]
-    start --> maintenance["Maintenance"]
-    maintenance -->|bundle rehydrated| feature["Feature"]
-    maintenance -->|conflict| blocked["Blocked"]
-    intake -->|material unknowns| clarification["Clarification"]
+    intake -->|material unknowns| clarification
     intake -->|intent sufficient| feature
-    intake -->|invalid scope| blocked["Blocked"]
+    intake -->|invalid scope| blocked
+    maintenance -->|bundle rehydrated| feature
+    maintenance -->|conflict| blocked
     clarification -->|resolved| feature
     clarification -->|unresolved| blocked
-    feature -->|definition complete| tasks["Vertical Tasks"]
+    feature -->|definition complete| tasks
     feature -->|conflict or incomplete| blocked
-    tasks -->|slices complete| task_dependency_graph["Task Dependency Graph"]
+    tasks -->|slices complete| task-dependency-graph
     tasks -->|incomplete| blocked
-    task_dependency_graph -->|acyclic and covered| complete["Complete"]
-    task_dependency_graph -->|invalid| blocked
+    task-dependency-graph -->|acyclic and covered| complete
+    task-dependency-graph -->|invalid| blocked
 ~~~
 
 Mermaid is the human-readable projection applied once per repository run. The
 node registry and standardized headers are the structural contract. Never infer
 a transition from Mermaid alone, and never add a context, linking, preview, or
 publication node to this graph.
+ Entry routes are resolved before entering the graph; they are not additional
+ nodes in the Mermaid projection.
 
 ## Node registry
 
@@ -243,6 +253,12 @@ affected repository set, and run the repository context precondition. Freeze
 one feature boundary and one context record per affected repository. Stop when
 the scope is implementation-only, unbounded, contradictory, or missing an
 authorized repository identity.
+
+An explicit Idea capture may provide the transient
+[idea-source handoff](../idea/references/idea-source.md). Treat it as tentative
+source evidence, keep source_route as new-source, preserve its open questions,
+and derive every Feature and Task planning field independently. Do not invoke
+Idea automatically or promote its fields into requirements without evidence.
 
 ### Clarification
 
