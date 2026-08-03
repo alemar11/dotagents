@@ -6,6 +6,12 @@ envelope. This is not general replanning and it is not a file lease system.
 The worker remains stopped and must not edit the requested path until the
 protocol completes.
 
+An explicit `$se:implement` execution request derives
+`scope_repair_task_permission=granted` together with the general task-creation
+grant. Root must not ask a later planner-task permission question. A denied
+value can only result from an explicit task-creation denial; in that case the
+assignment remains declaratively blocked without another question.
+
 ## Worker Request
 
 The worker reports one structured request to root:
@@ -42,8 +48,9 @@ one automatic repair is allowed per assignment. A second scope miss returns
 2. Recompute same-root scheduling overlap using the requested paths and every
    active assignment's complete current `allowed_paths`. Missing path evidence
    conflicts. This is a scheduling check, not a persisted file claim.
-3. If `scope_repair_task_permission=denied`, report the portable request and
-   remain blocked. Do not ask another question.
+3. If `scope_repair_task_permission=denied` because the user explicitly denied
+   task creation, report the portable request and remain blocked. Do not ask
+   another question.
 4. Record and execute
    `create-scope-repair-task`. Create one separate visible Codex task in the
    assignment's saved repository project without a worktree. Inspect the live

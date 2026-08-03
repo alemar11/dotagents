@@ -237,10 +237,10 @@ until authoritative recovery or contract change permits that root to continue.
 
 When a worker reports a valid out-of-envelope path, root follows
 `scope-repair-orchestration.md`. It starts the separate planner task immediately
-when authorized, may monitor an overlapping peer in parallel, and recomputes
-the complete path overlap before restarting the original worker. This does not
-create dynamic per-file claims: the durable envelopes and ordinary scheduling
-gate remain authoritative.
+under the explicit execution task-creation grant, may monitor an overlapping
+peer in parallel, and recomputes the complete path overlap before restarting
+the original worker. This does not create dynamic per-file claims: the durable
+envelopes and ordinary scheduling gate remain authoritative.
 
 ## Allowed Follow-Up Messages
 

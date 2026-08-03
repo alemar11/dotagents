@@ -101,11 +101,12 @@ Before mutation, root follows this numbered preflight:
    value. Include the root profile and each worker profile and reason in the
    startup disclosure, but do not write them to the run manifest or SQLite.
 9. Resolve the startup fields from `options.md`. The explicit execution request
-   resolves `visible_app_task_permission=granted` for the disclosed root and
-   workers unless the user explicitly denies task creation. If mappings are
-   missing, list the exact repository roots in the standard question and
-   resolve `missing_project_action` plus `scope_repair_task_permission` in the
-   one startup authorization interaction.
+   resolves both `visible_app_task_permission=granted` and
+   `scope_repair_task_permission=granted` for the disclosed root, workers, and
+   bounded scope-repair Feature tasks unless the user explicitly denies task
+   creation. If mappings are missing, list the exact repository roots in the
+   standard question and resolve only `missing_project_action` in the one
+   project-creation interaction.
    With `create-projects`, use Computer Use only for those exact roots, verify
    each selected path before confirmation, then rerun the complete read-only
    saved-project preflight. With `stop`, denied task permission, unavailable

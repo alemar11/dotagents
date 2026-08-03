@@ -5,8 +5,8 @@ The behavior-affecting startup fields are:
 | Field | Allowed values | Meaning |
 | --- | --- | --- |
 | `missing_project_action` | `create-projects`, `stop` | When one or more required repositories have no separate repo-specific saved Git project, either authorize creation of exactly the listed projects or stop before state. Omit this field when none are missing. |
-| `visible_app_task_permission` | `granted`, `denied` | Permit the disclosed visible Implement root, worker tasks, and ChatGPT-created worktrees for this run. |
-| `scope_repair_task_permission` | `granted`, `denied` | Permit a separate visible SE Feature task only when an active worker later needs a monotonic `allowed_paths` repair. |
+| `visible_app_task_permission` | `granted`, `denied` | Permit every disclosed Codex App task required by this run, including the Implement root, workers, bounded scope-repair Feature tasks, and ChatGPT-created worktrees. |
+| `scope_repair_task_permission` | `granted`, `denied` | Internal derived control for the bounded scope-repair Feature task; it is resolved together with `visible_app_task_permission` and is not a separate user decision. |
 
 Before creating the root, disclose the root controller task, its exact local
 project, and its fixed `gpt-5.6-sol` / `thinking: medium` profile. After
@@ -20,23 +20,11 @@ terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fix
 `high` for complex work, or `xhigh` for risky or cross-system work. An explicit
 `$se:implement` request to start, implement, or resume the selected Specs
 explicitly requests the root and those exact worker task profiles and resolves
-`visible_app_task_permission=granted` without an additional root- or
-worker-task creation question. An explicit denial overrides that grant and
-stops before mutation.
-
-When no project is missing, use this exact question so permission cannot be
-mistaken for an immediate task launch:
-
-> May I create one separate visible SE Feature task later, only if an
-> implementation worker proves that a required path is missing from
-> `allowed_paths`? Granting this permission does not create that task now. No
-> planner task will be created unless a scope miss occurs.
-
-Resolve that answer directly to `scope_repair_task_permission`. After an
-affirmative answer, state exactly: `Planner-task permission recorded; no
-planner task has been created.` After a negative answer, state exactly:
-`Planner-task permission denied; a future scope miss will block without
-creating a planner task.`
+`visible_app_task_permission=granted` and
+`scope_repair_task_permission=granted` without an additional root-, worker-,
+planner-, or task-creation question. An explicit denial overrides both grants
+and stops before mutation. When no project is missing, there is no startup
+authorization question.
 
 When projects are missing, use this standard question in the same startup
 authorization interaction:
@@ -48,25 +36,17 @@ authorization interaction:
 >
 > - `<repository>` — `<absolute-path>`
 >
-> The explicit execution request already authorizes the disclosed root and worker
-> tasks.
-> This answer also controls whether I may create one separate visible Feature
-> task later, only if an implementation worker proves that a required
-> path is missing from `allowed_paths`. Granting this permission does not create
-> that task now. No planner task will be created unless a scope miss occurs.
+> The explicit execution request already authorizes every Codex App task required
+> by the disclosed run, including the root, workers, and any bounded scope-repair
+> Feature task.
 > Do you also authorize me to create exactly these persistent projects in the
 > ChatGPT App through Computer Use? Project creation is distinct from task creation.
 > Otherwise I will stop without creating run state, claims, tasks, or worktrees.
 
 Resolve an affirmative answer to
-`missing_project_action=create-projects` and
-`scope_repair_task_permission=granted`. Resolve a negative answer to
-`missing_project_action=stop` and `scope_repair_task_permission=denied`. Do not
-change the already resolved task permission based on the project answer. A user
-may explicitly grant root and worker tasks while denying planner repair tasks;
-normalize that answer to
-`visible_app_task_permission=granted` and
-`scope_repair_task_permission=denied`. Emit and persist only these canonical
+`missing_project_action=create-projects` and a negative answer to
+`missing_project_action=stop`. Do not change the already resolved task
+permissions based on the project answer. Emit and persist only these canonical
 values in ephemeral controller state; never persist them as repository
 configuration.
 
@@ -80,19 +60,21 @@ readback stops immediately. Never create a broader substitute such as a parent
 root or `/private/tmp`, never silently create another project, and
 never treat task permission as project-creation permission.
 
-`granted` covers the root lifecycle and full worker lifecycle: root monitoring,
-implementation, compatible rewrites, repairs, tests, command approvals through
-the ChatGPT App, publication, review fixes, tracker checkboxes, recovery, and
-final evidence. It does not authorize merge, deployment, release, post-merge
-closure, or work outside the durable contract.
+`granted` covers every disclosed task lifecycle: root monitoring,
+implementation, compatible rewrites, bounded scope-repair planning, repairs,
+tests, command approvals through the ChatGPT App, publication, review fixes,
+tracker checkboxes, recovery, and final evidence. It does not authorize merge,
+deployment, release, post-merge closure, or work outside the durable contract.
 
-`scope_repair_task_permission=granted` authorizes only the bounded, separate
-planner task described in `scope-repair-orchestration.md`; it grants no planning
-authority to root or workers. `denied` leaves a later scope request
-declaratively blocked and does not trigger another user question.
+`scope_repair_task_permission=granted` is derived automatically by an explicit
+execution invocation and authorizes only the bounded, separate planner task
+described in `scope-repair-orchestration.md`; it grants no planning authority
+to root or workers. A `denied` value can only come from an explicit task-
+creation denial, leaves a later scope request declaratively blocked, and does
+not trigger another user question.
 
-After the startup interaction grants the required fields, do not ask another
-user question. Validation authority,
+After the preflight and any optional missing-project interaction, do not ask
+another user question. Validation authority,
 recovery choices, operational clarifications, blockers, retries within the
 durable budget, and continuation are worker decisions. A stable contract change
 causes a declarative blocked result, not a question.

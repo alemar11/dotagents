@@ -14,7 +14,8 @@ the root presents and follows this six-stage path:
 
 1. Select complete GitHub Feature Specs and their implementation issues.
 2. Preflight the sources, repositories, saved Git projects, dependencies, and
-   worker profiles; resolve the one startup authorization interaction.
+   worker profiles; derive the explicit task-creation grant and resolve only
+   any required missing-project creation interaction.
 3. Prepare the run and claim each available Spec/head-branch pair.
 4. Create one visible managed-worktree worker per claimed Spec and deliver its
    assignment.
@@ -46,8 +47,8 @@ The detailed contracts remain in the directly routed references below.
 
 For the out-of-envelope path branch, the worker stops before using the missing
 path and reports the repository-relative path plus the evidence that it is
-needed. Root then spawns one separate visible SE Feature task, when the
-startup permission allows it, to update the GitHub Feature Spec's
+needed. Root then spawns one separate visible SE Feature task under the
+explicit task-creation grant to update the GitHub Feature Spec's
 `allowed_paths`. That planner task only changes the durable planning contract;
 it never implements code, edits the worker, or replaces the worker task. After
 the published contract is read back, root recomputes overlap and sends the
@@ -75,9 +76,12 @@ references:
   remain discovery even when they contain the word "implement".
 - Enter the execution flow only when the user explicitly directs the skill to
   start, implement, or resume one or more Feature Specs. That explicit
-  `$se:implement` execution request authorizes creating the disclosed
-  visible root and worker tasks plus the workers' ChatGPT-created worktrees.
-  Do not ask for an additional root- or worker-task creation confirmation.
+  `$se:implement` execution request authorizes every Codex App task required by
+  the disclosed topology: the visible root, worker tasks, any bounded
+  scope-repair Feature task, and the workers' ChatGPT-created worktrees. Do not
+  ask for an additional root-, worker-, planner-, or task-creation
+  confirmation. An explicit denial of task creation still overrides this
+  grant and stops before mutation.
 
 For `discovery-only`:
 
@@ -190,18 +194,18 @@ and is deduplicated by the worker. A protected non-bootstrap operation may
 replay only after authoritative failed readback proves the prior launch had no
 effect. Controller follow-up messages are not replayable.
 
-Resolve the startup authorization interaction defined in
-`references/options.md` only after the worker-project preflight. When a required
-repository has no separate saved Git project whose reported primary folder is
-the exact repository root, that same interaction either authorizes creation of
-only the listed projects plus the disclosed worker run, or stops before state.
-The explicit execution request resolves
-`visible_app_task_permission=granted` for the disclosed root and workers unless
-the user explicitly denies task creation. The startup interaction separately
-resolves missing-project creation and `scope_repair_task_permission`. The task
-grant covers the root controller, selected workers, ChatGPT-created worktrees,
-normal command approvals, validation, publication, review fixes, tracker
-updates, and recovery.
+Resolve the startup fields defined in `references/options.md` only after the
+worker-project preflight. When a required repository has no separate saved Git
+project whose reported primary folder is the exact repository root, the only
+remaining startup interaction either authorizes creation of the exact listed
+projects or stops before state. The explicit execution request resolves both
+`visible_app_task_permission=granted` and
+`scope_repair_task_permission=granted` for every task-management operation
+required by the disclosed run: the root controller, selected workers, bounded
+scope-repair Feature tasks, ChatGPT-created worktrees, normal command
+approvals, validation, publication, review fixes, tracker updates, and
+recovery. Do not ask a separate planner-task permission question. An explicit
+denial of task creation overrides both grants and stops before mutation.
 Never ask another authority, recovery, validation, blocker, or continuation
 question during the run.
 
@@ -298,10 +302,9 @@ more Feature Specs. A discovery-only request never enters this flow.
    `scripts/run-state --json feature-spec-set validate --input <absolute-file>`
    over ephemeral complete member-body snapshots and retain its exact
    `manifest_feature_set`. Keep those inputs unchanged until
-   `run start` revalidates them. Resolve the one startup authorization
-   interaction, including the bounded planner-task permission from
-   `references/scope-repair-orchestration.md`, only after this read-only
-   preflight.
+   `run start` revalidates them. Derive the explicit task-creation grants from
+   `options.md` only after this read-only preflight; resolve an interaction only
+   when the preflight found missing persistent Git projects.
    Before any task mutation, inspect the live Codex App declarations for every
    operation used by this flow and verify every argument that will be passed.
    Do not infer support from a previous runtime or from prompt text. Prefer
@@ -355,9 +358,9 @@ more Feature Specs. A discovery-only request never enters this flow.
    worker or grant cross-worktree access.
    If a worker reports a required path outside the durable envelope, follow
    `references/scope-repair-orchestration.md`: retain the original worker and
-claim, delegate the portable repair to a separate SE Feature task when
-   authorized and supported, recompute same-root overlap, then send the
-   crash-safe next contract generation.
+   claim, delegate the portable repair to a separate SE Feature task under the
+   explicit task-creation grant when the runtime supports it, recompute
+   same-root overlap, then send the crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,
    Codex task, Git, PR, CI, and native Codex review evidence without editing or
    judging criteria. Complete each assignment claim when its root-verified
