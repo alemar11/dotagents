@@ -28,14 +28,14 @@ Before mutation, root follows this numbered preflight:
    graph. Read the exact label metadata through the G issue workflow;
    incomplete pagination, stale reads, races, or one missing label stop the
    affected Spec before claims, tasks, or worktrees.
-2. Read the current Codex task and `list_projects`. When task readback reports a
-   non-null `projectId`, require it to identify one local saved Codex project on
-   the task's current host and record that exact `controller_project_id`; also
-   read its reported primary path. This direct binding may be multi-folder or
-   unrelated to the feature.
+2. Read the current Codex task and project list. When task readback reports an
+   explicit saved-project binding, require it to identify one local saved Codex
+   project on the task's current host and record that exact binding as
+   `controller_project_id`; also read its reported primary path. This direct
+   binding may be multi-folder or unrelated to the feature.
 
-   When task readback omits `projectId`, use the compatibility fallback only if
-   all of these authoritative facts hold:
+   When task readback omits an explicit saved-project binding, use the
+   compatibility fallback only if all of these authoritative facts hold:
 
    - task readback reports a local current host and an absolute `cwd`;
    - `cwd` resolves to an existing non-symlink directory and is exactly the Git
@@ -183,9 +183,9 @@ a broader parent project as a diagnostic step. A failed or partial project
 setup is reported exactly and never converted into an active run.
 
 On recovery, reread the controller task and projects. A direct binding must
-still identify the recorded controller project. An omitted `projectId` must
-reproduce every step-2 fallback predicate and resolve the same recorded project
-ID; otherwise stop rather than replacing the controller identity.
+still identify the recorded controller project. An omitted explicit binding
+must reproduce every step-2 fallback predicate and resolve the same recorded
+project ID; otherwise stop rather than replacing the controller identity.
 
 One root task may own only one unfinished run. A second run from that task
 starts only after the first is terminal.
@@ -210,13 +210,16 @@ mutation. Never use a
 default PR base such as `main` as a head-branch collision: only the
 implementation head branch is exclusive.
 
-The root creates each worker as a visible Codex task with
-`environment=worktree`, `model=gpt-5.6-sol`, and the assignment's resolved
-`thinking=medium|high|xhigh`. Before calling it, root inspects the live
-declaration and passes only verified fields. When the declaration exposes a
-`title` field, root passes the exact canonical worker title in the creation
-call. The ChatGPT App creates the worktree and assigns it to that task. Root
-independently reads the created task and verifies the task, checkout directory,
+The root creates each worker as a visible Codex task in an isolated worktree,
+using `gpt-5.6-sol` and the assignment's resolved
+`thinking=medium|high|xhigh`. Before the one creation call, root inspects the
+live declaration and resolves the exact repository project and host from
+authoritative App readback. The model then calls the live creation tool
+directly, passing only declared fields and the canonical worker title when
+supported; this reference does not reproduce the tool's target or argument
+shape. The ChatGPT App creates the worktree and assigns it to that task. Root
+independently reads or lists the created task and verifies its task ID, project,
+host, environment, state, title, checkout directory,
 Git common directory, project binding, and literal `active|idle` state in the
 `create-worker` observation. Title evidence is recorded separately from the
 structural worker proof. If creation does not yield the exact title, root

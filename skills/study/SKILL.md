@@ -141,6 +141,30 @@ Use these routing terms consistently:
   orchestrator unless the App requires the owning user to answer directly.
 - `owning user`: the human authorized to answer approvals or input requests.
 
+## Study App task contract
+
+The parent and orchestrator interact with Codex App directly through the live
+task tools. Before each creation, read, wait, title, message, or archive call,
+inspect that operation's current declaration and pass only fields it exposes.
+This skill owns Study's outcomes, topology, authorization, lifecycle, and
+verification; it does not reproduce tool signatures, target schemas, or
+serialized App requests.
+
+Resolve the exact saved project and host from authoritative App state before
+creating the orchestrator. Every Study task must remain in that same project
+and local environment without a worktree. The model calls the live creation
+tool once per authorized orchestrator or worker slot, treating the immediate
+response only as a receipt. After a real task ID exists, independently read or
+list the task and verify its identity, project, host, environment, state,
+requested Study settings when exposed, and title as separate metadata.
+
+A rejection, timeout, transport error, client-side setup identifier, or other
+uncertain response requires bounded reconciliation through the live App before
+any retry. Reuse the exact task when it exists. Retry a reserved slot only when
+authoritative evidence proves that no task was created and the slot's recovery
+rules permit it; otherwise mark the slot unresolved and stop later creation.
+Never correlate or reconstruct identity from a title, prompt preview, or timing.
+
 ## Shared run tag and requested titles
 
 Choose one visual `run_tag` before the orchestrator is created:
@@ -195,29 +219,25 @@ Choose one visual `run_tag` before the orchestrator is created:
    assume the new task can see the active turn's unfinished context. Generate
    the shared `run_tag` first and include it explicitly in the handoff.
 2. Resolve the exact project used by the current session:
-   - Call `codex_app__list_projects` before using a `project` target.
+   - Call `codex_app__list_projects` before creating the orchestrator.
    - Match the current session's saved project by exact path and host when
      those facts are available; do not select by label alone.
-   - For a repository-backed session, create the task with that exact
-     `projectId` and `environment: { type: "local" }`.
-   - A projectless task cannot prove that its descendants share the same local
-     context. Stop before creating an orchestrator and report that Study
-     requires an exact saved local project. Do not create a new projectless
-     directory or substitute another saved project.
+   - Require the orchestrator and every worker to use that exact saved project
+     directly in its local environment.
+   - A standalone task outside the saved project cannot prove that its
+     descendants share the same local context. Stop before creation and report
+     that Study requires an exact saved local project; do not substitute
+     another destination.
    - If the match is missing or ambiguous, stop and report it instead of
      creating a task in a guessed project.
-3. Never use `environment: { type: "worktree" }`, `codex_app__fork_thread`,
-   `git worktree`, or a raw worktree command. Both the orchestrator and every
-   worker must run locally in the same project as the parent session.
-4. Create exactly one orchestrator task with `codex_app__create_thread`:
-
-   ```text
-   target: the resolved parent project with environment.type=local
-   model: gpt-5.6-sol
-   thinking: medium
-   title: Study: [<run-tag>] <short title> when exposed by the live declaration
-   prompt: the complete read-only handoff plus the orchestrator protocol
-   ```
+3. Never use a worktree, `codex_app__fork_thread`, `git worktree`, or a raw
+   worktree command. Both the orchestrator and every worker must run locally in
+   the same authoritative project and host as the parent session.
+4. Create exactly one orchestrator by calling the live creation tool directly
+   once. Require the resolved local project, `gpt-5.6-sol` at medium reasoning,
+   the canonical Study title when supported, and the complete read-only handoff
+   plus orchestrator protocol. The inspected declaration owns the accepted
+   argument shape.
 
    `model` and `thinking` are optional in the App API, but they are mandatory
    for Study. Treat the explicit `$study` invocation as authorization for
@@ -285,15 +305,11 @@ The orchestrator must execute the following protocol from its initial prompt:
    concise expected Markdown memo. Serialize assignments that depend on
    unstable findings.
 4. Create up to five visible worker tasks with
-   `codex_app__create_thread`. For each worker, pass:
-
-   ```text
-   target: the exact same projectId and environment.type=local as the parent
-   model: gpt-5.6-luna
-   thinking: max
-   title: Worker N: [<run-tag>] <short title> when exposed by the live declaration
-   prompt: the complete read-only assignment and the worker protocol below
-   ```
+   `codex_app__create_thread`. For each reserved slot, inspect the current live
+   declaration and call the tool directly once. Require the same authoritative
+   local project and host as the parent, `gpt-5.6-luna` at max reasoning, the
+   canonical worker title when supported, and the complete read-only assignment
+   plus worker protocol. Do not reproduce the tool's argument or target shape.
 
    Never omit `model` or `thinking` and never rely on the orchestrator's
    settings being inherited. After each real `threadId` is returned, read or
@@ -515,14 +531,15 @@ worktrees, generic subagents, raw shell task launchers, or a second
 orchestration mechanism.
 
 Before any task mutation, inspect the live declaration for every App operation
-used by the flow and verify every field that will be passed. In particular, do
-not infer creation-time title support from documentation or prompt text, and
-do not treat a creation response as title evidence. If a required operation or
-argument for task identity, project, environment, state, settings, monitoring,
-or cleanup is unavailable or unverifiable, stop as `unsupported-runtime`
-before creating the topology. `set_thread_title` and title fields are
-best-effort metadata capabilities; if unavailable, retain a title warning and
-continue after structural verification.
+used by the flow and verify every field that will be passed. Call the live tool
+directly; do not serialize its request, mirror its declaration, or route it
+through a local helper. In particular, do not infer creation-time title support
+from documentation or prompt text, and do not treat a creation response as
+title evidence. If a required operation or outcome for task identity, project,
+environment, state, settings, monitoring, or cleanup is unavailable or
+unverifiable, stop as `unsupported-runtime` before creating the topology.
+`set_thread_title` and title fields are best-effort metadata capabilities; if
+unavailable, retain a title warning and continue after structural verification.
 
 The authorized App task-management calls above are the only exceptions to the
 no-side-effect rule. Apply this availability matrix before and during a run:

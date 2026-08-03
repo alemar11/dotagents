@@ -274,6 +274,13 @@ consumer of an assignment-resume observation. Each revalidates the complete
 payload inside its write transaction; successful builder output does not
 reserve or advance state.
 
+Codex App calls remain outside this CLI. The model inspects and invokes the live
+App tools directly, then supplies only independently observed coordination and
+reconciliation facts to the app-operation builder. `run-state` does not know,
+construct, serialize, validate, or preserve App request payloads or tool
+declarations. Rejection, timeout, or unknown readback remains subject to the
+existing `app-operation finish` and `app-operation replay` gates.
+
 The scope-repair builder requires a `blocked-scope-repair` assignment and the
 successful recorded planner task. It derives run, assignment, current contract
 generation, repair ID, and source Spec ref. The caller supplies the exact

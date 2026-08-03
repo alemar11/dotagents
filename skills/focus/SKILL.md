@@ -45,45 +45,48 @@ title with one relevant leading emoji, and leave the calling task unchanged.
 4. End the handoff prompt with:
    `Do not begin work yet. Acknowledge this focus briefly, then wait for the
    user's follow-up.`
-5. Resolve the new task target:
-   - For repository-backed work, call `list_projects` and match the current
-     workspace root to exactly one saved project. Create the task in that
-     project with `environment.type=local` so it retains the intended checkout
-     without creating a worktree.
-   - For work with no repository context, use a `projectless` target.
+5. Resolve the new task's destination semantically:
+   - For repository-backed work, call `list_projects`, match the current
+     workspace root and host to exactly one saved project, and require the new
+     task to use that project directly without creating a worktree.
+   - For work with no repository context, require a standalone task outside a
+     saved project only when the live creation tool supports that outcome.
    - If repository-backed work has no unique saved-project match, stop and
-     report the mismatch. Do not create a projectless substitute.
+     report the mismatch. Do not substitute another destination.
 6. Before any task mutation, inspect the live declarations for `list_projects`,
    `create_thread`, and the `read_thread` or `list_threads` operation that will
-   verify the created task's identity, project, environment, and state. Pass
-   only fields exposed by those declarations. Inspect `set_thread_title` when
-   available so it can be used once as a title fallback; missing title support
-   is a warning capability, not a structural runtime failure. Stop before
-   creation only when a structural operation or argument is unavailable or
-   unverifiable, and report `unsupported-runtime`.
-7. Call `create_thread` with the compact handoff as its prompt. Omit `model` and
-   `thinking` so the user's configured defaults apply. When the inspected
-   declaration exposes `title`, pass the chosen title in that creation call;
-   otherwise omit it and continue to the verified fallback below when that
-   operation is available. Do not rely
-   on a creation response or prompt text as visible-title evidence. If creation
-   returns only a client-side identifier, report the setup as pending and do
-   not attempt to title the task; a real task ID remains structurally required.
+   verify the created task's identity, project, host, environment, and state.
+   Inspect `set_thread_title` when available so it can be used once as a title
+   fallback. The model calls these live tools directly and passes only fields
+   exposed by their current declarations; this skill does not reproduce their
+   signatures or target schema. Stop before creation only when a structural
+   operation or required outcome is unavailable or unverifiable, and report
+   `unsupported-runtime`.
+7. Call `create_thread` directly once with the compact handoff. Let the user's
+   configured model and reasoning defaults apply. Pass the chosen title in the
+   creation call only when the inspected declaration supports it; otherwise
+   continue to the verified fallback below when available. Treat the immediate
+   response only as a receipt, never as visible-title or structural proof. A
+   client-side setup identifier is not a real task ID and must not be used with
+   task-ID operations.
 8. When creation returns a real `threadId`, independently read or list the
-   created task and verify its identity, project, local environment, and
-   operational state. Compare the observed title separately. If it is missing
-   or different and the live declaration exposes `set_thread_title`, call it
-   at most once with that ID and the chosen title, plus only fields exposed by
-   its declaration, then read or list the task again. If the setter or title
-   readback is unavailable, retain the real task and record
-   `title-unverified`. Never rename the calling task and never retry a title
-   mutation.
-9. Treat an unavailable or missing title as `title-unverified` and a different
-   or normalized title as `title-drift`. Preserve the real task and continue
-   after structural verification, returning the warning, observed title, and
-   App's native created-task link or card. Require an exact title only when the
-   user explicitly requested one; otherwise title warnings must not block task
-   creation or completion.
+   created task and verify its identity, exact project and host, direct local
+   environment, and operational state. Compare the observed title separately.
+   If it is missing or different and the live declaration exposes
+   `set_thread_title`, call that tool directly at most once, then read or list
+   the task again. If the setter or title readback is unavailable, retain the
+   structurally verified task and record `title-unverified`. Never rename the
+   calling task and never retry a title mutation.
+9. A rejection, timeout, transport error, client-side setup identifier, or
+   uncertain response requires bounded reconciliation through the live App
+   read/list surface before any retry. Reuse the exact task if it exists; retry
+   creation only after authoritative evidence proves that no task was created.
+   If reconciliation remains uncertain, report the partial result and do not
+   create a replacement. Treat an unavailable or missing title as
+   `title-unverified` and a different or normalized title as `title-drift`.
+   Preserve the real task and return the warning, observed title, and App's
+   native created-task link or card. Require an exact title only when the user
+   explicitly requested one; otherwise title warnings must not block completion.
 
 If several topics remain active, choose the most recently discussed unresolved
 outcome. Do not copy the full conversation, browse, inspect repository files,

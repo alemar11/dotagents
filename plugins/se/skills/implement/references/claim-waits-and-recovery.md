@@ -52,11 +52,13 @@ the objective, or use a heartbeat as lifecycle state.
 ### Worker creation may already have happened
 
 If root was interrupted after requesting a visible worker but before recording
-the result, read the ChatGPT App task list and the candidate Codex task. Verify
-its stable task ID, selected project, checkout directory, Git common directory,
-and current state. If the exact worker exists, finish the already recorded
-`create-worker` operation and reuse it. First reconcile its independently read-
-back creation title. If that title is not exact, reconcile the separately
+the result, read the ChatGPT App task list and the candidate Codex task.
+Reconcile the exact recorded operation ID and launch count against the live App
+state before accepting or replaying the operation. Independently verify the
+task's stable ID, selected project, host, environment, checkout directory, Git
+common directory, and current state. If the exact worker exists, finish the
+already recorded `create-worker` operation and reuse it. First reconcile its
+independently read-back creation title. If that title is not exact, reconcile the separately
 recorded `set-worker-title` fallback: call `set_thread_title` only for its
 authorized launch, read back the exact title, and bootstrap only after that
 creation-or-fallback path is attempted. If the exact worker exists but title

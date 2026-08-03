@@ -91,9 +91,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   or explicitly abandoned workers, then leaves the orchestrator open as the
   single visible summary task. Neither the
   orchestrator nor a worker may ever invoke Study or create a nested Study run.
-  Study passes Sol/medium and Luna/max explicitly at creation; because the App
-  creation API has no title field, it initializes each visible title
-  immediately after the real task ID is returned and independently verifies it.
+  Study passes Sol/medium and Luna/max explicitly at creation. It inspects the
+  live creation declaration for title support, uses creation-time titles when
+  available, and otherwise applies the verified fallback after a real task ID
+  is returned.
   When no worker count is specified, Study normally chooses 1–2 workers for a
   focused investigation, 3 for a multi-dimensional comparison, and 4–5 only
   for broad investigations with genuinely independent tracks; five is a cap,

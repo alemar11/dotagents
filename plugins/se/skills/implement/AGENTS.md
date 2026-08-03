@@ -12,6 +12,10 @@ file records maintenance contracts for the package.
   contract, named JSON protocols, artifact fingerprint, and database schema
   are separate authorities; the executable and `references/run-state.md`
   must stay aligned.
+- Keep Codex App API interaction in the natural-language runtime contract.
+  Local helpers must not construct, serialize, validate, or mirror App tool
+  payloads or declarations. `run-state` may gate operation identity, launch
+  generations, replay, and reconciliation evidence, but never calls App tools.
 - `scripts/verify-ready` is a separate read-only terminal verifier and must
   never write run state.
 - `tests/test_run_state_github.py` and `tests/test_verify_ready.py` are the

@@ -149,15 +149,16 @@ defaults grant the root no implementation authority. When the controller
 project is multi-folder, treat every attached folder as read-only coordination
 context and never use that controller project as a worker target.
 
-Current Codex task readback may omit `projectId` for a compatibility workspace
-even though its `cwd` is the exact reported path of one saved local Git project.
-In that case, resolve a controller-only project identity only through the
-bounded exact-path fallback in `references/root-bootstrap.md`. The current
-`list_projects` surface reports one project path but not the complete folder set,
-so the fallback does not prove or require that the saved project is
-single-folder. It may therefore identify either a one-folder project or a
-multi-folder project's primary path, both of which are valid controller
-contexts. It never makes that project eligible as a worker target or replaces
+Current Codex task readback may omit an explicit saved-project binding for a
+compatibility workspace even though its working directory is the exact reported
+path of one saved local Git project. In that case, resolve a controller-only
+project identity only through the bounded exact-path fallback in
+`references/root-bootstrap.md`. The current project-listing surface reports one
+project path but not the complete folder set, so the fallback does not prove or
+require that the saved project is single-folder. It may therefore identify
+either a one-folder project or a multi-folder project's primary path, both of
+which are valid controller contexts. It never makes that project eligible as a
+worker target or replaces
 the independent worker-project preflight.
 
 When the controller project is multi-folder, every worker still runs in the
@@ -194,6 +195,18 @@ and is deduplicated by the worker. A protected non-bootstrap operation may
 replay only after authoritative failed readback proves the prior launch had no
 effect. Controller follow-up messages are not replayable.
 
+Every Codex App operation is performed directly by the model through the live
+App tools. Before the call, inspect the current declaration and use only fields
+it exposes; this skill defines the required outcome, topology, authorization,
+and verification but never reproduces an App payload schema. For operations
+inside an active run, `run-state` authorizes one logical operation and launch
+generation before the model calls the tool once. The model then independently
+reads the resulting task, records the observed identity and reconciliation
+evidence, and lets `run-state` decide whether the operation finished or an
+evidence-backed replay is authorized. Rejection, timeout, or unknown readback
+must be reconciled through the live App before any replay.
+`references/codex-task-orchestration.md` owns this Implement-specific contract.
+
 Resolve the startup fields defined in `references/options.md` only after the
 worker-project preflight. When a required repository has no separate saved Git
 project whose reported primary folder is the exact repository root, the only
@@ -222,8 +235,8 @@ relay and monitor, not the Implement controller:
    state, accepted constraints, expected terminal report, validation
    expectations, unresolved risks, and the rule that the root must not invoke
    `$se:implement` or create another root. Include the parent task ID and host
-   when the App exposes them, the exact project ID, and
-   `environment.type=local`.
+   when the App exposes them, and the exact authoritative local project/host
+   binding.
 2. Resolve the current session's exact saved local project through
    `list_projects`, matching the current path and host. A missing, projectless,
    cross-host, or ambiguous match stops before root creation; do not substitute
@@ -232,26 +245,23 @@ relay and monitor, not the Implement controller:
    verified repository-specific projects.
 3. Before task mutation, inspect the live declarations for `create_thread`,
    `set_thread_title`, task readback/listing, and bounded task waits. Create
-   exactly one root task for a new run with:
-
-   ```text
-   environment: { type: local }
-   model: gpt-5.6-sol
-   thinking: medium
-   title: the canonical Implement Feature root title when known
-   prompt: the complete handoff plus the root protocol
-   ```
+   exactly one root task directly through the live creation tool in the
+   authoritative local project and host, with the required Sol/medium profile,
+   complete handoff, root protocol, and canonical title when supported. Pass
+   only fields exposed by the inspected declaration; do not encode or preserve
+   a local copy of its target or argument shape.
 
    When the final assignment count is not yet authoritative, use the stable
    provisional title `🤖 Implement Feature`; the root owns the existing single
    count-based `set-root-title` fallback after `run start`. Creation-time title
    support is always independently read back and is never identity evidence.
-4. After creation, independently verify the real `threadId`, exact project,
-   local environment, task state, and requested `gpt-5.6-sol` /
-   `thinking: medium` settings when telemetry is exposed. A title warning is
-   non-blocking; structural or settings drift stops before workers. A returned
-   `clientThreadId`, timeout, or uncertain response is pending setup: reconcile
-   the existing App task before any retry and never create a duplicate.
+4. After creation, independently read or list the task and verify the real
+   `threadId`, exact project, host, local environment, task state, and title.
+   Verify the requested `gpt-5.6-sol` / `thinking: medium` settings when
+   telemetry is exposed. A title warning is non-blocking; structural or
+   settings drift stops before workers. A returned `clientThreadId`, timeout,
+   or uncertain response is pending setup: reconcile the existing App task
+   before any retry and never create a duplicate.
 5. For a `resume` request, resolve the unfinished run's recorded
    `root_task_id`, read it back, and send the continuation only to that exact
    root. Never create a replacement root while the run is unfinished. If the

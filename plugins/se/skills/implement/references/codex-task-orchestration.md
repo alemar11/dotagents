@@ -18,14 +18,21 @@ For every such change, root follows one crash-safe sequence:
    changing the Codex task in the ChatGPT App, then retain its generated opaque
    `operation_id`; for `send-bootstrap`, also retain the deterministically
    derived `bootstrap_id`; retain the returned `launch_count` for every action;
-2. perform the change through the ChatGPT App tools only when
-   `app-operation begin` returns `launch_authorized=true`;
-3. use both the immediate tool response and an independent reading of the
-   actual task to build the typed observation for that exact `launch_count` and
-   finish the recorded operation;
-4. after an interruption, inspect the actual object first and record whether
+2. inspect the live declaration for the App operation about to run and resolve
+   the required semantic outcome against the authoritative project, host, task,
+   and assignment facts. Do not copy the declaration, serialize an App request,
+   or route the call through a local helper;
+3. perform the change through the ChatGPT App tools only when
+   `app-operation begin` returns `launch_authorized=true`. The model calls the
+   live tool directly once for that launch and passes only arguments accepted
+   by the inspected declaration;
+4. treat the immediate response as a receipt, then independently read or list
+   the actual task. Use those observed facts to build the normal `run-state`
+   operation observation for that exact `launch_count`, including an
+   authoritative `readback_ref`, and finish the recorded operation;
+5. after an interruption, inspect the actual object first and record whether
    the change already happened;
-5. never begin another logical operation to retry the same effect. Call
+6. never begin another logical operation to retry the same effect. Call
    `app-operation replay` only when `finish` reports
    `replay_authorized=true`; retain the same `operation_id`, use the incremented
    `launch_count`, and for bootstrap retain the same `bootstrap_id`.
@@ -59,6 +66,8 @@ Use the current ChatGPT App tool declarations as the runtime capability
 contract. Inspect the exact signatures of `codex_app__create_thread`,
 `codex_app__set_thread_title`, and `codex_app__set_thread_archived` before any
 startup mutation, and pass only fields present in those declarations. The
+model calls those tools directly; no local helper may construct, serialize,
+validate, or preserve their request payloads or declarations. The
 creation declaration may expose an optional `title`; pass the canonical title
 in the creation call when that exact field is exposed. Do not claim that
 `title` is unsupported or add it without verification.
@@ -87,22 +96,17 @@ any App operation.
 
 The parent creates one root only for a new explicit execution run. It resolves
 the exact current local project and inspects the live App declarations before
-calling `codex_app__create_thread`. When the declaration exposes the fields,
-the call passes:
+calling `codex_app__create_thread` directly. This policy supplies the required
+root outcome—authoritative local project and host, Sol/medium profile, canonical
+title when supported, complete handoff, and root protocol—while the live
+declaration alone owns the accepted argument and target shape.
 
-```text
-environment: { type: local }
-model: gpt-5.6-sol
-thinking: medium
-title: the canonical root title when known
-prompt: the complete parent handoff and root protocol
-```
-
-The parent independently reads back the real task ID, project, local
-environment, task state, and root model/reasoning settings when exposed. It
-records title warnings separately from structural identity. A missing,
-normalized, or drifted creation title is non-blocking because the root owns the
-existing one-time `set-root-title` fallback after authoritative `run start`.
+The parent binds the one creation call to its bootstrap attempt even though no
+SQLite run exists yet. It independently reads back the real task ID, project,
+host, local environment, task state, title, and root model/reasoning settings
+when exposed. It records title warnings separately from structural identity. A
+missing, normalized, or drifted creation title is non-blocking because the root
+owns the existing one-time `set-root-title` fallback after authoritative `run start`.
 An unavailable or conflicting root model/reasoning profile is blocking and
 prevents worker creation. A `clientThreadId`, timeout, or uncertain response is
 pending setup; the parent reconciles the existing task and never creates a
@@ -131,11 +135,12 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    `root-title-unverified` or `root-title-drift` telemetry but does not block
    worker creation. The title is UI evidence, never identity or durable state.
 2. For each claimed assignment allowed by path and dependency serialization,
-   create one visible Codex worker task with `environment=worktree` in the
-   selected local Git project in the ChatGPT App. Pass
-   `model=gpt-5.6-sol`, the assignment's resolved
-   `thinking=medium|high|xhigh` from `task-model-policy.md`, and the canonical
-   worker `title` when the live declaration exposes it. Use this exact
+   create one visible Codex worker task in an isolated App-managed worktree of
+   the selected local Git project. Require `gpt-5.6-sol`, the assignment's
+   resolved `medium|high|xhigh` reasoning from `task-model-policy.md`, and the
+   canonical worker title when the live declaration supports it. The model
+   calls the live creation tool directly and the declaration owns the accepted
+   argument and target shape. Use this exact
    no-authority
    preparation prompt: `This visible task is being prepared as an Implement
    Feature worker. Do not inspect, edit, branch, test, publish, or mutate
