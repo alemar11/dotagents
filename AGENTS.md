@@ -104,6 +104,13 @@ when the package is intended for Codex.
 - Keep one canonical owner for every behavior-affecting field registry,
   template, protocol, and result shape. Cross-reference it instead of copying
   detailed doctrine into multiple packages.
+- Keep [`references/codex-model-index.md`](references/codex-model-index.md) as
+  the repository-wide inventory of skill-level Codex model and reasoning
+  behavior. When a skill or plugin skill adds, removes, renames, or changes a
+  model, reasoning value, role, or intentional ambient/default inheritance,
+  update the index in the same change. Use one row per skill/model/reasoning
+  role, including separate rows when a skill creates multiple profiles. The
+  index points to runtime owners and must not duplicate their full policies.
 - In `references/` folders, use lowercase Markdown filenames except
   `README.md` and `AGENTS.md`.
 
