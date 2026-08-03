@@ -22,6 +22,12 @@ The planner owns the current Feature graph run and returns the complete
 Feature/Task bundle. The application task is an execution envelope, not a
 visible node or transition in the Feature graph.
 
+The planner must run in the invoking session's exact saved local project and
+local environment. Planning is read-only: do not create or use a Git worktree,
+isolated checkout, or task fork. If that destination cannot be independently
+verified, fail closed before creating, resuming, or monitoring the planner
+task.
+
 The title uses the established planner/controller emoji convention. Replace
 only `<Feature outcome>` with the short, concrete, deterministic outcome for
 the current Feature run.

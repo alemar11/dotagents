@@ -114,6 +114,15 @@ if (
     or 'title_template: "🤖 Plan Feature · <Feature outcome>"' not in feature_profile
 ):
     errors.append("feature task profile must define the Sol/medium planner and title")
+feature_destination_requirements = (
+    "exact saved local project" in feature_profile
+    and "local environment" in feature_profile
+    and "do not create or use a git worktree" in feature_profile.lower()
+    and "isolated checkout" in feature_profile.lower()
+    and "task fork" in feature_profile.lower()
+)
+if not feature_destination_requirements:
+    errors.append("feature task profile must require the exact local project without worktrees")
 if (
     "role: orchestrator" not in implement_profile
     or "gpt-5.6-sol" not in implement_profile

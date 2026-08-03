@@ -14,6 +14,9 @@ Its skills are deliberately separated by responsibility:
 - skills/implement/ is the Task execution entry point and owns its task
   profile and topology instead of inheriting the Feature profile; its required
   orchestrator and worker roles are checked before startup.
+- The Feature planner stays in the invoking session's exact saved local
+  project and local environment without a Git worktree; isolated worktrees
+  belong only to the separate Implement workflow.
 - scripts/validate-task-contract.sh checks the package statically; it never
   proves that the live ChatGPT/Codex application can create or monitor tasks.
 - repository context starts at AGENTS.md and follows the repository's own

@@ -54,7 +54,7 @@ planning and verified Task handoffs. It does not replace SE:
 
 | Skill | Purpose |
 | --- | --- |
-| `se2:feature` | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues, vertical Task graphs, and explicit Task dependency waves. |
+| `se2:feature` | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues and vertical Task graphs in the invoking local project without creating a worktree. |
 | `se2:implement` | Execute agent-ready Tasks through skill-owned orchestrator/worker profiles and the shared task preflight and handoff contracts. |
 
 ## Reusable Skills

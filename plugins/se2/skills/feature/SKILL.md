@@ -42,6 +42,12 @@ The profile's canonical emoji title is requested and read back as best-effort
 display metadata for the planner task; title uncertainty never changes the
 Feature graph or authorizes a duplicate task.
 
+The planner must use the invoking session's exact saved local project and
+local environment. `se2:feature` is planning-only, so its planner task must
+not create or use a Git worktree, isolated checkout, or task fork. If the
+destination cannot be independently verified, fail closed before creating,
+resuming, or monitoring the planner task.
+
 The application task is an execution envelope for the current Feature graph
 run, not an additional Feature-graph node. The shared references own the live
 capability, destination, identity, authorization, update-relay, and
