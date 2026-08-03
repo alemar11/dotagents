@@ -49,6 +49,13 @@ SE is the repo-local project-lifecycle plugin. It keeps durable project knowledg
 | `se:implement` | Create one visible Sol/medium root controller and coordinate isolated workers through validation, review, and PR-ready delivery. |
 | `se:audit` | Monitor active sessions using SE skills and return a prioritized read-only report. |
 
+SE2 is an experimental parallel plugin for issue-first, graph-declared Feature
+planning. It does not replace SE and its initial prototype is planning-only:
+
+| Skill | Purpose |
+| --- | --- |
+| se2:feature | Load repository context from the AGENTS.md hierarchy, then converge linked Feature issues, vertical Task graphs, and explicit Task dependency waves. |
+
 ## Reusable Skills
 
 | Skill | Purpose |
@@ -128,6 +135,7 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add se2@alemar11
 ```
 
 If the `alemar11` marketplace is already registered, install G directly:
@@ -135,6 +143,7 @@ If the `alemar11` marketplace is already registered, install G directly:
 ```sh
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add se2@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -144,15 +153,17 @@ of the GitHub source, then install the same plugin:
 codex plugin marketplace add /path/to/dotagents
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add se2@alemar11
 ```
 
 During local development, validate the changed plugin and reinstall each
 versioned plugin from the repository source. G has a dedicated helper;
-SE is reinstalled directly:
+SE and SE2 are reinstalled directly:
 
 ```sh
 plugins/g/projects/g/scripts/reinstall-local
 codex plugin add se@alemar11 --json
+codex plugin add se2@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
@@ -163,6 +174,8 @@ codex plugin remove g@alemar11
 codex plugin add g@alemar11
 codex plugin remove se@alemar11
 codex plugin add se@alemar11
+codex plugin remove se2@alemar11
+codex plugin add se2@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old

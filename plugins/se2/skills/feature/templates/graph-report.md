@@ -1,0 +1,81 @@
+# Feature Bundle Report
+
+## Operational Evidence
+
+- entry_route: <create-or-maintenance>
+- run_mode: <preview-or-publish>
+- source_route: <new-source-or-existing-source>
+- terminal_state: <complete-or-blocked>
+- conceptual_result: <complete-Feature-and-Task-bundle>
+
+The operational mode is internal to the final bundle step. It is not a graph
+node or a separate conceptual result.
+
+## Repository Runs
+
+| repository_identity | feature_ref | task_count | graph_state |
+| --- | --- | --- | --- |
+| <repository> | <Feature issue reference> | <number> | <complete-or-blocked> |
+
+## Repository Context
+
+| repository_identity | sources_read | context_evidence | missing_or_conflicting |
+| --- | --- | --- | --- |
+| <repository> | <sources selected by AGENTS.md hierarchy> | <facts used> | <none or blocker> |
+
+## Feature Set
+
+| repository_identity | feature_issue_ref | feature_type_projection | link_reason |
+| --- | --- | --- | --- |
+| <repository> | <Feature issue reference> | <Feature-or-not-applicable> | <shared boundary or proof link> |
+
+## Feature Definition
+
+- feature_id: <stable-feature-identity>
+- feature_slug: <lower-kebab-feature-slug>
+- acceptance_criteria: <complete or missing items>
+- documentation_updates: <complete or none>
+
+## Tasks
+
+| task_id | task_issue_ref | feature_ref | vertical_outcome | dependency_ids | type_projection | wave | readiness |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <generated-id> | <Task issue reference> | <Feature reference> | <outcome> | <IDs-or-none> | <Task-or-not-applicable> | <wave-number> | <evidence> |
+
+## Task Dependency Graph
+
+<One edge per real Task prerequisite. State why each serialized edge is
+necessary. Feature links are not Task dependencies.>
+
+## Execution Waves
+
+- Wave 0: <Tasks that can start immediately.>
+- Wave 1: <Tasks unblocked after Wave 0.>
+
+## Acceptance Coverage
+
+| feature_criterion | owning_task_ids |
+| --- | --- |
+| <criterion> | <Task-IDs> |
+
+## Publication Evidence
+
+- calculated_bundle: <complete or missing items>
+- feature_attachment: <verified Feature-to-Task evidence>
+- task_dependency_relationships: <verified evidence>
+- issue_type_projection: <Feature/Task mapping or not-applicable>
+- read_after_write: <publish-only evidence or not-applicable>
+
+## Feature Maintenance Changelog
+
+- change_plan: <not-applicable, proposed, or complete>
+- feature_comment_refs: <verified separate comment refs or none>
+- significant_changes: <reason, Feature definition changes, Tasks, and dependency changes>
+
+The changelog is a lateral publication output on the Feature issue, not a graph
+node or terminal state.
+
+## Blockers and Assumptions
+
+- Blockers: <none or exact blocker>
+- Unvalidated assumptions: <none or explicit assumptions>

@@ -1,0 +1,27 @@
+{
+  "name": "se2",
+  "version": "0.2.0",
+  "description": "Generate repository-scoped Feature issues and vertical Task dependency graphs with explicit dependencies.",
+  "author": {
+    "name": "alemar11",
+    "url": "https://github.com/alemar11"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SE2",
+    "shortDescription": "Prototype graph-declared Feature and Task planning.",
+    "longDescription": "SE2 is an experimental issue-first, graph-first Feature planning plugin. Its Feature skill starts from repository AGENTS.md context, keeps a Mermaid overview, a canonical node registry, and one standard Markdown contract for every workflow step. It converges one repository-owned Feature issue containing the canonical Feature definition with vertical Task issues, an acyclic Task dependency graph, readiness evidence, coordinated multi-repository Feature links, and an internally verified GitHub publication step when explicitly authorized.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Use $se2:feature to converge repository-owned Feature issues and their vertical Task dependency graphs, including Feature maintenance when requested, then return the complete bundle and GitHub verification when publication is explicitly authorized."
+    ],
+    "brandColor": "#BE185D"
+  }
+}

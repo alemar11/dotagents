@@ -1,6 +1,6 @@
 ---
 name: plugins-reload
-description: Refresh this project's repo-local G and SE plugins in the Codex cache. Use after changing either plugin or when a new Codex task must load the current plugin files.
+description: Refresh this project's repo-local G, SE, and SE2 plugins in the Codex cache. Use after changing any plugin or when a new Codex task must load the current plugin files.
 ---
 
 # Plugins Reload
@@ -10,6 +10,7 @@ Run these commands from the repository root:
 ```sh
 codex plugin add "g@alemar11" --json
 codex plugin add "se@alemar11" --json
+codex plugin add "se2@alemar11" --json
 ```
 
 For G maintenance, prefer the repository's Bash helper. It runs the
