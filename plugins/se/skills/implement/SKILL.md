@@ -7,7 +7,10 @@ description: "Discover or explicitly implement durable GitHub Feature Specs in t
 
 ## Normal Execution Path
 
-For an explicit execution request, present and follow this six-stage path:
+For an explicit execution request, the invoking parent session first creates or
+resumes one visible Implement root/controller task. The parent session does not
+execute the controller flow itself. After the root is structurally verified,
+the root presents and follows this six-stage path:
 
 1. Select complete GitHub Feature Specs and their implementation issues.
 2. Preflight the sources, repositories, saved Git projects, dependencies, and
@@ -18,6 +21,11 @@ For an explicit execution request, present and follow this six-stage path:
 5. Let each worker implement, test, update the tracker, review, and publish its
    GitHub PR autonomously.
 6. Verify current-head evidence and finish at `pr-ready-for-merge`; never merge.
+
+The parent session remains open while the root is runnable. It relays only
+coarse root milestones, blockers, and the root's final Markdown report. The
+root's final report is authoritative; the parent must not synthesize a second
+implementation result.
 
 Keep `run-state` commands, protocol versions, operation IDs, replay generations,
 and observation files internal unless an exception requires explaining them.
@@ -68,8 +76,8 @@ references:
 - Enter the execution flow only when the user explicitly directs the skill to
   start, implement, or resume one or more Feature Specs. That explicit
   `$se:implement` execution request authorizes creating the disclosed
-  visible worker tasks and their ChatGPT-created worktrees. Do not ask for an
-  additional worker-task creation confirmation.
+  visible root and worker tasks plus the workers' ChatGPT-created worktrees.
+  Do not ask for an additional root- or worker-task creation confirmation.
 
 For `discovery-only`:
 
@@ -92,9 +100,10 @@ For `discovery-only`:
 
 Use this skill only after explicit `$se:implement` invocation in the
 ChatGPT App in Codex mode. For execution, consume complete execution-ready
-Feature Specs and their issues unchanged. Never plan or implement in root,
-create raw worktrees, merge, enqueue, deploy,
-release, or perform post-merge closure.
+Feature Specs and their issues unchanged. The parent session only bootstraps
+and monitors the root; the root is a control plane and never implements
+repository code; workers own implementation. Never create raw worktrees,
+merge, enqueue, deploy, release, or perform post-merge closure.
 
 `references/feature-spec-contract.md` owns the stable-source mutation table.
 The root and workers may read stable fields, detect drift, and block. They may
@@ -115,7 +124,7 @@ The parent Feature Spec is not a substitute for its child issue labels. A
 missing label blocks that Spec before state and is routed back to Feature;
 Implement never adds or repairs the label.
 
-The root coordinates; each visible Codex worker task executes one Feature Spec
+The root/controller coordinates; each visible Codex worker task executes one Feature Spec
 end to end in the ChatGPT-created worktree assigned to that task. A worker that remains within the durable
 contract and continues producing coherent progress and evidence must not be
 micromanaged. Root owns scheduling, canonical Feature Spec claims, safely
@@ -185,15 +194,81 @@ repository has no separate saved Git project whose reported primary folder is
 the exact repository root, that same interaction either authorizes creation of
 only the listed projects plus the disclosed worker run, or stops before state.
 The explicit execution request resolves
-`visible_app_task_permission=granted` unless the user explicitly denies worker
-creation. The startup interaction separately resolves missing-project creation
-and `scope_repair_task_permission`. The worker grant
-covers the selected workers, ChatGPT-created worktrees, normal command
-approvals, validation, publication, review fixes, tracker updates, and recovery.
+`visible_app_task_permission=granted` for the disclosed root and workers unless
+the user explicitly denies task creation. The startup interaction separately
+resolves missing-project creation and `scope_repair_task_permission`. The task
+grant covers the root controller, selected workers, ChatGPT-created worktrees,
+normal command approvals, validation, publication, review fixes, tracker
+updates, and recovery.
 Never ask another authority, recovery, validation, blocker, or continuation
 question during the run.
 
+## Parent-session bootstrap
+
+This protocol runs only for an explicit `start`, `implement`, or `resume`
+request. A `discovery-only` request remains GitHub-only and creates no root.
+
+The session where `$se:implement` is invoked is the `parent session`. It is a
+relay and monitor, not the Implement controller:
+
+1. Build a complete handoff before creating a root. Include the request mode,
+   objective, selected or requested Feature Specs, repository context, current
+   state, accepted constraints, expected terminal report, validation
+   expectations, unresolved risks, and the rule that the root must not invoke
+   `$se:implement` or create another root. Include the parent task ID and host
+   when the App exposes them, the exact project ID, and
+   `environment.type=local`.
+2. Resolve the current session's exact saved local project through
+   `list_projects`, matching the current path and host. A missing, projectless,
+   cross-host, or ambiguous match stops before root creation; do not substitute
+   a new project or a worktree. The root and parent share this control-plane
+   project, while implementation workers still use their independently
+   verified repository-specific projects.
+3. Before task mutation, inspect the live declarations for `create_thread`,
+   `set_thread_title`, task readback/listing, and bounded task waits. Create
+   exactly one root task for a new run with:
+
+   ```text
+   environment: { type: local }
+   model: gpt-5.6-sol
+   thinking: medium
+   title: the canonical Implement Feature root title when known
+   prompt: the complete handoff plus the root protocol
+   ```
+
+   When the final assignment count is not yet authoritative, use the stable
+   provisional title `🤖 Implement Feature`; the root owns the existing single
+   count-based `set-root-title` fallback after `run start`. Creation-time title
+   support is always independently read back and is never identity evidence.
+4. After creation, independently verify the real `threadId`, exact project,
+   local environment, task state, and requested `gpt-5.6-sol` /
+   `thinking: medium` settings when telemetry is exposed. A title warning is
+   non-blocking; structural or settings drift stops before workers. A returned
+   `clientThreadId`, timeout, or uncertain response is pending setup: reconcile
+   the existing App task before any retry and never create a duplicate.
+5. For a `resume` request, resolve the unfinished run's recorded
+   `root_task_id`, read it back, and send the continuation only to that exact
+   root. Never create a replacement root while the run is unfinished. If the
+   root identity cannot be reconciled, stop and report the recovery blocker.
+6. Keep the parent turn open and monitor the root with bounded waits, using
+   direct root milestones when available and the root's final response as the
+   authoritative report. Relay only preflight/run/worker/blocker milestones
+   and the final Markdown report; do not relay routine worker collaboration or
+   execute repository, Git, GitHub, or run-state work in the parent.
+7. The parent never archives the root. A root that completes, blocks, or
+   becomes recoverable remains the visible controller task for its run.
+
+The parent-task identity and relay context are transient handoff data; the
+existing run-state continues to persist only the real root task as
+`root_task_id`. This keeps the first bootstrap change compatible with the
+current run manifest and SQLite protocol.
+
 ## Controller Flow
+
+This flow runs in the newly created or explicitly resumed root task, never in
+the parent session. The root first verifies the handoff, its own task identity,
+the local control-plane project, and the explicit `gpt-5.6-sol` /
+`thinking: medium` profile, then follows the existing controller flow.
 
 This flow applies only after the user explicitly directs execution of one or
 more Feature Specs. A discovery-only request never enters this flow.
@@ -205,6 +280,9 @@ more Feature Specs. A discovery-only request never enters this flow.
    GitHub PR delivery, and exact repository-to-worker-project mapping before state.
    Apply the ready-for-agent gate to every final implementation issue before
    resolving worker profiles, startup authorization, run state, or claims.
+   Verify that the current root task readback still matches the parent handoff
+   and explicitly reports `gpt-5.6-sol` with `thinking: medium` when those
+   settings are exposed; settings drift stops before workers.
    Resolve each worker's fixed model and adaptive thinking level through
    `references/task-model-policy.md`, verify destination-host support, and
    disclose every resolved profile before startup authorization.

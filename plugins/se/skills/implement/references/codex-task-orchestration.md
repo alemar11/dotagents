@@ -1,10 +1,16 @@
 # Implement Codex Task Orchestration
 
-Root alone creates or changes visible Codex tasks, titles, and archives through
-the ChatGPT App. Root owns only controller bootstrap and the explicitly
-allowed controller follow-ups below. Workers never create tasks; they send the
-bounded direct peer messages defined below without routing routine
-collaboration through root.
+The parent session creates exactly one visible root/controller task during the
+parent-session bootstrap. After that root is structurally verified, root alone
+creates or changes worker and planner tasks, titles, and archives through the
+ChatGPT App. Workers never create tasks; they send the bounded direct peer
+messages defined below without routing routine collaboration through root.
+
+The parent-created root task is the one exception to the run-state app-operation
+sequence below: no run exists yet to own a SQLite operation. The parent must
+reconcile the App task before retrying, then the root records its real task ID in
+the normal run manifest and run-state. This follows the Study-style bounded
+bootstrap; it does not create a second run-state machine.
 
 For every such change, root follows one crash-safe sequence:
 
@@ -76,6 +82,37 @@ The title check below is the normal readback immediately after creation. The
 prompt is never title evidence, and a `create_thread` response is not evidence
 that an undocumented field was accepted. Do not pass undocumented fields to
 any App operation.
+
+## Parent Root Creation
+
+The parent creates one root only for a new explicit execution run. It resolves
+the exact current local project and inspects the live App declarations before
+calling `codex_app__create_thread`. When the declaration exposes the fields,
+the call passes:
+
+```text
+environment: { type: local }
+model: gpt-5.6-sol
+thinking: medium
+title: the canonical root title when known
+prompt: the complete parent handoff and root protocol
+```
+
+The parent independently reads back the real task ID, project, local
+environment, task state, and root model/reasoning settings when exposed. It
+records title warnings separately from structural identity. A missing,
+normalized, or drifted creation title is non-blocking because the root owns the
+existing one-time `set-root-title` fallback after authoritative `run start`.
+An unavailable or conflicting root model/reasoning profile is blocking and
+prevents worker creation. A `clientThreadId`, timeout, or uncertain response is
+pending setup; the parent reconciles the existing task and never creates a
+replacement root.
+
+The parent keeps the task open and monitors the root with bounded waits. Root
+sends concise parent milestones and the final report when the parent task ID is
+available; wait/read telemetry remains the fallback and authoritative source.
+Parent relay messages contain no worker instructions, diagnosis, or technical
+state and are not persisted in `run-state`.
 
 ## Root Title And Worker Creation
 
@@ -187,6 +224,13 @@ authoritative SQLite, task, tracker, and repository state before taking action.
 Never create a replacement root, heartbeat, worker-to-root wake, or synthetic
 lifecycle for an unfinished run.
 
+At every meaningful milestone, root may send the parent only a coarse status
+message: setup/readiness, run and claims, worker bootstrap, first terminal or
+material blocker, and final verification. When the run reaches its terminal
+boundary, root sends the same Markdown report to the parent and returns it as
+its own final response. The parent relays that report without rewriting it; the
+root remains unarchived.
+
 A declaratively blocked response does not call `run finish`. The blocked run
 and its claims remain unfinished and exclusively bound to the same root task
 until authoritative recovery or contract change permits that root to continue.
@@ -257,11 +301,12 @@ worker reruns it after every accepted fix and binds the final result to the
 current HEAD. Root only verifies the resulting evidence and never edits or
 reviews the candidate.
 
-Before root sends a controller message, record `send-worker-message` in SQLite. After sending, verify
+Before root sends a controller message to a worker, record
+`send-worker-message` in SQLite. After sending, verify
 the immediate response and independently read the exact task conversation,
 then finish the recorded operation. Controller follow-ups are not replayable;
 an unresolved follow-up remains unresolved rather than being resent under
 another operation. Store no message body, hash, or worker technical state.
 Omit `model` and `thinking` from every `send_message_to_thread` call so the
-worker keeps the exact profile selected at creation; never override or
-reclassify it during follow-up.
+existing root or worker keeps the exact profile selected at creation; never
+override or reclassify it during follow-up.

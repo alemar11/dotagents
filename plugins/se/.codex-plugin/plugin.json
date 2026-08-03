@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Shape ideas into agent-ready Feature Specs, maintain durable project knowledge, and coordinate validated implementation delivery.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Maintain project knowledge, shape Features, and coordinate reviewed delivery.",
-    "longDescription": "SE bundles five project-lifecycle skills: Learn maintains durable repository knowledge and ADRs; Improve Codebase Architecture finds and pressure-tests refactors; Idea captures proposals; Feature converges Feature Specs and agent-ready implementation issues; and Implement coordinates validated, reviewed delivery. SE owns lifecycle semantics and orchestration; G owns GitHub transport and verification.",
+    "longDescription": "SE bundles five project-lifecycle skills: Learn maintains durable repository knowledge and ADRs; Improve Codebase Architecture finds and pressure-tests refactors; Idea captures proposals; Feature converges Feature Specs and agent-ready implementation issues; and Implement creates one visible Sol/medium root controller for validated, reviewed delivery workers. SE owns lifecycle semantics and orchestration; G owns GitHub transport and verification.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],

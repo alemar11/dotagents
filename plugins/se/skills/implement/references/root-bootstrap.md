@@ -1,6 +1,24 @@
 # Implement Root Bootstrap
 
-Root is a lightweight control plane. Before mutation:
+The parent session creates the root/controller task before this protocol runs.
+The root is a lightweight control plane and must not invoke `$se:implement`,
+create another root, or replace itself. The parent-task ID, host, and relay
+instructions are transient handoff context; the real root task ID remains the
+only durable controller identity in `run-state`.
+
+On entry, before the numbered preflight below, the root must:
+
+- read the current task and verify its real `threadId`, local environment,
+  exact control-plane project, and the parent-provided handoff;
+- verify `model=gpt-5.6-sol` and `thinking=medium` when task telemetry exposes
+  them; settings drift blocks before workers;
+- retain the parent task ID only for coarse milestone and final-report relay;
+  the parent is not a worker, repository, or run-state target;
+- keep the root task unarchived and keep the same root for resume/recovery;
+- treat the parent-facing final Markdown report as a relay of root evidence, not
+  as a second root synthesis.
+
+Before mutation, root follows this numbered preflight:
 
 1. Read `../../../references/workflow-contract.md` and
    `../../../references/ready-gate.md`, then read and validate the complete
@@ -77,17 +95,17 @@ Root is a lightweight control plane. Before mutation:
    Contract assigns each component either to that proof owner or to the peer
    that owns the component. Do not require access to worktrees that do not
    exist yet.
-8. Load `task-model-policy.md`, resolve exactly one worker profile per
-   implementation-eligible Feature Spec, and verify destination-host support
-   for the canonical model and every allowed thinking value. Include each
-   resolved profile and reason in the startup disclosure, but do not write it
-   to the run manifest or SQLite.
+8. Load `task-model-policy.md`, verify the fixed root profile, resolve exactly
+   one worker profile per implementation-eligible Feature Spec, and verify
+   destination-host support for the canonical model and every allowed thinking
+   value. Include the root profile and each worker profile and reason in the
+   startup disclosure, but do not write them to the run manifest or SQLite.
 9. Resolve the startup fields from `options.md`. The explicit execution request
-   resolves `visible_app_task_permission=granted` unless the user explicitly
-   denies worker creation. If mappings are missing, list the exact repository
-   roots in the standard question and resolve `missing_project_action` plus
-   `scope_repair_task_permission` in the one startup authorization
-   interaction.
+   resolves `visible_app_task_permission=granted` for the disclosed root and
+   workers unless the user explicitly denies task creation. If mappings are
+   missing, list the exact repository roots in the standard question and
+   resolve `missing_project_action` plus `scope_repair_task_permission` in the
+   one startup authorization interaction.
    With `create-projects`, use Computer Use only for those exact roots, verify
    each selected path before confirmation, then rerun the complete read-only
    saved-project preflight. With `stop`, denied task permission, unavailable

@@ -45,7 +45,7 @@ SE is the repo-local project-lifecycle plugin. It keeps durable project knowledg
 | `se:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
 | `se:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
 | `se:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
-| `se:implement` | Coordinate isolated workers through validation, review, and PR-ready delivery. |
+| `se:implement` | Create one visible Sol/medium root controller and coordinate isolated workers through validation, review, and PR-ready delivery. |
 
 ## Reusable Skills
 
@@ -101,7 +101,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `se:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$se:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
 - `se:idea` loads the plugin workflow contract and uses `$g:github-issues` for exact GitHub preflight reads and Idea mutations.
 - `se:feature` uses the plugin's internal clarification protocol for context-backed questions and `$se:learn` for context or ADR routing plus implementation-closeout handoff. Feature owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$g:github-issues` for exact paginated GitHub Idea and Feature-bundle convergence reads in both run modes plus published tracker mutations.
-- `se:implement` keeps discovery GitHub-only and side-effect free. Explicit execution reads the SE workflow contract and requires `ready-for-agent` on every final implementation issue before claims or workers; it then preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/se/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
+- `se:implement` keeps discovery GitHub-only and side-effect free. Explicit execution first creates or resumes one visible `gpt-5.6-sol`/`medium` root controller in the invoking session's exact local project; the parent relays coarse milestones and the final root report. The root then reads the SE workflow contract, requires `ready-for-agent` on every final implementation issue before claims or workers, preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/se/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 

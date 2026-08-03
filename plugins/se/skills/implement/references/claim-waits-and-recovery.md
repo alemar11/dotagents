@@ -20,6 +20,25 @@ branches may run under different roots in the same repository.
 
 ## Concrete Interruption Scenarios
 
+### Parent root creation may already have happened
+
+If the parent session was interrupted after requesting the root but before
+receiving a real `threadId`, reconcile the App task list and exact task readback
+using the returned `clientThreadId` when available. Verify the root's real task
+ID, exact local project, environment, state, and `gpt-5.6-sol` /
+`thinking: medium` settings before continuing. A title warning is telemetry;
+structural or settings drift stops before any worker or run-state mutation.
+
+If a real root exists, reuse it and continue monitoring; if authoritative
+readback proves that no root exists, one bounded creation retry may use the
+same parent bootstrap attempt. Timeout, transport error, or contradictory
+evidence remains unresolved and forbids a duplicate. The parent must never
+search by title alone or create a second root with a new title.
+
+Once the root has started `run-state`, its `root_task_id` is the durable
+controller identity. Parent-session interruption does not release claims or
+authorize a replacement root; resume is routed to the same visible root.
+
 ### The root task was interrupted
 
 An unfinished run keeps its exact `root_task_id` as the sole controller

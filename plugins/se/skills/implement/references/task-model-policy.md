@@ -1,18 +1,32 @@
-# Implement Visible Worker Model Policy
+# Implement Visible Task Model Policy
 
 ## Ownership
 
 This file is the canonical owner of the model and reasoning policy for visible
-Codex worker tasks created by `$se:implement`. The policy is fixed runtime
-behavior, not a user option, Feature Spec field, Project Context value, tracker
-artifact, run-manifest field, or SQLite fact.
+Codex root and worker tasks created by `$se:implement`. The policy is fixed
+runtime behavior, not a user option, Feature Spec field, Project Context value,
+tracker artifact, run-manifest field, or SQLite fact.
 
-The policy applies only to the visible worker task created for each
-implementation-eligible Feature Spec. Native `codex review` uses the installed
+The root/controller task always uses the fixed Study-compatible controller
+profile below. The worker task created for each implementation-eligible Feature
+Spec uses the adaptive profile below. Native `codex review` uses the installed
 Codex CLI's review command and is not a separate Implement Feature model
 selection or run-state option.
 
-## Canonical Profile
+## Controller Profile
+
+| Field | Value |
+| --- | --- |
+| `model` | `gpt-5.6-sol` |
+| `thinking` | `medium` |
+
+The parent session passes both fields explicitly when creating the root. The
+root must independently read back its task settings when the App exposes them.
+Missing or conflicting model/reasoning telemetry is a setup limitation that
+must be reported; observed settings drift blocks worker creation. The root
+never inherits the parent session's model or reasoning settings.
+
+## Worker Profile
 
 | Field | Value |
 | --- | --- |
@@ -36,9 +50,10 @@ read-only capability evidence, stop as `unsupported-runtime` before run state,
 claims, tasks, or worktrees. Missing title support is a best-effort warning,
 unless the user explicitly requires an exact title.
 
-The startup disclosure names this exact model and adaptive thinking policy.
-`visible_app_task_permission=granted` is therefore the authorized user's
-explicit request to create the disclosed workers with those exact profiles.
+The startup disclosure names the controller profile and the adaptive worker
+policy. `visible_app_task_permission=granted` is therefore the authorized
+user's explicit request to create the disclosed root and workers with those
+exact profiles.
 
 ## Per-Spec Thinking Resolution
 
@@ -72,14 +87,16 @@ incomplete Feature Spec.
 
 ## Application And Recovery
 
-Resolve the profile once before authorization and keep it stable for the
-worker's lifetime. Pass the canonical `model` and resolved `thinking` value to
-`create_thread` when creating the visible worker. On every
+Resolve the root profile before root creation and keep it stable for the root's
+lifetime. Resolve each worker profile once before worker authorization and keep
+it stable for that worker's lifetime. Pass the canonical `model` and resolved
+`thinking` value to `create_thread` for both root and worker creation. On every
 `send_message_to_thread` call, omit both override fields so the existing task
-settings remain unchanged; never steer a worker with another profile.
+settings remain unchanged; never steer a root or worker with another profile.
 
-The selected profile is runtime-derived coordination behavior. Do not write it
-to the run manifest or SQLite. Recovery resumes only the original visible task,
-whose task settings remain authoritative. If authoritative task readback shows
-an unavailable or conflicting profile, block as `unsupported-runtime`; never
-replace the worker, silently reclassify it, or compensate with another model.
+The selected profiles are runtime-derived coordination behavior. Do not write
+them to the run manifest or SQLite. Recovery resumes only the original visible
+task, whose task settings remain authoritative. If authoritative task readback
+shows an unavailable or conflicting profile, block as `unsupported-runtime`;
+never replace the root or worker, silently reclassify it, or compensate with
+another model.
