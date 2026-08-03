@@ -14,7 +14,36 @@ The preflight runs for both read-only and write-capable flows. It must finish
 before any G operation, GitHub mutation, run-state mutation, claim, task, or
 worker creation that depends on G.
 
-## Read-only checks
+## Host runtime checks
+
+Before inspecting plugins, establish that the Codex CLI executable used by the
+current host is available and runnable. The ChatGPT desktop app, a plugin cache,
+or a reported plugin `source.path` does not prove that the terminal CLI is
+installed.
+
+Run:
+
+```sh
+command -v codex
+codex --version
+```
+
+Require `command -v` to resolve an executable and require `codex --version` to
+exit successfully with a usable version string. Record the resolved executable
+path and version as diagnostic evidence only; do not pin this availability gate
+to a particular version or persist it as run configuration.
+
+Block before any plugin check when either command fails:
+
+- `codex-cli-missing`: no `codex` executable resolves on `PATH`;
+- `codex-runtime-error`: the resolved executable cannot run or its version
+  output cannot be trusted.
+
+Do not install, update, or launch the CLI automatically. A missing CLI requires
+an explicit user-authorized installation or environment repair before rerunning
+the preflight.
+
+## Plugin checks
 
 Run:
 
@@ -68,7 +97,8 @@ distinguish:
 - `plugin-disabled`: the exact entry exists but `enabled` is not `true`;
 - `skill-unresolvable`: the reported bundle root or `github-issues` skill is
   missing or malformed;
-- `codex-runtime-error`: the list command or JSON response cannot be trusted;
+- `codex-runtime-error`: the CLI, list command, or JSON response cannot be
+  trusted;
 - `codex-dependency-unresolved`: the explicit G handoff fails after the local
   checks pass.
 
