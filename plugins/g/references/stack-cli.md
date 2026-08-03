@@ -7,6 +7,11 @@ logic; those remain owned by `gh-stack`.
 
 ## Readiness and installation
 
+The scoped host, authentication, and extension gate is owned by
+[`gh-dependency-preflight.md`](gh-dependency-preflight.md). Load it before
+stack-dependent operations; this reference owns the typed wrapper surface and
+the explicit installation boundary.
+
 ```bash
 <plugin-root>/scripts/g --json doctor
 <plugin-root>/scripts/g --json stack ensure
@@ -67,7 +72,7 @@ G envelope:
 ```json
 {
   "ok": true,
-  "version": "1.0.0",
+  "version": "1.1.1",
   "command": ["stack", "view"],
   "data": {}
 }

@@ -19,6 +19,10 @@ skills, direct `git`, the shared CLI, and connector-backed PR operations:
   readiness and `publish open --title-file --body-file` for new PRs. Use the
   connector for supported existing-PR lifecycle operations. Do not put PR
   title or body text in argv or a shell string.
+- When the publish path is selected, load
+  [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+  before the first `gh`-dependent command. The shared reference owns the
+  `gh` availability, authentication, and conditional `gh-stack` checks.
 - Use `<plugin-root>/scripts/g stack ensure` and `stack link` only when
   the selected PR base branch is the head of exactly one existing PR in the
   same repository. Pass PR numbers in bottom-to-top order so this operation

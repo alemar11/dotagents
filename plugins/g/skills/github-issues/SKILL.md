@@ -15,6 +15,10 @@ Prefer the required GitHub connector for supported remote reads and writes. Use
 `gh` for connector gaps. An authorized connector write may fall back
 automatically only when the operation and repository are identical, `gh`
 authentication and access succeed, and the transport switch is reported.
+When a connector gap requires direct `gh`, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+immediately before that fallback. Connector-only operations do not require the
+CLI gate.
 
 
 ## Role

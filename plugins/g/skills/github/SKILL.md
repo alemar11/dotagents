@@ -9,6 +9,12 @@ Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
 Connector calls and local-only commands do not use shell escalation.
 
+Before the first provider-facing direct `gh` or `<plugin-root>/scripts/g`
+operation, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md).
+Connector-only paths skip the gate; stack operations additionally require the
+exact `github/gh-stack` readiness check owned by that reference.
+
 ## Role
 
 Use this plugin-only umbrella when a GitHub request is mixed, ambiguous, or
@@ -34,6 +40,9 @@ skill and keep that skill's authority and safety rules intact.
 - Read [`../../references/stack-cli.md`](../../references/stack-cli.md) for the
   typed command surface, JSON envelope, raw escape hatch, and extension
   readiness states.
+- Read
+  [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+  for the shared `gh`, authentication, and conditional `gh-stack` gate.
 
 Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 

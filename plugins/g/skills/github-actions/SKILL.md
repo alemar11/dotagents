@@ -22,6 +22,11 @@ and rerun operations. Use `gh` for unsupported or external checks. An authorized
 write may fall back automatically only for the same operation and repository
 after `gh` authentication and access verification; report the fallback.
 
+Before the first provider-facing connector fallback or shared CLI command,
+load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+and require its host and authentication checks.
+
 Resolve `<plugin-root>` as two directories above the directory containing this
 `SKILL.md`. Use the shared CLI when stable aggregation or focused snippets add
 value:

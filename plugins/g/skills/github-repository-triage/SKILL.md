@@ -18,6 +18,10 @@ verification. Report every fallback. This skill never performs GitHub writes
 or automatically falls back between write transports; route every
 write-shaped request to its owning skill.
 
+Before the first provider-facing direct `gh` or shared CLI fallback, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+and require its host and authentication checks.
+
 
 ## Role
 

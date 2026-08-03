@@ -22,6 +22,10 @@ provider text, use only a structured connector mutation whose exact target can
 be read back, or the typed file-backed G commands below. Never place a
 title, body, description, reply, or review text in argv or a shell string.
 
+Before the first provider-facing shared CLI command, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+and require its host and authentication checks.
+
 Resolve `<plugin-root>` as two directories above the directory containing this
 `SKILL.md`:
 

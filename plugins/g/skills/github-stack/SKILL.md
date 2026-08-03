@@ -18,8 +18,11 @@ rebasing, synchronization, and merge behavior to the official
 
 Resolve `<plugin-root>` as two directories above this `SKILL.md`. Read
 [`../../references/stack-cli.md`](../../references/stack-cli.md) before using
-the command surface and load [`references/workflows.md`](references/workflows.md)
-for the requested lifecycle operation.
+the command surface, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+for the scoped `gh` and `gh-stack` readiness gate, and load
+[`references/workflows.md`](references/workflows.md) for the requested lifecycle
+operation.
 
 ## Boundaries
 
@@ -38,8 +41,8 @@ for the requested lifecycle operation.
 ## Readiness and authorization
 
 1. Resolve the repository and plugin root.
-2. Run `g --json doctor` and
-   `g --json stack ensure` before stack operations.
+2. Load and pass the shared `gh` dependency preflight. It owns the host CLI,
+   authenticated-provider, and exact `github/gh-stack` checks.
 3. If the extension is missing, stop and report the prerequisite. Run
    `g --json stack ensure --install` only after the user explicitly
    authorizes installing `github/gh-stack`.

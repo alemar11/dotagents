@@ -16,6 +16,10 @@ Prefer the required GitHub connector for supported remote reads and writes. Use
 automatically only when the operation and repository are identical, `gh`
 authentication and access succeed, and the transport switch is reported.
 
+Before the first provider-facing shared CLI operation, load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
+and require its host and authentication checks.
+
 
 ## Role
 
