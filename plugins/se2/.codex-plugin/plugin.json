@@ -1,7 +1,7 @@
 {
   "name": "se2",
-  "version": "0.3.1+codex.20260803155702",
-  "description": "Plan repository-scoped Features and vertical Tasks, then hand off verified Task execution through a shared application preflight contract.",
+  "version": "0.4.0",
+  "description": "Capture session proposals as Ideas, plan repository-scoped Features and vertical Tasks, then hand off verified Task execution through shared application contracts.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SE2",
-    "shortDescription": "Plan Features and execute Tasks through verified handoffs.",
-    "longDescription": "SE2 is an experimental issue-first, graph-first Feature planning plugin with a separate Task implementation entry point. Its Feature skill starts from repository AGENTS.md context, keeps a Mermaid overview, a canonical node registry, and one standard Markdown contract for every workflow step. It converges one repository-owned Feature issue containing the canonical Feature definition with vertical Task issues, an acyclic Task dependency graph, readiness evidence, coordinated multi-repository Feature links, and an internally verified GitHub publication step when explicitly authorized. Root plugin contracts standardize live task preflight, destination and identity observation, update relay, and reconciliation; each skill owns its task profile and topology.",
+    "shortDescription": "Capture Ideas and execute verified SE2 Tasks.",
+    "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit Idea capture, Feature planning, and Task implementation entry points. Its Idea skill builds a transient session capture bundle and can preview or publish verified GitHub Ideas through the G-owned issue workflow. Its Feature skill starts from repository AGENTS.md context, keeps a Mermaid overview, a canonical node registry, and one standard Markdown contract for every workflow step. It converges one repository-owned Feature issue containing the canonical Feature definition with vertical Task issues, an acyclic Task dependency graph, readiness evidence, coordinated multi-repository Feature links, and an internally verified GitHub publication step when explicitly authorized. Root plugin contracts standardize live task preflight, destination and identity observation, update relay, and reconciliation; each task-managed skill owns its task profile and topology.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -21,7 +21,8 @@
     "websiteURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $se2:feature for an explicit Feature or Feature maintenance run: load repository AGENTS.md context, pass the skill-owned task profile through the shared task preflight when a task handoff is needed, converge repository-owned Feature issues and vertical Task dependency graphs, and return the complete bundle with GitHub verification only when publication is explicitly authorized.",
-      "Use $se2:implement only for an explicit SE2 Task implementation request; load the same root task preflight and handoff contracts and fail closed when live creation, observation, or monitoring cannot be verified."
+      "Use $se2:implement only for an explicit SE2 Task implementation request; load the same root task preflight and handoff contracts and fail closed when live creation, observation, or monitoring cannot be verified.",
+      "Use $se2:idea for an explicit Idea capture request; build a transient session bundle, preview it without mutation, or publish verified GitHub Ideas through the G-owned issue workflow when publication is explicitly authorized."
     ],
     "brandColor": "#BE185D"
   }

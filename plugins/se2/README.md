@@ -1,6 +1,7 @@
 # SE2
 
-SE2 is an experimental issue-first, graph-first Feature planning plugin.
+SE2 is an experimental issue-first, graph-first plugin for Idea capture,
+Feature planning, and verified Task handoff.
 
 Its skills are deliberately separated by responsibility:
 
@@ -9,11 +10,18 @@ Its skills are deliberately separated by responsibility:
 - templates/ contains authoring resources, not executable nodes.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
+- references/workflow-contract.md and references/codex-dependency-preflight.md
+  are the SE2-owned contracts for Idea metadata and the G dependency gate.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
   to planner, orchestrator, and worker tasks; titles remain display metadata.
 - skills/implement/ is the Task execution entry point and owns its task
   profile and topology instead of inheriting the Feature profile; its required
   orchestrator and worker roles are checked before startup.
+- skills/idea/ is the explicit capture entry point. It builds a transient
+  session bundle, previews non-durable Ideas, or publishes verified hosted
+  Ideas through the G-owned issue workflow; it never writes project memory or
+  starts an application task.
+  Invoke it explicitly as `se2:idea`.
 - The Feature planner stays in the invoking session's exact saved local
   project and local environment without a Git worktree; isolated worktrees
   belong only to the separate Implement workflow.

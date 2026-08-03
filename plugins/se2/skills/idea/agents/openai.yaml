@@ -1,0 +1,7 @@
+interface:
+  display_name: "Idea Capture"
+  short_description: "Capture session proposals as tentative Ideas."
+  brand_color: "#D97706"
+  default_prompt: "Use $se2:idea to capture the concrete proposals from this session as previewable or explicitly publishable GitHub Ideas, preserving open questions and stopping after the capture report."
+policy:
+  allow_implicit_invocation: false
