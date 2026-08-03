@@ -12,6 +12,7 @@ from . import __version__
 from .review_request import validate_receipt
 from .review_thread import validate_reply_receipt, validate_resolution_receipt
 from .terminal_evidence import validate_terminal_evidence_receipt
+from .ready_review import ReadyReviewError, validate_ready_trigger
 
 
 REQUEST_SCHEMA = "g-review-operation-request:v1"
@@ -19,12 +20,14 @@ RESULT_SCHEMA = "g-review-operation-result:v1"
 START_RECEIPT_SCHEMA = "g-review-operation-start:v1"
 VALIDATION_DESCRIPTOR_SCHEMA = "owned-operation-validation-descriptor:v1"
 OPERATIONS = frozenset({
-    "request", "wait", "warning", "reply", "resolve",
+    "request", "wait", "ready-check", "ready-wait", "warning", "reply", "resolve",
     "reconcile-mutation", "reconcile-terminal",
 })
 OUTCOMES = {
     "request": frozenset({"created", "recognized-existing"}),
     "wait": frozenset({"clean", "findings", "pending-at-deadline", "request-correlation-failure", "provider-failure"}),
+    "ready-check": frozenset({"clean", "findings", "pending", "stale", "ambiguous", "provider-failure"}),
+    "ready-wait": frozenset({"clean", "findings", "pending-at-deadline", "stale", "ambiguous", "provider-failure"}),
     "warning": frozenset({"posted", "recognized-existing"}),
     "reply": frozenset({"posted", "recognized-existing"}),
     "resolve": frozenset({"resolved", "already-resolved"}),
@@ -40,6 +43,8 @@ UTC_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 LEGAL_STATUS_OUTCOME = {
     "request": {"created": "completed", "recognized-existing": "completed"},
     "wait": {"clean": "completed", "findings": "completed", "pending-at-deadline": "completed", "request-correlation-failure": "failed", "provider-failure": "failed"},
+    "ready-check": {"clean": "completed", "findings": "completed", "pending": "completed", "stale": "failed", "ambiguous": "ambiguous", "provider-failure": "failed"},
+    "ready-wait": {"clean": "completed", "findings": "completed", "pending-at-deadline": "completed", "stale": "failed", "ambiguous": "ambiguous", "provider-failure": "failed"},
     "warning": {"posted": "completed", "recognized-existing": "completed"},
     "reply": {"posted": "completed", "recognized-existing": "completed"},
     "resolve": {"resolved": "completed", "already-resolved": "completed"},
@@ -114,6 +119,8 @@ def _validate_input(operation: str, value: Any, target: dict[str, Any]) -> dict[
     fields = {
         "request": {"request_key"},
         "wait": {"request_receipt", "wait_started_at", "wait_deadline"},
+        "ready-check": {"ready_receipt"},
+        "ready-wait": {"ready_receipt", "wait_started_at", "wait_deadline"},
         "warning": {"request_receipt", "prior_pending_result", "body_file", "body_fingerprint"},
         "reply": {"request_receipt", "prior_findings_result", "followup_obligation", "finding_comment_id", "thread_id", "thread_fingerprint", "body_file", "body_fingerprint"},
         "resolve": {"request_receipt", "prior_reply_result", "followup_obligation", "reply_receipt"},
@@ -130,6 +137,17 @@ def _validate_input(operation: str, value: Any, target: dict[str, Any]) -> dict[
             )
         except ValueError as exc:
             raise OperationError(str(exc)) from exc
+    if "ready_receipt" in item:
+        try:
+            validate_ready_trigger(
+                item["ready_receipt"],
+                provider=target["provider"],
+                repository=target["repository"],
+                pr_number=target["pr_number"],
+                expected_head=target["head_sha"],
+            )
+        except (ReadyReviewError, TypeError, ValueError) as exc:
+            raise OperationError(str(exc)) from exc
     for name in ("body_fingerprint", "thread_fingerprint"):
         if name in item:
             _sha(item[name], f"input.{name}")
@@ -142,7 +160,7 @@ def _validate_input(operation: str, value: Any, target: dict[str, Any]) -> dict[
         raise OperationError("input.finding_comment_id is invalid")
     if operation == "request":
         _sha(item["request_key"], "input.request_key")
-    if operation == "wait":
+    if operation in {"wait", "ready-wait"}:
         started = _utc_timestamp(item["wait_started_at"], "input.wait_started_at")
         deadline = _utc_timestamp(item["wait_deadline"], "input.wait_deadline")
         if deadline != started + timedelta(minutes=45):
@@ -379,7 +397,7 @@ def _validate_mutation_artifact(value: Any, name: str) -> dict[str, Any]:
 
 def _validate_observation_artifact(value: Any) -> dict[str, Any]:
     item = _exact(value, {"kind", "object_id", "object_url", "actor", "body_fingerprint", "outcome"}, "facts.artifact")
-    if item["kind"] not in {"none", "formal-review", "provider-comment", "clean-reaction"}:
+    if item["kind"] not in {"none", "formal-review", "provider-comment", "inline-finding", "clean-reaction"}:
         raise OperationError("facts.artifact.kind is invalid")
     if item["outcome"] not in {None, "clean", "findings", "error"}:
         raise OperationError("facts.artifact.outcome is invalid")
@@ -433,6 +451,36 @@ def validate_facts(operation: str, outcome: str, value: Any) -> dict[str, Any]:
             raise OperationError("correlation failure requires a proven non-recognized request")
         if item["provider_state"] != expected[1]:
             raise OperationError("wait outcome does not match provider state")
+        return item
+    if operation in {"ready-check", "ready-wait"}:
+        item = _exact(value, {
+            "repository", "pr_number", "head_sha", "provider", "ready_receipt",
+            "provider_state", "observation_fingerprint", "finding_count",
+            "finding_comment_ids", "artifact",
+        }, "facts")
+        validate_ready_trigger(
+            item["ready_receipt"],
+            provider=item["provider"],
+            repository=item["repository"],
+            pr_number=item["pr_number"],
+            expected_head=item["head_sha"],
+        )
+        if item["provider_state"] not in {"clean", "findings", "pending", "stale", "ambiguous", "failed"}:
+            raise OperationError("facts.provider_state is invalid")
+        _sha(item["observation_fingerprint"], "facts.observation_fingerprint")
+        if not isinstance(item["finding_count"], int) or isinstance(item["finding_count"], bool) or item["finding_count"] < 0:
+            raise OperationError("facts.finding_count is invalid")
+        ids = item["finding_comment_ids"]
+        if not isinstance(ids, list) or ids != sorted(set(ids)) or any(not isinstance(v, int) or isinstance(v, bool) or v < 1 for v in ids):
+            raise OperationError("facts.finding_comment_ids is invalid")
+        _validate_observation_artifact(item["artifact"])
+        expected_state = {
+            "clean": "clean", "findings": "findings", "pending": "pending",
+            "pending-at-deadline": "pending", "stale": "stale",
+            "ambiguous": "ambiguous", "provider-failure": "failed",
+        }[outcome]
+        if item["provider_state"] != expected_state:
+            raise OperationError("ready review outcome does not match provider state")
         return item
     if operation == "warning":
         item = _exact(value, {"request_receipt", "mutation"}, "facts")

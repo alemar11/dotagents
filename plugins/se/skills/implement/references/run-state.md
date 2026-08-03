@@ -38,7 +38,7 @@ machine-readable registry for these identities and protocols:
 | Feature Spec Set input | `implement-feature/feature-spec-set-input` | `2.0.0` |
 | Codex task-operation observation | `implement-feature/app-operation-observation` | `2.0.0` |
 | Contract-repair observation | `implement-feature/contract-repair-observation` | `1.0.0` |
-| Delivery-ready observation | `implement-feature/delivery-ready-observation` | `3.0.0` |
+| Delivery-ready observation | `implement-feature/delivery-ready-observation` | `4.0.0` |
 | Recovery observation | `implement-feature/recovery-observation` | `3.0.0` |
 | Assignment-resume observation | `implement-feature/assignment-resume-observation` | `2.0.0` |
 
@@ -172,7 +172,8 @@ scripts/run-state --json assignment ready-observation create \
   --validation-head-sha HEAD --review-head-sha HEAD \
   --review-candidate-head-sha CANDIDATE --review-profile standard \
   --default-branch-name main --pr-url https://github.com/owner/repository/pull/44 \
-  --provider-observation-ref PROVIDER \
+  --ready-transition-observation-ref READY_TRANSITION \
+  --ready-review-observation-ref READY_REVIEW \
   --tracker-readback-ref TRACKER \
   --output /absolute/new-ready-observation.json
 scripts/run-state --json assignment ready \
@@ -331,7 +332,7 @@ payload. The ready builder accepts repeated
 `--codex-review-head-sha`, which must bind the native review to the current
 HEAD.
 GitHub PR delivery requires `--default-branch-name`, `--pr-url`, and
-`--provider-observation-ref`.
+`--ready-transition-observation-ref` and `--ready-review-observation-ref`.
 `peer-input` applies the dependent-assignment validation that the consumer
 later repeats. `assignment ready` has no readiness flag: it derives the
 mutation exclusively from the observation's `readiness_mode`, preventing the
@@ -450,9 +451,10 @@ mutation attempt. Its expected title is derived from the immutable assignment co
 Ready observations always bind assignment/thread/repository/checkout, named head
 and base branches, head/base SHAs, clean worktree, base ancestry, current-head
 validation and native Codex-review SHAs, the first coherent review-candidate
-SHA, the derived review profile, GitHub issue
-readback, the GitHub default branch, canonical PR URL, provider observation ref,
-and the exact prerequisite HEAD map. Status is always `pr-ready-for-merge`.
+SHA, the derived review profile, GitHub issue readback, the GitHub default
+branch, canonical PR URL, the ready-transition observation, the ready-triggered
+review observation, and the exact prerequisite HEAD map. Status is always
+`pr-ready-for-merge`.
 
 The exact common ready-observation fields are:
 `schema`, `schema_version`, `assignment_id`, `thread_id`, `repository_identity`,
@@ -462,8 +464,9 @@ The exact common ready-observation fields are:
 `validation_head_sha`, `review_head_sha`, `review_candidate_head_sha`,
 `review_profile`, `codex_review_head_sha`,
 `tracker_readback_ref`, `prerequisite_heads`, and `status`. Every observation
-also requires exactly `default_branch_name`, `pr_url`, and
-`provider_observation_ref`. No other keys are accepted.
+also requires exactly `default_branch_name`, `pr_url`,
+`ready_transition_observation_ref`, and `ready_review_observation_ref`. No other
+keys are accepted.
 
 `review_profile` is exactly `standard` or `high-risk`, derived by the worker
 from the accepted task risk. Both profiles invoke native review with

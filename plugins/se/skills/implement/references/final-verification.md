@@ -5,7 +5,7 @@ Root then performs read-only verification; it does not edit code, rerun implemen
 check boxes, uncheck boxes, or judge acceptance criteria.
 
 The worker-facing `pr-ready-for-merge` result is also the
-`implement-feature/delivery-ready-observation` `3.0.0` status value. It maps to
+`implement-feature/delivery-ready-observation` `4.0.0` status value. It maps to
 assignment state `pr-ready` and aggregate outcome `pr-ready`.
 
 Collect the terminal reports and immutable current-head evidence for every
@@ -34,10 +34,17 @@ For each assignment, root rereads:
   `review_profile=standard|high-risk`; both profiles require native review on
   the candidate, and its final `codex_review_head_sha` must bind the current
   HEAD after all accepted fixes;
+- exact Send publication evidence for the PR head and draft-state read-back;
+- the typed ready-transition observation proving the exact draft-to-ready
+  event for that PR and HEAD;
+- the typed ready-triggered provider-review observation, with provider, result,
+  artifact timestamp, exact SHA, and finding/thread identities. Any review
+  performed while the PR was draft is consultative and cannot satisfy this
+  requirement;
 - actionable feedback resolution;
 - committed tracker readback and a clean managed worktree;
 - open non-draft PR identity, provider default-branch base, configured CI,
-  mergeability, conflicts, rules, and approvals.
+  mergeability, conflicts, rules, approvals, and zero unresolved review threads.
 
 If authoritative final evidence agrees, use `assignment ready-observation
 create --readiness-mode terminal` to build the private typed payload from that

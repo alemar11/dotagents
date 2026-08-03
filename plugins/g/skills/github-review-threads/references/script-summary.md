@@ -126,7 +126,11 @@ request key. Only its exact canonical marker is recognized; markerless plain,
 short, or prose requests are diagnosed as `unbound`, while malformed or
 conflicting typed markers are `invalid`.
 `check` may inspect without a receipt, but `wait` requires one and never scans
-for a replacement SHA-bearing comment.
+for a replacement SHA-bearing comment. `ready-check` and `ready-wait` require a
+`g-codex-ready-trigger:v1` receipt proving one exact draft-to-ready transition;
+they correlate only provider artifacts after that ready timestamp and exact
+full SHA. They never create or search for an explicit request comment and
+return a `g-codex-ready-review-certificate:v1` projection with the observation.
 `wait` also returns `attempts`, `state_transitions`, and `unchanged_attempts`.
 The observation fingerprint excludes those counters and elapsed time, so
 callers can suppress unchanged ledger and progress updates.

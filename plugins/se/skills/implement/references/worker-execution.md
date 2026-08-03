@@ -128,17 +128,39 @@ delta against the declared base without inheriting ambient settings. If the
 worker fixes a finding, repeat `verify-ready`, rerun the same command, and bind
 `codex_review_head_sha` and `review_head_sha` to the resulting HEAD.
 
+After the local review is clean, publish through `$g:send`. Send owns commit
+push, draft PR creation or existing-PR preservation, issue linkage, and exact
+publication read-back; it stops there and does not request or wait for Codex
+review. The worker keeps the exact published HEAD, PR URL, draft state, body,
+base, and Send publication evidence.
+
+When HEAD, PR body, and required CI are stable, the worker explicitly marks the
+draft PR ready and independently records the provider ready-transition event.
+The worker passes that typed transition evidence to the read-only
+`ready-check`/`ready-wait` path of `$g:github-review-threads`. A draft review,
+if manually requested for consultation, is never terminal evidence for this
+ready cycle.
+
+If the ready cycle reports a finding and a later fix publishes a new SHA, the
+worker reruns local review, pushes the new SHA, requests an explicit
+`@codex review <new-SHA>` on the already-ready PR, waits for that exact request,
+and repeats the final thread, CI, HEAD, and mergeability checks.
+
 Follow `tracker-checklists.md` for every issue and parent checkbox. If later work
 invalidates proof, uncheck it and read back the correction. Restore and commit
 that proof before the next native review fix verification; do not create a
 tracker-only post-review HEAD.
 
-The successful result is `pr-ready-for-merge` with GitHub PR/provider/CI and
-mergeability proof, exact repository and checkout identity, named target branch
-and HEAD, base branch and base SHA ancestry, clean worktree, current-head
-validation and reviews, committed GitHub issue readback, required
-`capture_outcome=captured` and documentation-diff evidence, and no unresolved
-recorded task changes. Coherent progress needs no root intervention.
+The successful result is `pr-ready-for-merge` only with a ready-transition
+observation and a correlated ready-triggered provider-review observation for
+the same PR and full HEAD, plus GitHub PR/CI and mergeability proof, exact
+repository and checkout identity, named target branch and HEAD, base branch
+and base SHA ancestry, clean worktree, current-head validation and reviews,
+committed GitHub issue readback, required `capture_outcome=captured` and
+documentation-diff evidence, zero unresolved review threads, and no unresolved
+recorded task changes. A pending, timed-out, stale, ambiguous, or consultative
+review is not delivery-ready evidence. Coherent progress needs no root
+intervention.
 
 ## Peer Collaboration And Combined Proof
 

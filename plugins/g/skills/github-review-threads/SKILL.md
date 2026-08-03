@@ -62,8 +62,9 @@ Use JSON `reviews address` as the typed source for a review thread's current
 authority; do not reproduce the hash locally.
 
 Managed orchestration uses the closed `reviews operation` family. G owns
-the complete request/result schemas for `request`, `wait`, `warning`, `reply`,
-`resolve`, `reconcile-mutation`, and `reconcile-terminal`. Preparation and
+the complete request/result schemas for `request`, `wait`, `ready-check`,
+`ready-wait`, `warning`, `reply`, `resolve`, `reconcile-mutation`, and
+`reconcile-terminal`. Preparation and
 validation are read-only. Execution atomically appends a
 `g-review-operation-start:v1` receipt to G's own per-user journal
 before transport; resume and reconciliation read the same exact journal and
@@ -79,16 +80,19 @@ sufficient proof of success.
 
 1. Resolve the base repository and PR, then list review threads with resolution
    state and enough surrounding diff context to understand each comment.
-   For an automated-review request, capture the intended full head SHA and a
-   caller-owned request key, invoke `reviews request`, and persist its complete
-   request receipt. Pass that receipt unchanged to `reviews wait`; the waiter
-   fetches the exact provider comment id and never substitutes a newer comment.
+   For an explicit automated-review request, capture the intended full head SHA
+   and a caller-owned request key, invoke `reviews request`, and persist its
+   complete request receipt. Pass that receipt unchanged to `reviews wait`; the
+   waiter fetches the exact provider comment id and never substitutes a newer
+   comment. For a review triggered by draft-to-ready, use `reviews ready-check`
+   or `reviews ready-wait` with one typed ready-transition receipt. These
+   operations are read-only and never post `@codex review`.
    Never accept review evidence from an older head. Reuse the returned
    `observation_fingerprint`; unchanged observations are not state transitions
    and must not cause caller-side ledger writes or progress messages.
    Use `reviews terminal-evidence` only to independently verify one exact typed
-   request lineage after a caller has recorded a correlation failure. It is a
-   read-only proof operation, never a replacement request or waiter.
+   explicit-request lineage after a caller has recorded a correlation failure.
+   It is a read-only proof operation, never a replacement request or waiter.
 2. Group duplicates and classify feedback as actionable, already addressed,
    informational, obsolete, or requiring a user decision.
 3. Present or honor the selected actionable set. Do not silently implement

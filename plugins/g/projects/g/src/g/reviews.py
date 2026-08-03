@@ -38,6 +38,7 @@ from .review_request import (
     receipt_matches,
     validate_receipt,
     validate_full_head,
+    FULL_SHA_PATTERN,
 )
 from .review_thread import (
     build_reply_receipt,
@@ -63,6 +64,7 @@ from .terminal_evidence import (
     build_terminal_evidence_receipt,
     validate_terminal_evidence_receipt,
 )
+from .ready_review import ReadyReviewError, build_ready_trigger, validate_ready_trigger
 from .review_operation import (
     OperationError,
     build_request as build_operation_request,
@@ -1147,6 +1149,237 @@ def check_automated_review(
     payload["error_code"] = error_code
     payload["observation_fingerprint"] = stable_observation_fingerprint(payload)
     return payload
+
+
+def _ready_timestamp(value: object, name: str) -> datetime:
+    if not isinstance(value, str):
+        raise ReviewError(f"{name} is missing.", code="ready_trigger_invalid", exit_code=64)
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ReviewError(
+            f"{name} must be a canonical UTC timestamp.",
+            code="ready_trigger_invalid",
+            exit_code=64,
+        ) from exc
+    return parsed.replace(tzinfo=timezone.utc)
+
+
+def _provider_timestamp(value: object, name: str) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise ReviewError(f"Provider artifact {name} is missing.", code="provider_response_invalid", exit_code=4)
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ReviewError(
+            f"Provider artifact {name} is not a valid timestamp.",
+            code="provider_response_invalid",
+            exit_code=4,
+        ) from exc
+    if parsed.tzinfo is None:
+        raise ReviewError(
+            f"Provider artifact {name} has no timezone.",
+            code="provider_response_invalid",
+            exit_code=4,
+        )
+    return parsed.astimezone(timezone.utc)
+
+
+def _ready_artifact(kind: str, item: dict[str, Any], outcome: str | None) -> dict[str, Any]:
+    object_id = item.get("id") if kind != "provider-comment" else item.get("comment_id")
+    object_url = item.get("html_url")
+    body = str(item.get("body") or "")
+    return {
+        "kind": kind,
+        "object_id": object_id,
+        "object_url": object_url,
+        "actor": _item_login(item),
+        "body_fingerprint": text_fingerprint(body) if body else None,
+        "created_at": item.get("submitted_at") or item.get("created_at"),
+        "outcome": outcome,
+        "head": item.get("commit_id") or item.get("reviewed_head"),
+    }
+
+
+def check_ready_automated_review(
+    repo: str,
+    pr: int,
+    provider: str,
+    expected_head: str,
+    ready_identity: dict[str, Any],
+) -> dict[str, Any]:
+    """Observe the provider review caused by one exact ready transition."""
+
+    is_provider_author(provider, "")
+    try:
+        trigger = validate_ready_trigger(
+            ready_identity,
+            provider=provider,
+            repository=repo,
+            pr_number=pr,
+            expected_head=expected_head,
+        )
+    except ReadyReviewError as exc:
+        raise ReviewError(str(exc), code="ready_trigger_invalid", exit_code=64) from exc
+
+    ready_at = _ready_timestamp(trigger["ready_at"], "ready_at")
+    pull = gh_json(["api", f"repos/{repo}/pulls/{pr}", "-H", "Accept: application/vnd.github+json"])
+    if not isinstance(pull, dict):
+        raise ReviewError("Unexpected pull request response shape.", code="api_error", exit_code=4)
+    current_head = str(((pull.get("head") or {}).get("sha")) or "").lower()
+    if not FULL_SHA_PATTERN.fullmatch(current_head):
+        raise ReviewError("Pull request response did not include an exact head SHA.", code="api_error", exit_code=4)
+    current_is_draft = pull.get("draft")
+    current_base = str(((pull.get("base") or {}).get("ref")) or "")
+    current_body_fingerprint = text_fingerprint(str(pull.get("body") or ""))
+    head_is_current = current_head == expected_head
+    ready_is_current = current_is_draft is False
+    base_is_current = current_base == trigger["base_branch"]
+    body_is_current = current_body_fingerprint == trigger["body_fingerprint"]
+
+    reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
+    inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
+    conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+
+    provider_reviews = [
+        item for item in reviews
+        if authored_by(item, provider)
+        and sha_matches(item.get("commit_id"), expected_head)
+        and _provider_timestamp(item.get("submitted_at"), "submitted_at") > ready_at
+    ]
+    top_level_findings = [
+        item for item in inline_comments
+        if authored_by(item, provider)
+        and sha_matches(item.get("commit_id"), expected_head)
+        and item.get("in_reply_to_id") is None
+        and _provider_timestamp(item.get("created_at"), "created_at") > ready_at
+    ]
+    terminal_comments = []
+    for item in conversation:
+        parsed = provider_terminal_comment_any(item, provider)
+        if parsed is None or not sha_matches(parsed.get("reviewed_head"), expected_head):
+            continue
+        if _provider_timestamp(parsed.get("created_at"), "created_at") > ready_at:
+            terminal_comments.append(parsed)
+
+    formal_outcomes: set[str] = set()
+    for item in provider_reviews:
+        state = str(item.get("state") or "").upper()
+        if state == "CHANGES_REQUESTED":
+            formal_outcomes.add("findings")
+        elif state == "APPROVED":
+            formal_outcomes.add("clean")
+    if top_level_findings:
+        formal_outcomes.add("findings")
+    terminal_outcomes = {str(item["outcome"]) for item in terminal_comments}
+    outcomes = formal_outcomes | terminal_outcomes
+
+    evidence: dict[str, Any] = {
+        "kind": "none",
+        "object_id": None,
+        "object_url": None,
+        "actor": None,
+        "body_fingerprint": None,
+        "created_at": None,
+        "outcome": None,
+        "head": expected_head,
+    }
+    if terminal_comments:
+        evidence = _ready_artifact("provider-comment", terminal_comments[-1], terminal_comments[-1]["outcome"])
+    elif provider_reviews:
+        latest = provider_reviews[-1]
+        state = str(latest.get("state") or "").upper()
+        evidence = _ready_artifact(
+            "formal-review",
+            latest,
+            "findings" if state == "CHANGES_REQUESTED" else "clean" if state == "APPROVED" else None,
+        )
+    elif top_level_findings:
+        evidence = _ready_artifact("inline-finding", top_level_findings[0], "findings")
+
+    if not head_is_current or not ready_is_current or not base_is_current or not body_is_current:
+        review_state = "stale"
+    elif len(terminal_comments) > 1 or len(outcomes) > 1:
+        review_state = "ambiguous"
+    elif len(outcomes) == 1:
+        review_state = next(iter(outcomes))
+    else:
+        review_state = "pending"
+
+    finding_ids = sorted(
+        int(item["id"])
+        for item in top_level_findings
+        if isinstance(item.get("id"), int) and not isinstance(item.get("id"), bool)
+    )
+    payload: dict[str, Any] = {
+        "repo": repo,
+        "pr": pr,
+        "provider": provider,
+        "ready_trigger": trigger,
+        "review_state": review_state,
+        "head": expected_head,
+        "current_head": current_head,
+        "head_is_current": head_is_current,
+        "pr_is_ready": ready_is_current,
+        "base_is_current": base_is_current,
+        "body_is_current": body_is_current,
+        "review": {
+            "count": len(provider_reviews),
+            "findings": len(top_level_findings),
+            "finding_comment_ids": finding_ids,
+        },
+        "terminal_comment": {
+            "count": len(terminal_comments),
+            "outcomes": sorted(terminal_outcomes),
+        },
+        "evidence": evidence,
+        "failure_kind": "head-drift" if review_state == "stale" else "ambiguous-provider-evidence" if review_state == "ambiguous" else None,
+        "error_code": "head_drift" if review_state == "stale" else "ambiguous_review_evidence" if review_state == "ambiguous" else None,
+    }
+    payload["observation_fingerprint"] = stable_observation_fingerprint(payload)
+    payload["certificate"] = {
+        "schema": "g-codex-ready-review-certificate:v1",
+        "provider": provider,
+        "repository": repo,
+        "pr_number": pr,
+        "head_sha": expected_head,
+        "ready_trigger_fingerprint": trigger["trigger_fingerprint"],
+        "review_state": review_state,
+        "evidence": evidence,
+        "finding_comment_ids": finding_ids,
+        "observation_fingerprint": payload["observation_fingerprint"],
+    }
+    return payload
+
+
+def wait_for_ready_automated_review(
+    repo: str,
+    pr: int,
+    provider: str,
+    expected_head: str,
+    timeout: float,
+    interval: float,
+    max_interval: float,
+    ready_identity: dict[str, Any],
+) -> tuple[dict[str, Any], int]:
+    deadline = time.monotonic() + timeout
+    attempts = 0
+    current_interval = interval
+    last: dict[str, Any] | None = None
+    while True:
+        attempts += 1
+        last = check_ready_automated_review(repo, pr, provider, expected_head, ready_identity)
+        last["attempts"] = attempts
+        if last["review_state"] in {"clean", "findings", "stale", "ambiguous"}:
+            return last, REVIEW_EXIT_CODES.get(str(last["review_state"]), 4)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            last["timed_out"] = True
+            last["review_state"] = "pending"
+            return last, 124
+        time.sleep(min(current_interval, remaining))
+        current_interval = min(max_interval, current_interval * 2)
 
 
 def terminal_provider_evidence(
@@ -3074,6 +3307,15 @@ def _operation_outcome(operation: str, facts: dict[str, Any], exit_code: int = 0
         if state == "findings": return "completed", "findings"
         if exit_code == 124: return "completed", "pending-at-deadline"
         return "failed", "provider-failure"
+    if operation in {"ready-check", "ready-wait"}:
+        state = facts.get("review_state")
+        if state == "clean": return "completed", "clean"
+        if state == "findings": return "completed", "findings"
+        if state == "pending":
+            return "completed", "pending-at-deadline" if operation == "ready-wait" and exit_code == 124 else "pending"
+        if state == "stale": return "failed", "stale"
+        if state == "ambiguous": return "ambiguous", "ambiguous"
+        return "failed", "provider-failure"
     if operation == "warning":
         return "completed", "recognized-existing" if facts.get("status") == "recovered" else "posted"
     if operation == "reply":
@@ -3115,6 +3357,28 @@ def _normalize_owned_facts(request: dict[str, Any], raw: dict[str, Any], outcome
         kind = evidence.get("kind") if evidence.get("kind") in {"formal-review", "provider-comment", "clean-reaction"} else "none"
         artifact = {"kind": kind, "object_id": evidence.get("object_id") if kind != "none" else None, "object_url": evidence.get("object_url") if kind != "none" else None, "actor": evidence.get("actor") if kind != "none" else None, "body_fingerprint": evidence.get("body_fingerprint") if kind != "none" else None, "outcome": evidence.get("outcome") if kind != "none" else None}
         return {"repository": target["repository"], "pr_number": target["pr_number"], "head_sha": target["head_sha"], "provider": target["provider"], "request_receipt": supplied["request_receipt"], "request_binding": raw.get("request_binding"), "provider_state": provider_state, "observation_fingerprint": raw.get("observation_fingerprint"), "finding_count": int((raw.get("review") or {}).get("findings") or 0), "finding_comment_ids": list((raw.get("review") or {}).get("finding_comment_ids") or []), "artifact": artifact}
+    if operation in {"ready-check", "ready-wait"}:
+        evidence = raw.get("evidence") or {}
+        kind = evidence.get("kind") if evidence.get("kind") in {"formal-review", "provider-comment", "inline-finding", "clean-reaction"} else "none"
+        artifact = {
+            "kind": kind,
+            "object_id": evidence.get("object_id") if kind != "none" else None,
+            "object_url": evidence.get("object_url") if kind != "none" else None,
+            "actor": evidence.get("actor") if kind != "none" else None,
+            "body_fingerprint": evidence.get("body_fingerprint") if kind != "none" else None,
+            "outcome": evidence.get("outcome") if kind != "none" else None,
+        }
+        state = raw.get("review_state")
+        provider_state = state if state in {"clean", "findings", "pending", "stale", "ambiguous"} else "failed"
+        return {
+            "repository": target["repository"], "pr_number": target["pr_number"],
+            "head_sha": target["head_sha"], "provider": target["provider"],
+            "ready_receipt": supplied["ready_receipt"], "provider_state": provider_state,
+            "observation_fingerprint": raw.get("observation_fingerprint"),
+            "finding_count": int((raw.get("review") or {}).get("findings") or 0),
+            "finding_comment_ids": list((raw.get("review") or {}).get("finding_comment_ids") or []),
+            "artifact": artifact,
+        }
     if operation == "warning":
         return {"request_receipt": supplied["request_receipt"], "mutation": _mutation_artifact(raw)}
     if operation == "reply":
@@ -3148,8 +3412,8 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
         raise ReviewError(str(exc), code="owned_operation_invalid", exit_code=64) from exc
     if mode == "reconcile" and request["operation"] not in {"reconcile-mutation", "reconcile-terminal"}:
         raise ReviewError("Only reconciliation operations may use operation reconcile.", code="owned_operation_invalid", exit_code=64)
-    if mode == "resume" and request["operation"] != "wait":
-        raise ReviewError("Only an already-started wait may use operation resume.", code="owned_operation_invalid", exit_code=64)
+    if mode == "resume" and request["operation"] not in {"wait", "ready-wait"}:
+        raise ReviewError("Only an already-started review wait may use operation resume.", code="owned_operation_invalid", exit_code=64)
     if mode == "execute" and request["operation"] in {"reconcile-mutation", "reconcile-terminal"}:
         raise ReviewError("Reconciliation operations require operation reconcile.", code="owned_operation_invalid", exit_code=64)
     start = _owned_operation_start(request, create=mode == "execute")
@@ -3165,6 +3429,17 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
         invoked = _datetime.now(timezone.utc)
         timeout = max(0, int((deadline - invoked).total_seconds()))
         facts, exit_code = wait_for_automated_review(repo, pr, provider, head, timeout, 10, 30, supplied["request_receipt"])
+    elif operation == "ready-check":
+        facts = check_ready_automated_review(repo, pr, provider, head, supplied["ready_receipt"])
+        exit_code = REVIEW_EXIT_CODES.get(str(facts.get("review_state")), 4)
+    elif operation == "ready-wait":
+        from datetime import datetime as _datetime
+        deadline = _datetime.fromisoformat(supplied["wait_deadline"].replace("Z", "+00:00"))
+        invoked = _datetime.now(timezone.utc)
+        timeout = max(0, int((deadline - invoked).total_seconds()))
+        facts, exit_code = wait_for_ready_automated_review(
+            repo, pr, provider, head, timeout, 10, 30, supplied["ready_receipt"],
+        )
     elif operation == "warning":
         body = read_text_file(supplied["body_file"], field="body")
         if body.sha256 != supplied["body_fingerprint"]: raise ReviewError("Warning body fingerprint changed.", code="owned_operation_drift", exit_code=4)
@@ -3397,9 +3672,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Absolute UTF-8 JSON file containing the complete typed request receipt.",
     )
     terminal.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
+    trigger = subparsers.add_parser(
+        "ready-trigger",
+        help="Build one typed ready-transition receipt without contacting GitHub.",
+    )
+    trigger.add_argument("--provider", required=True, choices=("codex",))
+    trigger.add_argument("--repo", required=True)
+    trigger.add_argument("--pr", required=True, type=int)
+    trigger.add_argument("--head", required=True)
+    trigger.add_argument("--ready-event-id", required=True)
+    trigger.add_argument("--ready-ref", required=True)
+    trigger.add_argument("--ready-at", required=True)
+    trigger.add_argument("--base-branch", required=True)
+    trigger.add_argument("--body-fingerprint", required=True)
+    trigger.add_argument("--output-file", required=True)
     for command, help_text in (
         ("check", "Inspect automated review state once and exit."),
         ("wait", "Wait for an automated review to complete or time out."),
+        ("ready-check", "Inspect the review triggered by one exact ready transition."),
+        ("ready-wait", "Wait for the review triggered by one exact ready transition."),
     ):
         review = subparsers.add_parser(command, help=help_text)
         review.add_argument("--provider", required=True, help="Automated review provider. Currently: codex.")
@@ -3407,8 +3698,9 @@ def build_parser() -> argparse.ArgumentParser:
         review.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
         review.add_argument("--head", help="Expected reviewed head SHA. Defaults to the current PR head.")
         review.add_argument("--request-receipt-file", help="Absolute UTF-8 JSON file containing the complete typed request receipt.")
+        review.add_argument("--ready-receipt-file", help="Absolute UTF-8 JSON file containing the typed ready-transition receipt.")
         review.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
-        if command == "wait":
+        if command in {"wait", "ready-wait"}:
             review.add_argument("--timeout", default="15m", help="Maximum wait, for example 30s, 15m, or 1h.")
             review.add_argument("--interval", default="10s", help="Initial polling interval. Default: 10s.")
             review.add_argument("--max-interval", default="30s", help="Maximum polling interval. Default: 30s.")
@@ -3433,7 +3725,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReviewError as exc:
         raw = list(argv or [])
         if "--json" in raw:
-            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "prepare", "validate", "check", "wait", "terminal-evidence"}), "")])
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "prepare", "validate", "check", "wait", "ready-check", "ready-wait", "ready-trigger", "terminal-evidence"}), "")])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -3463,6 +3755,33 @@ def main(argv: list[str] | None = None) -> int:
         }
         if args.json:
             emit_success(payload, ["validate"])
+        else:
+            print(json.dumps(payload, indent=2))
+        return 0
+    if args.command == "ready-trigger":
+        try:
+            trigger = build_ready_trigger(
+                provider=args.provider,
+                repository=args.repo,
+                pr_number=positive_int(str(args.pr), "pr"),
+                head_sha=validate_full_head(args.head),
+                ready_event_id=args.ready_event_id,
+                ready_ref=args.ready_ref,
+                ready_at=args.ready_at,
+                base_branch=args.base_branch,
+                body_fingerprint=args.body_fingerprint,
+            )
+            _write_json_object(args.output_file, trigger)
+            payload = {"ready_trigger": trigger, "output_file": args.output_file}
+        except (ReadyReviewError, ReviewError) as exc:
+            error = exc if isinstance(exc, ReviewError) else ReviewError(str(exc), code="ready_trigger_invalid", exit_code=64)
+            if args.json:
+                emit_error(error, ["ready-trigger"])
+            else:
+                print(error.message, file=sys.stderr)
+            return error.exit_code
+        if args.json:
+            emit_success(payload, ["ready-trigger"])
         else:
             print(json.dumps(payload, indent=2))
         return 0
@@ -3508,14 +3827,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(json.dumps(payload, indent=2))
         return 0
-    if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "terminal-evidence"}:
+    if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "ready-check", "ready-wait", "terminal-evidence"}:
         parser.print_help()
         return 0
     try:
         pr = positive_int(args.pr, "pr")
         repo = resolve_repo(args.repo, allow_non_project=args.allow_non_project)
-        if args.command in {"check", "wait", "terminal-evidence"}:
+        if args.command in {"check", "wait", "ready-check", "ready-wait", "terminal-evidence"}:
             request_identity = None
+            ready_identity = None
             if args.request_receipt_file:
                 try:
                     receipt_text = read_text_file(args.request_receipt_file, field="request-receipt").text
@@ -3526,10 +3846,25 @@ def main(argv: list[str] | None = None) -> int:
                     raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64) from exc
                 if not isinstance(request_identity, dict):
                     raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64)
+            ready_receipt_file = getattr(args, "ready_receipt_file", None)
+            if ready_receipt_file:
+                ready_identity = _read_json_object(ready_receipt_file, "ready receipt")
             if args.command in {"wait", "terminal-evidence"} and request_identity is None:
                 raise ReviewError(
                     "The identity-bound automated review waiter requires --request-receipt-file.",
                     code="request_binding_required",
+                    exit_code=64,
+                )
+            if args.command in {"ready-check", "ready-wait"} and ready_identity is None:
+                raise ReviewError(
+                    "The ready-triggered review operation requires --ready-receipt-file.",
+                    code="ready_binding_required",
+                    exit_code=64,
+                )
+            if args.command in {"ready-check", "ready-wait"} and request_identity is not None:
+                raise ReviewError(
+                    "A ready-triggered review operation cannot use a request receipt.",
+                    code="ready_binding_conflict",
                     exit_code=64,
                 )
             if args.command == "terminal-evidence":
@@ -3551,7 +3886,7 @@ def main(argv: list[str] | None = None) -> int:
                     exit_code = REVIEW_EXIT_CODES[str(status)] if binding == "absent" and status == "not-requested" else REQUEST_BINDING_EXIT_CODES.get(binding, 4)
                 else:
                     exit_code = REVIEW_EXIT_CODES[str(payload["review_state"])]
-            else:
+            elif args.command == "wait":
                 timeout = duration_seconds(args.timeout, "timeout")
                 interval = duration_seconds(args.interval, "interval")
                 max_interval = duration_seconds(args.max_interval, "max-interval")
@@ -3563,6 +3898,26 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 payload, exit_code = wait_for_automated_review(
                     repo, pr, args.provider, args.head, timeout, interval, max_interval, request_identity
+                )
+            elif args.command == "ready-check":
+                if not args.head:
+                    raise ReviewError("ready-check requires --head.", code="invalid_arguments", exit_code=64)
+                payload = check_ready_automated_review(repo, pr, args.provider, validate_full_head(args.head), ready_identity)
+                exit_code = REVIEW_EXIT_CODES.get(str(payload["review_state"]), 4)
+            else:
+                if not args.head:
+                    raise ReviewError("ready-wait requires --head.", code="invalid_arguments", exit_code=64)
+                timeout = duration_seconds(args.timeout, "timeout")
+                interval = duration_seconds(args.interval, "interval")
+                max_interval = duration_seconds(args.max_interval, "max-interval")
+                if interval > max_interval:
+                    raise ReviewError(
+                        "--interval cannot be greater than --max-interval.",
+                        code="invalid_arguments",
+                        exit_code=64,
+                    )
+                payload, exit_code = wait_for_ready_automated_review(
+                    repo, pr, args.provider, validate_full_head(args.head), timeout, interval, max_interval, ready_identity
                 )
             if args.json:
                 emit_success(payload, [args.command])

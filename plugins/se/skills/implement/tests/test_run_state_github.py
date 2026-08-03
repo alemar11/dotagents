@@ -202,8 +202,10 @@ class RunStateGitHubScenarios(unittest.TestCase):
             "main",
             "--pr-url",
             pr_url,
-            "--provider-observation-ref",
-            "provider:example:44",
+            "--ready-transition-observation-ref",
+            "ready-transition:example:44",
+            "--ready-review-observation-ref",
+            "ready-review:example:44",
             "--output",
             str(output),
         ]

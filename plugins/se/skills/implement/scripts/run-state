@@ -51,7 +51,7 @@ PROTOCOLS = {
     },
     "delivery_ready_observation": {
         "schema": "implement-feature/delivery-ready-observation",
-        "schema_version": "3.0.0",
+        "schema_version": "4.0.0",
     },
     "recovery_observation": {
         "schema": "implement-feature/recovery-observation",
@@ -194,7 +194,8 @@ READY_COMMON_FIELDS = {
 READY_GITHUB_FIELDS = {
     "default_branch_name",
     "pr_url",
-    "provider_observation_ref",
+    "ready_transition_observation_ref",
+    "ready_review_observation_ref",
 }
 
 
@@ -3707,7 +3708,8 @@ def ready_observation_payload(
     github_values = {
         "default_branch_name": args.default_branch_name,
         "pr_url": args.pr_url,
-        "provider_observation_ref": args.provider_observation_ref,
+        "ready_transition_observation_ref": args.ready_transition_observation_ref,
+        "ready_review_observation_ref": args.ready_review_observation_ref,
     }
     payload.update(github_values)
     validate_ready_observation_shape(payload)
@@ -3854,11 +3856,22 @@ def validate_ready_evidence(
             4,
         )
     pr_url = value["pr_url"]
-    provider_observation_ref = string(
-        value["provider_observation_ref"],
-        "provider_observation_ref",
+    ready_transition_observation_ref = string(
+        value["ready_transition_observation_ref"],
+        "ready_transition_observation_ref",
         2048,
     )
+    ready_review_observation_ref = string(
+        value["ready_review_observation_ref"],
+        "ready_review_observation_ref",
+        2048,
+    )
+    if ready_transition_observation_ref == ready_review_observation_ref:
+        raise StateError(
+            "invalid-ready-observation",
+            "ready transition and ready review evidence must be distinct",
+            4,
+        )
     terminal_state = "pr-ready"
     unresolved = connection.execute(
         """SELECT COUNT(*) FROM app_operations
@@ -3878,7 +3891,10 @@ def validate_ready_evidence(
         "base_sha": base_sha,
         "pr_url": pr_url,
         "default_branch": default_branch,
-        "provider_observation_ref": provider_observation_ref,
+        "ready_transition_observation_ref": ready_transition_observation_ref,
+        "ready_review_observation_ref": ready_review_observation_ref,
+        # The existing assignment column is the durable provider-observation slot.
+        "provider_observation_ref": ready_review_observation_ref,
         "terminal_state": terminal_state,
     }
 
@@ -5289,7 +5305,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ready_create.add_argument("--default-branch-name", required=True)
     ready_create.add_argument("--pr-url", required=True)
-    ready_create.add_argument("--provider-observation-ref", required=True)
+    ready_create.add_argument("--ready-transition-observation-ref", required=True)
+    ready_create.add_argument("--ready-review-observation-ref", required=True)
     ready_create.add_argument("--output", required=True)
     ready_create.set_defaults(
         handler=command_assignment_ready_observation_create,

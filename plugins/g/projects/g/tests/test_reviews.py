@@ -27,6 +27,7 @@ from g.review_mutation import (
 )
 from g.review_thread import build_reply_receipt, validate_reply_receipt, validate_resolution_receipt
 from g.terminal_evidence import validate_terminal_evidence_receipt
+from g.ready_review import build_ready_trigger
 
 class ReviewsContractTests(unittest.TestCase):
     HOSTILE = "`ticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
@@ -113,6 +114,19 @@ class ReviewsContractTests(unittest.TestCase):
         plan = build_request("codex", "owner/repo", 12, head, f"request-{comment_id}")
         return receipt(plan, request, status="posted")
 
+    def ready_trigger(self, head: str, *, ready_at: str = "2026-07-20T12:05:00Z") -> dict[str, object]:
+        return build_ready_trigger(
+            provider="codex",
+            repository="owner/repo",
+            pr_number=12,
+            head_sha=head,
+            ready_event_id="event-123",
+            ready_ref="https://github.com/owner/repo/pull/12#event-123",
+            ready_at=ready_at,
+            base_branch="main",
+            body_fingerprint=text_fingerprint("body"),
+        )
+
     def finding(self, *, comment_id: int = 55, head: str | None = None) -> dict[str, object]:
         return {
             "id": comment_id,
@@ -172,14 +186,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "2.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "2.1.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.1.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -563,7 +577,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.1.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -592,7 +606,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.1.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -1035,6 +1049,51 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(payload["request_binding"], "recognized")
         self.assertEqual(payload["review"]["findings"], 1)
         self.assertEqual(payload["review"]["finding_comment_ids"], [8])
+
+    def test_ready_review_ignores_pre_ready_clean_and_reports_post_ready_finding(self) -> None:
+        head = "a" * 40
+        pre_ready_clean = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-20T12:01:00Z",
+        }
+        post_ready_finding = {
+            "id": 101,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: findings.\n\n[P2] address this finding.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-20T12:06:00Z",
+        }
+        pull = {"head": {"sha": head}, "draft": False, "base": {"ref": "main"}, "body": "body"}
+        with mock.patch.object(cli, "gh_json", return_value=pull), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[pre_ready_clean, post_ready_finding]),
+        ):
+            payload = cli.check_ready_automated_review("owner/repo", 12, "codex", head, self.ready_trigger(head))
+
+        self.assertEqual(payload["review_state"], "findings")
+        self.assertEqual(payload["terminal_comment"]["count"], 1)
+        self.assertEqual(payload["certificate"]["review_state"], "findings")
+
+    def test_ready_review_requires_ready_pr_and_current_body(self) -> None:
+        head = "b" * 40
+        pull = {"head": {"sha": head}, "draft": True, "base": {"ref": "main"}, "body": "body"}
+        with mock.patch.object(cli, "gh_json", return_value=pull), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(),
+        ):
+            payload = cli.check_ready_automated_review("owner/repo", 12, "codex", head, self.ready_trigger(head))
+
+        self.assertEqual(payload["review_state"], "stale")
+        self.assertEqual(payload["error_code"], "head_drift")
+
+    def test_ready_trigger_rejects_tampered_fingerprint(self) -> None:
+        trigger = self.ready_trigger("c" * 40)
+        trigger["ready_event_id"] = "tampered"
+        with self.assertRaises(cli.ReviewError):
+            cli.check_ready_automated_review("owner/repo", 12, "codex", "c" * 40, trigger)
 
     def test_check_codex_counts_only_top_level_inline_findings(self) -> None:
         head = "a" * 40

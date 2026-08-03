@@ -18,6 +18,7 @@ from g.review_operation import (
     validate_result_for_request,
 )
 from g.review_request import build_request as build_provider_request, receipt
+from g.ready_review import build_ready_trigger
 from g import reviews
 
 
@@ -43,6 +44,15 @@ class ReviewOperationContractTests(unittest.TestCase):
             "user": {"login": "agent"},
         }, status="posted")
 
+    def ready_receipt(self) -> dict[str, object]:
+        return build_ready_trigger(
+            provider="codex", repository="owner/repo", pr_number=12,
+            head_sha="f" * 40, ready_event_id="event-123",
+            ready_ref="https://github.com/owner/repo/pull/12#event-123",
+            ready_at="2026-07-20T12:05:00Z", base_branch="main",
+            body_fingerprint="6" * 64,
+        )
+
     def controller(self, operation: str) -> dict[str, object]:
         return {
             "decision": "action", "action": f"g-{operation}",
@@ -60,6 +70,10 @@ class ReviewOperationContractTests(unittest.TestCase):
         inputs: dict[str, object] = {"request_key": "9" * 64}
         if operation == "wait":
             inputs = {"request_receipt": self.receipt(), "wait_started_at": "2026-07-20T12:00:00Z", "wait_deadline": "2026-07-20T12:45:00Z"}
+        elif operation == "ready-check":
+            inputs = {"ready_receipt": self.ready_receipt()}
+        elif operation == "ready-wait":
+            inputs = {"ready_receipt": self.ready_receipt(), "wait_started_at": "2026-07-20T12:05:00Z", "wait_deadline": "2026-07-20T12:50:00Z"}
         return build_request(operation=operation, controller_envelope=self.controller(operation), target=self.target(), input_value=inputs)
 
     def start(self, request_value: dict[str, object]) -> dict[str, object]:
@@ -97,6 +111,41 @@ class ReviewOperationContractTests(unittest.TestCase):
         ):
             with self.assertRaises(OperationError):
                 build_request(operation="wait", controller_envelope=self.controller("wait"), target=self.target(), input_value={"request_receipt": self.receipt(), "wait_started_at": started, "wait_deadline": deadline})
+
+    def test_ready_operations_bind_to_ready_transition_receipt(self) -> None:
+        self.assertEqual(validate_request(self.request("ready-check"))["operation"], "ready-check")
+        self.assertEqual(validate_request(self.request("ready-wait"))["operation"], "ready-wait")
+        tampered = copy.deepcopy(self.ready_receipt())
+        tampered["head_sha"] = "e" * 40
+        with self.assertRaises(OperationError):
+            build_request(
+                operation="ready-check", controller_envelope=self.controller("ready-check"),
+                target=self.target(), input_value={"ready_receipt": tampered},
+            )
+
+    def test_ready_result_requires_closed_provider_state(self) -> None:
+        request_value = self.request("ready-check")
+        facts = {
+            "repository": "owner/repo", "pr_number": 12, "head_sha": "f" * 40,
+            "provider": "codex", "ready_receipt": self.ready_receipt(),
+            "provider_state": "findings", "observation_fingerprint": "4" * 64,
+            "finding_count": 1, "finding_comment_ids": [101],
+            "artifact": {"kind": "inline-finding", "object_id": 101,
+                "object_url": "https://github.com/owner/repo/pull/12#discussion_r101",
+                "actor": "chatgpt-codex-connector[bot]", "body_fingerprint": "5" * 64,
+                "outcome": "findings"},
+        }
+        result = build_result(
+            request=request_value, start_receipt=self.start(request_value),
+            status="completed", outcome="findings", facts=facts,
+            evidence_ref="g-operation://ready-findings",
+        )
+        self.assertEqual(validate_result(result), result)
+        invalid = copy.deepcopy(result)
+        invalid["facts"]["provider_state"] = "unknown"
+        invalid["result_fingerprint"] = fingerprint({k: v for k, v in invalid.items() if k != "result_fingerprint"})
+        with self.assertRaises(OperationError):
+            validate_result(invalid)
 
     def test_result_status_outcome_and_facts_are_closed(self) -> None:
         request_value = self.request("wait")
