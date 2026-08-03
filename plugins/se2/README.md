@@ -18,15 +18,13 @@ Its skills are deliberately separated by responsibility:
   profile and topology instead of inheriting the Feature profile; its required
   orchestrator and worker roles are checked before startup.
 - skills/idea/ is the explicit capture entry point. It builds a transient
-  session bundle, previews non-durable Ideas, or publishes verified hosted
-  Ideas through the G-owned issue workflow; it never writes project memory or
-  starts an application task.
+  session bundle, previews non-durable Ideas entirely locally, or publishes
+  verified hosted Ideas through the G-owned issue workflow as its terminal
+  operation; it never writes project memory or starts an application task.
   Invoke it explicitly as `se2:idea`.
 - The Feature planner stays in the invoking session's exact saved local
   project and local environment without a Git worktree; isolated worktrees
   belong only to the separate Implement workflow.
-- scripts/validate-task-contract.sh checks the package statically; it never
-  proves that the live ChatGPT/Codex application can create or monitor tasks.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
 - the prototype returns one Feature plus vertical Task dependency graphs,

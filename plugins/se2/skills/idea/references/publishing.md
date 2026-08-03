@@ -5,6 +5,10 @@ The G-owned GitHub issue workflow remains the only transport and owns safe
 body handling, issue creation, label administration, verification, and
 partial-failure mechanics.
 
+This reference is the only external terminal phase of the Idea workflow. The
+capture and preview paths must not load the G dependency preflight, inspect
+GitHub, or mutate hosted state.
+
 ## Hosted artifact
 
 Each durable Idea is an open issue with:

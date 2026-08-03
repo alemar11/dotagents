@@ -6,9 +6,11 @@ installation or maintenance procedure.
 
 ## When to run
 
-Run this read-only gate before the first hosted issue or label read or write in
-both `preview` and `publish` modes. A passing gate authorizes only the next
-handoff to the G-owned issue workflow; it does not grant publication authority.
+Run this read-only gate only after `run_mode=publish` is explicitly resolved,
+immediately before the first hosted issue or label read or write. Preview does
+not load this gate and must not access GitHub. A passing gate authorizes only
+the next handoff to the G-owned issue workflow; it does not grant publication
+authority.
 
 ## Required evidence
 

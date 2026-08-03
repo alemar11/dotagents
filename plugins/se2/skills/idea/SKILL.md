@@ -29,6 +29,23 @@ repositories, rendered bodies, preflight observations, publication order, and
 verified results. Discard it after the terminal capture report unless the
 hosted issue itself is the explicitly authorized durable output.
 
+## Workflow overview
+
+The first three stages are local. Only the `publish` terminal branch may load
+G or inspect and mutate GitHub state.
+
+~~~mermaid
+flowchart LR
+    capture["Capture session"] --> normalize["Normalize candidates"]
+    normalize --> freeze["Freeze local bundle"]
+    freeze --> terminal{"Terminal operation"}
+    terminal -->|"preview"| report["Local report<br/>proposed-idea:"]
+    terminal -->|"publish"| preflight["G preflight"]
+    preflight --> hosted["Hosted duplicate and collision checks"]
+    hosted --> mutate["Create or reuse Idea"]
+    mutate --> verify["Readback and recovery"]
+~~~
+
 ## Run contract
 
 Resolve `run_mode` once at the start. The only accepted values are:
@@ -52,13 +69,16 @@ metadata; do not repair or redefine it during a run.
 All hosted issue and label reads and writes belong to the repository's
 G-owned GitHub issue workflow. Do not call a provider API directly, construct
 an alternative transport, or return executable provider commands to the user.
+Capture and preview are fully local: they must not load G, inspect hosted
+issues or labels, or claim current hosted duplicate/collision state.
 
-Before the first hosted read or write, load
+Only after `run_mode=publish` is resolved, before its first hosted read or
+write, load
 [`../../references/codex-dependency-preflight.md`](../../references/codex-dependency-preflight.md)
-and complete its read-only availability gate. The gate applies to both run
-modes. If the required G workflow is missing, disabled, malformed, or
-unresolvable, fail closed before hosted access; remediation is advisory and
-must never install, enable, refresh, or substitute the dependency.
+and complete its read-only availability gate. If the required G workflow is
+missing, disabled, malformed, or unresolvable, fail closed before hosted
+access; remediation is advisory and must never install, enable, refresh, or
+substitute the dependency.
 
 The dependency gate authorizes the next workflow handoff only. It does not
 authorize publication. `publish` still requires explicit user authority for
@@ -117,41 +137,39 @@ Read [`references/idea-template.md`](references/idea-template.md) when
 rendering the canonical body. Keep its seven sections in order and do not add
 planning sections.
 
-### 3. Preflight the complete accepted set
+### 3. Freeze the local accepted set
 
-Before any publication or preview that claims current hosted state:
+Complete the local capture bundle before choosing the terminal operation:
 
 1. finalize every candidate's name, slug, body, owner, target, and intended
    metadata;
-2. inspect the target for the exact Idea marker, equivalent open Ideas, title
-   or slug collisions, and native Issue Type state;
-3. treat an existing issue as reusable only when its substantive proposal,
-   owner, marker, open state, and absent native Issue Type are compatible;
-4. require an explicit decision for a materially different collision; never
-   overwrite, relabel, reopen, or silently reclassify it;
-5. recheck all candidates after any user-directed rename, merge, or split.
+2. confirm that every candidate has exactly one tracker owner and portable
+   source evidence;
+3. derive its deterministic `proposed-idea:` ref for preview or retain the
+   publication identity as unresolved until publish;
+4. recheck all candidates after any user-directed rename, merge, or split.
 
-Run the complete preflight before the first mutation. A preview may perform
-authorized reads, but it must remain non-mutating and must not return
-executable mutation instructions. If current hosted evidence cannot be
-verified, report the blocker instead of claiming that no duplicate or
-collision exists.
+Do not inspect hosted issues, labels, native Issue Types, or current duplicate
+and collision state in this phase. Those checks belong to the publish terminal
+operation. Preview must report that hosted equivalence and collision evidence
+was not consulted rather than claiming that no conflict exists.
 
 ### 4. Preview or publish
 
-For `run_mode=preview`, return the relevant in-memory bundle contents: each candidate's
-intended target, title, canonical body, metadata, publication order, and
-deterministic `proposed-idea:` ref. Mark every proposed ref non-durable. Do not
-request or perform a dry-run mutation.
+For `run_mode=preview`, return the relevant in-memory bundle contents: each
+candidate's intended target, title, canonical body, metadata, publication
+order, and deterministic `proposed-idea:` ref. Mark every proposed ref
+non-durable. Do not load the G dependency preflight, read GitHub, request a
+dry-run mutation, or perform any hosted operation.
 
 For `run_mode=publish`, load
 [`references/publishing.md`](references/publishing.md). Hand off only the
-normalized issue operation owned by the G workflow, after the dependency and
-candidate preflights pass. Create or reuse only the exact `idea` metadata
-required by the workflow contract. Use the already reconciled in-memory
-bundle as the publication source, and verify each result before moving to the
-next candidate. The hosted issue is the durable output; the bundle remains
-transient.
+normalized issue operation owned by the G workflow. The publication reference
+performs the dependency preflight, current hosted duplicate/collision checks,
+metadata checks, mutations, and readback only after the local bundle is
+complete. Use the already reconciled in-memory bundle as the publication
+source, and verify each result before moving to the next candidate. The hosted
+issue is the durable output; the bundle remains transient.
 
 ### 5. Recover and report
 
@@ -170,6 +188,8 @@ capture reporting.
 - Keep this skill self-contained and independent from other Idea skill
   implementations; do not import, alias, copy, or modify them.
 - Keep GitHub transport in the existing G-owned issue workflow.
+- Keep GitHub completely outside capture and preview; hosted state is a
+  terminal publish concern.
 - Keep caller publication authority separate from dependency availability.
 - Never treat a preview ref as a hosted identity.
 - Never infer ownership from task metadata or filesystem proximity.

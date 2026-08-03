@@ -16,7 +16,7 @@ the existing SE plugin.
 - references/workflow-contract.md owns the semantic Idea marker and hosted
   shape for SE2 Idea capture.
 - references/codex-dependency-preflight.md owns the fail-closed availability
-  gate before an Idea run uses the G-owned issue workflow.
+  gate before an Idea publish run uses the G-owned issue workflow.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
   registry, Feature/Task invariants, and terminal states.
 - skills/feature/references/task-profile.md owns the principal Feature planner
@@ -32,9 +32,6 @@ the existing SE plugin.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,
   preview/publish routing, and the capture-only terminal boundary. Its
   references own the canonical body and publication recovery details.
-- scripts/validate-task-contract.sh owns static package validation only. It
-  must never be used as evidence that the live application can create or
-  monitor a task.
 - .agents/plugins/marketplace.json owns repo-local discovery registration.
 
 ## Maintenance contract
@@ -72,6 +69,4 @@ the existing SE plugin.
 - Check that the marketplace path and plugin metadata point to this package.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
-- Run scripts/validate-task-contract.sh for static package checks only; its
-  success is not live application or monitoring evidence.
 - Run git diff --check before handoff.
