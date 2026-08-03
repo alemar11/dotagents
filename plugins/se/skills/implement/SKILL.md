@@ -136,9 +136,8 @@ recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, review-candidate preparation, finding
 acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
-worker always runs the native `codex review` command in its managed checkout,
-passing its fixed model and resolved thinking value through the CLI's global
-model and `model_reasoning_effort` overrides; root never runs review and only
+worker always runs native review in its managed checkout with its fixed
+model and resolved reasoning profile; root never runs review and only
 verifies the worker's reported review evidence.
 
 The controller task may be bound to a local Codex multi-folder project. Codex
@@ -195,12 +194,11 @@ and is deduplicated by the worker. A protected non-bootstrap operation may
 replay only after authoritative failed readback proves the prior launch had no
 effect. Controller follow-up messages are not replayable.
 
-Every Codex App operation is performed directly by the model through the live
-App tools. Before the call, inspect the current declaration and use only fields
-it exposes; this skill defines the required outcome, topology, authorization,
-and verification but never reproduces an App payload schema. For operations
+Every Codex App effect is performed directly by the model through current live
+capabilities. This skill defines the required outcome, topology, authorization,
+and verification. For operations
 inside an active run, `run-state` authorizes one logical operation and launch
-generation before the model calls the tool once. The model then independently
+generation before the model performs the effect once. The model then independently
 reads the resulting task, records the observed identity and reconciliation
 evidence, and lets `run-state` decide whether the operation finished or an
 evidence-backed replay is authorized. Rejection, timeout, or unknown readback
@@ -237,31 +235,29 @@ relay and monitor, not the Implement controller:
    `$se:implement` or create another root. Include the parent task ID and host
    when the App exposes them, and the exact authoritative local project/host
    binding.
-2. Resolve the current session's exact saved local project through
-   `list_projects`, matching the current path and host. A missing, projectless,
-   cross-host, or ambiguous match stops before root creation; do not substitute
-   a new project or a worktree. The root and parent share this control-plane
+2. Resolve the current session's exact authoritative saved local project by
+   matching the current path and host. A missing, standalone, cross-host, or
+   ambiguous match stops before root creation; do not substitute a new project
+   or an isolated checkout. The root and parent share this control-plane
    project, while implementation workers still use their independently
    verified repository-specific projects.
-3. Before task mutation, inspect the live declarations for `create_thread`,
-   `set_thread_title`, task readback/listing, and bounded task waits. Create
-   exactly one root task directly through the live creation tool in the
-   authoritative local project and host, with the required Sol/medium profile,
-   complete handoff, root protocol, and canonical title when supported. Pass
-   only fields exposed by the inspected declaration; do not encode or preserve
-   a local copy of its target or argument shape.
+3. Before mutation, require live capabilities that can create, observe,
+   monitor, and title the requested controller topology. Create exactly one
+   root task once in the authoritative local project and host, with the required
+   Sol/medium profile, complete handoff, root protocol, and canonical title when
+   supported.
 
    When the final assignment count is not yet authoritative, use the stable
    provisional title `🤖 Implement Feature`; the root owns the existing single
    count-based `set-root-title` fallback after `run start`. Creation-time title
    support is always independently read back and is never identity evidence.
-4. After creation, independently read or list the task and verify the real
-   `threadId`, exact project, host, local environment, task state, and title.
-   Verify the requested `gpt-5.6-sol` / `thinking: medium` settings when
-   telemetry is exposed. A title warning is non-blocking; structural or
-   settings drift stops before workers. A returned `clientThreadId`, timeout,
-   or uncertain response is pending setup: reconcile the existing App task
-   before any retry and never create a duplicate.
+4. After creation, independently observe the task and verify its stable
+   identity, exact project, host, local execution, operational state, and title.
+   Verify the requested `gpt-5.6-sol` / medium-reasoning profile when telemetry
+   is exposed. A title warning is non-blocking; structural or settings drift
+   stops before workers. A provisional identity, timeout, or uncertain response
+   is pending setup: reconcile the existing App task before any retry and never
+   create a duplicate.
 5. For a `resume` request, resolve the unfinished run's recorded
    `root_task_id`, read it back, and send the continuation only to that exact
    root. Never create a replacement root while the run is unfinished. If the
@@ -315,19 +311,15 @@ more Feature Specs. A discovery-only request never enters this flow.
    `run start` revalidates them. Derive the explicit task-creation grants from
    `options.md` only after this read-only preflight; resolve an interaction only
    when the preflight found missing persistent Git projects.
-   Before any task mutation, inspect the live Codex App declarations for every
-   operation used by this flow and verify every argument that will be passed.
-   Do not infer support from a previous runtime or from prompt text. Prefer
-   `title` in every `create_thread` call when the inspected declaration
-   exposes that field, then independently read back the created title. If
-   creation does not yield the exact requested title, use the verified
-   `set_thread_title` operation at most once after a real task ID exists and
-   independently read it back again. If `create_thread.title` is absent, use
-   that same fallback when available. Missing or unverifiable structural
-   operations or arguments stop the run as `unsupported-runtime`; missing or
-   unverifiable title support produces `title-unverified` telemetry and does
-   not stop workers, bootstrap, or implementation unless the user explicitly
-   requires an exact title.
+   Before task mutation, require the live Codex runtime to support every
+   structural outcome used by this flow. Do not infer support from a previous
+   runtime or prompt text. Request canonical titles during creation when
+   available, independently observe them, and apply one verified fallback only
+   after stable task identity exists. Missing or unverifiable structural
+   capabilities stop the run as `unsupported-runtime`; missing or unverifiable
+   title support produces `title-unverified` telemetry and does not stop
+   workers, bootstrap, or implementation unless the user explicitly requires
+   an exact title.
    Missing saved projects either follow the explicitly authorized bounded setup
    path or stop before run state, claim, task, or worktree creation.
 2. Prepare shared run state through read-only `capabilities` and `doctor`, then
@@ -372,7 +364,7 @@ more Feature Specs. A discovery-only request never enters this flow.
    explicit task-creation grant when the runtime supports it, recompute
    same-root overlap, then send the crash-safe next contract generation.
 7. Apply `references/final-verification.md`. Root rereads authoritative GitHub,
-   Codex task, Git, PR, CI, and native Codex review evidence without editing or
+   Codex task, Git, PR, CI, and native review evidence without editing or
    judging criteria. Complete each assignment claim when its root-verified
    evidence reaches `pr-ready`, then finish the run only
    when the whole requested GitHub PR vector is ready.

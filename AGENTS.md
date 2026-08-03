@@ -83,18 +83,20 @@ when the package is intended for Codex.
 
 ### Codex Integration
 
-- Before integrating with Codex through App tools, the CLI, MCP servers, or
-  another exposed interface, verify the current runtime contract. Confirm that
-  every operation, parameter, enum, and nested field used by the integration
-  is actually exposed and accepted in the environment where it will run.
-- Do not infer API or argument support from a skill, an older tool schema,
-  cached metadata, documentation, UI wording, or a related endpoint. Treat
-  those sources as clues until the current interface confirms the behavior.
-- Send only verified fields and handle missing or changed capabilities
-  explicitly. If the contract does not match the intended call, stop or report
-  the incompatibility instead of guessing, silently substituting another
-  operation, or claiming that the request was applied. Re-check dynamic
-  interfaces when needed and distinguish requested state from observed state.
+- Specify every runtime-skill interaction with Codex semantically in natural
+  language: define the intended outcome, topology, authorization, lifecycle,
+  verification, and recovery behavior. Runtime skills and their references
+  must not name Codex APIs or tools or duplicate their operations, parameters,
+  response fields, signatures, enums, target forms, or payloads.
+- The model uses the current live Codex capabilities directly. Skills may
+  require semantic runtime properties, such as a saved project, local or
+  isolated execution, a model profile, or independently verified task state,
+  but must not encode how the live interface represents them. If the required
+  outcome cannot be established, report the incompatibility instead of
+  guessing, substituting another operation, or claiming success.
+- Keep requested state, immediate receipts, and independently observed state
+  distinct. Treat display metadata as non-identity evidence and reconcile
+  uncertain effects before any retry.
 
 ### Documentation and Contract Ownership
 

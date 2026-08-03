@@ -7,9 +7,9 @@ explicit run-state reset; manifests and databases from the previous contract
 epoch are not migrated. Worker creation records the task binding first and may
 include an independently read-back creation title. When creation does not set
 the exact title, the separate recorded `set-worker-title` operation uses the
-App's `set_thread_title` API at most once and an independent readback as the
-fallback. Title outcomes are best-effort telemetry; structural task identity,
-project, checkout, and operational state remain the gates for downstream work.
+available title mutation capability at most once and an independent readback
+as the fallback. Title outcomes are best-effort telemetry; structural task
+identity, project, checkout, and operational state remain the gates for downstream work.
 Externally owned scope repair and contract generations remain in
 place while path and dependency serialization stay controller invariants; the
 runtime does not add per-file claims. The
@@ -274,12 +274,11 @@ consumer of an assignment-resume observation. Each revalidates the complete
 payload inside its write transaction; successful builder output does not
 reserve or advance state.
 
-Codex App calls remain outside this CLI. The model inspects and invokes the live
-App tools directly, then supplies only independently observed coordination and
-reconciliation facts to the app-operation builder. `run-state` does not know,
-construct, serialize, validate, or preserve App request payloads or tool
-declarations. Rejection, timeout, or unknown readback remains subject to the
-existing `app-operation finish` and `app-operation replay` gates.
+Codex App effects remain outside this CLI. The model uses current live
+capabilities directly, then supplies only independently observed coordination and
+reconciliation facts to the app-operation builder. `run-state` does not mediate
+live Codex interaction. Rejection, timeout, or unknown readback remains subject
+to the existing `app-operation finish` and `app-operation replay` gates.
 
 The scope-repair builder requires a `blocked-scope-repair` assignment and the
 successful recorded planner task. It derives run, assignment, current contract
@@ -301,7 +300,7 @@ For a successful `create-worker`, `observed_state` is the literal Codex task
 state and accepts `active` or `idle`; `observed_title` is optional and, when
 present, is the independently read-back creation title. `set-worker-title`
 carries the exact task ID and independently observed title after the App's
-`set_thread_title` fallback call. The latest successful creation or fallback
+title fallback. The latest successful creation or fallback
 title readback is surfaced as `effect_warning=worker-title-unverified` or
 `effect_warning=worker-title-drift` when the title is missing or different.
 These warnings do not block bootstrap or archival after the structural worker
@@ -345,8 +344,8 @@ never choose or replace one. That ID is the durable logical operation identity.
 The returned positive `launch_count` identifies one authorized execution
 generation: begin creates generation `1`, and every accepted replay increments
 it. For `send-bootstrap`, begin also derives the stable `bootstrap_id` in
-`bootstrap-*` form. The operation has no review-owner choice: native
-`codex review` is always worker-owned, while root remains an orchestrator and
+`bootstrap-*` form. The operation has no review-owner choice: native review is
+always worker-owned, while root remains an orchestrator and
 evidence verifier.
 Every result authorizes only its reported generation.
 
@@ -354,7 +353,7 @@ Every result authorizes only its reported generation.
 generation and returns the exact expected planner title
 `🧭 Scope Repair · <Feature Spec title>`. Creation may record an exact
 independent title readback; if it does not, `set-scope-repair-title` initializes
-that title through `set_thread_title` at most once as the fallback.
+that title through the available title capability at most once as the fallback.
 `send-scope-revision` consumes the planner task after structural identity and
 state are verified, regardless of the title warning. A planner title mismatch
 returns `effect_warning=scope-repair-title-unverified` or
@@ -467,7 +466,7 @@ also requires exactly `default_branch_name`, `pr_url`, and
 `provider_observation_ref`. No other keys are accepted.
 
 `review_profile` is exactly `standard` or `high-risk`, derived by the worker
-from the accepted task risk. Both profiles invoke native `codex review` with
+from the accepted task risk. Both profiles invoke native review with
 the fixed worker model and resolved `medium|high|xhigh` reasoning; the
 `codex_review_head_sha` must equal the final `head_sha` that the command
 reviewed. After accepted fixes, `validation_head_sha` and `review_head_sha`

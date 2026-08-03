@@ -13,7 +13,7 @@ project, and its fixed `gpt-5.6-sol` / `thinking: medium` profile. After
 validating the current Feature Spec frontier and completing the read-only
 worker-project preflight, disclose the selected Specs, repositories, branches,
 expected worker count, ChatGPT-created worktrees, GitHub publication, tracker
-mutation, validation, and the native `codex review` command for every worker,
+mutation, validation, and native review for every worker,
 plus the exact
 terminal boundary: `pr-ready-for-merge`. For every worker, also disclose the fixed
 `gpt-5.6-sol` model and its resolved thinking level: `medium` for routine work,
@@ -53,8 +53,9 @@ configuration.
 `create-projects` authorizes only the exact paths listed in the question.
 Before confirming each file-picker selection, read back the selected absolute
 path and require exact equality with the expected Git root. After creation,
-read `list_projects` again and require the saved path and independently resolved
-Git common directory to match the expected repository. Ambiguous selection,
+observe the authoritative saved-project inventory again and require the saved
+path and independently resolved Git common directory to match the expected
+repository. Ambiguous selection,
 inaccessible Computer Use, a locked host, a parent path, or a mismatched
 readback stops immediately. Never create a broader substitute such as a parent
 root or `/private/tmp`, never silently create another project, and

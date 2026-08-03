@@ -18,16 +18,12 @@ For every such change, root follows one crash-safe sequence:
    changing the Codex task in the ChatGPT App, then retain its generated opaque
    `operation_id`; for `send-bootstrap`, also retain the deterministically
    derived `bootstrap_id`; retain the returned `launch_count` for every action;
-2. inspect the live declaration for the App operation about to run and resolve
-   the required semantic outcome against the authoritative project, host, task,
-   and assignment facts. Do not copy the declaration, serialize an App request,
-   or route the call through a local helper;
-3. perform the change through the ChatGPT App tools only when
-   `app-operation begin` returns `launch_authorized=true`. The model calls the
-   live tool directly once for that launch and passes only arguments accepted
-   by the inspected declaration;
-4. treat the immediate response as a receipt, then independently read or list
-   the actual task. Use those observed facts to build the normal `run-state`
+2. resolve the required semantic outcome against the authoritative project,
+   host, task, and assignment facts;
+3. perform the change through the current live Codex capabilities only when
+   `app-operation begin` authorizes that launch, and perform it once;
+4. treat the immediate response as a receipt, then independently observe the
+   actual task. Use those observed facts to build the normal `run-state`
    operation observation for that exact `launch_count`, including an
    authoritative `readback_ref`, and finish the recorded operation;
 5. after an interruption, inspect the actual object first and record whether
@@ -60,55 +56,44 @@ implied by that action, status, and launch generation. When refining an
 `unknown` observation, carry every previously recorded fact forward unchanged
 and add only newly authoritative evidence.
 
-## App Task API And Best-Effort Title Metadata
+## Codex Task Boundary And Best-Effort Title Metadata
 
-Use the current ChatGPT App tool declarations as the runtime capability
-contract. Inspect the exact signatures of `codex_app__create_thread`,
-`codex_app__set_thread_title`, and `codex_app__set_thread_archived` before any
-startup mutation, and pass only fields present in those declarations. The
-model calls those tools directly; no local helper may construct, serialize,
-validate, or preserve their request payloads or declarations. The
-creation declaration may expose an optional `title`; pass the canonical title
-in the creation call when that exact field is exposed. Do not claim that
-`title` is unsupported or add it without verification.
-Independently read or list the created task after the creation call and verify
-the real task ID, project, environment/worktree, and operational state. If the
-title is missing, unavailable, or different, use the separately recorded
-`set_thread_title` operation at most once as the fallback, with the real
-`threadId`, requested `title`, and no other field unless the inspected
-declaration explicitly exposes it. Read or list the task again when possible.
+Use the current live Codex capabilities directly. No local helper may
+construct, serialize, validate, preserve, or replay Codex requests. Request the
+canonical title during creation when supported and never infer support from a
+previous runtime. Independently observe the created task and verify its stable
+identity, project, execution mode, and operational state. If the title is
+missing, unavailable, or different, use the separately recorded title fallback
+at most once for that stable task, then observe it again when possible.
 Record `title-unverified` or `title-drift` in the operation result and
 telemetry, but do not block a structurally verified worker, bootstrap, or scope
-repair. The cleanup operation is likewise valid only with its declared fields.
+repair. Cleanup is requested only through an available live lifecycle
+capability.
 Only an explicit exact-title request makes a title warning blocking;
-unverifiable structural identity or required structural arguments remain
+unverifiable structural identity or required structural outcomes remain
 `unsupported-runtime` failures.
-A `create_thread` response is usable only when it yields or can be reconciled
-to the real `threadId`; a client-only identifier is not sufficient for title
+A creation receipt is usable only when it yields or can be reconciled to a
+stable task identity; a provisional identity is not sufficient for title
 initialization or bootstrap.
 
 The title check below is the normal readback immediately after creation. The
-prompt is never title evidence, and a `create_thread` response is not evidence
-that an undocumented field was accepted. Do not pass undocumented fields to
-any App operation.
+prompt and immediate receipt are never title evidence.
 
 ## Parent Root Creation
 
 The parent creates one root only for a new explicit execution run. It resolves
-the exact current local project and inspects the live App declarations before
-calling `codex_app__create_thread` directly. This policy supplies the required
-root outcome—authoritative local project and host, Sol/medium profile, canonical
-title when supported, complete handoff, and root protocol—while the live
-declaration alone owns the accepted argument and target shape.
+the exact current local project before creating the task. This policy supplies
+the required root outcome—authoritative local project and host, Sol/medium
+profile, canonical title when supported, complete handoff, and root protocol.
 
 The parent binds the one creation call to its bootstrap attempt even though no
-SQLite run exists yet. It independently reads back the real task ID, project,
-host, local environment, task state, title, and root model/reasoning settings
+SQLite run exists yet. It independently observes the stable task identity,
+project, host, local execution, task state, title, and root profile
 when exposed. It records title warnings separately from structural identity. A
 missing, normalized, or drifted creation title is non-blocking because the root
 owns the existing one-time `set-root-title` fallback after authoritative `run start`.
 An unavailable or conflicting root model/reasoning profile is blocking and
-prevents worker creation. A `clientThreadId`, timeout, or uncertain response is
+prevents worker creation. A provisional identity, timeout, or uncertain response is
 pending setup; the parent reconciles the existing task and never creates a
 replacement root.
 
@@ -124,9 +109,9 @@ This section is reachable only after the worker-project preflight and any
 explicitly authorized project setup have passed for every selected repository.
 After at least one assignment owns its Feature Spec and head-branch claim:
 
-1. If the live declaration exposes the root title operation, begin
-   `set-root-title`, call `codex_app__set_thread_title` at most once for the
-   root, and independently read back the title when possible. If it does not,
+1. If title mutation is available, begin `set-root-title`, apply the canonical
+   root title at most once, and independently observe the title when possible.
+   If it is unavailable,
    record `root-title-unverified` in the run report and continue. For one
    assignment use `🤖 Implement Feature · 1 Spec`. For two or more use
    `🤖 Implement Feature · N Specs`, where `N` is the immutable total
@@ -138,26 +123,23 @@ After at least one assignment owns its Feature Spec and head-branch claim:
    create one visible Codex worker task in an isolated App-managed worktree of
    the selected local Git project. Require `gpt-5.6-sol`, the assignment's
    resolved `medium|high|xhigh` reasoning from `task-model-policy.md`, and the
-   canonical worker title when the live declaration supports it. The model
-   calls the live creation tool directly and the declaration owns the accepted
-   argument and target shape. Use this exact
+   canonical worker title when creation-time title initialization is available.
+   Use this exact
    no-authority
    preparation prompt: `This visible task is being prepared as an Implement
    Feature worker. Do not inspect, edit, branch, test, publish, or mutate
    anything yet. Wait for the controller's full bootstrap envelope.` Do not
    impose a numeric worker limit. The ChatGPT App creates the worktree and
    assigns it to the task; root never runs `git worktree add`.
-3. Independently verify the stable task ID, checkout directory, Git common
-   directory, literal task state `active|idle`, and project binding in the
-   `create-worker` observation. Both task states mean that the exact task
-   binding exists, not that implementation progress has begun. Record the
-   returned title separately when available.
+3. Independently verify the stable task identity, checkout directory, Git
+   common directory, normalized operational state, and project binding in the
+   `create-worker` observation. This proves that the exact task binding exists,
+   not that implementation progress has begun. Record the observed title
+   separately when available.
 4. If the creation readback does not confirm the exact canonical title, begin
-   `set-worker-title` for the recorded worker, call
-   `codex_app__set_thread_title` at most once with the recorded `threadId` and
-   exact canonical title, using no additional field unless the live declaration
-   exposes it, and independently read back the title when possible before
-   finishing the operation. A missing or normalized-to-different title returns
+   `set-worker-title` for the recorded worker, apply the exact canonical title
+   at most once to that stable task, and independently observe the title when
+   possible before finishing the operation. A missing or normalized-to-different title returns
    `effect_warning=worker-title-unverified` or
    `effect_warning=worker-title-drift`; it does not set cleanup or forbid
    bootstrap. Do not repair drift with another title operation. Keep the
@@ -260,7 +242,7 @@ instructions or relay peer discussion. For a repairable mismatch, send only the
 missing or inconsistent evidence and exact HEAD, tracker, task, or provider
 refs when applicable.
 
-The worker sends the native `codex review` result summary and evidence refs
+The worker sends the native review result summary and evidence refs
 bound to the exact reviewed HEAD. Root may read and relay those facts as
 coordination evidence, but never launches review, adds diagnosis, or supplies
 repair strategy. The worker owns finding acceptance, repair, validation, and
@@ -301,15 +283,9 @@ Before its worker-owned review, the worker builds the review handoff with:
 
 The worker forwards the returned `base_sha` and `head_sha` without shortening,
 expanding, or reconstructing either value to its native review invocation. It
-passes the fixed worker model and resolved thinking explicitly:
-
-```bash
-codex --model gpt-5.6-sol \
-  -c 'model_reasoning_effort="<resolved-thinking>"' \
-  review --base <base-branch>
-```
-
-The command reviews the complete branch delta. The worker reruns it after every
+uses the fixed worker model and resolved reasoning profile explicitly against
+the declared base branch. Native review covers the complete branch delta. The
+worker reruns it after every
 accepted fix and binds the final result to the current HEAD. Root only verifies
 the resulting evidence and never edits or reviews the candidate.
 
@@ -319,6 +295,5 @@ the immediate response and independently read the exact task conversation,
 then finish the recorded operation. Controller follow-ups are not replayable;
 an unresolved follow-up remains unresolved rather than being resent under
 another operation. Store no message body, hash, or worker technical state.
-Omit `model` and `thinking` from every `send_message_to_thread` call so the
-existing root or worker keeps the exact profile selected at creation; never
-override or reclassify it during follow-up.
+Follow-up messages must preserve the exact task profile selected at creation;
+never override or reclassify it during follow-up.

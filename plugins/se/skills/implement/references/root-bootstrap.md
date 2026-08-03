@@ -8,9 +8,9 @@ only durable controller identity in `run-state`.
 
 On entry, before the numbered preflight below, the root must:
 
-- read the current task and verify its real `threadId`, local environment,
+- read the current task and verify its stable identity, local execution,
   exact control-plane project, and the parent-provided handoff;
-- verify `model=gpt-5.6-sol` and `thinking=medium` when task telemetry exposes
+- verify the `gpt-5.6-sol` / medium-reasoning profile when task telemetry exposes
   them; settings drift blocks before workers;
 - retain the parent task ID only for coarse milestone and final-report relay;
   the parent is not a worker, repository, or run-state target;
@@ -28,21 +28,23 @@ Before mutation, root follows this numbered preflight:
    graph. Read the exact label metadata through the G issue workflow;
    incomplete pagination, stale reads, races, or one missing label stop the
    affected Spec before claims, tasks, or worktrees.
-2. Read the current Codex task and project list. When task readback reports an
-   explicit saved-project binding, require it to identify one local saved Codex
-   project on the task's current host and record that exact binding as
-   `controller_project_id`; also read its reported primary path. This direct
-   binding may be multi-folder or unrelated to the feature.
+2. Observe the current Codex task and authoritative saved-project inventory.
+   When the task has an explicit saved-project binding, require it to identify
+   one local saved Codex project on the task's current host and record that
+   exact binding as `controller_project_id`; also establish its primary path.
+   This direct binding may be multi-folder or unrelated to the feature.
 
    When task readback omits an explicit saved-project binding, use the
    compatibility fallback only if all of these authoritative facts hold:
 
-   - task readback reports a local current host and an absolute `cwd`;
-   - `cwd` resolves to an existing non-symlink directory and is exactly the Git
+   - authoritative task observation establishes a local current host and an
+     absolute working directory;
+   - that directory resolves to an existing non-symlink directory and is
+     exactly the Git
      worktree root reported by `git rev-parse --show-toplevel`;
-   - exactly one `list_projects` entry is local, belongs to that same host,
-     reports `isGitRepository=true`, and has a real path exactly equal to the
-     real `cwd`;
+   - exactly one saved project is local, belongs to that same host, is
+     authoritatively identified as Git-backed, and has a canonical path exactly
+     equal to the task's canonical working directory;
    - independently resolving the candidate path's absolute Git common directory
      succeeds and exactly matches the current task repository's absolute Git
      common directory; and
@@ -50,10 +52,10 @@ Before mutation, root follows this numbered preflight:
      cross-host candidate, non-Git candidate, missing path, symlink alias, or
      Git-common-directory mismatch remains.
 
-   Record that unique candidate's project ID as `controller_project_id`. A
-   singular `list_projects.path` is only a reported project path; because the
-   current ChatGPT App metadata does not expose the complete folder set or folder
-   count, do not claim that this fallback proves a single-folder project. The
+   Record that unique candidate's stable project identity as
+   `controller_project_id`. One reported project path does not expose the
+   complete folder set or folder count, so do not claim that this fallback
+   proves a single-folder project. The
    candidate may be a one-folder project or the primary path of a multi-folder
    workspace. Both are safe as controller identity because the controller
    project is UI/control-plane identity and read-only coordination context only:
@@ -63,11 +65,11 @@ Before mutation, root follows this numbered preflight:
 3. Resolve each affected repository's canonical GitHub identity as
    `github:owner/repository` and verify that the saved project points to that
    repository.
-4. Run the worker-project preflight with `list_projects`. Every affected
-   repository must map bijectively to one separate local saved Git project on
-   the current host whose reported primary folder is exactly that repository
-   root and whose independently resolved Git common directory matches the
-   canonical repository identity. Resolve this eligibility independently even
+4. Run the worker-project preflight against the authoritative saved-project
+   inventory. Every affected repository must map bijectively to one separate
+   local saved Git project on the current host. Its reported primary folder
+   must be exactly that repository root, and its independently resolved Git
+   common directory must match the canonical repository identity. Resolve this eligibility independently even
    when step 2 used the same project ID as controller identity: exact-path
    controller resolution is not worker-project evidence. When the controller
    project is multi-folder, exclude its project ID from worker mapping even when
@@ -211,21 +213,19 @@ default PR base such as `main` as a head-branch collision: only the
 implementation head branch is exclusive.
 
 The root creates each worker as a visible Codex task in an isolated worktree,
-using `gpt-5.6-sol` and the assignment's resolved
-`thinking=medium|high|xhigh`. Before the one creation call, root inspects the
-live declaration and resolves the exact repository project and host from
-authoritative App readback. The model then calls the live creation tool
-directly, passing only declared fields and the canonical worker title when
-supported; this reference does not reproduce the tool's target or argument
-shape. The ChatGPT App creates the worktree and assigns it to that task. Root
-independently reads or lists the created task and verifies its task ID, project,
-host, environment, state, title, checkout directory,
-Git common directory, project binding, and literal `active|idle` state in the
+using `gpt-5.6-sol` and the assignment's resolved medium, high, or extra-high
+reasoning profile. Before the one creation attempt, root resolves the exact
+repository project and host from authoritative App state and requests the
+canonical worker title when supported. The ChatGPT App creates the isolated
+checkout and assigns it to that task. Root independently observes the created
+task and verifies its stable identity, project, host, execution mode, state,
+title, checkout directory, Git common directory, project binding, and
+operational state in the
 `create-worker` observation. Title evidence is recorded separately from the
 structural worker proof. If creation does not yield the exact title, root
-records `set-worker-title`, calls `set_thread_title` at most once with the real
-task ID, exact canonical title, and only the arguments exposed by the inspected
-declaration, then independently verifies the title again when possible. A
+records `set-worker-title`, applies the exact canonical title at most once to
+the stable task identity, then independently verifies the title again when
+possible. A
 missing or different title records `title-unverified` or `title-drift` and does
 not prevent bootstrap once task identity, project, checkout, Git common
 directory, and operational state are verified. Root never runs `git worktree
@@ -245,19 +245,11 @@ every sibling must become terminal and the mixed run finishes as `abandoned`,
 not as successful delivery.
 
 Each full bootstrap has one fixed execution policy: the worker owns native
-Codex review. After read-only checkout identity preflight and before branch or
-implementation mutation, the worker verifies that the installed CLI exposes
-the exact worker-profile invocation:
-
-```bash
-codex --model gpt-5.6-sol \
-  -c 'model_reasoning_effort="<resolved-thinking>"' \
-  review --help
-```
-
-`<resolved-thinking>` must be the worker's resolved `medium`, `high`, or
-`xhigh` value. A missing or unusable review command, model override, or
-reasoning override is reported as `blocked-app-capability` before editing;
+review. After read-only checkout identity preflight and before branch or
+implementation mutation, the worker verifies that the current live runtime can
+perform native review with the exact worker model and resolved medium, high, or
+extra-high reasoning profile. An unavailable or unusable profiled review
+capability is reported as `blocked-app-capability` before editing;
 root records the evidence and does not take over the review. The bootstrap
 contains no review-owner choice or reroute field, and replay keeps only the
 same operation ID and `bootstrap_id`. Never copy credentials or try an

@@ -31,10 +31,10 @@ is proven. Read the parent again after every change. GitHub mutations go through
 the current G issue workflow.
 
 Complete and read back all tracker mutations before opening the first full
-native Codex review on the committed candidate. If a review fix invalidates
+native review on the committed candidate. If a review fix invalidates
 acceptance proof, uncheck or repair the tracker state, read it back, and include
 the restored tracker state in the same coherent fix HEAD before rerunning
-`codex review`. A tracker-only HEAD after clean review is sequencing drift:
+native review. A tracker-only HEAD after clean review is sequencing drift:
 it does not justify another model review and must not be used as terminal
 evidence.
 

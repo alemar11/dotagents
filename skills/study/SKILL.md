@@ -99,7 +99,7 @@ Five is an absolute, non-bypassable worker cap for the entire Study run:
 - If the user does not specify a count, choose zero to five based on the
   analysis; do not create five by default. `original_requested_count` is then
   `unspecified`, `planned_worker_count` is the justified count after applying
-  the cap, and `created_worker_count` is the number of real worker thread IDs
+  the cap, and `created_worker_count` is the number of stable worker identities
   returned.
 
 These count rules have precedence over the general efficiency heuristic. A
@@ -143,12 +143,11 @@ Use these routing terms consistently:
 
 ## Study App task contract
 
-The parent and orchestrator interact with Codex App directly through the live
-task tools. Before each creation, read, wait, title, message, or archive call,
-inspect that operation's current declaration and pass only fields it exposes.
+The parent and orchestrator interact with Codex App directly through current
+live capabilities for creation, observation, monitoring, messaging, titles,
+and archival.
 This skill owns Study's outcomes, topology, authorization, lifecycle, and
-verification; it does not reproduce tool signatures, target schemas, or
-serialized App requests.
+verification. The model uses the current live Codex capabilities directly.
 
 Resolve the exact saved project and host from authoritative App state before
 creating the orchestrator. Every Study task must remain in that same project
@@ -182,30 +181,27 @@ Choose one visual `run_tag` before the orchestrator is created:
   from 1 through 5.
 - Keep titles concise, specific, and stable for the entire run. Do not include
   progress, status, dates, model settings, or changing worker counts.
-- The live `codex_app__create_thread` declaration may expose an optional
-  `title` parameter. Inspect the declaration before creating any task and pass
-  only fields it exposes; do not infer title support from an older contract.
-  When `title` is exposed, pass the canonical title in the creation call. Do
-  not treat the creation response or a title embedded in the prompt as
-  visible-title evidence.
-- After a real `threadId` is returned, independently read or list the task. If
+- Request the canonical title during creation when the current live
+  capabilities support that outcome. Do not treat the creation receipt or a
+  title embedded in the prompt as visible-title evidence.
+- After a stable task identity exists, independently observe the task. If
   the observed title exactly matches the requested title, record
   `title-verified` and keep the creation-time result. If the title is missing,
-  unavailable, or different, call `codex_app__set_thread_title` at most once as
-  the fallback, passing the requested title and only the arguments exposed by
-  its live declaration. Independently read or list the task again and record
+  unavailable, or different, apply the requested title at most once when title
+  mutation is available. Independently observe the task again and record
   the creation receipt, any fallback receipt, observed title, evidence source,
   and `title-unverified` or `title-drift` warning before continuing. If
-  `create_thread` does not expose `title`, use this fallback when available.
+  creation-time title initialization is unavailable, use this fallback when
+  available.
 - Never rename a task again to repair drift. Title setup and title readback are
   best-effort metadata: once the real task ID, project, environment, state,
-  and requested Study settings are independently verified, continue creating
+  and requested Study profile are independently verified, continue creating
   or monitoring tasks with the warning attached. Require an exact title only
   when the user explicitly requests one; otherwise a title warning is not a
   setup failure.
 - Treat the run tag and titles as display metadata only. Never use either as
   identity, state, a branch name, a correlation key, or a recovery key. Bind
-  identity and lineage only to real thread IDs recorded in the ledger.
+  identity and lineage only to stable task identities recorded in the ledger.
 - If the App normalizes or returns a different title, report the mismatch and
   preserve the task identity; never silently rename it or reconstruct identity
   by searching for the run tag.
@@ -219,9 +215,9 @@ Choose one visual `run_tag` before the orchestrator is created:
    assume the new task can see the active turn's unfinished context. Generate
    the shared `run_tag` first and include it explicitly in the handoff.
 2. Resolve the exact project used by the current session:
-   - Call `codex_app__list_projects` before creating the orchestrator.
-   - Match the current session's saved project by exact path and host when
-     those facts are available; do not select by label alone.
+   - Resolve the current session's authoritative saved project before creating
+     the orchestrator. Match by exact path and host; do not select by label
+     alone.
    - Require the orchestrator and every worker to use that exact saved project
      directly in its local environment.
    - A standalone task outside the saved project cannot prove that its
@@ -230,22 +226,18 @@ Choose one visual `run_tag` before the orchestrator is created:
      another destination.
    - If the match is missing or ambiguous, stop and report it instead of
      creating a task in a guessed project.
-3. Never use a worktree, `codex_app__fork_thread`, `git worktree`, or a raw
+3. Never use an isolated checkout, a task fork, a Git worktree, or a raw
    worktree command. Both the orchestrator and every worker must run locally in
    the same authoritative project and host as the parent session.
-4. Create exactly one orchestrator by calling the live creation tool directly
-   once. Require the resolved local project, `gpt-5.6-sol` at medium reasoning,
-   the canonical Study title when supported, and the complete read-only handoff
-   plus orchestrator protocol. The inspected declaration owns the accepted
-   argument shape.
+4. Create exactly one orchestrator once. Require the resolved local project,
+   `gpt-5.6-sol` at medium reasoning, the canonical Study title when supported,
+   and the complete read-only handoff plus orchestrator protocol.
 
-   `model` and `thinking` are optional in the App API, but they are mandatory
-   for Study. Treat the explicit `$study` invocation as authorization for
-   these fixed Study settings; never omit them and never inherit the calling
-   task's model or reasoning. After the real `threadId` is available, read or
-   list the task and independently verify `Study: [<run-tag>] <short title>`.
-   If creation did not set that exact title, call the verified
-   `codex_app__set_thread_title` fallback at most once and verify it again.
+   The Sol/medium profile is mandatory Study policy. Treat the explicit
+   `$study` invocation as authorization for it; never inherit the calling
+   task's profile. After a stable task identity is available, independently
+   verify `Study: [<run-tag>] <short title>`. If creation did not set that exact
+   title, apply the verified title fallback at most once and verify it again.
    Do not create workers until the orchestrator's real task ID, project,
    environment, state, and requested model/reasoning are verified. A missing or
    different title becomes `title-unverified` or `title-drift` telemetry and
@@ -257,28 +249,27 @@ Choose one visual `run_tag` before the orchestrator is created:
    unavailable, record that limitation and never claim applied Sol settings
    from the prompt or creation request alone.
 
-   Include the parent task ID and host ID in the handoff when the App exposes
-   them. The orchestrator uses them for milestone and final messages. Never
-   invent an ID; the parent task can still monitor the orchestrator through
-   `codex_app__wait_threads` when a parent ID is unavailable.
+   Include the stable parent task and host identities in the handoff when they
+   are observable. The orchestrator uses them for milestone and final messages.
+   Never invent an identity; the parent can still monitor the orchestrator when
+   direct parent messaging is unavailable.
 5. If structural identity, project/environment, state, or requested settings
    cannot be verified for the orchestrator, stop before creating workers and
    report the exact setup failure. A title warning alone does not stop Study;
    preserve the real task ID and continue without creating a replacement.
-6. Keep the parent turn open after creation. Use bounded
-   `codex_app__wait_threads` calls on the returned orchestrator `threadId` and
-   relay meaningful progress to the user as it arrives. Do not claim the
-   analysis is complete until the orchestrator returns a terminal result.
+6. Keep the parent turn open after creation. Monitor the exact orchestrator
+   with bounded waits and relay meaningful progress to the user as it arrives.
+   Do not claim the analysis is complete until the orchestrator returns a
+   terminal result.
 7. When the user requested more than five workers, the orchestrator owns the
    canonical counts. Relay its original/planned-count milestone in the parent
    before monitoring begins; if direct parent messaging is unavailable, state
    the same counts from the parent handoff and reconcile them with the final
    report.
 
-If `codex_app__create_thread` returns only a `clientThreadId`, treat setup as
-pending. Do not pass that value to tools that require `threadId`, do not create
-a duplicate task, and report the pending state until the App exposes the real
-task ID.
+If creation returns only a provisional setup identity, treat setup as pending.
+Do not use it as a stable task identity, do not create a duplicate task, and
+report the pending state until the real task can be observed.
 
 ## Orchestrator protocol
 
@@ -304,43 +295,39 @@ The orchestrator must execute the following protocol from its initial prompt:
    acceptance criteria for the analysis, validation or research method, and a
    concise expected Markdown memo. Serialize assignments that depend on
    unstable findings.
-4. Create up to five visible worker tasks with
-   `codex_app__create_thread`. For each reserved slot, inspect the current live
-   declaration and call the tool directly once. Require the same authoritative
-   local project and host as the parent, `gpt-5.6-luna` at max reasoning, the
-   canonical worker title when supported, and the complete read-only assignment
-   plus worker protocol. Do not reproduce the tool's argument or target shape.
+4. Create up to five visible worker tasks. For each reserved slot, create once
+   in the same authoritative local project and host as the parent, using
+   `gpt-5.6-luna` at max reasoning, the canonical worker title when supported,
+   and the complete read-only assignment plus worker protocol.
 
-   Never omit `model` or `thinking` and never rely on the orchestrator's
-   settings being inherited. After each real `threadId` is returned, read or
-   list the task and independently verify `Worker N: [<run-tag>] <short title>`.
-   If creation did not set that exact title, call the verified
-   `codex_app__set_thread_title` fallback at most once and verify it again
+   The Luna/max profile is mandatory Study policy and must not be inherited
+   from the orchestrator. After each stable task identity is available,
+   independently verify `Worker N: [<run-tag>] <short title>`. If creation did
+   not set that exact title, apply the verified title fallback at most once
+   and verify it again
    before recording `title-unverified` or `title-drift` telemetry. Do not use
    the prompt as title evidence. Compare active model and reasoning telemetry
    when exposed; record `settings-drift` for any mismatch and do not create a
    replacement. A title warning does not prevent the worker from starting.
 
-   Do not use `multi_agent_v1__spawn_agent`, a CLI process, a worktree, or a
-   different project as a substitute for a visible worker task.
-5. Record each returned real `threadId`, `hostId`, initialized title, assignment,
-   shared `run_tag`, and dependency order in the orchestrator's working
+   Do not use a generic subagent mechanism, CLI process, worktree, or different
+   project as a substitute for a visible worker task.
+5. Record each stable task identity, host identity, initialized title,
+   assignment, shared `run_tag`, and dependency order in the orchestrator's working
    context. If a creation result is uncertain, reconcile it with the App before
    retrying; never create a duplicate merely because an immediate response was
    lost.
-6. Monitor all created workers with bounded `codex_app__wait_threads` calls,
-   using returned cursors to avoid replaying the same progress. Use
-   `codex_app__read_thread` for the exact status or final evidence needed for a
-   decision. Do not busy-poll.
-7. Use `codex_app__send_message_to_thread` for concise worker questions,
-   evidence requests, dependency handoffs, blocker handling, and parent
-   milestones. Keep routine research collaboration between each worker and
-   this orchestrator; do not make the parent session relay every worker
-   message.
+6. Monitor all created workers with bounded waits that resume from the latest
+   observed progress and independently inspect exact status or final evidence
+   when needed for a decision. Do not busy-poll.
+7. Send concise worker questions, evidence requests, dependency handoffs,
+   blocker handling, and parent milestones directly between the relevant
+   tasks. Keep routine research collaboration between each worker and this
+   orchestrator; do not make the parent session relay every worker message.
 8. Keep the parent informed at meaningful milestones when its real task ID is
    available: analysis scope fixed, workers created, material blocker, first
    terminal result, and final synthesis. If no parent ID is available, rely on
-   the parent's `wait_threads` monitoring and include all milestones in the
+   the parent's monitoring and include all milestones in the
    orchestrator's final result.
 9. Wait for every created worker to become `completed`, `failed`, or explicitly
    `abandoned`. A `needs-attention` worker is nonterminal: notify the parent and
@@ -349,7 +336,7 @@ The orchestrator must execute the following protocol from its initial prompt:
 10. Capture terminal evidence for every worker: its final memo when available,
     otherwise its final structured state, reason, error, and last message.
     After all workers are terminal or explicitly abandoned, request archival
-    of every worker with `codex_app__set_thread_archived`. Keep the orchestrator
+    of every worker through the live task lifecycle. Keep the orchestrator
     unarchived so it remains as the single visible Study summary task. Record
     the archival call receipt and any bounded post-call verification
     separately; never hide an archival failure or request archival before
@@ -372,17 +359,17 @@ Track each planned worker slot separately from any task it creates. Slot states
 are `not-started`, `pending-setup`, `created`, `creation-failed`,
 `settings-drift`, and `unresolved-setup`:
 
-- Reserve the slot before calling `create_thread`; never renumber, free, or
+- Reserve the slot before creating a task; never renumber, free, or
   reuse it during the run.
 - A definitive creation error proving no task exists sets `creation-failed`.
   Continue with later planned slots but never retry that slot.
 - A timeout, transport error, or response with neither ID and uncertain server
   state sets `pending-setup`, stops later creation, and follows the same bounded
-  reconciliation as a returned `clientThreadId`.
-- A returned `clientThreadId` stays in its own ledger field and must never be
-  passed to thread-ID tools or counted in `created_worker_count`. Use up to
-  three bounded `list_threads` snapshots and correlate only through an explicit
-  matching client-ID field, never title or preview.
+  reconciliation as any other provisional setup result.
+- A provisional setup identity stays separate from stable task identity and
+  must not count as a created worker. Use up to three bounded authoritative
+  snapshots and correlate only through explicit identity evidence, never title,
+  prompt preview, or timing.
 - A real task whose title cannot be initialized or independently verified keeps
   the `created` slot state. Record `title-unverified` or `title-drift` beside
   the real ID and evidence, do not retry or create a replacement, and continue
@@ -396,7 +383,7 @@ are `not-started`, `pending-setup`, `created`, `creation-failed`,
 - If reconciliation fails, set `unresolved-setup`; leave every later planned
   slot `not-started` with reason `creation halted after uncertain slot`, and
   report a partial run. Never create replacements.
-- A real `threadId` sets `created`. Before turn telemetry appears, track the
+- A stable task identity sets `created`. Before turn telemetry appears, track the
   task workflow state as `created-awaiting-turn`; bounded empty snapshots do not
   imply failure or justify replacement.
 
@@ -405,11 +392,9 @@ Track every real task in exactly one workflow state:
 - `created-awaiting-turn`: a real ID exists but no turn status is observable.
 - `active`: the latest turn is in progress.
 - `completed`: the latest turn completed without error and the task is idle.
-- `needs-attention`: structured App telemetry reports a nonempty actionable
-  `activeFlags` value such as `waitingOnUserInput`, or `wait_threads` returns an
-  explicit needs-attention wake. Preserve the raw flag or wake reason. Never
-  infer this state from prose alone. Notify the parent session; the owning user
-  must answer through the App surface.
+- `needs-attention`: structured task telemetry reports an explicit actionable
+  request. Preserve the observed reason and never infer this state from prose
+  alone. Notify the parent session; the owning user must answer through the App.
 - `monitoring-unavailable`: neither wait nor read telemetry can establish the
   current task state. Preserve the last known state and raw tool errors, notify
   the parent session, and pause. This is infrastructure observability, never a
@@ -419,25 +404,24 @@ Track every real task in exactly one workflow state:
 - `abandoned`: recovery is proven unavailable, or the owning user explicitly
   abandons a `needs-attention` task. Record the exact reason.
 
-Maintain separate `wait_cursor` and `read_page_cursor` values per real task.
-Only a `wait_threads` cursor is reused as `afterCursor`; only a `read_thread`
-page cursor is reused for pagination. An incoming parent message may interrupt
-a wait without invalidating the last confirmed wait cursor; resume from that
-cursor. Deduplicate evidence by returned revision and message or event ID, not
-by prose. On a wait error, use `read_thread`; if monitoring remains unavailable,
-mark `monitoring-unavailable` and notify the parent. Never turn missing
-telemetry into a success claim. Resume only when either telemetry surface
-recovers; if recovery is proven impossible, the owning user may explicitly
-direct abandonment.
+Maintain separate progress and inspection positions per real task according to
+the live capabilities that produced them; never interchange them. An incoming
+parent message may interrupt a wait without invalidating the last confirmed
+progress position. Deduplicate evidence by stable revisions or event identity,
+not by prose. If one monitoring path fails, independently inspect the exact
+task; if monitoring remains unavailable, mark `monitoring-unavailable` and
+notify the parent. Never turn missing telemetry into a success claim. Resume
+only when authoritative observation recovers; if recovery is proven impossible,
+the owning user may explicitly direct abandonment.
 
 Track archival separately from slot and task state. Request archival only for
 `completed`, `failed`, or explicitly `abandoned` workers after terminal
 evidence is captured. For a failed or abandoned worker, structured final state,
 reason, error, and last telemetry substitute for a missing memo. Record the
-`set_thread_archived` request receipt as `accepted`, `failed`, or `unavailable`.
-Because archival is asynchronous, record bounded post-call verification only
-when an explicit archived-state field is available; omission from a recent-task
-list is not independent proof. Keep the orchestrator unarchived.
+archival request receipt as `accepted`, `failed`, or `unavailable`.
+Because archival is asynchronous, record bounded post-request verification only
+when authoritative archival state is observable; omission from a recent-task
+view is not independent proof. Keep the orchestrator unarchived.
 
 Use these final outcome definitions:
 
@@ -457,8 +441,8 @@ Never present either as the authoritative final report.
 ## Worker protocol
 
 Give every worker a complete read-only assignment rather than expecting it to
-infer scope from the title. Include the exact orchestrator `threadId` and
-`hostId` when available, the shared `run_tag`, shared project identity, paths
+infer scope from the title. Include the exact orchestrator and host identities
+when available, the shared `run_tag`, shared project identity, paths
 to inspect, questions to answer, evidence requirements, dependencies, and
 Markdown memo format.
 
@@ -478,8 +462,8 @@ Require each worker to:
   invoke Study. This prohibition is absolute even if the worker receives an
   explicit request to use Study.
 - Send concise research progress, evidence, dependency, blocker, and
-  completion messages to the orchestrator with
-  `codex_app__send_message_to_thread` when the task ID is available. Do not
+  completion messages directly to the orchestrator when its stable identity is
+  available. Do not
   send routine worker coordination to the parent session.
 - Return a textual Markdown memo containing observations, sources or paths,
   reasoning, uncertainties, and recommendations. Do not return source-code
@@ -498,11 +482,11 @@ authoritative for completion. Use the structure in
 - original requested, planned, and actually created worker counts, whether the
   hard cap was applied, whether the parent was notified, and the terminal state
   and reason for each worker;
-- a ledger for every planned slot, including client ID, real thread ID,
-  creation receipt or error, slot state, and unstarted-slot reason;
+- a ledger for every planned slot, including provisional and stable task
+  identities, creation receipt or error, slot state, and unstarted-slot reason;
 - task telemetry provenance: host, project, environment, requested model and
-  reasoning, title source, separate wait/read cursors, raw attention flag,
-  error, and terminal-evidence message or turn ID;
+  reasoning, title source, separate monitoring positions, observed attention
+  reason, error, and terminal-evidence identity;
 - milestone delivery evidence for cap, workers-created, first-terminal, and
   final-report messages;
 - archival request receipt and independent verification status separately for
@@ -519,54 +503,20 @@ Do not hide a partial result behind a success summary. Do not imply that task
 creation authorization also authorized repository, Git, GitHub, deployment,
 account, or destructive operations.
 
-## App tool boundary
+## Codex interaction boundary
 
-Use the Codex App task tools for orchestration: `list_projects`,
-`create_thread`, `set_thread_title`, `list_threads`, `wait_threads`,
-`read_thread`, and `send_message_to_thread` as needed. Use
-`set_thread_archived` only for the post-result worker archival phase. Use other
-tools only for read-only research or inspection. Keep `model` and `thinking`
-fixed and explicit in every `create_thread` request. Never switch to
-worktrees, generic subagents, raw shell task launchers, or a second
-orchestration mechanism.
+Use the current live Codex capabilities directly for the authorized Study task
+topology and use other capabilities only for read-only research or inspection.
+Never switch to isolated checkouts, generic subagents, raw shell task launchers,
+or a second orchestration mechanism. Keep the Sol/medium orchestrator and
+Luna/max worker profiles fixed as semantic Study policy.
 
-Before any task mutation, inspect the live declaration for every App operation
-used by the flow and verify every field that will be passed. Call the live tool
-directly; do not serialize its request, mirror its declaration, or route it
-through a local helper. In particular, do not infer creation-time title support
-from documentation or prompt text, and do not treat a creation response as
-title evidence. If a required operation or outcome for task identity, project,
-environment, state, settings, monitoring, or cleanup is unavailable or
-unverifiable, stop as `unsupported-runtime` before creating the topology.
-`set_thread_title` and title fields are best-effort metadata capabilities; if
-unavailable, retain a title warning and continue after structural verification.
-
-The authorized App task-management calls above are the only exceptions to the
-no-side-effect rule. Apply this availability matrix before and during a run:
-
-- `list_projects` and `create_thread` are required before any topology exists;
-  if either is unavailable, stop without creating tasks.
-- `wait_threads` is required for normal monitoring. If unavailable after task
-  creation, use bounded `read_thread` snapshots; if both are unavailable,
-  report `monitoring-unavailable` and pause.
-- `read_thread` is the required fallback for wait errors and exact final memo
-  capture. If unavailable only after a clean wait completion, use the final
-  message returned by `wait_threads` and report the missing independent read.
-- `send_message_to_thread` is optional when the parent task ID is unavailable
-  or monitoring already exposes milestones; report that direct messaging was
-  not exercised.
-- `create_thread.title` is preferred for every task when the live declaration
-  exposes it. After creation, independently verify the structural task
-  identity, project, environment, and state, then verify the requested title
-  separately. If creation did not set it, use `set_thread_title` at most once
-  as the fallback, with only its live-declared arguments, and verify the title
-  again. If the fallback is unavailable or the final title is not exact,
-  preserve the task identity and emit `title-unverified` or `title-drift`; do
-  not stop orchestration or create a replacement unless the user explicitly
-  required the exact title.
-- `list_threads` is optional except for explicit client-ID reconciliation. A
-  missing tool makes the reserved slot `unresolved-setup` as described above.
-- `set_thread_archived` is post-result cleanup. Its absence or failure is an
-  archive-request error, not a reason to hide an otherwise valid analysis
-  result. A successful receipt proves acceptance only unless another surface
-  exposes an explicit archived-state field.
+Before mutation, establish that the live runtime can create and independently
+observe the requested topology, monitor exact tasks, exchange required
+messages, and request post-result worker archival. Do not serialize or mirror
+the live interface. If structural identity, project, local execution, state,
+settings, monitoring, or cleanup cannot be established, stop or use the
+specific recovery behavior above. Title initialization and archival are
+best-effort metadata and lifecycle capabilities: report their absence or
+failure without replacing a structurally verified task or hiding a valid
+analysis result.

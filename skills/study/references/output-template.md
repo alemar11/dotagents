@@ -6,18 +6,18 @@
 - **Shared run tag:** `[<run-tag>]`
 - **Requested orchestrator title:** `Study: [<run-tag>] <short title>`
 - **Observed orchestrator title:** `<observed title or unavailable>`
-- **Title creation/fallback receipt:** `<create_thread title readback and, if used, set_thread_title receipt>`
-- **Title evidence source:** `<independent read/list/unavailable>`
+- **Title creation/fallback receipt:** `<creation-time title observation and, if used, title-fallback receipt>`
+- **Title evidence source:** `<authoritative observation/unavailable>`
 - **Title status/warning:** `<title-verified/title-unverified/title-drift or not-applicable>`
-- **Orchestrator thread ID:** `<thread ID>`
-- **Host/project/environment:** `<host ID / project ID and path / local>`
+- **Orchestrator stable identity:** `<stable task identity>`
+- **Host/project/execution:** `<host identity / project identity and path / local>`
 - **Requested model/reasoning:** `gpt-5.6-sol / medium`
 - **Settings evidence source:** `<creation receipt or independent telemetry>`
 - **Orchestrator state:** `<completed/failed>`
 - **Orchestrator state reason:** `<reason>`
 - **Original requested worker count:** `<count or unspecified>`
 - **Planned worker count after cap:** `<0-5>`
-- **Created worker count:** `<0-5 real thread IDs>`
+- **Created worker count:** `<0-5 stable task identities>`
 - **Hard cap applied:** `<yes/no>`
 - **Parent notified of cap:** `<yes/no/not-applicable>`
 - **Full-capacity mode:** `<yes/no>`
@@ -69,17 +69,17 @@ code.
 
 ## Worker slot ledger
 
-| Slot | Assignment | Slot state | Client ID | Thread ID | Creation receipt or error | State reason |
+| Slot | Assignment | Slot state | Provisional identity | Stable task identity | Creation receipt or error | State reason |
 | --- | --- | --- | --- | --- | --- | --- |
 | Worker N |  |  |  |  |  |  |
 
 List all planned slots, including `not-started`, `creation-failed`, and
-`unresolved-setup` slots. Never correlate an unresolved client ID by title or
+`unresolved-setup` slots. Never correlate an unresolved provisional identity by title or
 preview.
 
 ## Task telemetry ledger
 
-| Task | Requested title | Title creation/fallback receipt | Observed title and source | Title status/warning | Thread ID | Host | Project/environment | Requested model/reasoning | Settings evidence source | State | State reason/raw flag | Wait cursor | Read cursor | Revision/event/message | Error | Terminal evidence source | Archive request receipt | Archive verification |
+| Task | Requested title | Title creation/fallback receipt | Observed title and source | Title status/warning | Stable identity | Host | Project/execution | Requested profile | Settings evidence source | State | State reason/attention evidence | Progress position | Inspection position | Revision/event identity | Error | Terminal evidence source | Archive request receipt | Archive verification |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Orchestrator |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | not-requested | not-applicable |
 | Worker N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -95,7 +95,7 @@ state/error/last-message evidence that substitutes for a missing memo.
 
 ## Worker results
 
-| Worker | Thread ID | Terminal state | Key result |
+| Worker | Stable task identity | Terminal state | Key result |
 | --- | --- | --- | --- |
 |  |  |  |  |
 

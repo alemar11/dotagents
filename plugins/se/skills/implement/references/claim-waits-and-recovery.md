@@ -23,10 +23,10 @@ branches may run under different roots in the same repository.
 ### Parent root creation may already have happened
 
 If the parent session was interrupted after requesting the root but before
-receiving a real `threadId`, reconcile the App task list and exact task readback
-using the returned `clientThreadId` when available. Verify the root's real task
-ID, exact local project, environment, state, and `gpt-5.6-sol` /
-`thinking: medium` settings before continuing. A title warning is telemetry;
+receiving a stable task identity, reconcile authoritative App state using any
+provisional identity evidence when available. Verify the root's stable identity,
+exact local project, execution mode, state, and `gpt-5.6-sol` / medium-reasoning
+profile before continuing. A title warning is telemetry;
 structural or settings drift stops before any worker or run-state mutation.
 
 If a real root exists, reuse it and continue monitoring; if authoritative
@@ -58,9 +58,9 @@ state before accepting or replaying the operation. Independently verify the
 task's stable ID, selected project, host, environment, checkout directory, Git
 common directory, and current state. If the exact worker exists, finish the
 already recorded `create-worker` operation and reuse it. First reconcile its
-independently read-back creation title. If that title is not exact, reconcile the separately
-recorded `set-worker-title` fallback: call `set_thread_title` only for its
-authorized launch, read back the exact title, and bootstrap only after that
+independently observed creation title. If that title is not exact, reconcile
+the separately recorded `set-worker-title` fallback: apply the title only for
+its authorized launch, observe the exact title, and bootstrap only after that
 creation-or-fallback path is attempted. If the exact worker exists but title
 initialization did not happen, do not treat the creation prompt or an
 incidental title as sufficient evidence; record `title-unverified` or

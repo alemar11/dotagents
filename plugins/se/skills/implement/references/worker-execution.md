@@ -5,7 +5,7 @@ ChatGPT-created worktree assigned to its visible Codex task. It owns issue
 sequence, technical design, implementation and rewrites,
 repairs, tests, validation, commits, review-candidate preparation, finding
 acceptance and fixes, GitHub issue progress, GitHub PR publication, CI, provider
-review fixes, native Codex review, and final evidence. Root only orchestrates
+review fixes, native review, and final evidence. Root only orchestrates
 and verifies the worker's reported evidence.
 
 Before implementation, verify or create/select the declared named branch in the
@@ -16,16 +16,9 @@ durable delivery.
 
 Before editing implementation files, run the explicit worker-profile review
 preflight immediately after read-only checkout identity preflight and before
-branch selection:
-
-```bash
-codex --model gpt-5.6-sol \
-  -c 'model_reasoning_effort="<resolved-thinking>"' \
-  review --help
-```
-
-Continue only when the exact invocation succeeds. If the capability or either
-explicit override is unavailable, report `blocked-app-capability` and stop
+branch selection. Continue only when the current live runtime proves that
+native review can use the exact worker model and resolved reasoning profile.
+If that capability is unavailable, report `blocked-app-capability` and stop
 before implementation. Do not retry with escalation, silently use ambient
 configuration, or copy credentials. Root never takes over native review; the
 worker retains design, implementation, finding verification, fixes,
@@ -103,10 +96,10 @@ changes in the same coherent candidate HEAD. A `deferred`,
 is `blocked-durable-contract`, never PR-ready evidence.
 
 The worker derives
-`review_profile=standard|high-risk`, runs native `codex review` against the
+`review_profile=standard|high-risk`, runs native review against the
 candidate's base branch with the worker's explicit `gpt-5.6-sol` model and
-resolved `medium|high|xhigh` reasoning, verifies and aggregates its findings,
-owns every fix and revalidation, and reruns the same command whenever a fix
+resolved medium, high, or extra-high reasoning, verifies and aggregates its
+findings, owns every fix and revalidation, and reruns the review whenever a fix
 changes HEAD. Both review profiles invoke the native command. Never
 force-push published history, merge, enqueue, deploy, release, or perform
 post-merge closure.
@@ -122,17 +115,9 @@ Before worker-owned review, run:
 
 Use its exact `head_sha` and `base_sha` fields verbatim. Never expand a short
 SHA manually. The worker repeats this readback immediately before launch and
-keeps the review evidence bound to the exact candidate HEAD. Then run:
-
-```bash
-codex --model gpt-5.6-sol \
-  -c 'model_reasoning_effort="<resolved-thinking>"' \
-  review --base <base-branch>
-```
-
-Use the exact resolved worker thinking value (`medium`, `high`, or `xhigh`)
-instead of the placeholder. The command reviews the complete branch delta
-against the declared base without inheriting ambient model settings. If the
+keeps the review evidence bound to the exact candidate HEAD. Native review then
+uses the resolved worker reasoning profile and reviews the complete branch
+delta against the declared base without inheriting ambient settings. If the
 worker fixes a finding, repeat `verify-ready`, rerun the same command, and bind
 `codex_review_head_sha` and `review_head_sha` to the resulting HEAD.
 

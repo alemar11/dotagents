@@ -52,18 +52,17 @@ one automatic repair is allowed per assignment. A second scope miss returns
    task creation, report the portable request and remain blocked. Do not ask
    another question.
 4. Record and execute
-   `create-scope-repair-task`. Inspect the live creation declaration, resolve
-   the assignment's authoritative saved repository project and host, and call
-   the live App creation tool directly once for the authorized operation.
-   Create one separate visible Codex task without a worktree, pass only fields
-   accepted by the live declaration, and do not reproduce its target schema or
-   use the prompt as title evidence. Independently read or list the created
+   `create-scope-repair-task`. Resolve
+   the assignment's authoritative saved repository project and host, and create
+   once for the authorized operation. Create one separate visible Codex task
+   without a worktree and do not use the
+   prompt as title evidence. Independently observe the created
    task, verify its task ID, project, host, environment, state, and title, and
    record those facts plus the authoritative readback reference in the normal
    operation observation. If creation did not
-   set the exact title, record and execute `set-scope-repair-title`, call
-   `set_thread_title` at most once with the exact title and only the arguments
-   exposed by its inspected declaration, and independently verify that readback
+   set the exact title, record and execute `set-scope-repair-title`, apply
+   the available title fallback at most once with the exact title, and
+   independently verify that readback
    when possible before invoking
 `$se:feature` as the separate Feature task against the authoritative
    `source_spec_ref` and

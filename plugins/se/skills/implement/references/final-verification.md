@@ -30,8 +30,8 @@ For each assignment, root rereads:
 - when the issue contains `## Domain Knowledge Closeout`, the exact accepted
   `knowledge_delta`, `capture_outcome=captured`, named destinations, reconciled
   item/target evidence, and the verified documentation diff on the same HEAD;
-- current-head native Codex review evidence with its worker-derived
-  `review_profile=standard|high-risk`; both profiles require `codex review` on
+- current-head native review evidence with its worker-derived
+  `review_profile=standard|high-risk`; both profiles require native review on
   the candidate, and its final `codex_review_head_sha` must bind the current
   HEAD after all accepted fixes;
 - actionable feedback resolution;
