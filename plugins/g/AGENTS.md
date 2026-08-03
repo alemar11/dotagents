@@ -1,8 +1,9 @@
 # G Plugin Maintenance
 
-`plugins/g/` is the repo-local source package for Git and GitHub
-provider primitives. Runtime behavior belongs in each bundled `SKILL.md` and
-its references; this file governs the plugin package and its shared artifact.
+`plugins/g/` is the repo-local source package for Git and GitHub provider
+primitives plus read-only active-session monitoring. Runtime behavior belongs
+in each bundled `SKILL.md` and its references; this file governs the plugin
+package and its shared artifact.
 
 ## Ownership map
 
@@ -14,6 +15,8 @@ its references; this file governs the plugin package and its shared artifact.
 - `references/options.md` owns shared canonical invocation fields;
   `references/network-execution.md` owns shell network and authentication
   handling.
+- `skills/audit/` owns explicit, read-only Codex App monitoring of active tasks
+  that use G skills; it does not own Git/GitHub transport.
 - `skills/<name>/` owns only its narrow provider-primitive contract and local
   adapters or reference summaries.
 
@@ -36,9 +39,11 @@ unversioned, or belongs to another repository.
 - Keep the manifest, `projects/g/pyproject.toml`, package version,
   rebuilt artifact, and installed/cache verification surfaces aligned after a
   shared runtime change.
-- Keep bundled skills provider-primitive and workflow-agnostic. Caller-owned
-  planning, orchestration, project context, queue state, issue-body, and label
-  policy must remain in composing skills.
+- Keep Git/GitHub bundled skills provider-primitive and workflow-agnostic.
+  `skills/audit/` is the explicit read-only App-monitoring exception and must
+  not add Git/GitHub transport. Caller-owned planning, orchestration, project
+  context, queue state, issue-body, and label policy must remain in composing
+  skills.
 - Do not add a second Git/GitHub transport or move publication policy into the
   shared helper. Preserve explicit authority for every GitHub mutation.
 - Treat plugin caches as verification surfaces, never editable sources.

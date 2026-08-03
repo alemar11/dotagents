@@ -1,9 +1,10 @@
 # SE Plugin Maintenance
 
 `plugins/se/` is the repo-local source package for durable project
-context, architecture improvement, feature intake, planning, and implementation
-orchestration. Runtime behavior belongs in the bundled skills and references;
-this file governs package ownership and maintenance.
+context, architecture improvement, feature intake, planning, implementation
+orchestration, and active-session auditing. Runtime behavior belongs in the
+bundled skills and references; this file governs package ownership and
+maintenance.
 
 ## Ownership map
 
@@ -25,6 +26,8 @@ this file governs package ownership and maintenance.
   including context-backed clarification, deferred knowledge handoff, and the
   internal codebase-grounded hardening pass for missing issues.
 - `skills/implement/` owns Codex App orchestration and delivery verification.
+- `skills/audit/` owns read-only monitoring of active sessions using SE skills
+  and prioritized feedback, bug, and improvement reporting.
 - `skills/learn/` owns durable repository context, ADR routing,
   confirmed capture, Code Review Rules, and explicit `AGENTS.md` compaction.
 - `skills/improve-codebase-architecture/` owns evidence-backed architecture
@@ -32,8 +35,8 @@ this file governs package ownership and maintenance.
 
 ## Maintenance contract
 
-- Keep `idea`, `feature`, `implement`, `learn`, and
-  `improve-codebase-architecture` as separate public bundled skills.
+- Keep `idea`, `feature`, `implement`, `learn`, `improve-codebase-architecture`,
+  and `audit` as separate public bundled skills.
 - Keep clarification internal to `idea` and `feature`. The caller phase derives
   its profile; do not expose a fourth clarification skill or add a selectable
   clarification mode.
@@ -62,7 +65,7 @@ this file governs package ownership and maintenance.
 ## Validation
 
 - Validate the manifest with the plugin validator.
-- Validate all five bundled skill metadata files with the skill validator.
+- Validate all six bundled skill metadata files with the skill validator.
 - Run the focused `feature` and `implement` test suites plus Project Context
   documentation/link checks and repository-wide stale-reference scans.
 - Run `git diff --check` before handoff.

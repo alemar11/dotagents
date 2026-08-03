@@ -243,11 +243,21 @@ not as successful delivery.
 Each full bootstrap has one fixed execution policy: the worker owns native
 Codex review. After read-only checkout identity preflight and before branch or
 implementation mutation, the worker verifies that the installed CLI exposes
-`codex review --help`. A missing or unusable review command is reported as
-`blocked-app-capability` before editing; root records the evidence and does not
-take over the review. The bootstrap contains no review-owner choice or reroute
-field, and replay keeps only the same operation ID and `bootstrap_id`. Never
-copy credentials or try an escalated launch.
+the exact worker-profile invocation:
+
+```bash
+codex --model gpt-5.6-sol \
+  -c 'model_reasoning_effort="<resolved-thinking>"' \
+  review --help
+```
+
+`<resolved-thinking>` must be the worker's resolved `medium`, `high`, or
+`xhigh` value. A missing or unusable review command, model override, or
+reasoning override is reported as `blocked-app-capability` before editing;
+root records the evidence and does not take over the review. The bootstrap
+contains no review-owner choice or reroute field, and replay keeps only the
+same operation ID and `bootstrap_id`. Never copy credentials or try an
+escalated launch.
 
 After the required ordinary workers and worktrees exist, forward-test the
 declared distributed execution topology before combined validation. Every

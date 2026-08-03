@@ -36,8 +36,9 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `g:send` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, link it to an existing target PR when applicable, and request a current-head Codex review. |
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
+| `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 
-SE is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, and Implement orchestration as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to G:
+SE is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, Implement orchestration, and active-session auditing as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to G:
 
 | Skill | Purpose |
 | --- | --- |
@@ -46,6 +47,7 @@ SE is the repo-local project-lifecycle plugin. It keeps durable project knowledg
 | `se:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
 | `se:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
 | `se:implement` | Create one visible Sol/medium root controller and coordinate isolated workers through validation, review, and PR-ready delivery. |
+| `se:audit` | Monitor active sessions using SE skills and return a prioritized read-only report. |
 
 ## Reusable Skills
 

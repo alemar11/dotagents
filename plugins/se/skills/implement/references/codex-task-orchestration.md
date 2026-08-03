@@ -295,11 +295,18 @@ Before its worker-owned review, the worker builds the review handoff with:
 ```
 
 The worker forwards the returned `base_sha` and `head_sha` without shortening,
-expanding, or reconstructing either value to its native review invocation.
-`codex review --base <base-branch>` reviews the complete branch delta. The
-worker reruns it after every accepted fix and binds the final result to the
-current HEAD. Root only verifies the resulting evidence and never edits or
-reviews the candidate.
+expanding, or reconstructing either value to its native review invocation. It
+passes the fixed worker model and resolved thinking explicitly:
+
+```bash
+codex --model gpt-5.6-sol \
+  -c 'model_reasoning_effort="<resolved-thinking>"' \
+  review --base <base-branch>
+```
+
+The command reviews the complete branch delta. The worker reruns it after every
+accepted fix and binds the final result to the current HEAD. Root only verifies
+the resulting evidence and never edits or reviews the candidate.
 
 Before root sends a controller message to a worker, record
 `send-worker-message` in SQLite. After sending, verify

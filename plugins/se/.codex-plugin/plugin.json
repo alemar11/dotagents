@@ -1,7 +1,7 @@
 {
   "name": "se",
-  "version": "1.4.0",
-  "description": "Shape ideas into agent-ready Feature Specs, maintain durable project knowledge, and coordinate validated implementation delivery.",
+  "version": "1.5.0",
+  "description": "Shape ideas into agent-ready Feature Specs, maintain durable project knowledge, coordinate validated implementation delivery, and audit active sessions.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Maintain project knowledge, shape Features, and coordinate reviewed delivery.",
-    "longDescription": "SE bundles five project-lifecycle skills: Learn maintains durable repository knowledge and ADRs; Improve Codebase Architecture finds and pressure-tests refactors; Idea captures proposals; Feature converges Feature Specs and agent-ready implementation issues; and Implement creates one visible Sol/medium root controller for validated, reviewed delivery workers. SE owns lifecycle semantics and orchestration; G owns GitHub transport and verification.",
+    "longDescription": "SE bundles six project-lifecycle skills: Learn maintains durable repository knowledge and ADRs; Improve Codebase Architecture finds and pressure-tests refactors; Idea captures proposals; Feature converges Feature Specs and agent-ready implementation issues; Implement creates one visible Sol/medium root controller for validated, reviewed delivery workers; and Audit monitors active SE sessions read-only. SE owns lifecycle semantics and orchestration; G owns GitHub transport and verification.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -18,7 +18,8 @@
     "defaultPrompt": [
       "Use $se:learn to maintain durable project knowledge and ADRs.",
       "Use $se:improve-codebase-architecture to find and pressure-test architecture improvements.",
-      "Use $se:feature to turn an Idea into an agent-ready Feature Spec bundle."
+      "Use $se:feature to turn an Idea into an agent-ready Feature Spec bundle.",
+      "Audit active Codex tasks using SE skills and prioritize feedback, bugs, and improvements."
     ],
     "brandColor": "#2F6F8F"
   }

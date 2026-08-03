@@ -1,0 +1,8 @@
+interface:
+  display_name: "SE Session Audit"
+  short_description: "Monitor active SE sessions read-only."
+  brand_color: "#166534"
+  default_prompt: "Use $se:audit to monitor active Codex tasks using SE skills and return a prioritized read-only report of feedback, bugs, and improvements."
+
+policy:
+  allow_implicit_invocation: false

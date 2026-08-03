@@ -460,7 +460,8 @@ also requires exactly `default_branch_name`, `pr_url`, and
 `provider_observation_ref`. No other keys are accepted.
 
 `review_profile` is exactly `standard` or `high-risk`, derived by the worker
-from the accepted task risk. Both profiles invoke native `codex review`; the
+from the accepted task risk. Both profiles invoke native `codex review` with
+the fixed worker model and resolved `medium|high|xhigh` reasoning; the
 `codex_review_head_sha` must equal the final `head_sha` that the command
 reviewed. After accepted fixes, `validation_head_sha` and `review_head_sha`
 bind the final `head_sha`; `review_candidate_head_sha` remains the immutable

@@ -132,8 +132,10 @@ recorded task changes, coarse run status, and read-only final
 verification. The worker owns issue order, design, implementation and rewrites,
 repairs, tests, validation, publication, review-candidate preparation, finding
 acceptance and fixes, tracker proof, and its final delivery-ready evidence. The
-worker always runs the native `codex review` command in its managed checkout;
-root never runs review and only verifies the worker's reported review evidence.
+worker always runs the native `codex review` command in its managed checkout,
+passing its fixed model and resolved thinking value through the CLI's global
+model and `model_reasoning_effort` overrides; root never runs review and only
+verifies the worker's reported review evidence.
 
 The controller task may be bound to a local Codex multi-folder project. Codex
 uses that project's primary folder for new-task working directory, default Git
