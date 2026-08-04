@@ -27,6 +27,7 @@ inputs:
   - maintenance-evidence
   - run_mode
   - operation-evidence
+  - source-idea-lifecycle-evidence
 outputs:
   - calculated-feature-bundle
   - terminal-report
@@ -59,4 +60,6 @@ The final report must state the Feature reference, Task references, Task
 dependency edges, `allowed_paths`, overlap evidence, theoretical execution
 waves, scope-overlap gates, acceptance coverage, readiness evidence, selected
 mode, Feature and Task acceptance high-water marks, and any unvalidated
-assumptions.
+assumptions. For a new-source publication from an exact hosted Idea, also report
+the source Idea reference and verified `closed/completed` state; otherwise state
+that no source-Idea lifecycle mutation applied.

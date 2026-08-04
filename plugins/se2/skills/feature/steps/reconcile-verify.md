@@ -8,6 +8,7 @@ inputs:
   - publication-receipts
   - partial-publication-state
   - maintenance-changelog-receipts
+  - source-idea-close-receipt
 outputs:
   - verified-publication-evidence
   - retained-identities
@@ -34,3 +35,9 @@ Feature-to-Task-and-Task-criterion coverage map. Distinguish verified created,
 updated, reused, missing, and ambiguous operations. Retry only an operation
 proven absent; preserve successful effects and block when hosted evidence cannot
 establish a safe continuation.
+
+When the published new-source bundle carried one exact hosted Idea, require an
+independent readback proving that exact Idea is closed with reason `completed`
+and that the retained Feature body still identifies it as tentative source
+evidence. Do not require or perform Idea closure for preview, existing-source,
+maintenance, or source evidence without an exact hosted Idea identity.

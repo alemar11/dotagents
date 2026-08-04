@@ -343,6 +343,10 @@ An explicit Idea capture may provide the transient
 source evidence, keep source_route as new-source, preserve its open questions,
 and derive every Feature and Task planning field independently. Do not invoke
 Idea automatically or promote its fields into requirements without evidence.
+When that handoff identifies one exact hosted Idea and publish succeeds, the
+publication workflow closes only that source Idea as completed after the full
+Feature/Task bundle has authoritative readback. Preview and ambiguous source
+identity never close an Idea.
 
 ### Clarification
 
@@ -417,7 +421,9 @@ Load steps/hosted-checks.md for current hosted duplicate, relation, metadata,
 and collision evidence. Load steps/mutate.md for the normalized G-owned issue
 operations, one operation at a time. Load steps/reconcile-verify.md after every
 hosted result, including partial or ambiguous results; retry only a missing
-operation proven absent by authoritative readback.
+operation proven absent by authoritative readback. For a new-source publication
+with one exact hosted Idea, treat its close-as-completed operation as the final
+hosted effect and require independent state readback before `complete`.
 
 ### Complete
 
@@ -452,6 +458,8 @@ A complete report must contain:
 - the calculated bundle and the selected operation evidence;
 - for maintenance, the lateral changelog plan or verified Feature comment;
 - retained identities, no-op operations, or missing operations when applicable.
+- exact source-Idea lifecycle evidence when a hosted Idea was promoted, while
+  the published Feature remains open.
 
 Terminal states:
 

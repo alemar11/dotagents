@@ -44,7 +44,7 @@ its required portable marker and full SHA still passes the same final gate.
 | --- | --- | --- |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Implementation-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
-| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and branch; read back repository, base, branch, full PR HEAD, URL, body, issue linkage, and draft state. |
+| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and branch and Task-only `closing_issue_refs`; read back repository, base, branch, full PR HEAD, URL, canonical closing lines, `closingIssuesReferences`, and draft state. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | CI, review, mergeability, and review-thread observation | G-owned hosted read/review workflows | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
@@ -72,12 +72,34 @@ run a new review cycle in the same worker session against the new exact SHA.
 ## PR publication
 
 Publish only after native review is clean and the exact publication scope is
-resolved from the explicit Implement request. Apply the shared hosted-content
-safety gate to the exact final PR title and body immediately before publication.
-Use the G-owned single-PR publication workflow to push the committed candidate
-and create or reuse a draft PR. Independently read back repository, base,
-branch, full PR HEAD, URL, body, issue linkage, and draft state. The PR HEAD must
-equal the reviewed candidate HEAD.
+resolved from the explicit Implement request.
+
+Before constructing the PR body, derive one exact `closing_issue_refs` set from
+the authoritative assignment and current candidate evidence:
+
+- include every Task issue mapped to this PR whose complete accepted scope and
+  current `T-AC-NN` set are satisfied by the candidate;
+- exclude every Feature and Idea issue even when all of its Tasks are complete;
+  Implement delivery intentionally leaves the owning Feature open;
+- reject a missing, extra, duplicate, partially satisfied, or repository-
+  ambiguous Task ref instead of silently publishing without closure linkage;
+- never treat a narrative `Task #N`, `Feature #N`, `Related to`, or
+  `## References` entry as a substitute for a closing keyword.
+
+Pass the verified nonempty set unchanged to the G-owned single-PR publication
+workflow. G renders one canonical `Closes` line per Task under `## Issues` and
+requires a default-branch PR for effective GitHub auto-closure. A stacked child
+whose current base is not the default branch must retain its exact pending Task
+closure set and stop on the G issue-linkage gate; never drop the refs merely to
+publish or claim `stack-ready`.
+
+Apply the shared hosted-content safety gate to the exact final PR title and body
+immediately before publication. Use the G-owned single-PR publication workflow
+to push the committed candidate and create or reuse a draft PR. Independently
+read back repository, base, branch, full PR HEAD, URL, body, draft state, and
+GitHub `closingIssuesReferences`. Require the read-back closing issue set to
+equal `closing_issue_refs` exactly and require every canonical Task `Closes`
+line exactly once. The PR HEAD must equal the reviewed candidate HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
 PR base. Require the G-owned workflow to identify exactly one open parent PR in
@@ -162,6 +184,9 @@ The orchestrator performs read-only final verification. Require:
   evidence bound to the exact current candidate HEAD;
 - current-head validation and native review evidence;
 - PR publication readback and exact PR HEAD equality;
+- exact Task-only `closing_issue_refs`, one canonical `Closes` line per Task,
+  and an equal GitHub `closingIssuesReferences` set, with no Feature or Idea
+  issue present;
 - `standalone` default-base evidence, or stacked parent identity, unchanged
   parent HEAD, exact child base, stack order, and verified link receipt;
 - ready-transition receipt plus a clean current-head automatic-review

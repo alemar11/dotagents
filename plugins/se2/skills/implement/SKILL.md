@@ -22,11 +22,14 @@ smallest recovery instead of inventing or normalizing IDs inside Implement.
 The expected terminal output is one verified pull-request delivery topology.
 Return a complete mapping from each selected Feature and Task set to its
 repositories, branches, exact HEADs, PR references, and standalone or stacked
-relationships and acceptance-evidence matrices. `complete` means every Task and
-Feature criterion is verified against the current candidate HEAD vector and
-every selected Feature has a verified `standalone-ready` or `stack-ready` PR
-output; this skill never merges, deploys, releases, or performs post-merge
-closure.
+relationships, acceptance-evidence matrices, and exact Task-only
+`closing_issue_refs`. `complete` means every Task and Feature criterion is
+verified against the current candidate HEAD vector, every selected Feature has
+a verified `standalone-ready` or `stack-ready` PR output, and each PR's GitHub
+closing references equal its fully satisfied Task issue set while excluding
+Feature and Idea issues. This skill never merges, deploys, releases, or performs
+post-merge closure; GitHub closes the linked Tasks when an eligible PR merges,
+while the Feature remains open.
 
 Implement has no local-only or preview execution mode. GitHub interaction is
 mandatory: the run reads authoritative Feature and Task contracts, uses hosted
@@ -394,6 +397,8 @@ Return one aggregate report with:
   row per `F-AC-NN`, each with status, evidence references, and exact candidate
   SHA or candidate-SHA vector;
 - candidate, review, publication, CI, stack, and final exact-HEAD evidence;
+- exact Task-only `closing_issue_refs` and verified PR-body/GitHub closing
+  references for every delivery;
 - one output row per PR with Feature refs, repository, delivery mode, parent PR
   when present, base, branch, full HEAD, PR URL, stack order and receipt when
   present, and `standalone-ready` or `stack-ready` readiness state;

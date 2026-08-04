@@ -11,6 +11,7 @@ outputs:
   - publication-receipts
   - partial-publication-state
   - maintenance-changelog-receipts
+  - source-idea-close-receipt
 transitions:
   - to: reconcile-verify
     when: hosted-operation-returned-or-may-have-returned
@@ -35,3 +36,13 @@ are resolved, create or update the Feature body with the complete acceptance
 criteria, monotonic Feature and Task high-water marks, and authoritative
 Feature-to-Task-and-Task-criterion coverage map. Verify operations one at a time
 through the next reconciliation node.
+
+For a new-source publication with one exact hosted `idea-source`, close that
+Idea as `completed` only after authoritative readback has confirmed the Feature,
+every Task, every attachment and dependency, metadata, and the final Feature
+body. Route the exact close through the G-owned issue workflow. Never close the
+Idea during preview, before the durable Feature bundle exists, from a tentative
+title or narrative mention, or when any preceding publication result is
+missing, stale, partial, or ambiguous. A failed or ambiguous close preserves the
+published Feature bundle but blocks completion until the exact Idea state is
+reconciled; never repeat the close blindly.

@@ -11,6 +11,7 @@ inputs:
 outputs:
   - normalized-feature-publication
   - publication-order
+  - source-idea-close-operation
 transitions:
   - to: preflight
     when: publication-operation-is-normalized
@@ -26,5 +27,10 @@ terminal_states: []
 Use the frozen bundle as the only publication input. This is the default
 terminal operation unless the invocation explicitly requests preview. Normalize
 one exact Feature/Task issue operation at a time and preserve the implicit
-mutation scope derived from the explicit request. Do not read or mutate hosted state from this node;
-`preflight` owns the dependency gate and the first hosted access.
+mutation scope derived from the explicit request. When the new-source route
+contains one exact hosted `idea-source`, normalize closing that source Idea as
+the final publication operation after the Feature and every Task are published
+and verified. Omit the close operation for preview, existing-source,
+maintenance, local/non-hosted source evidence, or an ambiguous Idea identity.
+Do not read or mutate hosted state from this node; `preflight` owns the
+dependency gate and the first hosted access.
