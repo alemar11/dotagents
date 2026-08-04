@@ -16,6 +16,12 @@ vector and prove every member is an ancestor of the candidate. The candidate's
 integration base and intended PR base must preserve that ancestry; a
 prerequisite PR being ready is not sufficient proof.
 
+Freeze one transient delivery record before review. A standalone candidate uses
+the verified default branch. A stacked candidate names exactly one immediate
+parent assignment and PR, the parent head branch, the exact parent candidate
+SHA used as `base_sha`, and its bottom-to-top position. Do not infer a parent
+from branch naming, issue order, display metadata, or operational serialization.
+
 ## Native review loop
 
 Before review, independently verify worker/worktree identity, candidate
@@ -38,15 +44,44 @@ candidate and create or reuse a draft PR. Independently read back repository,
 base, branch, full PR HEAD, URL, body, issue linkage, and draft state. The PR
 HEAD must equal the reviewed candidate HEAD.
 
+For a stacked candidate, supply the verified parent head branch as the explicit
+PR base. Require the G-owned workflow to identify exactly one open parent PR in
+the same repository, publish only the current worker branch, and link the
+parent/current pair in bottom-to-top order after the child PR is read back.
+Preserve the returned parent identity and `stack_link_receipt`. Do not use a
+stack-wide submit, push, sync, rebase, or merge operation from normal
+publication, and never install a missing stack dependency implicitly.
+
 When validation, body, and required CI are stable, mark the PR ready through
 the G-owned workflow and independently observe the transition. A draft review
 is consultative and never satisfies the ready cycle.
+
+## Stack reconciliation
+
+After a stacked publication, the orchestrator independently verifies the exact
+repository, parent and child PR identities, unchanged draft states, child base,
+both full heads, immediate parent relationship, stack order, and link receipt.
+The child base must equal the parent head branch, the live parent head must equal
+the frozen `base_sha`, and the child head must equal the reviewed candidate.
+
+Treat a confirmed child PR and an unverified stack link as separate effects.
+Preserve successful publication evidence, record an ambiguous link as unknown,
+and reconcile authoritative provider state before any repair. Never recreate or
+repush the child merely because stack readback failed. A proven stale base or
+parent HEAD returns the same child worker to implementation; an unreconciled
+link blocks only that assignment while independent work continues.
 
 ## Hosted review monitoring
 
 Monitor the ready-triggered provider review, CI, mergeability, and review
 threads for the current full PR HEAD. Pending, timed-out, stale, ambiguous, or
 draft-only review evidence is not terminal.
+
+For a stacked child, also monitor the immediate parent PR and base relationship.
+Any parent HEAD or readiness change invalidates the child's ancestry, review,
+CI, and readiness evidence even when the child head itself did not move. Wait
+for the parent to pass final verification, then require the child worker to
+rebase onto the new parent HEAD and repeat its complete candidate cycle.
 
 If hosted review produces an actionable finding, return evidence to the same
 implementation worker. The worker fixes, validates, commits, and publishes the
@@ -63,9 +98,16 @@ The orchestrator performs read-only final verification. Require:
 - clean implementation worktree and exact current HEAD;
 - current-head validation and native review evidence;
 - PR publication readback and exact PR HEAD equality;
+- `standalone` default-base evidence, or stacked parent identity, unchanged
+  parent HEAD, exact child base, stack order, and verified link receipt;
 - ready-transition and current-head hosted review evidence;
 - required CI, mergeability, and zero unresolved actionable review threads.
 
 Return repairable evidence mismatches to the worker without diagnosis. The
 worker owns repair and replacement evidence. Final verification never edits
 code, reruns review, mutates issues, or merges.
+
+Report a standalone PR as `standalone-ready`. Report a child as `stack-ready`
+only when every lower parent in the selected chain is current and
+delivery-ready, while recognizing that the child is not independently
+mergeable ahead of those parents.

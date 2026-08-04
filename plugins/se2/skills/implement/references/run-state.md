@@ -128,12 +128,28 @@ or `blocked` evidence. Every result requires authoritative readback;
 `unknown` may be refined to one definitive result after reconciliation, while
 a definitive result is immutable.
 
+Delivery topology does not add a table or assignment field. Reconstruct it from
+the authoritative Task dependency graph, assignment `base_branch`, `base_sha`,
+`head_branch`, `candidate_sha`, live PR state, and operation evidence. Before a
+stacked child publication, reserve the normal publication effect and a separate
+child-bound operation with `action=stack-link`. Use a stable subject derived
+from repository identity, verified parent PR, child branch, and candidate SHA
+so the reservation exists before the G-owned workflow attempts the link.
+
+After the worker returns, finish the publication and stack-link operations
+independently. Store the G receipt by reference and require an authoritative
+parent/child readback reference. A confirmed PR with an ambiguous link records
+publication as `applied` and stack-link as `unknown`; it never replays PR
+creation or linking without reconciliation. This usage requires no schema,
+runtime-contract, envelope, or CLI-version change.
+
 ## Recovery boundary
 
 On resume, read the last ledger checkpoint, then independently observe current
 application tasks, worktrees, repositories, Feature/Task issues, PRs, and
-reviews. Reconcile differences before another side effect. Ledger text never
-proves external state.
+reviews. For stacked assignments, also re-read parent/child bases, full heads,
+stack order, and link state. Reconcile differences before another side effect.
+Ledger text never proves external state.
 
 A ledger failure blocks only a new side effect or recovery step that requires
 durable idempotency. It does not prevent ordinary live dialogue or read-only

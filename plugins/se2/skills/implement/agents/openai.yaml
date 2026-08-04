@@ -1,7 +1,7 @@
 interface:
   display_name: "Implement Features"
-  short_description: "Turn GitHub Features into independently verified PRs."
+  short_description: "Deliver verified standalone or stacked Feature PRs."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:implement only for an explicit request to implement or resume one or more complete authoritative GitHub Features. Traverse the Implement graph, verify the Sol orchestrator and adaptive Sol workers, keep each implementation isolated, require exact-HEAD in-session review, use Contract Repair for defective Feature specifications, checkpoint only durable boundaries, and return one or more independently verified PR outputs or a fail-closed blocker."
+  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Features. Traverse the Implement graph, derive standalone or stacked delivery separately from execution order, gate stacked children on a current green parent, keep workers isolated, require exact-HEAD review, reconcile parent and stack drift, use Contract Repair for defective specifications, and return verified PR topology or a fail-closed blocker."
 policy:
   allow_implicit_invocation: false

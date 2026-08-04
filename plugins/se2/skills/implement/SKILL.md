@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Execute one or more authoritative GitHub SE2 Features through a graph-first multi-Feature orchestrator, isolated implementation workers with exact-HEAD in-session review, Contract Repair, and one or more PR-ready outputs; use only for explicit implementation or resume requests."
+description: "Execute one or more authoritative GitHub SE2 Features through a graph-first multi-Feature orchestrator, isolated implementation workers, exact-HEAD review, verified standalone or stacked PR delivery, and Contract Repair; use only for explicit implementation or resume requests."
 ---
 
 # Implement Graph
@@ -14,11 +14,12 @@ repository identities, acceptance criteria, validation policy, and readiness
 evidence. Do not start from an isolated Task, local draft, Idea, or unbounded
 implementation request.
 
-The expected terminal output is one or more independently verified pull
-requests. Return a complete mapping from each selected Feature and Task set to
-its repositories, branches, exact HEADs, and PR references. `complete` means
-every selected Feature has its required PR output ready for merge; this skill
-never merges, deploys, releases, or performs post-merge closure.
+The expected terminal output is one verified pull-request delivery topology.
+Return a complete mapping from each selected Feature and Task set to its
+repositories, branches, exact HEADs, PR references, and standalone or stacked
+relationships. `complete` means every selected Feature has a verified
+`standalone-ready` or `stack-ready` PR output; this skill never merges, deploys,
+releases, or performs post-merge closure.
 
 ## Shared contracts and dependencies
 
@@ -43,7 +44,8 @@ Before creating, resuming, or monitoring application tasks, load:
   metadata, update relay, reconciliation, and terminal reports.
 
 Load [orchestration.md](references/orchestration.md) when scheduling workers,
-handling worker dialogue, or repairing a Feature contract. Load
+deriving delivery topology, handling worker dialogue, or repairing a Feature
+contract. Load
 [review-delivery.md](references/review-delivery.md) when a candidate HEAD is
 ready for review or publication. Load [run-state.md](references/run-state.md)
 before preparing, resuming, checkpointing, or resetting the ledger.
@@ -56,7 +58,8 @@ before preparing, resuming, checkpointing, or resetting the ledger.
 | source-preflight | validation | complete Feature and Task bundles are readable | runtime-preflight, blocked | hosted | none |
 | runtime-preflight | validation | authoritative bundles and target repositories are known | prepare-run, blocked | read | none |
 | prepare-run | action | every required role and destination passed preflight | schedule, blocked | durable | none |
-| schedule | decision | run is ready for another wave or aggregate terminal reconciliation | worker-bootstrap, release-claims, deferred, blocked | none | none |
+| schedule | decision | run is ready for another wave or aggregate terminal reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |
+| delivery-gate | decision | one or more unfinished assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
 | implement-validate | action | worker identity and implementation worktree are verified | candidate, contract-conflict, assignment-blocked, blocked | durable, hosted | none |
 | contract-conflict | action | worker reports an evidence-backed stable contract conflict | repair-authority, assignment-blocked, blocked | durable | none |
@@ -66,9 +69,10 @@ before preparing, resuming, checkpointing, or resetting the ledger.
 | candidate | validation | worker reports committed, validated candidate HEAD | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
-| publish-pr | action | native review is clean and GitHub mutation is authorized | ready-monitor, assignment-blocked, blocked | hosted, durable | none |
-| ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, final-verify, assignment-blocked, blocked | hosted, durable | none |
-| final-verify | validation | current PR, CI, review, task, checkout, and HEAD evidence are available | schedule, assignment-blocked, blocked | read, durable | none |
+| publish-pr | action | native review is clean and GitHub mutation is authorized | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
+| stack-reconcile | validation | a stacked PR was published or its parent, base, link, or exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
+| ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
+| final-verify | validation | current PR, topology, CI, review, task, checkout, and HEAD evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read, durable | none |
 | assignment-blocked | action | one assignment cannot progress but independent work may remain | schedule | durable | none |
 | assignment-deferred | action | one assignment awaits bounded user authorization | schedule | durable | none |
 | release-claims | action | every selected Feature is delivery-ready and no assignment remains active | complete, blocked | durable | none |
@@ -84,11 +88,13 @@ flowchart TD
         runtime-preflight
         prepare-run
         schedule
+        delivery-gate
         worker-bootstrap
         contract-conflict
         repair-authority
         repair-task
         repair-readback
+        stack-reconcile
         final-verify
         assignment-blocked
         assignment-deferred
@@ -113,10 +119,14 @@ flowchart TD
     runtime-preflight --> blocked
     prepare-run --> schedule
     prepare-run --> blocked
-    schedule --> worker-bootstrap
+    schedule --> delivery-gate
     schedule --> release-claims
     schedule --> deferred
     schedule --> blocked
+    delivery-gate --> worker-bootstrap
+    delivery-gate --> schedule
+    delivery-gate --> assignment-blocked
+    delivery-gate --> blocked
     worker-bootstrap --> implement-validate
     worker-bootstrap --> assignment-blocked
     worker-bootstrap --> blocked
@@ -147,14 +157,21 @@ flowchart TD
     review-decision --> publish-pr
     review-decision --> assignment-blocked
     review-decision --> blocked
-    publish-pr --> ready-monitor
+    publish-pr -->|standalone| ready-monitor
+    publish-pr -->|stacked| stack-reconcile
     publish-pr --> assignment-blocked
     publish-pr --> blocked
+    stack-reconcile --> ready-monitor
+    stack-reconcile --> implement-validate
+    stack-reconcile --> assignment-blocked
+    stack-reconcile --> blocked
     ready-monitor --> implement-validate
+    ready-monitor --> stack-reconcile
     ready-monitor --> final-verify
     ready-monitor --> assignment-blocked
     ready-monitor --> blocked
     final-verify --> schedule
+    final-verify --> stack-reconcile
     final-verify --> assignment-blocked
     final-verify --> blocked
     assignment-blocked --> schedule
@@ -174,6 +191,12 @@ Features. `schedule` enters terminal `deferred` only when all remaining work is
 waiting for user authority, and terminal `blocked` only for an aggregate or
 unrecoverable prerequisite that prevents every remaining path.
 
+`delivery-gate` derives one transient delivery mode for each candidate
+assignment without changing its Task dependency graph. `stack-reconcile` is an
+orchestrator validation node, not another application task or implementation
+role. It verifies the stacked relationship created by the G-owned publication
+workflow and routes stale descendant evidence back to the owning worker.
+
 ## Orchestrator boundary
 
 The Sol/medium orchestrator is control plane only. It may coordinate multiple
@@ -184,9 +207,22 @@ code, choose implementation or review fixes, judge findings, rewrite Feature
 contracts, or mirror routine worker dialogue into the ledger.
 
 Derive execution waves from each Feature Task DAG, repository and path overlap,
-and verified runtime capacity. Do not add a numeric worker cap or invent
-cross-Feature dependencies. A blocked or deferred assignment does not stop
-independent Features; shared prerequisites remain binding.
+and verified runtime capacity. Derive delivery topology separately. Operational
+serialization, path overlap, and runtime capacity never create a PR stack. A
+single same-repository prerequisite may produce a stacked child only when the
+parent assignment passed `final-verify`, its current PR HEAD equals its reviewed
+candidate, and the child will use that exact branch and HEAD as its integration
+base. Parallel, unrelated, and cross-repository assignments remain standalone.
+Do not add a numeric worker cap or invent cross-Feature dependencies. A blocked
+or deferred assignment does not stop independent Features; shared prerequisites
+remain binding.
+
+Before bootstrapping a stacked child, verify the parent is still
+`delivery-ready`, its required CI and reviews remain clean, its exact HEAD is
+unchanged, and the required G publication and official stack capability are
+available. A pending, failing, stale, or ambiguous parent keeps the child out of
+the runnable wave. Never install a missing stack dependency or silently publish
+the child as standalone.
 
 Before scheduling, atomically claim the complete sorted input Feature set in
 the ledger. An active claim held by another run blocks startup for that Feature
@@ -207,6 +243,13 @@ the candidate is committed and the same worktree is clean at its exact HEAD.
 Any HEAD change invalidates the prior review and requires a new in-session
 review cycle. The orchestrator receives review evidence but never performs or
 judges the review.
+
+A stacked child worker starts from the verified parent candidate SHA in its own
+isolated worktree. If the parent later changes, the orchestrator invalidates the
+descendant base, review, CI, and readiness evidence. After the parent passes
+`final-verify` again, each descendant worker rebases its own branch in
+bottom-to-top order, then repeats validation, review, publication, and hosted
+monitoring. The orchestrator never edits or rebases worker code itself.
 
 ## Contract Repair boundary
 
@@ -246,8 +289,8 @@ GitHub Feature may belong to only one active Implement run at a time, while one
 run may claim multiple Features atomically.
 
 Write ledger checkpoints only at durable boundaries: run start, assignment and
-task binding, candidate HEAD, review cycle, PR publication, Contract Repair,
-reconciliation, and terminal verification. Do not store prompts, message
+task binding, candidate HEAD, review cycle, PR publication, stack-link
+reconciliation, Contract Repair, and terminal verification. Do not store prompts, message
 bodies, model/reasoning profiles, Feature or Task bodies, findings, validation
 logs, or routine worker technical state. A ledger failure blocks only a new
 side effect or recovery step that requires durable idempotency; it does not
@@ -261,9 +304,10 @@ Return one aggregate report with:
 - every implementation worker identity and verified destination;
 - execution-wave and blocked/deferred evidence;
 - Contract Repair generations and authorization outcomes;
-- candidate, review, publication, CI, and final exact-HEAD evidence;
-- one output row per PR with Feature refs, repository, base, branch, full HEAD,
-  PR URL, and readiness state;
+- candidate, review, publication, CI, stack, and final exact-HEAD evidence;
+- one output row per PR with Feature refs, repository, delivery mode, parent PR
+  when present, base, branch, full HEAD, PR URL, stack order and receipt when
+  present, and `standalone-ready` or `stack-ready` readiness state;
 - aggregate `outcome: complete`, `deferred`, or `blocked`.
 
 Never claim completion while any selected Feature lacks its required verified

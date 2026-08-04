@@ -35,9 +35,12 @@ Its skills are deliberately separated by responsibility:
 - task-handoff.md applies the established `se:implement` emoji-title grammar
   to planner, orchestrator, and worker tasks; titles remain display metadata.
 - skills/implement/ accepts one or more complete authoritative GitHub Features
-  and aims to return one or more independently verified PRs. Its graph owns
-  multi-Feature scheduling, isolated Sol workers with exact-HEAD in-session review,
-  Contract Repair through Feature maintenance, and final exact-HEAD evidence.
+  and returns a verified standalone or stacked PR topology. Its graph owns
+  multi-Feature scheduling, a separate delivery projection, isolated Sol
+  workers with exact-HEAD in-session review, Contract Repair through Feature
+  maintenance, stack reconciliation, and final exact-HEAD evidence. A stack
+  represents a true same-repository code dependency, never serialization alone;
+  G owns PR publication and pairwise stack linking.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.

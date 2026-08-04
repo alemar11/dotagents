@@ -35,8 +35,9 @@ do not silently merge its graph contract into the existing SE plugin.
   node namespace.
 - skills/implement/SKILL.md owns the GitHub-Feature-to-PR workflow registry and
   Mermaid projection. Its references own multi-Feature orchestration,
-  orchestrator/worker profiles, Contract Repair, worker-session review and delivery,
-  and the SQLite WAL run-state contract.
+  execution and delivery topology, orchestrator/worker profiles, Contract
+  Repair, worker-session review, standalone and stacked delivery, stack
+  reconciliation, and the SQLite WAL run-state contract.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
@@ -56,9 +57,16 @@ do not silently merge its graph contract into the existing SE plugin.
 
 - Keep Feature planning free of implementation authority. Implement accepts
   one or more complete authoritative GitHub Features, never an isolated Task
-  or local draft, and aims to return one or more independently verified PRs.
+  or local draft, and returns a verified standalone or stacked PR topology.
   Contract Repair must re-enter Feature maintenance instead of silently
   rewriting the Feature graph or inheriting its planner profile.
+- Keep Implement execution waves separate from PR delivery topology.
+  Serialization, capacity, and path overlap do not create a stack. Stack only a
+  true same-repository code dependency from one green exact-HEAD parent; keep
+  parallel, unrelated, cross-repository, and multi-parent work standalone or
+  blocked until it has one valid integration base. G owns publication and
+  pairwise stack linking. Parent drift invalidates descendant evidence, and
+  each worker owns its own bottom-to-top rebase and review cycle.
 - Keep the Implement ledger a minimal recovery index, not a second workflow
   engine. Preserve five tables, including exclusive active Feature claims,
   SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
@@ -98,7 +106,8 @@ do not silently merge its graph contract into the existing SE plugin.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Implement registry/projection reconciliation, registered transition
-  targets, terminal reachability, and terminal nodes without outgoing edges.
+  targets, terminal reachability, terminal nodes without outgoing edges, and
+  the delivery-gate and stack-reconcile paths.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, the intentional refresh loop, terminal
   reachability, evidence classifications, and prohibited mutation behavior.

@@ -27,6 +27,36 @@ safe. Serialize real dependencies and unsafe overlap. Do not create synthetic
 dependencies, impose a fixed worker cap, or stop independent Features because
 one assignment is blocked or deferred.
 
+## Execution and delivery topology
+
+Keep scheduling and PR delivery as separate projections of the authoritative
+Task DAG. For every assignment considered by `delivery-gate`, derive exactly one
+transient mode:
+
+- `standalone`: no concrete same-repository parent branch is required; publish
+  against the verified repository default branch;
+- `stacked`: exactly one same-repository prerequisite is the intended immediate
+  parent, and the child will use that parent's verified branch and exact HEAD as
+  its integration base.
+
+Serial execution caused only by path overlap, capacity, or a preferred working
+order remains standalone. Parallel assignments and cross-repository
+prerequisites never form one stack. A fan-in cannot be represented as multiple
+stack parents: require one worker-owned integration candidate containing the
+complete prerequisite HEAD vector, or wait for an authoritative merged base.
+
+A stacked child is dependency-ready only after the immediate parent assignment
+is `delivery-ready` at `final-verify`, the live parent PR is open and ready, its
+required CI and reviews are clean, and its full head still equals the reviewed
+candidate SHA. Verify the G-owned single-PR publication workflow and official
+stack capability before creating the child worker. Missing, failing, stale, or
+ambiguous evidence keeps only that child out of the runnable wave; continue
+independent assignments and never degrade to a standalone PR.
+
+Returning from `delivery-gate` to `schedule` yields control until fresh parent
+or capacity evidence exists; it is not a polling loop and does not create an
+application task for a waiting child.
+
 An assignment-local block or authorization wait returns to scheduling after a
 durable checkpoint. Terminal `deferred` applies only when every remaining path
 waits for user authority; terminal `blocked` applies only when an aggregate or
@@ -42,6 +72,30 @@ relationships must preserve the same ancestry. If no authoritative merged,
 stacked, or worker-composed integration base contains the complete vector, the
 dependent assignment remains blocked; PR readiness alone is never dependency
 completion.
+
+For a stacked assignment, also pass the exact parent assignment, PR, branch,
+candidate SHA, and verified stack order. The worker creates its isolated
+worktree from that SHA and publishes against the parent branch through the
+G-owned single-PR workflow. That workflow may create the child PR and link the
+verified parent/current pair; neither the worker nor orchestrator uses
+stack-wide submit as a shortcut.
+
+## Parent drift and descendant recovery
+
+Re-read every parent PR immediately before child bootstrap, publication, stack
+reconciliation, and final verification. If a parent branch, full HEAD,
+readiness, or stack relationship changes after a child starts, invalidate every
+affected descendant's integration-base, review, CI, and delivery-ready
+evidence. Do not treat a green child check against the old base as current.
+
+First return the changed parent to its owning worker and require it to pass
+`final-verify` at the new exact HEAD. Then resume descendant workers in
+bottom-to-top order. Each worker rebases and validates only its own branch,
+runs a new exact-HEAD review, republishes through G, and returns fresh link and
+hosted-review evidence. The orchestrator coordinates this sequence and records
+reconciliation but never runs a stack-wide rebase, edits code, or resolves
+conflicts. An ambiguous link result preserves the confirmed PR publication,
+records the link effect as unknown, and blocks blind retry.
 
 The orchestrator may exchange these messages with workers:
 
@@ -116,5 +170,6 @@ Feature is delivery-ready and terminal reconciliation has released every claim
 owned by the run. Preserve claims for resumable blocked or deferred runs and
 preserve one aggregate vector:
 
-`feature_ref, task_refs, repository_identity, base_branch, head_branch,
-head_sha, pr_url, readiness_state`.
+`feature_ref, task_refs, repository_identity, delivery_mode, parent_pr,
+base_branch, base_sha, head_branch, head_sha, pr_url, stack_order,
+stack_link_status, readiness_state`.
