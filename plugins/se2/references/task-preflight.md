@@ -19,6 +19,7 @@ The contract owns the common gates for task creation and observation:
 - explicit invocation;
 - live application capabilities;
 - independent identity, project, host, and state observation;
+- deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
 - repository and project destination verification;
 - recovery after an ambiguous effect.
@@ -62,6 +63,14 @@ supported by the live runtime, the preflight result is `blocked` with
 `blocker: unsupported-runtime`. There is no automatic model, reasoning, worker,
 or topology fallback.
 
+For every role whose profile declares a deterministic display title, also
+inspect the live capability to request that title, observe it independently,
+correct it after the stable task identity is known, and preserve enough
+attempt evidence to prevent replay after recovery. Record unavailable title
+initialization, correction, or recovery evidence as a display-metadata
+limitation. It does not block an otherwise verifiable task topology, but it
+must not be omitted from the preflight or later reported as verified.
+
 ### 3. Verifiable destination
 
 Resolve one exact destination for every task before creation. Independently
@@ -94,13 +103,23 @@ Record these decisions independently:
 
 - `task_creation_authorization`: permission to create or resume the task in
   the application;
+- `title_adjustment_authorization`: permission to correct the same declared
+  deterministic title at most once after the stable task identity is observed;
 - `github_mutation_authorization`: permission for the exact requested GitHub
   issue, branch, pull-request, review, relation, label, or comment mutation.
 
-One authorization never implies the other. A granted task permission does not
-authorize GitHub mutation. A granted GitHub publication permission does not
-authorize creating or monitoring an application task. If the invoking skill
-needs both, it must obtain and verify both explicitly.
+Task creation and GitHub authorization never imply each other. A granted task
+permission does not authorize GitHub mutation, and a granted GitHub publication
+permission does not authorize creating or monitoring an application task. If
+the invoking skill needs both, it must obtain and verify both explicitly. Keep
+the bounded title-adjustment authority separately visible as described below.
+
+When an explicit invocation authorizes creation of a task whose skill-owned
+profile declares a canonical title, the bounded correction of that same title
+is part of the requested task initialization unless the user explicitly
+forbids renaming. Record that authority separately because correction is a
+distinct application effect. It never authorizes arbitrary or later lifecycle
+renames.
 
 ### 6. Reconciliation before retry
 
@@ -137,6 +156,8 @@ preflight:
     monitor_task: available
     relay_partial_updates: available
     relay_final_update: available
+    request_display_title: available
+    adjust_display_title: available
   target:
     repository_identity: "<independently observed repository>"
     project_identity: "<independently observed project>"
@@ -145,6 +166,7 @@ preflight:
     independently_verified: true
   authorization:
     task_creation: granted
+    title_adjustment: granted-for-declared-title
     github_mutation: not-requested
   outcome: ready
 ```
@@ -161,3 +183,12 @@ or monitoring/relay path is unavailable, the outcome is `blocked`. The skill
 must return the smallest recovery input and stop before the affected task
 effect. It must not claim that a task exists, is being monitored, or completed
 until the required live evidence is available.
+
+A missing title-request or title-adjustment capability alone is not a topology
+blocker because a title is display metadata. Continue only after recording the
+limitation for the handoff's mandatory title-reconciliation outcome; never
+convert missing title evidence into successful verification.
+
+Lost or ambiguous title-attempt evidence also never blocks otherwise valid
+task work, but it forbids another adjustment. Read the current title,
+preserve the stable task identity, and report the resulting title warning.

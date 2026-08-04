@@ -128,6 +128,18 @@ or `blocked` evidence. Every result requires authoritative readback;
 `unknown` may be refined to one definitive result after reconciliation, while
 a definitive result is immutable.
 
+Treat a bounded application-task title adjustment as an application side
+effect. Before applying it, reserve an operation with
+`action=task-title-adjust` and a stable subject derived from the exact task
+identity alone. Retain the exact requested title in the operation's referenced
+effect evidence. Bind worker and Contract Repair planner reservations to their
+assignment; the orchestrator owns every reservation and readback. Finish the
+operation from the adjustment evidence and authoritative title observation.
+On resume, reconcile a pending or `unknown` reservation and never begin a
+second adjustment for that subject, even when Contract Repair changes the task
+outcome or canonical title. This usage reuses the existing operations contract
+and requires no schema, runtime-contract, envelope, or CLI-version change.
+
 Delivery topology does not add a table or assignment field. Reconstruct it from
 the authoritative Task dependency graph, assignment `base_branch`, `base_sha`,
 `head_branch`, `candidate_sha`, live PR state, and operation evidence. Before a
@@ -150,6 +162,11 @@ application tasks, worktrees, repositories, Feature/Task issues, PRs, and
 reviews. For stacked assignments, also re-read parent/child bases, full heads,
 stack order, and link state. Reconcile differences before another side effect.
 Ledger text never proves external state.
+
+For title recovery, the current display title can verify a match but cannot
+prove whether a missing or different title was never adjusted. When the
+operation reservation or retained attempt evidence is missing or ambiguous,
+do not adjust again; preserve the task and report the shared title warning.
 
 A ledger failure blocks only a new side effect or recovery step that requires
 durable idempotency. It does not prevent ordinary live dialogue or read-only

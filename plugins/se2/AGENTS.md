@@ -10,10 +10,11 @@ do not silently merge its graph contract into the existing SE plugin.
 - .codex-plugin/plugin.json owns SE2 identity, version, discovery metadata,
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability,
-  destination, observation, authorization, update-relay, and recovery gates.
+  destination, observation, authorization, display-title capability,
+  update-relay, and recovery gates.
 - references/task-handoff.md owns the shared task assignment, observation,
-  partial/final relay, deterministic emoji title grammar, reconciliation, and
-  terminal-report evidence.
+  partial/final relay, deterministic emoji title grammar, bounded title
+  reconciliation, and terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea marker and hosted
   shape for SE2 Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -75,6 +76,11 @@ do not silently merge its graph contract into the existing SE plugin.
 - Keep Task dependency edges executable: a downstream candidate must contain
   every exact prerequisite HEAD through verified merged, stacked, or
   worker-composed ancestry. PR readiness alone never satisfies a dependency.
+- Keep deterministic task-title initialization shared by every task-managed
+  SE2 skill. After stable identity readback, require one bounded reconciliation
+  outcome before monitoring: exact verification or an explicit
+  `title-unverified`/`title-drift` warning. Never use a title as identity,
+  repeat an adjustment, or create a replacement task for title failure.
 - Keep Idea capture independent from Feature/Task and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -108,6 +114,9 @@ do not silently merge its graph contract into the existing SE plugin.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery-gate and stack-reconcile paths.
+- Validate that Feature and Implement both route every created task through the
+  shared title-reconciliation outcome before normal monitoring or update relay,
+  and that resume paths cannot repeat an uncertain adjustment.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, the intentional refresh loop, terminal
   reachability, evidence classifications, and prohibited mutation behavior.

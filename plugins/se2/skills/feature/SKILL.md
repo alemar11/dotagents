@@ -48,9 +48,13 @@ before creating, resuming, or monitoring the planner task, then use
 [task-handoff.md](../../references/task-handoff.md) for assignment and relay
 evidence.
 
-The profile's canonical emoji title is requested and read back as best-effort
-display metadata for the planner task; title uncertainty never changes the
-Feature graph or authorizes a duplicate task.
+Complete the shared title-reconciliation subprotocol for the profile's
+canonical emoji title before monitoring or relaying planner updates. A title
+warning never changes the Feature graph, blocks otherwise valid planning, or
+authorizes a duplicate task, but it must be reported rather than skipped.
+Feature keeps no persistent title ledger: after a resume without retained
+evidence proving that adjustment was never attempted, observe the title but do
+not adjust it again; report the shared warning outcome when it does not match.
 
 The planner must use the invoking session's exact saved local project and
 local environment. `se2:feature` is planning-only, so its planner task must

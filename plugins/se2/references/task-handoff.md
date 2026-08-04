@@ -10,6 +10,7 @@ authorization decisions.
 
 - [Handoff boundary](#handoff-boundary)
 - [Canonical title metadata](#canonical-title-metadata)
+- [Title reconciliation](#title-reconciliation)
 - [Observation record](#observation-record)
 - [Update relay](#update-relay)
 - [Failure and recovery evidence](#failure-and-recovery-evidence)
@@ -59,12 +60,61 @@ orchestrator, and every Implement worker:
   authorization, state, claim, branch, or recovery evidence.
 
 Request the canonical title during task creation when the live capability is
-available, then independently read it back. If initialization is unavailable
-or the observed title is missing or different, use a separately authorized
-title adjustment at most once for that stable task and read it back again when
-possible. Record `title-unverified` or `title-drift` as best-effort warning
-evidence. Never create a duplicate task, retry creation, or recover an
-ambiguous effect from a title match.
+available, then independently read it back after the stable task identity is
+known. Creation acceptance is never title verification. Resolve the title
+reconciliation below before normal monitoring or update relay begins.
+
+## Title reconciliation
+
+For every titled SE2 task, complete this bounded subprotocol:
+
+1. preserve the stable task identity from authoritative observation;
+2. compare the first independently observed title with the exact requested
+   title;
+3. when they match, record `verified` without another title effect;
+4. when the title is missing or different and adjustment is available and
+   authorized, first retain evidence that no prior adjustment was attempted,
+   reserve the effect durably when the invoking workflow has durable recovery,
+   and then adjust that same stable task to the requested title exactly once;
+5. independently read the title back after the adjustment;
+6. record `verified`, `title-unverified`, or `title-drift` before entering
+   normal monitoring or relaying updates.
+
+An unavailable capability, rejected adjustment, ambiguous effect, failed
+readback, or lost attempt record never authorizes another task or a second
+title adjustment. Reconcile an ambiguous adjustment by authoritative readback
+and retain the original task identity. Title failure is warning evidence
+rather than a task-topology blocker, but it must never be skipped or silently
+reported as success.
+
+Keep one reconciliation record per stable task. Retain it in session state for
+a non-durable workflow. When the invoking workflow already owns durable
+side-effect recovery, reserve the adjustment there before applying it and bind
+the reservation to the stable task identity alone. Retain the exact requested
+title as effect evidence, never as identity or as part of the idempotency key.
+Do not add persistence solely for title metadata.
+
+```yaml
+title_reconciliation:
+  requested_title: "<canonical display title>"
+  initial_observed_title: null
+  adjustment_authorization: granted-for-declared-title
+  adjustment_capability: available
+  prior_attempt_evidence: no-prior-attempt
+  recovery_record: transient
+  adjustment_attempted: true
+  final_observed_title: "<canonical display title or null>"
+  title_status: verified
+  evidence_refs:
+    - "<initial and final authoritative observations>"
+```
+
+On resume, reuse the retained reconciliation record or the invoking workflow's
+durable effect reservation, then independently read the current title. A
+pending, unknown, applied, or otherwise attempted adjustment is never begun
+again. If retained evidence cannot prove that no prior attempt occurred, do
+not adjust: preserve the task and finalize `verified` when authoritative
+readback already matches, otherwise record `title-unverified` or `title-drift`.
 
 ## Observation record
 
@@ -76,8 +126,9 @@ task_observation:
   task_profile_ref: "<skill-owned profile>"
   role: "<profile role>"
   requested_title: "<canonical display title>"
-  observed_title: "<read-back display title or null>"
+  observed_title: "<final read-back display title or null>"
   title_status: verified
+  title_reconciliation_ref: "<bounded reconciliation evidence>"
   task_identity: "<exact observed task identity>"
   repository_identity: "<exact observed repository>"
   project_identity: "<exact observed project>"
@@ -93,6 +144,10 @@ The task identity is stable evidence; titles and other display metadata are
 not.
 
 ## Update relay
+
+Do not begin normal monitoring or relay a partial update until title
+reconciliation has produced either `verified`, `title-unverified`, or
+`title-drift`. The warning outcomes do not suspend otherwise valid work.
 
 Relay updates without changing their meaning or presenting a partial update as
 final. Each relayed update must identify the observed task and distinguish its
@@ -131,11 +186,16 @@ The allowed `retry_decision` values are `allowed`, `forbidden`, and `blocked`.
 An `unknown` effect can never justify a retry. If the application or monitor
 cannot provide reconciliation, report `retry_decision: blocked` and stop.
 
+Apply the same read-before-retry rule to an ambiguous title adjustment, but do
+not retry that adjustment. Preserve the task and finalize its title status from
+the authoritative evidence that remains available.
+
 ## Final handoff result
 
 The final relay must preserve the exact task identity and include:
 
 - the final independently observed task, project, host, repository, and state;
+- the final title-reconciliation status and any display-metadata warning;
 - the Feature/Task outcome and validation evidence;
 - any repository or documentation changes actually made by the task;
 - the preflight authorization record by reference;

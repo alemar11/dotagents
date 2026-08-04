@@ -33,7 +33,9 @@ Its skills are deliberately separated by responsibility:
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se2:audit`.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
-  to planner, orchestrator, and worker tasks; titles remain display metadata.
+  to planner, orchestrator, and worker tasks, with authoritative readback and
+  at most one bounded correction before monitoring; titles remain display
+  metadata.
 - skills/implement/ accepts one or more complete authoritative GitHub Features
   and returns a verified standalone or stacked PR topology. Its graph owns
   multi-Feature scheduling, a separate delivery projection, isolated Sol

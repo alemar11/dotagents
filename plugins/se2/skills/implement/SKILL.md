@@ -43,6 +43,19 @@ Before creating, resuming, or monitoring application tasks, load:
 - [task-handoff.md](../../references/task-handoff.md) for assignments, title
   metadata, update relay, reconciliation, and terminal reports.
 
+For the orchestrator, every worker, and every Feature Contract Repair planner,
+complete the shared title-reconciliation subprotocol after stable task identity
+observation and before normal monitoring or update relay. Preserve valid task
+execution on a title warning, report that warning explicitly, and never create
+a replacement task or repeat the bounded title adjustment.
+
+The orchestrator owns title-adjustment recovery for every Implement-managed
+task. Before an adjustment, reserve the effect in the existing operations
+index using the stable task identity alone, retain the exact requested title as
+effect evidence, then finish it from the adjustment evidence and authoritative
+readback. On resume, reconcile an existing pending or unknown reservation;
+never begin a second adjustment.
+
 Load [orchestration.md](references/orchestration.md) when scheduling workers,
 deriving delivery topology, handling worker dialogue, or repairing a Feature
 contract. Load
@@ -289,8 +302,9 @@ GitHub Feature may belong to only one active Implement run at a time, while one
 run may claim multiple Features atomically.
 
 Write ledger checkpoints only at durable boundaries: run start, assignment and
-task binding, candidate HEAD, review cycle, PR publication, stack-link
-reconciliation, Contract Repair, and terminal verification. Do not store prompts, message
+task binding, bounded title adjustment, candidate HEAD, review cycle, PR
+publication, stack-link reconciliation, Contract Repair, and terminal
+verification. Do not store prompts, message
 bodies, model/reasoning profiles, Feature or Task bodies, findings, validation
 logs, or routine worker technical state. A ledger failure blocks only a new
 side effect or recovery step that requires durable idempotency; it does not
