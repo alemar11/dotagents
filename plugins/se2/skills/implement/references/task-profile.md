@@ -67,10 +67,9 @@ incomplete Task contract. If the selected model or reasoning value cannot be
 verified from live capability evidence before worker creation, fail closed with
 `unsupported-runtime`.
 
-The title templates reuse the existing `se:implement` planner/controller and
-worker emoji convention. Replace only the outcome placeholder with a short,
-concrete, deterministic result; do not use titles as task identity or recovery
-evidence.
+The title templates reuse the established planner, controller, and worker emoji
+convention. Replace only the outcome placeholder with a short, concrete,
+deterministic result; do not use titles as task identity or recovery evidence.
 
 There is no automatic model, reasoning, or topology fallback. If the live
 runtime cannot verify the Sol/medium orchestrator or an adaptive Sol worker

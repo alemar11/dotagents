@@ -15,7 +15,7 @@ roles:
     model: gpt-5.6-sol
     reasoning: medium
 topology: single-planner-task
-title_template: "🤖 Plan Feature · <Feature outcome>"
+title_template: "📚 Plan Feature · <Feature outcome>"
 ```
 
 The planner owns the current Feature graph run and returns the complete
@@ -28,9 +28,9 @@ isolated checkout, or task fork. If that destination cannot be independently
 verified, fail closed before creating, resuming, or monitoring the planner
 task.
 
-The title uses the established planner/controller emoji convention. Replace
-only `<Feature outcome>` with the short, concrete, deterministic outcome for
-the current Feature run.
+The title uses the established planner emoji convention. Replace only
+`<Feature outcome>` with the short, concrete, deterministic outcome for the
+current Feature run.
 
 The `planner` role is required exactly as declared. Do not substitute another
 model, lower the reasoning level, or silently introduce additional workers.

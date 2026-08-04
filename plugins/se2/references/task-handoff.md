@@ -54,8 +54,8 @@ orchestrator, and every Implement worker:
 - derive the emoji and wording deterministically from the active skill role and
   bounded Feature/Task outcome; never choose them randomly;
 - use the skill-owned profile template for the role's content, while retaining
-  the shared grammar and the existing `🤖` planner/controller and `🛠️` worker
-  convention;
+  the shared grammar and the existing `📚` planner, `🤖` controller, and `🛠️`
+  worker convention;
 - treat the title as display metadata only. It is never task identity,
   authorization, state, claim, branch, or recovery evidence.
 
