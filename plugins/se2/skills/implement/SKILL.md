@@ -69,6 +69,17 @@ worktree editing or validation. Read
 [review-delivery.md](references/review-delivery.md) for the operation-by-operation
 owner and readback matrix.
 
+Local dependency setup is part of implementation when it is required by the
+authorized Feature. Workers may install dependencies already declared by the
+repository and may add or update application dependencies, the manifest, and
+the lockfile when that change is necessary to satisfy the Feature scope. Those
+changes remain subject to scoped review and must not include generated
+dependency directories such as `node_modules/`. Stop only when the dependency
+change materially expands the Feature scope, introduces an unrelated
+architectural choice, or requires external credentials or remote state beyond
+the declared implementation workflow. This policy does not authorize
+installing, replacing, or refreshing SE2/G runtime dependencies implicitly.
+
 Before creating, resuming, or monitoring application tasks, load:
 
 - [task-profile.md](references/task-profile.md) for orchestrator and worker
