@@ -1,6 +1,6 @@
 interface:
-  display_name: "Idea Capture"
-  short_description: "Traverse a graph-first session-capture workflow."
+  display_name: "💡 Idea Capture"
+  short_description: "Capture concrete ideas for future feature planning."
   brand_color: "#D97706"
   default_prompt: "Use $se2:idea as an explicit graph-first capture workflow; preserve open questions, preview locally or publish only with explicit authority, apply the shared portable-content gate before every hosted write, and expose a transient idea-source handoff for later Feature planning."
 policy:

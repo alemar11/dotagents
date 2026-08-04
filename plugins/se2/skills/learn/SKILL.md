@@ -1,6 +1,6 @@
 ---
 name: learn
-description: "Maintain evidence-backed durable repository knowledge—Project Context, ADRs, localization conventions, confirmed corrections, Code Review Rules, and explicit AGENTS.md compaction proposals—through authorized local repository changes only. Use only after an explicit request for repository-knowledge inspection, capture, update, or routing."
+description: "Capture and maintain durable knowledge about a repository, including Project Context, ADRs, localization conventions, confirmed corrections, Code Review Rules, and explicit AGENTS.md compaction proposals; make only authorized local changes and use only for explicit repository-knowledge requests."
 ---
 
 # Learn Project Context

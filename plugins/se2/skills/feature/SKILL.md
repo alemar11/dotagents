@@ -1,9 +1,9 @@
 ---
 name: feature
-description: "Traverse a graph-first repository-scoped Feature workflow that converges Feature issues and complete vertical Task dependency graphs with explicit dependencies, execution waves, repository context from AGENTS.md hierarchy, and readiness evidence; publish to GitHub by default, allow preview only by explicit request, and never implement code."
+description: "Plan or maintain a repository-scoped feature by defining acceptance criteria, breaking it into vertical tasks, mapping dependencies and execution waves, and producing readiness evidence; publish to GitHub by default, allow preview only by explicit request, and never implement code."
 ---
 
-# Feature Graph
+# Feature Planning
 
 ## Purpose and invocation
 

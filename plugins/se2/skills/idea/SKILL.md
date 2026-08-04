@@ -1,6 +1,6 @@
 ---
 name: idea
-description: "Capture concrete proposals from the current session as tentative GitHub Ideas for later planning. Use only after an explicit request to save or preview an Idea; save/capture defaults to GitHub publication and preview is opt-in; do not trigger for ordinary brainstorming."
+description: "Capture concrete ideas from the current session as tentative GitHub Ideas for future feature planning. Use only after an explicit request to save or preview an Idea; save or capture defaults to GitHub publication, while preview is opt-in; do not trigger for ordinary brainstorming."
 ---
 
 # Idea Capture

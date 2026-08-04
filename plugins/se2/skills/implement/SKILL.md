@@ -1,9 +1,9 @@
 ---
 name: implement
-description: "Execute one or more authoritative GitHub SE2 Features through a mandatory GitHub-backed graph-first multi-Feature orchestrator, isolated implementation workers, exact-HEAD review, verified standalone or stacked PR delivery, and Contract Repair; use only for explicit implementation or resume requests."
+description: "Implement one or more authoritative GitHub Features using isolated workers, exact-HEAD review, acceptance-criteria evidence, and verified standalone or stacked pull request delivery; use only for explicit implementation or resume requests, and stop with a clear blocker when the Feature specification is incomplete or invalid."
 ---
 
-# Implement Graph
+# Implement Features
 
 ## Input and output invariant
 

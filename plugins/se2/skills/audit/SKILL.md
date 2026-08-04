@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Monitor active Codex App sessions that visibly use SE2-owned skills, reconstruct their workflow-graph conformance from positive evidence, and report feedback, bugs, regressions, graph violations, and graph-design improvements read-only; use only after an explicit $se2:audit invocation."
+description: "Review active Codex App sessions that use SE2 skills, reconstruct workflow conformance from evidence, and report feedback, bugs, regressions, violations, and design improvements without changing state; use only after an explicit $se2:audit invocation."
 ---
 
 # Audit SE2 Sessions
@@ -13,9 +13,25 @@ to Learn, Idea, Feature, Implement, or another non-monitoring skill owned by the
 current SE2 plugin. Monitor that frozen cohort until every selected session
 becomes terminal or the user stops the audit.
 
+## Persistent monitoring objective
+
+At `intake`, establish the following persistent objective for the audit run:
+
+> Monitor the frozen attributed cohort until every selected session reaches a
+> terminal state, no session is attributable, or the user explicitly stops the
+> audit.
+
+Keep this objective active across bounded waits, temporary no-progress periods,
+incomplete reads, and ordinary turn boundaries. Do not end the audit with a
+terminal report while any selected session remains `active`, `inProgress`,
+stalled, or waiting for input. A progress update is not a terminal report. The
+objective ends only at the stopping conditions above.
+
 Keep the audit read-only and return its report in the invoking session. Do not
-persist transcripts, findings, checkpoints, or monitor state. This skill owns
-no model profile, worker topology, task creation, or delegation behavior.
+persist transcripts, findings, checkpoints, or audit state. The runtime
+monitoring objective is the sole persistence mechanism allowed by this skill;
+it does not authorize model, worker, task, delegation, repository, or hosted
+state changes.
 
 Read the shared
 [workflow-graph.md](../../references/workflow-graph.md) before evaluating any
@@ -29,7 +45,7 @@ projection.
 
 | node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| intake | action | Resolve explicit scope and stopping policy. | explicit `$se2:audit` invocation | user request | frozen audit scope and stop policy | capability-check, blocked | invocation is not explicit or targets mutation | none | none |
+| intake | action | Resolve explicit scope, stopping policy, and persistent monitoring objective. | explicit `$se2:audit` invocation | user request | frozen audit scope, stop policy, and persistent monitoring objective | capability-check, blocked | invocation is not explicit or targets mutation | none | none |
 | capability-check | validation | Establish a reliable live inventory and authoritative-read boundary. | audit scope is frozen | live application capabilities | capability and coverage record | discover, blocked | inventory and authoritative reads are both unavailable | read | none |
 | discover | action | Freeze the initial active-session cohort and coverage boundary. | minimum live capabilities are available | active-session inventory | frozen cohort and coverage boundary | attribute, reported, blocked | no reliable cohort boundary can be established | read, transient | none |
 | attribute | validation | Retain only sessions with direct SE2-use evidence. | initial cohort is frozen | candidate sessions and task-visible evidence | attributed cohort and exclusions | observe, reported | none | read, transient | none |
@@ -230,8 +246,10 @@ Return compact Markdown in this order:
 ## Mutation boundary
 
 Do not create, message, resume, rename, pin, archive, fork, or hand off
-application sessions. Do not create Goals, edit repositories, write report
-files, run Git mutations, or mutate GitHub. Do not invoke another SE2 workflow
+application sessions. Do not create unrelated goals, edit repositories, write
+report files, run Git mutations, or mutate GitHub. The persistent monitoring
+objective defined at `intake` is allowed only to preserve audit continuity and
+does not authorize any other mutation. Do not invoke another SE2 workflow
 implicitly. If the user requests a fix, finish the audit report and require an
 explicit transition to the owning implementation or maintenance workflow.
 
