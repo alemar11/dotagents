@@ -51,7 +51,8 @@ Its skills are deliberately separated by responsibility:
   execution inside that Feature worktree, exact-HEAD in-session review, Contract Repair through Feature
   maintenance, stack reconciliation, and final exact-HEAD evidence. A stack
   represents a true same-repository code dependency, never serialization alone;
-  G owns PR publication and pairwise stack linking. GitHub interaction is
+  G owns PR publication and pairwise stack linking, while Send remains agnostic
+  about whether an explicit PR base participates in a stack. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
   Final provider readiness comes from the exact-head
   `g:github-delivery-status` contract; `ready` and

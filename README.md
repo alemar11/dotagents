@@ -35,7 +35,7 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
 | `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `g:send` | Confirm scope and resolved issues, commit, push, add automatic issue-closing references, open or update a pull request, and link it to an existing target PR when applicable. Review requests are separate. |
+| `g:send` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 

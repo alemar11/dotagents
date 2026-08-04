@@ -37,49 +37,34 @@ Apply all of these gates before continuing:
   body must preserve that exact value; Send never changes an existing PR
   between draft and ready.
 
-### Target PR And Stack Detection
+### Base Selection And Existing PR Reuse
 
 Resolve the intended PR base branch before commit or push. Use the explicit base
-branch supplied by the composing caller; otherwise use `defaultBranchRef.name`.
-The current implementation or feature head branch is not a PR base merely
-because another contract calls it `target_branch_name`.
+branch supplied by the composing caller for a new PR; otherwise use
+`defaultBranchRef.name`. A non-default explicit base is valid and is not evidence
+of a stack. The current implementation or feature head branch is not a PR base
+merely because another contract calls it `target_branch_name`.
 
-When the selected base is not the default branch, identify whether it is already
-represented by a PR in this repository. Query the selected branch as the PR head,
-not as the PR base:
+When the preflight finds exactly one matching open PR for the current branch,
+that PR is the publication target. If no base was explicitly supplied, preserve
+its exact `baseRefName`; if a base was supplied, require it to equal that
+read-back base. A missing or ambiguous base, an explicit-base mismatch, a fork
+head, or a repository mismatch blocks mutation. Never retarget an existing PR or
+silently fall back to the default branch. Preserve its `isDraft` value.
 
-```bash
-gh pr list --repo <owner/repo> --state open \
-  --head <owner>:<pr-base-branch> --limit 2 \
-  --json number,url,state,headRefName,headRepositoryOwner,headRepository,baseRefName,isDraft
-```
-
-Capture the result as `target_pr` only when there is exactly one PR and its
-`headRefName`, head repository owner/name, open state, and repository identity
-match the selected target. Zero results keep the normal single-PR path. More
-than one result or any mismatch is an ambiguity and blocks mutation; never pick
-a parent from title, creation time, branch similarity, or stack display order.
-
-Repeat this lookup after commit preparation and the second publish preflight.
-The selected base and exact `target_pr` identity must still match before push
-and again before the stack link. A newly appearing target PR is handled by the
-same stacked path; a changed or disappeared target is reported as remote-state
-drift and stops the operation.
-
-The target branch is an already published PR only when this lookup succeeds.
-Do not make `gh stack submit` the fallback: it pushes every local stack branch
-and creates or updates every PR in that stack, which bypasses Send's one-branch
-push, body, and draft-state contracts.
+Send does not infer, verify, link, or manage a stack. A composing workflow that
+has already established a parent/child relationship invokes the separate
+`$g:github-stack` flow after Send's publication readback. Do not make
+`gh stack submit` the fallback: it publishes every local stack branch and
+bypasses Send's one-branch push, body, and draft-state contracts.
 
 ### Closing Issue References
 
-Before committing or mutating a PR, build `closing_issue_refs` from exact
-evidence that the PR fully resolves each issue:
-
-- explicit issue refs supplied by the user or composing caller;
-- exact GitHub implementation-issue refs in the accepted execution contract or
-  tracker state for this change;
-- valid closing references already present in an existing PR description.
+Before committing or mutating a PR, receive the exact caller-owned
+`closing_issue_refs` set for issues fully resolved by this PR. A composing
+workflow owns the implementation and acceptance evidence; Send validates the
+issue identities and transports the set. Preserve valid closing references
+already present in an existing PR description.
 
 Do not derive a closing ref from a bare number, branch name, commit subject,
 parent Feature Spec, related issue, dependency, or issue whose accepted scope
@@ -103,11 +88,12 @@ already closed; it remains part of the PR's tracking history. Do not add a new
 closing reference for an already-closed issue unless the explicit or accepted
 execution evidence still identifies it as resolved by this PR.
 
-When the verified set is nonempty, require the PR base to equal the current
-`defaultBranchRef.name`. GitHub interprets closing keywords only for PRs
-targeting the default branch. Stop on a non-default existing PR and request
-explicit retargeting authority; Send never silently retargets it or moves the
-references into `target_pr`.
+The selected PR base does not change this validation. Send carries the exact
+caller-provided set to the PR body and verifies the canonical lines and provider
+references; it does not decide whether the current delivery topology will make
+GitHub close those issues or mutate an issue directly. A composing workflow such
+as Implement owns the standalone/stacked interpretation and any separate
+post-publication delivery verification.
 
 Render one line per issue under this exact PR-description section:
 
@@ -169,38 +155,21 @@ ambiguous response. Do not retry it blindly.
 Before `publish open`, require the body file to contain the complete canonical
 `## Issues` section whenever `closing_issue_refs` is nonempty. After creation,
 read back the PR description and require every expected `Closes` line exactly
-once. When `closing_issue_refs` is nonempty, the base read-back must still equal
-the current default branch. Otherwise it must equal the selected
-`<pr-base-branch>`.
+once. The base read-back must equal the selected `<pr-base-branch>` regardless
+of whether that branch is the repository default.
 
 When the post-push lookup returns an existing PR, do not run `publish open
 --draft` and do not invoke any draft-state lifecycle mutation. Require its
 post-update `isDraft` value to equal the pre-push value. An existing ready PR
 therefore remains ready while its branch and optional title/body are updated.
-When `target_pr` exists, require this existing child PR's `baseRefName` to equal
-the selected target branch; Send never silently retargets an existing PR.
+Require its base to equal the pre-push base or the explicitly requested base;
+Send never silently retargets an existing PR.
 
 After the post-push lookup returns the exact existing PR or `publish open`
 returns the exact newly created PR, require the PR head to equal the full
-published commit SHA. If `target_pr` exists, read back the target and child PRs
-and link them before final publication verification:
-
-```bash
-<plugin-root>/scripts/g --json stack ensure
-<plugin-root>/scripts/g --json stack link <target-pr-number> <current-pr-number>
-```
-
-Use PR numbers in bottom-to-top order; branch arguments would give `gh-stack`
-permission to push branches outside Send's ownership. Omit `--open` so the
-target and child retain their exact `isDraft` values. Read back both PRs after
-the link, confirm the target is still the immediate base of the child, and
-persist the command output or stack identity as `stack_link_receipt`. Do not
-call `stack submit`, `stack push`, `stack sync`, `stack rebase`, or `stack merge`
-from this flow. `stack ensure --install` is never implicit.
-
-After the optional link succeeds, verify the exact repository, PR, base, full
-published head SHA, draft state, issue linkage, and `stack_link_receipt` when a
-target PR exists. Send stops after this publication evidence. It must not
+published commit SHA. Verify the exact repository, PR, base, full published head
+SHA, draft state, and issue linkage. Send stops after this publication evidence.
+It must not
 request or wait for an automated Codex review. A composing workflow may invoke
 `$g:github-review-threads` separately using this exact publication evidence;
 the ready transition and any automatic provider review remain outside Send.
@@ -242,16 +211,14 @@ gh pr view <number> --repo <owner/repo> \
 ```
 
 Verify `headRefName` and the head repository still match the preflight before
-editing. Never silently retarget a PR or change its `isDraft` value. When
-`closing_issue_refs` is nonempty, require `baseRefName` to equal the current
-default branch, merge the canonical issue lines into the existing body, and
-read back every expected line exactly once. Preserve every previously valid
-closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
+editing. Never silently retarget a PR or change its `isDraft` value. Preserve
+the existing `baseRefName`, merge the canonical issue lines into the existing
+body, and read back every expected line exactly once. Preserve every previously
+valid closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
 keep it draft. After the normal push updates this PR, verify its full head SHA,
-unchanged draft state, unchanged base, and complete issue linkage. If the PR's
-base branch is the head of exactly one `target_pr`, perform the two-PR stack link
-after that read-back and before final publication verification described in
-`Publish New Work`.
+unchanged draft state, unchanged base, and complete issue linkage. If the caller
+also needs a stack relationship, invoke `$g:github-stack` separately after this
+publication readback.
 
 ## Safe Retry
 
@@ -263,10 +230,6 @@ after that read-back and before final publication verification described in
 - If `publish open` reports an ambiguous write, preserve its read-back evidence
   and stop. It already performed the only automatic exact-head read-back; do
   not issue another create attempt.
-- If `stack link` fails or returns an ambiguous result after a confirmed child
-  PR, preserve the child publication evidence and report the stack relationship
-  as unverified. Re-read the target and child PRs before any explicitly
-  authorized repair; do not repeat the child push or PR creation.
 - On any changed branch, remote, upstream, authentication, or PR state, stop and
   rerun the full preflight rather than continuing from stale assumptions.
 
@@ -279,7 +242,6 @@ Return:
 - PR URL
 - whether the PR is draft or ready
 - PR base and current default branch
-- `target_pr` and `stack_link_receipt` when a target PR existed
 - canonical `closing_issue_refs` and exact PR-body read-back
 - exact published head SHA and draft-state read-back
 - validation performed before publishing

@@ -287,8 +287,9 @@ unrecoverable prerequisite that prevents every remaining path.
 `delivery-gate` derives one transient delivery mode for each candidate Feature
 assignment without changing its internal Task dependency graph.
 `stack-reconcile` is an orchestrator validation node, not another application task or implementation
-role. It verifies the stacked relationship created by the G-owned publication
-workflow and routes stale descendant evidence back to the owning Feature Worker.
+role. It verifies the stacked relationship created by the separate G-owned
+stack-link workflow after PR publication and routes stale descendant evidence
+back to the owning Feature Worker.
 
 ## Orchestrator boundary
 

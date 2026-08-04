@@ -250,13 +250,37 @@ def open_pr(
             code="branch_not_pushed",
             exit_code=65,
         )
+    existing = state["existing_pull_request"]
     selected_base = base or state["default_branch"]
-    if state["existing_pull_request"]:
-        existing = state["existing_pull_request"]
+    selected_draft = draft
+    if existing:
+        existing_base = existing.get("baseRefName")
+        if not isinstance(existing_base, str) or not existing_base:
+            raise GError(
+                "Existing pull-request read-back did not include a base branch.",
+                code="provider_target_mismatch",
+                exit_code=65,
+            )
+        if base is not None and base != existing_base:
+            raise GError(
+                f"Existing pull request #{existing.get('number')} targets '{existing_base}', "
+                f"not the explicit base '{base}'.",
+                code="pull_request_base_mismatch",
+                exit_code=65,
+            )
+        selected_base = existing_base
+        existing_draft = existing.get("isDraft")
+        if not isinstance(existing_draft, bool):
+            raise GError(
+                "Existing pull-request read-back did not include a draft state.",
+                code="provider_target_mismatch",
+                exit_code=65,
+            )
+        selected_draft = existing_draft
         verified = _verified_pull_request(
             _read_pull_request(state["repo"], int(existing["number"]), root),
             repo=state["repo"], branch=state["branch"], base=selected_base,
-            draft=draft, title=title, body=body,
+            draft=selected_draft, title=title, body=body,
         )
         return {"status": "reused", "pull_request": verified, "preflight": state}
     request = {

@@ -42,9 +42,12 @@ the local branch lifecycle. Arguments are bottom-to-top:
 <plugin-root>/scripts/g --json stack link <bottom-pr> <top-pr>
 ```
 
-This is distinct from `send`: `send` owns the current branch publication and
-uses `link` only for its verified one-hop target/current pair. Do not use
-`link` to guess a stack from branch names or ambiguous PRs.
+Consume the exact PR identities and publication readbacks from the caller when
+available. Verify both repositories, the child base, both full heads, and the
+intended bottom-to-top order before treating the link receipt as authoritative.
+This is distinct from `send`: `send` owns the current branch publication, while
+this skill owns the explicit parent/current relationship. Do not use `link` to
+guess a stack from branch names or ambiguous PRs.
 
 ## Publish a complete stack
 

@@ -1,6 +1,6 @@
 {
   "name": "g",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Manage Git and GitHub work from commits and issue triage through read-only delivery status and reviewed pull-request delivery, with active-session audits.",
   "author": {
     "name": "alemar11",

@@ -46,7 +46,7 @@ its required portable marker and full SHA still passes the same final gate.
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; Feature Worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Feature-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; Feature Worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
 | One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and branch and Task-only `closing_issue_refs`; read back repository, base, branch, full PR HEAD, URL, canonical closing lines, `closingIssuesReferences`, and draft state. |
-| Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
+| Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | `$g:github-delivery-status` | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
 | Hosted Codex review and actionable review-thread observation | G-owned review workflow | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
@@ -90,10 +90,11 @@ the authoritative assignment and current candidate evidence:
 
 Pass the verified nonempty set unchanged to the G-owned single-PR publication
 workflow. G renders one canonical `Closes` line per Task under `## Issues` and
-requires a default-branch PR for effective GitHub auto-closure. A stacked child
-whose current base is not the default branch must retain its exact pending Task
-closure set and stop on the G issue-linkage gate; never drop the refs merely to
-publish or claim `stack-ready`.
+reads back the exact body and `closingIssuesReferences` set. The delivery mode,
+not Send, determines the intended base: a standalone candidate uses the
+verified default branch, while a stacked child uses the verified parent branch.
+Keep the exact Task closure set on every PR; a non-default child is not blocked
+merely because it carries those references.
 
 Apply the shared hosted-content safety gate to the exact final PR title and body
 immediately before publication. Use the G-owned single-PR publication workflow
@@ -104,12 +105,13 @@ equal `closing_issue_refs` exactly and require every canonical Task `Closes`
 line exactly once. The PR HEAD must equal the reviewed candidate HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
-PR base. Require the G-owned workflow to identify exactly one open parent PR in
-the same repository, publish only the current Feature Worker branch, and use the
-G-owned pairwise stack-link workflow after the child PR is read back. Preserve
-the returned parent identity and `stack_link_receipt`. Do not use a stack-wide
-publication, push, sync, rebase, or merge operation from normal publication,
-and never install a missing stack dependency implicitly.
+PR base. Use the G-owned single-PR publication workflow to publish only the
+current Feature Worker branch, then invoke the separate G-owned pairwise
+stack-link workflow with the already verified parent/current PR identities.
+Preserve the parent identity and `stack_link_receipt` from that separate
+operation. Do not use a stack-wide publication, push, sync, rebase, or merge
+operation from normal publication, and never install a missing stack dependency
+implicitly.
 
 When validation, body, and required CI are stable, mark the PR ready through
 the G-owned workflow and independently observe the transition. A draft review
@@ -117,7 +119,7 @@ is consultative and never satisfies the ready cycle.
 
 ## Stack reconciliation
 
-After a stacked publication, the orchestrator independently verifies the exact
+After a stacked publication and separate stack-link operation, the orchestrator independently verifies the exact
 repository, parent and child PR identities, unchanged draft states, child base,
 both full heads, immediate parent relationship, stack order, and link receipt.
 The child base must equal the parent head branch, the live parent head must equal

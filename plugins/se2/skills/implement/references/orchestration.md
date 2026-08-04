@@ -109,9 +109,10 @@ completion.
 For a stacked assignment, also pass the exact parent Feature assignment, PR,
 branch, candidate SHA, and verified stack order. The Feature Worker creates its
 isolated worktree from that SHA and publishes against the parent branch through the
-G-owned single-PR workflow. That workflow may create the child PR and link the
-verified parent/current pair; neither the Feature Worker nor orchestrator uses
-stack-wide submit as a shortcut.
+G-owned single-PR workflow. After the child publication readback, the
+orchestrator invokes the separate G-owned pairwise stack-link workflow with the
+verified parent/current PR identities; neither the Feature Worker nor
+orchestrator uses stack-wide submit as a shortcut.
 
 ## Parent drift and descendant recovery
 

@@ -51,7 +51,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | Request | Bundled skill |
 | --- | --- |
 | Local staging or commit, optionally push without PR | `$g:git-commit` |
-| Send local work as a branch and draft PR, linking it to an existing target PR when applicable | `$g:send` |
+| Send local work as a branch and draft PR | `$g:send` |
 | Stacked PR branch/stack lifecycle | `$g:github-stack` |
 | Issue and PR queue triage for one or more repositories | `$g:github-repository-triage` |
 | GitHub issue lifecycle and relationships | `$g:github-issues` |

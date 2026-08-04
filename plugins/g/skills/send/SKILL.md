@@ -1,6 +1,6 @@
 ---
 name: send
-description: Send local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, link every confirmed resolved issue for automatic closure, open a draft or update an existing pull request without changing its draft state, and link the new PR to an existing target PR when applicable.
+description: Send local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, include caller-provided resolved issue references for automatic closure, and open or update one pull request without changing its draft state.
 ---
 
 # Send
@@ -22,12 +22,8 @@ skills, direct `git`, the shared CLI, and connector-backed PR operations:
 - When the publish path is selected, load
   [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
   before the first `gh`-dependent command. The shared reference owns the
-  `gh` availability, authentication, and conditional `gh-stack` checks.
-- Use `<plugin-root>/scripts/g stack ensure` and `stack link` only when
-  the selected PR base branch is the head of exactly one existing PR in the
-  same repository. Pass PR numbers in bottom-to-top order so this operation
-  links the two published PRs without taking ownership of another branch's
-  push. Do not use `stack submit` for this path.
+  `gh` availability and authentication checks; stack-specific readiness belongs
+  to `$g:github-stack`.
 - Use `$g:github-issues`, `$g:github-repository-triage`, `$g:github-investigation`, `$g:github-actions`,
   or `$g:github-review-threads` only for focused follow-up GitHub work.
 
@@ -49,77 +45,40 @@ Prefer the shortest publish path that matches the state in front of you:
 - If the branch already has a PR, update that PR instead of treating the run as
   a fresh publish. Preserve its current draft or ready state and return the
   exact publication read-back.
-- If the selected PR base branch is itself the head of exactly one open PR in
-  this repository, publish or update the current PR against that branch and
-  link the target and current PR as one stacked pair after the child PR is
-  read back. This is one explicit link, not automatic management of a local
-  stack.
+- If a target base is explicitly supplied, publish or update the current PR
+  against that exact branch. Whether that base participates in a stack is a
+  separate `$g:github-stack` concern.
 - If there is no publishable local change, stop early and route issue-only
   follow-up to `$g:github-issues`.
 
-## Target PR And Stacked Link
+## Base Selection And Existing PR Reuse
 
 Resolve the PR base branch before committing or pushing. Use the explicit base
-branch supplied by the caller; otherwise use the repository default branch.
+branch supplied by the caller for a new PR; otherwise use the repository default
+branch. A non-default explicit base is valid and is not evidence of a stack.
 Never treat the worker or feature head branch as the PR base merely because it
 is named `target_branch_name`.
 
-When the selected base is not the default branch, look for the target PR by its
-head branch, not by its base branch:
+When the current branch already has exactly one matching open PR, that PR is the
+publication target. Without an explicit base, preserve its read-back
+`baseRefName`; with an explicit base, require it to equal that existing base.
+Stop on a missing or ambiguous base instead of retargeting the PR or silently
+falling back to the default branch. Preserve its current `isDraft` value.
 
-```bash
-gh pr list --repo <owner/repo> --state open \
-  --head <owner>:<pr-base-branch> --limit 2 \
-  --json number,url,state,headRefName,headRepositoryOwner,headRepository,baseRefName,isDraft
-```
-
-Treat the result as follows:
-
-- Zero PRs: continue the normal single-PR flow, using `--base
-  <pr-base-branch>` for a new PR when that base was explicitly selected.
-- Exactly one PR: record it as `target_pr` and use the stacked path after the
-  current PR exists. The target PR is the bottom item and the current PR is the
-  top item.
-- More than one PR, a fork head, a different head branch, or a repository
-  mismatch: stop before mutation. Do not choose a parent heuristically.
-
-After the current PR is created or updated and its exact base, head, title,
-body, and draft state are read back, run:
-
-```bash
-<plugin-root>/scripts/g --json stack ensure
-<plugin-root>/scripts/g --json stack link <target-pr-number> <current-pr-number>
-```
-
-Use PR numbers, never branch arguments, so `Send` remains the sole owner of the
-current branch push. Omit `--open`: linking must not convert either PR from
-draft to ready. `stack ensure --install` requires separate explicit authority
-and is never implicit. Read back both PRs after the link and record the command
-output or stack identity as the `stack_link_receipt`.
-
-Do not call `stack submit`, `stack push`, `stack sync`, `stack rebase`, or
-`stack merge` from this skill. Those commands can publish, rewrite, or operate
-on more than the current branch. If linking fails or its result is ambiguous,
-report the current PR as published and the stack link as unverified; do not
-repeat publication or the link blindly.
-
-Stack detection does not relax the issue-linkage contract. A non-default child
-PR with nonempty `closing_issue_refs` remains blocked by the default-branch
-requirement; never move those references to `target_pr` automatically, because
-that would mutate another PR's body and ownership.
+Send does not infer, verify, link, or manage a stack. A caller that needs a
+parent/child relationship invokes `$g:github-stack` separately after Send's
+publication receipt. Do not use `stack submit` as a Send fallback.
 
 ## Issue Linkage Contract
 
-Resolve `closing_issue_refs` as factual input: the exact GitHub issues whose
-accepted scope is fully satisfied by this PR. Collect them from explicit user
-or caller input and unambiguous execution or tracker evidence. Validate every
+Accept `closing_issue_refs` as caller-owned factual input: the exact GitHub
+issues whose accepted scope is fully satisfied by this PR. Validate every
 candidate against its exact GitHub repository and issue before PR mutation.
-Never infer an issue from a bare number, branch name, commit subject, nearby
-issue, parent Feature Spec, dependency, or partial implementation.
+Send must not derive an issue from a bare number, branch name, commit subject,
+nearby issue, parent Feature Spec, dependency, or partial implementation.
 
 When `closing_issue_refs` is nonempty:
 
-- require the PR base to equal the repository's current default branch;
 - include one canonical `Closes` line per deduplicated issue under `## Issues`
   in the PR description, using `Closes #<number>` for the PR repository and
   `Closes <owner>/<repository>#<number>` for another repository;
@@ -128,6 +87,13 @@ When `closing_issue_refs` is nonempty:
 - stop on conflicting, ambiguous, missing, or only partially satisfied issue
   evidence rather than adding a closing keyword that could close the wrong
   issue.
+
+The selected PR base does not change this validation. Send carries the exact
+caller-provided issue set to the PR body and verifies the resulting body and
+provider references; it does not decide whether the current delivery topology
+will make GitHub close those issues or mutate an issue directly. A composing
+workflow such as Implement owns the standalone/stacked interpretation and any
+separate post-publication delivery verification.
 
 When no issue is confirmed, omit `## Issues` rather than inventing a placeholder
 or asking merely to fill the section. Report the empty linkage result in the
@@ -140,14 +106,14 @@ closeout. See `references/workflows.md` for body construction and verification.
    `origin` repository and any configured upstream match the current branch,
    and look up an existing open PR for that branch. The shared network execution
    contract applies to the complete GitHub-dependent preflight from the outset.
-2. Resolve `<pr-base-branch>` and perform the read-only target-PR lookup above.
-   Capture zero or one exact `target_pr`; stop on ambiguity and repeat this
-   lookup after the commit/preflight boundary.
+2. Resolve the intended base using **Base Selection And Existing PR Reuse**.
+   Capture the existing PR's exact base when reusing it; stop on explicit-base
+   drift and repeat the base read-back after the commit/preflight boundary.
 3. Inspect worktree state and confirm the intended scope when it is mixed.
-4. Resolve and validate `closing_issue_refs`. Read an existing PR body when
-   present, preserve its valid closing references, and prepare the complete
-   template-aware PR body. If the resulting set is nonempty, require the PR
-   base to equal the current default branch before any PR mutation.
+4. Receive and validate the caller's exact `closing_issue_refs`. Read an
+   existing PR body when present, preserve its valid closing references, and
+   prepare the complete template-aware PR body. Do not impose a default-base
+   requirement in Send.
 5. Reuse the current commit when it already represents the intended scope.
    Otherwise create one through `$g:git-commit` with
    `commit_operation=commit-only`; Send retains ownership of push. Do not
@@ -155,10 +121,11 @@ closeout. See `references/workflows.md` for body construction and verification.
    may select a targeted fixup only from the explicit request or
    target-repository instructions with an exact target.
 6. Rerun the complete publish preflight immediately before pushing and repeat
-   the target-PR lookup. The selected base and exact `target_pr` identity must
-   still agree; otherwise stop and reconcile the changed remote state. Use a
-   normal push to the verified upstream, or `git push -u origin HEAD` only when
-   no upstream exists. Never infer permission to force-push.
+   the existing-PR/base read-back. The selected base must still agree with the
+   explicit target or preserved existing PR; otherwise stop and reconcile the
+   changed remote state. Use a normal push to the verified upstream, or `git push
+   -u origin HEAD` only when no upstream exists. Never infer permission to
+   force-push.
 7. Re-check for an existing PR after push. Open a draft PR only when none
    exists; otherwise update the existing PR without changing its `isDraft`
    value. In particular, a ready PR must remain ready; never call a draft
@@ -166,22 +133,19 @@ closeout. See `references/workflows.md` for body construction and verification.
    ambiguous create failure, look up the PR again before retrying so a
    successful first request cannot create a duplicate. Read back the PR body
    and require the exact canonical `Closes` line for every resolved
-   `closing_issue_ref`. If `target_pr` exists, require an existing child PR's
-   base to equal the selected target branch; never retarget it implicitly. Read
-   back the target identity and child base before linking, then run the typed
-   `stack link` flow above and verify both PRs after the link.
+   `closing_issue_ref`. Preserve the existing PR's base and draft state; never
+   retarget it implicitly.
 8. Stop after publication and its read-backs. Send must not request or wait for
    an automated Codex review. If a composing workflow needs one, it must invoke
    `$g:github-review-threads` as a separate operation using the exact repository,
    PR, and full published head SHA from Send's publication evidence. The ready
    transition and any automatic provider review remain outside Send.
 9. Return branch, PR URL, commit hash, PR base, canonical
-   `closing_issue_refs`, issue-linkage verification, exact published head and
-   draft-state read-back, stacked target PR identity and `stack_link_receipt`
-   when applicable, and verification performed. If the
-   post-publication verification or stack link fails after the push or PR
-   mutation succeeded, preserve and report the successful publish evidence
-   separately; do not repeat the push, PR creation, or link blindly.
+   `closing_issue_refs`, issue-linkage verification, exact published head,
+   draft-state read-back, and verification performed. If post-publication
+   verification fails after the push or PR mutation succeeded, preserve and
+   report the successful publish evidence separately; do not repeat the push or
+   PR creation blindly.
 
 ## References
 

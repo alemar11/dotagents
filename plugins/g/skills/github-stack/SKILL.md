@@ -28,8 +28,9 @@ operation.
 
 - Use `$g:send` for publishing or updating one PR, including its title,
   body, closing issue references, draft state, and push ownership.
-- `send` may invoke `stack link` for one target/current PR pair. Do not replace
-  that flow with `stack submit`.
+- Use this skill for an explicit parent/child link, even when the PRs were just
+  published by `$g:send`. `send` does not infer or invoke `stack link`; do not
+  replace this explicit relationship flow with `stack submit`.
 - Use this skill when the user explicitly asks for stack-wide publication,
   navigation, rebase, sync, restructuring, merge, or recovery.
 - Do not silently turn a single-PR request into a stack-wide operation.
@@ -87,7 +88,7 @@ express an explicitly requested non-interactive operation.
 | Request | Owner |
 | --- | --- |
 | One branch/PR publication or update | `$g:send` |
-| Link one new child PR to one existing target PR | `$g:send` |
+| Link one new child PR to one existing target PR | `$g:github-stack` |
 | Inspect or navigate an existing stack | `$g:github-stack` |
 | Publish all active stack branches | `$g:github-stack` with explicit `stack submit --auto` |
 | Rebase, sync, push, restructure, unstack, or merge a stack | `$g:github-stack` |

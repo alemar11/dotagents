@@ -42,6 +42,18 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("exact Task-only\n`closing_issue_refs`", skill)
         self.assertIn("while the Feature remains open", skill)
 
+    def test_stacked_children_keep_task_closures_and_link_separately(self) -> None:
+        reference = REFERENCE.read_text(encoding="utf-8")
+        orchestration = ORCHESTRATION.read_text(encoding="utf-8")
+        normalized = " ".join(reference.split())
+        orchestration_normalized = " ".join(orchestration.split())
+
+        self.assertIn("a non-default child is not blocked merely because it carries those references", normalized)
+        self.assertIn("separate G-owned pairwise stack-link workflow", normalized)
+        self.assertIn("orchestrator invokes the separate G-owned pairwise stack-link workflow", orchestration_normalized)
+        self.assertNotIn("pending Task closure set", normalized)
+        self.assertNotIn("stop on the G issue-linkage gate", normalized)
+
     def test_delivery_status_is_exact_head_and_has_two_accepted_dispositions(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")

@@ -28,13 +28,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "2.2.0")
+        self.assertEqual(output.strip(), "2.3.0")
 
     def test_json_doctor_shape(self) -> None:
         doctor_payload = {
             "ok": True,
             "provider_ready": True,
-            "version": "2.2.0",
+            "version": "2.3.0",
             "checks": {
                 "connector": {"cli_access": False},
                 "gh_stack": {"status": "missing"},
@@ -44,7 +44,7 @@ class CliContractTests(unittest.TestCase):
             code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "2.2.0")
+        self.assertEqual(payload["version"], "2.3.0")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
         self.assertIn("gh_stack", payload["checks"])
 
@@ -155,6 +155,86 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(result["status"], "dry-run")
         self.assertEqual(result["transport"]["endpoint"], "repos/owner/repo/pulls")
         self.assertNotIn("Title", json.dumps(result))
+
+    def test_publish_dry_run_accepts_explicit_non_default_base(self) -> None:
+        state = {
+            "repo": "owner/repo", "root": "/tmp/repo", "branch": "child",
+            "default_branch": "main", "on_default_branch": False,
+            "upstream": "origin/child", "dirty": False, "status": [],
+            "existing_pull_request": None,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Closes #10", encoding="utf-8")
+            with mock.patch("g.publish.preflight", return_value=state):
+                result = open_pr(
+                    repo=None, title_file=str(title_file), body_file=str(body_file),
+                    draft=True, base="parent", dry_run=True,
+                    expected_worktree_fingerprint=None,
+                )
+
+        self.assertEqual(result["target"]["base"], "parent")
+
+    def test_reused_pr_preserves_existing_base_and_draft_state(self) -> None:
+        state = {
+            "repo": "owner/repo", "root": "/tmp/repo", "branch": "child",
+            "default_branch": "main", "on_default_branch": False,
+            "upstream": "origin/child", "dirty": False, "status": [],
+            "existing_pull_request": {
+                "number": 7, "baseRefName": "parent", "isDraft": False,
+            },
+        }
+        pull = {
+            "number": 7,
+            "html_url": "https://github.com/owner/repo/pull/7",
+            "title": "Title",
+            "body": "Closes #10",
+            "draft": False,
+            "head": {"ref": "child", "repo": {"full_name": "owner/repo"}},
+            "base": {"ref": "parent", "repo": {"full_name": "owner/repo"}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Closes #10", encoding="utf-8")
+            with mock.patch("g.publish.preflight", return_value=state), \
+                 mock.patch("g.publish._read_pull_request", return_value=pull):
+                result = open_pr(
+                    repo=None, title_file=str(title_file), body_file=str(body_file),
+                    draft=True, base=None, dry_run=False,
+                    expected_worktree_fingerprint=None,
+                )
+
+        self.assertEqual(result["status"], "reused")
+        self.assertEqual(result["pull_request"]["target"]["base"], "parent")
+        self.assertFalse(result["pull_request"]["target"]["draft"])
+
+    def test_reused_pr_rejects_explicit_base_drift(self) -> None:
+        state = {
+            "repo": "owner/repo", "root": "/tmp/repo", "branch": "child",
+            "default_branch": "main", "on_default_branch": False,
+            "upstream": "origin/child", "dirty": False, "status": [],
+            "existing_pull_request": {
+                "number": 7, "baseRefName": "parent", "isDraft": True,
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Body", encoding="utf-8")
+            with mock.patch("g.publish.preflight", return_value=state):
+                with self.assertRaises(GError) as raised:
+                    open_pr(
+                        repo=None, title_file=str(title_file), body_file=str(body_file),
+                        draft=True, base="main", dry_run=False,
+                        expected_worktree_fingerprint=None,
+                    )
+
+        self.assertEqual(raised.exception.code, "pull_request_base_mismatch")
 
     def test_preflight_keeps_matching_explicit_repo_checkout(self) -> None:
         def fake_checked(command, cwd=None):
@@ -320,7 +400,7 @@ class CliContractTests(unittest.TestCase):
                 _find_open_pr("owner/repo", "feature", Path("/tmp/repo"))
         self.assertEqual(raised.exception.code, "pull_request_mismatch")
 
-    def test_open_pr_lookup_preserves_base_branch_for_closing_issue_gate(self) -> None:
+    def test_open_pr_lookup_preserves_existing_base_branch(self) -> None:
         payload = json.dumps([
             {
                 "number": 7, "url": "https://github.com/owner/repo/pull/7",
