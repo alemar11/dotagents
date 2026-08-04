@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Plan or maintain a repository-scoped feature by defining acceptance criteria, breaking it into vertical tasks, mapping dependencies and execution waves, and producing readiness evidence; publish to GitHub by default, allow preview only by explicit request, and never implement code."
+description: "Plan or maintain a repository-scoped feature by consolidating proposed splits into the smallest independently deliverable boundary, defining acceptance criteria, breaking it into vertical tasks, mapping dependencies and execution waves, and producing readiness evidence; publish to GitHub by default, allow preview only by explicit request, and never implement code."
 ---
 
 # Feature Planning
@@ -18,6 +18,12 @@ existing bundle. For one repository, converge one bounded feature into:
   prerequisites;
 - a complete acceptance-coverage map from Feature criteria to Tasks;
 - a terminal bundle report.
+
+Treat headings, numbering, or caller-proposed Feature splits as candidate
+boundaries, not durable identities. Before freezing a new Feature boundary,
+consolidate candidates that belong to one independently deliverable outcome
+and turn their internal slices into Tasks. Layers, order, paths, and formatting
+alone never justify separate Features.
 
 For a multi-repository feature, execute the same graph once per affected
 repository. Produce one linked Feature issue per repository and one local Task
@@ -226,6 +232,18 @@ acceptance criteria, safety constraints, required documentation updates, and
 validation policy. A single-repository feature has exactly one Feature; a
 multi-repository feature has one linked Feature per affected repository.
 
+For a new single-repository request, calculate the smallest coherent Feature
+boundary before assigning any Feature or Task identity. For every apparent
+Feature candidate, apply the residual-outcome test: after the sibling
+candidates are implemented, require one exclusive observable outcome,
+acceptance obligation, usable landing state, and concrete reason for separate
+delivery to remain. Fold a candidate with no such residual into the shared
+Feature and represent its distinct implementation work as vertical Tasks.
+Different layers, paths, preferred order, or caller formatting never prove an
+independent Feature. If independently deliverable outcomes really remain,
+clarify or scope separate Feature runs instead of forcing them into this one
+Feature. The multi-repository projection remains unchanged.
+
 The Feature definition is the canonical contract. There is no separate Spec
 entity in this plugin. When published, the Feature is a GitHub issue of type
 Feature; that type is publication metadata and never carries the semantics.
@@ -334,9 +352,14 @@ an unclear indication transition to blocked.
 Read the explicit intent or rehydrated maintenance evidence, resolve
 `entry_route` and `source_route`, identify the
 affected repository set, and run the repository context precondition. Freeze
-one feature boundary and one context record per affected repository. Stop when
-the scope is implementation-only, unbounded, contradictory, or missing an
-authorized repository identity.
+one feature boundary and one context record per affected repository only after
+the candidate split passes the residual-outcome test. Treat caller-proposed
+Feature names and counts as planning input unless the caller explicitly
+requires separate delivery identities. Consolidate candidates that have no
+exclusive observable residual; if a required split conflicts with that
+evidence, transition to clarification. Stop when the scope is
+implementation-only, unbounded, contradictory, or missing an authorized
+repository identity.
 
 An explicit Idea capture may provide the transient
 [idea-source handoff](../idea/references/idea-source.md). Treat it as tentative
@@ -353,7 +376,10 @@ identity never close an Idea.
 Resolve only material unknowns that would change the parent outcome, scope,
 ownership, acceptance criteria, or dependency graph. Ask or resolve one
 blocking decision at a time. Preserve accepted assumptions separately from
-confirmed evidence. Do not silently broaden the feature.
+confirmed evidence. When a requested split lacks an independent residual, ask
+whether to consolidate it into one Feature with multiple Tasks or supply the
+missing separate-delivery semantics. Never invent distinctions to preserve a
+requested count.
 
 ### Feature
 
@@ -361,6 +387,9 @@ Load steps/feature.md and templates/feature.md. Draft, review, or update one
 repository-owned Feature definition and its Feature issue per affected
 repository. On maintenance, review the canonical Feature definition against
 the explicit indication and rehydrate stable content before proposing changes.
+For a new Feature, require one minimal coherent outcome and record why every
+proposed sibling was consolidated or kept outside the run. Do not freeze an
+identity while another candidate can satisfy its complete observable contract.
 Require unique, individually provable acceptance criteria with stable
 `F-AC-NN` identities, explicit links to peer Features, and an explicit failure
 policy for constrained validation. A complete Feature definition must be
@@ -446,6 +475,7 @@ A complete report must contain:
 
 - every repository-owned Feature issue reference and the shared feature
   identity;
+- the candidate Feature boundaries, residual analysis, and consolidation;
 - every Task issue reference, Feature attachment, vertical outcome, and scope;
 - cross-repository Feature links;
 - Task dependency edges, theoretical execution waves, and planning rationale;

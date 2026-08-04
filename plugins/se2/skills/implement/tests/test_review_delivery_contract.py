@@ -6,9 +6,26 @@ REFERENCE = Path(__file__).resolve().parents[1] / "references/review-delivery.md
 ORCHESTRATION = Path(__file__).resolve().parents[1] / "references/orchestration.md"
 SKILL = Path(__file__).resolve().parents[1] / "SKILL.md"
 PREFLIGHT = Path(__file__).resolve().parents[3] / "references/codex-dependency-preflight.md"
+TASK_PROFILE = Path(__file__).resolve().parents[1] / "references/task-profile.md"
+RUN_STATE = Path(__file__).resolve().parents[1] / "references/run-state.md"
 
 
 class ReviewDeliveryContractTests(unittest.TestCase):
+    def test_one_feature_worker_owns_each_feature_and_its_single_pr(self) -> None:
+        skill = SKILL.read_text(encoding="utf-8")
+        orchestration = ORCHESTRATION.read_text(encoding="utf-8")
+        profile = TASK_PROFILE.read_text(encoding="utf-8")
+        run_state = RUN_STATE.read_text(encoding="utf-8")
+
+        self.assertIn("one-feature-worker-per-feature", profile)
+        self.assertIn('title_template: "🛠️ Feature Worker · <Feature outcome>"', profile)
+        self.assertIn("Create exactly one Feature Worker per selected Feature", orchestration)
+        self.assertIn("implements every Task serially in Task-DAG order", orchestration)
+        self.assertIn("Tasks may define semantic prerequisites", " ".join(skill.split()))
+        self.assertIn("they never\ncreate Task workers, Task branches, Task worktrees, or Task PRs", skill)
+        self.assertIn("Exactly one assignment may exist per claimed Feature", run_state)
+        self.assertIn("never create an empty commit, empty\nPR, cosmetic change, or artificial proof", skill)
+
     def test_pr_delivery_closes_tasks_but_not_features_or_ideas(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         skill = SKILL.read_text(encoding="utf-8")

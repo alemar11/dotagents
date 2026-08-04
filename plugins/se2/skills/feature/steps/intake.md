@@ -11,6 +11,8 @@ inputs:
   - maintenance-evidence
 outputs:
   - normalized-intent
+  - candidate-feature-boundaries
+  - feature-boundary-analysis
   - entry_route
   - source_route
   - affected-repositories
@@ -37,6 +39,28 @@ terminal_states: []
 Normalize a new request or rehydrate the maintenance evidence into one bounded
 feature candidate. Preserve the desired outcome, non-goals, affected
 repository set and path scopes, constraints, and observable success signals.
+
+Treat headings, numbering, named phases, and caller-proposed Feature splits as
+candidate boundaries rather than durable identities. For every same-repository
+candidate, ask what exclusive observable outcome, acceptance obligation,
+usable landing state, and separate-delivery reason remains after its siblings
+are implemented. Consolidate candidates with no residual outcome into one
+Feature boundary and carry their distinct work forward as Task candidates.
+Different layers, paths, preferred execution order, or presentation structure
+do not establish separate Features.
+
+If multiple independently deliverable outcomes remain, scope one bounded
+Feature run and retain the others as explicit out-of-scope candidates. If the
+caller requires separate Features but the residual-outcome evidence does not
+support them, transition to clarification instead of inventing distinctions or
+publishing overlapping Feature identities. Preserve the mandatory linked
+one-Feature-per-repository projection for a genuinely multi-repository
+capability.
+
+Apply this consolidation automatically only to new-source planning. For an
+existing-source or maintenance route, preserve durable Feature identities
+unless the explicit external indication requests a boundary repair; otherwise
+record the existing boundary as retained.
 
 When idea-source is supplied, treat it as tentative source evidence. Keep
 source_route as new-source, preserve its open questions, independently reload

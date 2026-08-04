@@ -28,6 +28,16 @@ the conceptual result remains the complete Feature-and-Task bundle.
 | --- | --- | --- | --- |
 | <repository> | <sources selected by AGENTS.md hierarchy> | <facts used> | <none or blocker> |
 
+## Feature Boundary Decision
+
+- candidate_feature_boundaries: <prompt-proposed candidates or one>
+- residual_outcomes: <exclusive observable outcome, acceptance obligation,
+  usable landing state, and separate-delivery reason per candidate>
+- consolidation_decision: <one retained Feature, absorbed Task scopes, and any
+  independently deliverable out-of-scope candidates>
+- decision_evidence: <why formatting, layers, paths, or ordering did not create
+  artificial Feature identities>
+
 ## Feature Set
 
 | repository_identity | feature_issue_ref | feature_type_projection | link_reason |

@@ -5,6 +5,7 @@ purpose: report-the-complete-feature-task-bundle-after-operation-verification
 entry_conditions:
   - selected-operation-is-preview-or-hosted-publication-is-verified
 inputs:
+  - feature-boundary-decision
   - feature-definition
   - feature-issue
   - tasks
@@ -44,7 +45,8 @@ terminal_states:
 
 Report the complete desired bundle after the selected terminal operation has
 finished. For each affected repository, retain its Feature definition, Feature
-issue, every vertical Task, Feature attachment, Task dependency relationships,
+boundary decision, Feature issue, every vertical Task, Feature attachment,
+Task dependency relationships,
 criterion coverage, monotonic acceptance high-water marks, context evidence,
 required documentation updates, GitHub issue state, topological execution
 waves, and scope-overlap gates. The complete bundle also includes the linked
@@ -56,10 +58,11 @@ operation and any maintenance changelog comment. This node has no publication,
 retry, or recovery side effect; failures transition to `blocked` from the
 operation node that owns the missing evidence.
 
-The final report must state the Feature reference, Task references, Task
-dependency edges, `allowed_paths`, overlap evidence, theoretical execution
-waves, scope-overlap gates, acceptance coverage, readiness evidence, selected
-mode, Feature and Task acceptance high-water marks, and any unvalidated
+The final report must state the Feature boundary decision, Feature reference,
+Task references, Task dependency edges, `allowed_paths`, overlap evidence,
+theoretical execution waves, scope-overlap gates, acceptance coverage,
+readiness evidence, selected mode, Feature and Task acceptance high-water
+marks, and any unvalidated
 assumptions. For a new-source publication from an exact hosted Idea, also report
 the source Idea reference and verified `closed/completed` state; otherwise state
 that no source-Idea lifecycle mutation applied.

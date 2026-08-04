@@ -1,7 +1,7 @@
 interface:
   display_name: "🛠️ Implement Features"
-  short_description: "Implement features and deliver verified standalone or stacked pull requests."
+  short_description: "Implement each Feature with one Feature Worker and PR."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Features. Traverse the Implement graph, require criterion-level acceptance evidence bound to each exact candidate HEAD, apply the shared portable-content gate before every hosted write, derive standalone or stacked delivery separately from execution order, gate stacked children on a current green parent, keep workers isolated, require exact-HEAD review, reconcile parent and stack drift, use Contract Repair for defective specifications, and return verified PR topology or a fail-closed blocker."
+  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Features, create one isolated Feature Worker and one PR per implementation-eligible Feature, execute each Feature's Task DAG serially in that worktree, require exact-HEAD acceptance and review evidence, derive Feature-level standalone or stacked delivery separately from Task order, route zero-delta or defective contracts through Contract Repair without artificial changes, and return verified topology or a fail-closed blocker."
 policy:
   allow_implicit_invocation: false

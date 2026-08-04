@@ -47,16 +47,16 @@ the established `se:implement` grammar:
 ```
 
 Apply these shared rules to the Feature planner task, the Implement
-orchestrator, and every Implement worker:
+orchestrator, and every Implement Feature Worker:
 
 - begin with exactly one contextual emoji, followed by one space;
 - keep the role, scope, or outcome short, concrete, and deterministic;
 - derive the emoji and wording deterministically from the active skill role and
-  either an immutable selected scope or a bounded Feature/Task outcome; never
+  either an immutable selected scope or a bounded Feature outcome; never
   choose them randomly;
 - use the skill-owned profile template for the role's content, while retaining
   the shared grammar and the existing `📚` planner, `🤖` orchestrator, and
-  `🛠️` worker convention;
+  `🛠️` Feature Worker convention;
 - for an Implement orchestrator, use `1 Feature` for one selected Feature and
   `<feature_count> Features` for multiple selected Features. Freeze that count
   from the authoritative run scope; do not derive it from worker count,

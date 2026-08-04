@@ -7,6 +7,8 @@ entry_conditions:
 inputs:
   - normalized-intent
   - resolved-intent
+  - feature-boundary-analysis
+  - resolved-feature-boundary
   - accepted-assumptions
   - source_route
   - entry_route
@@ -16,6 +18,7 @@ inputs:
   - repository-context
   - documentation-update-candidates
 outputs:
+  - feature-boundary-decision
   - feature-definition
   - feature-issue
   - feature-issue-ref
@@ -32,6 +35,7 @@ transitions:
   - to: blocked
     when: feature-definition-or-feature-relationship-is-conflicted
 stop_if:
+  - feature-boundary-analysis-is-missing-or-unresolved
   - acceptance-criteria-are-not-individually-provable
   - acceptance-criterion-id-is-missing-duplicate-or-reused
   - feature-acceptance-high-water-is-missing-or-decreases
@@ -49,6 +53,14 @@ Feature issue for each affected repository. The Feature definition is the
 canonical contract: outcome, non-goals, requirements, repository/path scope,
 context evidence, acceptance criteria, safety constraints, documentation
 updates, and validation policy. There is no separate Spec entity.
+
+Before freezing a new Feature identity, verify the Intake boundary analysis.
+Retain the smallest coherent boundary whose outcome is independently valuable
+and separately deliverable. Fold every candidate without an exclusive
+observable residual into this Feature and preserve its distinct work as Task
+scope. Record the candidates, residual-outcome evidence, final consolidation,
+and any independently deliverable candidate intentionally left for a separate
+Feature run. Block rather than publishing overlapping Feature identities.
 
 For a new Feature, render templates/feature.md. For an existing Feature,
 preserve its identity and stable content, compare it with the explicit

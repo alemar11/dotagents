@@ -1,7 +1,7 @@
 interface:
   display_name: "📚 Feature Planning"
-  short_description: "Plan a feature and break it into ready-to-implement tasks."
+  short_description: "Consolidate a feature and derive ready tasks."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:feature for an explicit repository-scoped Feature graph run; load the skill-owned task profile and shared task preflight before any task handoff, request its deterministic emoji title, converge Feature issues with stable bracketed acceptance-criterion IDs and vertical Task dependency graphs, apply the shared portable-content gate before every hosted write, support Feature maintenance through the same graph, and return the complete bundle without implementing code."
+  default_prompt: "Use $se2:feature for an explicit repository-scoped Feature graph run; consolidate caller-proposed splits into the smallest independently deliverable Feature boundary, derive stable acceptance criteria and vertical Task dependencies, support maintenance through the same graph, and return the complete bundle without implementing code."
 policy:
   allow_implicit_invocation: false

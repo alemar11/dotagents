@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "1.0.0"
-CONTRACT_VERSION = "1.0.0"
-SCHEMA_VERSION = 1
+CLI_VERSION = "2.0.0"
+CONTRACT_VERSION = "2.0.0"
+SCHEMA_VERSION = 2
 ENVELOPE = "se2-implement/ledger-envelope"
-ENVELOPE_VERSION = "1.0.0"
+ENVELOPE_VERSION = "2.0.0"
 RESET_TOKEN = "drop-and-recreate"
 TIMEOUT_MS = 5000
 DEFAULT_DB = Path.home() / ".cache/dotagents/plugins/se2/skills/implement/run-state.sqlite3"
@@ -38,15 +38,15 @@ GITHUB_ISSUE_URL = re.compile(
 FULL_SHA = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 FINAL_OPERATION_STATES = {"applied", "not-applied", "unknown", "blocked"}
 ASSIGNMENT_FIELDS = {
-    "feature_ref", "task_ref", "repository_identity", "status", "checkpoint",
+    "feature_ref", "repository_identity", "status", "checkpoint",
     "worker_task_id", "worker_project_id", "implementation_worktree",
     "base_branch", "head_branch", "base_sha", "candidate_sha", "pr_url", "repair_id",
     "contract_generation",
 }
 REQUIRED_ASSIGNMENT_FIELDS = {
-    "feature_ref", "task_ref", "repository_identity", "status", "checkpoint"
+    "feature_ref", "repository_identity", "status", "checkpoint"
 }
-IMMUTABLE_ASSIGNMENT_FIELDS = {"feature_ref", "task_ref", "repository_identity"}
+IMMUTABLE_ASSIGNMENT_FIELDS = {"feature_ref", "repository_identity"}
 TABLE_COLUMNS = {
     "runtime_metadata": (
         "singleton", "schema_version", "runtime_contract_version",
@@ -60,7 +60,7 @@ TABLE_COLUMNS = {
         "feature_ref", "run_id", "status", "revision", "created_at", "updated_at",
     ),
     "assignments": (
-        "run_id", "assignment_id", "feature_ref", "task_ref",
+        "run_id", "assignment_id", "feature_ref",
         "repository_identity", "status", "checkpoint", "worker_task_id",
         "worker_project_id", "implementation_worktree", "base_branch", "head_branch",
         "base_sha", "candidate_sha", "pr_url", "repair_id",
@@ -75,7 +75,7 @@ TABLE_COLUMNS = {
 SCHEMA_SQL = """
 CREATE TABLE runtime_metadata (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-  schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+  schema_version INTEGER NOT NULL CHECK (schema_version = 2),
   runtime_contract_version TEXT NOT NULL,
   runtime_cli_version TEXT NOT NULL,
   runtime_artifact_sha256 TEXT NOT NULL
@@ -102,7 +102,6 @@ CREATE TABLE assignments (
   run_id TEXT NOT NULL,
   assignment_id TEXT NOT NULL,
   feature_ref TEXT NOT NULL,
-  task_ref TEXT NOT NULL,
   repository_identity TEXT NOT NULL,
   status TEXT NOT NULL,
   checkpoint TEXT NOT NULL,
@@ -120,6 +119,7 @@ CREATE TABLE assignments (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (run_id, assignment_id),
+  UNIQUE (run_id, feature_ref),
   FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
 );
 CREATE TABLE operations (
@@ -270,7 +270,7 @@ def verify_schema(db: sqlite3.Connection) -> dict[str, Any]:
     if normalized_schema_objects(db) != expected_schema_objects():
         raise LedgerError(
             "invalid-state-schema",
-            "ledger tables, constraints, foreign keys, or indexes do not match schema 1",
+            f"ledger tables, constraints, foreign keys, or indexes do not match schema {SCHEMA_VERSION}",
         )
     rows = db.execute("SELECT * FROM runtime_metadata").fetchall()
     if len(rows) != 1 or rows[0]["singleton"] != 1:
@@ -492,10 +492,14 @@ def run_checkpoint(path: Path, run_id: str, revision: int, status: str,
                 raise LedgerError("assignments-not-ready", "complete requires verified assignments")
             if db.execute(
                 "SELECT 1 FROM assignments WHERE run_id=? "
-                "AND (status!='delivery-ready' OR checkpoint!='final-verify') LIMIT 1",
+                "AND NOT ((status='delivery-ready' AND checkpoint='final-verify') "
+                "OR (status='contract-resolved' AND checkpoint='repair-readback')) LIMIT 1",
                 (run_id,),
             ).fetchone():
-                raise LedgerError("assignments-not-ready", "all assignments must pass final verification")
+                raise LedgerError(
+                    "assignments-not-ready",
+                    "all assignments must be delivery-ready or authoritatively contract-resolved",
+                )
             if db.execute(
                 "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
                 (run_id,),
@@ -638,10 +642,14 @@ def feature_release(path: Path, run_id: str, input_path: Path) -> dict[str, Any]
             raise LedgerError("assignments-not-ready", "every Feature requires an assignment")
         if db.execute(
             "SELECT 1 FROM assignments WHERE run_id=? "
-            "AND (status!='delivery-ready' OR checkpoint!='final-verify') LIMIT 1",
+            "AND NOT ((status='delivery-ready' AND checkpoint='final-verify') "
+            "OR (status='contract-resolved' AND checkpoint='repair-readback')) LIMIT 1",
             (run_id,),
         ).fetchone():
-            raise LedgerError("assignments-not-ready", "all assignments must pass final verification")
+            raise LedgerError(
+                "assignments-not-ready",
+                "all assignments must be delivery-ready or authoritatively contract-resolved",
+            )
         if db.execute(
             "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
             (run_id,),
@@ -700,8 +708,6 @@ def assignment_input(path: Path) -> dict[str, Any]:
             raise LedgerError("invalid-input", f"{field} must be a full lowercase Git SHA")
     if "feature_ref" in payload:
         payload["feature_ref"] = canonical_issue_ref(payload["feature_ref"], "feature_ref")
-    if "task_ref" in payload:
-        payload["task_ref"] = canonical_issue_ref(payload["task_ref"], "task_ref")
     if "repository_identity" in payload:
         repository = payload["repository_identity"]
         if not repository.startswith("github:") or repository != repository.lower():
@@ -715,13 +721,6 @@ def assignment_input(path: Path) -> dict[str, Any]:
                 raise LedgerError(
                     "invalid-input",
                     "feature_ref must belong to repository_identity",
-                )
-        if "task_ref" in payload:
-            task_repository = payload["task_ref"].split("#", 1)[0]
-            if repository != f"github:{task_repository}":
-                raise LedgerError(
-                    "invalid-input",
-                    "task_ref must belong to repository_identity",
                 )
     return payload
 
@@ -776,6 +775,14 @@ def assignment_checkpoint(path: Path, run_id: str, assignment_id: str,
             missing = REQUIRED_ASSIGNMENT_FIELDS - set(payload)
             if missing:
                 raise LedgerError("invalid-input", f"missing fields: {sorted(missing)}")
+            if db.execute(
+                "SELECT 1 FROM assignments WHERE run_id=? AND feature_ref=? LIMIT 1",
+                (run_id, payload["feature_ref"]),
+            ).fetchone():
+                raise LedgerError(
+                    "feature-assignment-exists",
+                    f"Feature {payload['feature_ref']} already has an assignment in run {run_id}",
+                )
             if revision != 0:
                 raise LedgerError("revision-conflict", "new assignment requires revision 0")
             columns = ["run_id", "assignment_id", *payload, "revision", "created_at", "updated_at"]

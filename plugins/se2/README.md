@@ -41,13 +41,14 @@ Its skills are deliberately separated by responsibility:
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se2:audit`.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
-  to planner, orchestrator, and worker tasks, with authoritative readback and
+  to planner, orchestrator, and Feature Worker tasks, with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
   metadata.
 - skills/implement/ accepts one or more complete authoritative GitHub Features
   and returns a verified standalone or stacked PR topology. Its graph owns
-  multi-Feature scheduling, a separate delivery projection, isolated Sol
-  workers with exact-HEAD in-session review, Contract Repair through Feature
+  multi-Feature scheduling, a separate delivery projection, one isolated Sol
+  Feature Worker and one PR per implementation-eligible Feature, serial Task-DAG
+  execution inside that Feature worktree, exact-HEAD in-session review, Contract Repair through Feature
   maintenance, stack reconciliation, and final exact-HEAD evidence. A stack
   represents a true same-repository code dependency, never serialization alone;
   G owns PR publication and pairwise stack linking. GitHub interaction is
@@ -57,9 +58,10 @@ Its skills are deliberately separated by responsibility:
   `ready-with-manual-action` are accepted without granting Implement any merge,
   auto-merge, bypass, or queue authority.
   Feature and Task acceptance criteria use stable bracketed IDs rather than
-  Markdown checkbox state; workers bind Task criterion evidence to candidate
-  HEADs and the orchestrator aggregates Feature coverage without rewriting
-  issue bodies.
+  Markdown checkbox state; Feature Workers bind every Task criterion to the
+  same final Feature candidate HEAD and the orchestrator aggregates Feature
+  coverage without rewriting issue bodies. Zero-delta Features route through
+  Contract Repair and never receive empty commits, cosmetic edits, or empty PRs.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.
@@ -75,9 +77,11 @@ Its skills are deliberately separated by responsibility:
   belong only to the separate Implement workflow.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
-- the prototype returns one Feature plus vertical Task dependency graphs,
-  including multi-repository Feature links and local dependency waves, without
-  implementing code. Acceptance criteria are ordinary list items with stable
+- the prototype consolidates caller-proposed same-repository Feature splits
+  that lack exclusive observable outcomes, then returns one minimal Feature
+  plus vertical Task dependency graphs, including multi-repository Feature
+  links and local dependency waves, without implementing code. Acceptance
+  criteria are ordinary list items with stable
   `F-AC-NN` and `T-AC-NN` identities and explicit coverage. Feature publishes
   through an explicit terminal
   preview/publish subgraph with publish as the default and preview only by

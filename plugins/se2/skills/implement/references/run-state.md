@@ -4,7 +4,7 @@ This reference owns the minimal SQLite WAL checkpoint and recovery ledger for
 `se2:implement`. The ledger is not the workflow engine and never replaces
 authoritative application, GitHub, Git, or filesystem readback.
 
-The orchestrator is the sole runtime ledger client. Workers communicate
+The orchestrator is the sole runtime ledger client. Feature Workers communicate
 bounded evidence to the orchestrator and never invoke, inspect, or reconcile
 the ledger directly.
 
@@ -12,14 +12,14 @@ the ledger directly.
 
 Normal execution uses the shipped standard-library Python artifact at
 `scripts/run-state`. The CLI version, runtime contract, and database schema are
-independent identities. The initial contract is:
+independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `1.0.0` |
-| Runtime contract | `1.0.0` |
-| Database schema | integer `1` |
-| JSON envelope | `se2-implement/ledger-envelope` version `1.0.0` |
+| CLI | `2.0.0` |
+| Runtime contract | `2.0.0` |
+| Database schema | integer `2` |
+| JSON envelope | `se2-implement/ledger-envelope` version `2.0.0` |
 
 The default database is:
 
@@ -68,18 +68,19 @@ Keep only five tables:
   aggregate status, and revision;
 - `feature_claims`: exclusive active ownership from one authoritative GitHub
   Feature to one Implement run, with revision and explicit release state;
-- `assignments`: Feature/Task refs, worker identity and worktree, branches,
+- `assignments`: one immutable Feature ref, Feature Worker identity and worktree, branches,
   SHAs, PR ref, repair identity, contract generation, checkpoint, status, and
   revision;
 - `operations`: one idempotency reservation for a side effect, its subject,
   status, receipt ref, and readback ref.
 
 Do not store Feature/Task bodies, prompts, messages, findings, logs, arbitrary
-JSON, model/reasoning profiles, code state, or worker technical state.
+JSON, model/reasoning profiles, code state, or Feature Worker technical state.
 
 Path claims are transient control-plane reservations, not a sixth ledger table.
-The orchestrator must normalize an assignment's `allowed_paths`, atomically
-claim the resulting envelope before worker bootstrap, and release or
+The orchestrator must normalize the union of every Task's `allowed_paths` in a
+Feature assignment, atomically claim the resulting envelope before Feature
+Worker bootstrap, and release or
 reconcile it at the assignment boundary. Never infer path ownership from an
 active Feature claim, a theoretical Feature wave, or a stale assignment
 checkpoint. On resume, independently re-read the authoritative bundle and
@@ -111,29 +112,33 @@ set or changes nothing; an active claim from another run returns
 `owner/repository#number` identity before lookup or storage, including an
 equivalent GitHub issue URL. `feature release` accepts the complete active claim
 set and expected revision for every member, verifies the run is at
-`release-claims`, every assignment is delivery-ready at `final-verify`, and no
-operation remains pending or unknown, then releases the whole set in one
+`release-claims`, every assignment is either delivery-ready at `final-verify`
+or authoritatively `contract-resolved` at `repair-readback`, and no operation
+remains pending or unknown, then releases the whole set in one
 transaction. It never releases one Feature independently. Preserve claims for
 resumable blocked or deferred runs. Never infer release from task or PR state
 without terminal reconciliation.
 
-An assignment may be created or moved only while its `feature_ref` has an
+Exactly one assignment may exist per claimed Feature in a run. An assignment
+may be created or moved only while its `feature_ref` has an
 active claim owned by the same run. A released, missing, or foreign claim
 blocks the checkpoint; assignment state never establishes Feature ownership.
-Feature, Task, and repository identity are immutable after creation, and
+Feature and repository identity are immutable after creation, and
 `contract_generation` may stay unchanged or advance by exactly one.
 
-Criterion-level acceptance evidence remains in the authoritative worker task
-report. The assignment's existing `worker_task_id`, `candidate_sha`, Task ref,
-and contract generation form its recovery key. On resume, reread the worker
-report and require its acceptance matrix to match that complete key; never add
-the matrix, issue body, or an opaque evidence field to the ledger.
+Criterion-level acceptance evidence remains in the authoritative Feature
+Worker task report. The assignment's existing `worker_task_id`, `candidate_sha`,
+Feature ref, and contract generation form its recovery key. On resume, reread
+the Feature Worker report and require its complete Task-ref set and acceptance
+matrix to match the current authoritative Feature bundle and that recovery key;
+never add the matrix, issue body, or an opaque evidence field to the ledger.
 
 `run checkpoint` and `assignment checkpoint` accept only documented,
 allowlisted fields and one expected revision. They record durable boundaries,
 not every graph transition. A run can become `complete` only after at least one
 Feature claim has been released, at least one assignment exists, every
-assignment is delivery-ready at `final-verify`, and all operations are resolved.
+assignment is delivery-ready at `final-verify` or authoritatively
+`contract-resolved` at `repair-readback`, and all operations are resolved.
 An empty run can never complete. `operation begin` is idempotent for one
 `run_id, action, subject_id`; duplicate calls return the original operation.
 Beginning a side effect requires an active run and the assignment's active
@@ -148,7 +153,7 @@ Treat a bounded application-task title adjustment as an application side
 effect. Before applying it, reserve an operation with
 `action=task-title-adjust` and a stable subject derived from the exact task
 identity alone. Retain the exact requested title in the operation's referenced
-effect evidence. Bind worker and Contract Repair planner reservations to their
+effect evidence. Bind Feature Worker and Contract Repair planner reservations to their
 assignment; the orchestrator owns every reservation and readback. Finish the
 operation from the adjustment evidence and authoritative title observation.
 On resume, reconcile a pending or `unknown` reservation and never begin a
@@ -157,14 +162,14 @@ outcome or canonical title. This usage reuses the existing operations contract
 and requires no schema, runtime-contract, envelope, or CLI-version change.
 
 Delivery topology does not add a table or assignment field. Reconstruct it from
-the authoritative Task dependency graph, assignment `base_branch`, `base_sha`,
+real Feature-level code dependencies and assignment `base_branch`, `base_sha`,
 `head_branch`, `candidate_sha`, live PR state, and operation evidence. Before a
 stacked child publication, reserve the normal publication effect and a separate
 child-bound operation with `action=stack-link`. Use a stable subject derived
 from repository identity, verified parent PR, child branch, and candidate SHA
 so the reservation exists before the G-owned workflow attempts the link.
 
-After the worker returns, finish the publication and stack-link operations
+After the Feature Worker returns, finish the publication and stack-link operations
 independently. Store the G receipt by reference and require an authoritative
 parent/child readback reference. A confirmed PR with an ambiguous link records
 publication as `applied` and stack-link as `unknown`; it never replays PR
