@@ -20,8 +20,11 @@
 <plugin-root>/scripts/g reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/g reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
 <plugin-root>/scripts/g reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file>
+<plugin-root>/scripts/g --json reviews ready-trigger --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-event-id <event-id> --ready-ref <event-url> --ready-at <utc-timestamp> --base-branch <branch> --body-fingerprint <sha256> --output-file <absolute-ready-receipt-file>
 <plugin-root>/scripts/g --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/g --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
+<plugin-root>/scripts/g --json reviews ready-check --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file>
+<plugin-root>/scripts/g --json reviews ready-wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file> --timeout <caller-owned-duration>
 <plugin-root>/scripts/g --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
 ```
 
@@ -57,8 +60,9 @@ The script does not write configuration files.
 
 ## Owned Review Operations
 
-Managed orchestration uses the closed operations `request`, `wait`, `warning`,
-`reply`, `resolve`, `reconcile-mutation`, and `reconcile-terminal`. G
+Managed orchestration uses the closed operations `request`, `wait`,
+`ready-check`, `ready-wait`, `warning`, `reply`, `resolve`,
+`reconcile-mutation`, and `reconcile-terminal`. G
 8.1.4 owns the complete `g-review-operation-request:v1` and
 `g-review-operation-result:v1` schemas. `prepare` and both validators are
 read-only. `execute` revalidates the exact controller envelope and atomically
@@ -131,6 +135,10 @@ for a replacement SHA-bearing comment. `ready-check` and `ready-wait` require a
 they correlate only provider artifacts after that ready timestamp and exact
 full SHA. They never create or search for an explicit request comment and
 return a `g-codex-ready-review-certificate:v1` projection with the observation.
+Use this ready lineage for the initial automatic review. After a findings fix
+is pushed, use a fresh explicit `request` and identity-bound `wait` for each new
+full SHA until clean. Do not treat receipt-less `not-requested`, absent comments,
+or zero unresolved threads as a clean automatic-review result.
 `wait` also returns `attempts`, `state_transitions`, and `unchanged_attempts`.
 The observation fingerprint excludes those counters and elapsed time, so
 callers can suppress unchanged ledger and progress updates.

@@ -2,8 +2,30 @@
 
 ## Check Or Wait For Automated Review
 
-Create the typed request first. G owns the only accepted request grammar
-and returns the complete provider identity receipt:
+### Initial automatic review
+
+When automatic Codex review is configured, opening a PR for review triggers the
+first review without an `@codex review` comment. Bind that cycle to the exact
+G-owned draft-to-ready transition receipt and published full SHA:
+
+```bash
+<plugin-root>/scripts/g --json reviews ready-check --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file>
+<plugin-root>/scripts/g --json reviews ready-wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file> --timeout <caller-owned-duration>
+```
+
+`ready-check` reads once. `ready-wait` polls with bounded backoff. Neither posts
+or searches for an explicit request comment. G may normalize a clean formal
+review, authenticated terminal comment, or provider-authored PR-level 👍
+reaction created after the ready transition as terminal clean evidence.
+Findings are terminal for that reviewed head. Absence of
+comments, zero unresolved threads, or a generic `not-requested` observation is
+not terminal evidence for this ready-triggered lineage.
+
+### Explicit re-review after a fix push
+
+After findings are fixed, committed, validated, and pushed to the existing PR,
+create one typed request for the new full SHA. G owns the only accepted request
+grammar and returns the complete provider identity receipt:
 
 ```bash
 <plugin-root>/scripts/g --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file>
@@ -51,8 +73,8 @@ first observation and later transitions, but must not rewrite control state or
 emit progress for an unchanged fingerprint. Use one bounded `wait`; do not
 build a manual `check` plus shell-sleep loop around it.
 
-After fixing and pushing findings, post a fresh typed review request with a new
-request key and run the check or wait against the new full SHA. A timed-out
+Repeat the fix, push, fresh typed request, and wait cycle until the current full
+SHA has a clean terminal result. A timed-out
 wait returns exit code `124`, the last observed state, attempt count,
 transition count, and unchanged-attempt count; a calling orchestrator decides
 whether to schedule a later heartbeat.

@@ -100,9 +100,33 @@ link blocks only that assignment while independent work continues.
 
 ## Hosted review monitoring
 
-Monitor the ready-triggered provider review, CI, mergeability, and review
-threads for the current full PR HEAD. Pending, timed-out, stale, ambiguous, or
-draft-only review evidence is not terminal.
+The first hosted Codex review and every later re-review have different trigger
+lineages. Keep them separate:
+
+1. After the G-owned draft-to-ready transition, persist its exact typed ready
+   receipt and invoke the G-owned `ready-wait` operation for the published full
+   PR HEAD. This observes the automatic review configured for a PR opened for
+   review and never posts `@codex review`. Do not invoke `reviews request` for
+   this initial cycle.
+2. Accept only G-normalized current-head terminal evidence. A clean formal
+   review, authenticated terminal comment, or clean provider reaction may be a
+   clean outcome; actionable inline or terminal findings return the assignment
+   to the same implementation worker. Absence of comments, zero unresolved
+   threads, zero CI checks, or a generic `not-requested` observation is not a
+   clean result.
+3. After findings, the worker fixes and validates, creates a new candidate,
+   repeats native review, and publishes the new exact HEAD to the existing PR.
+   Only then invoke the G-owned `request` operation with a new request key,
+   persist its exact request receipt, and invoke `wait` against that same full
+   SHA. Repeat this fix, publish, explicit-request, and wait cycle until the
+   current full PR HEAD has a clean terminal result.
+
+Monitor CI, mergeability, and review threads alongside that provider-review
+cycle. Pending, timed-out, stale, ambiguous, draft-only, missing-ready-receipt,
+or request-correlation evidence is not terminal. One bounded wait may return a
+pending state at its caller-owned deadline; when continued monitoring remains
+authorized, the orchestrator resumes through later bounded waits without
+posting a duplicate request or resetting the existing lineage.
 
 For a stacked child, also monitor the immediate parent PR and base relationship.
 Any parent HEAD or readiness change invalidates the child's ancestry, review,
@@ -110,12 +134,10 @@ CI, and readiness evidence even when the child head itself did not move. Wait
 for the parent to pass final verification, then require the child worker to
 rebase onto the new parent HEAD and repeat its complete candidate cycle.
 
-If hosted review produces an actionable finding, return evidence to the same
-implementation worker. The worker fixes and validates; the G-owned local Git
-workflow creates the new candidate, and the G-owned publication workflow
-publishes it. Then repeat native review in the same worker session and request a
-new hosted review bound to that exact SHA. Never force-push, merge, enqueue,
-deploy, release, or perform post-merge closure.
+If hosted review produces an actionable finding, preserve its exact provider,
+PR, head, artifact, and observation fingerprint when returning it to the same
+implementation worker. Never force-push, merge, enqueue, deploy, release, or
+perform post-merge closure.
 
 ## Final verification
 
@@ -128,7 +150,10 @@ The orchestrator performs read-only final verification. Require:
 - PR publication readback and exact PR HEAD equality;
 - `standalone` default-base evidence, or stacked parent identity, unchanged
   parent HEAD, exact child base, stack order, and verified link receipt;
-- ready-transition and current-head hosted review evidence;
+- ready-transition receipt plus a clean current-head automatic-review
+  certificate for an unchanged initial HEAD, or the latest explicit-request
+  receipt plus its clean current-head review result after one or more fix
+  pushes;
 - required CI, mergeability, and zero unresolved actionable review threads.
 
 Return repairable evidence mismatches to the worker without diagnosis. The

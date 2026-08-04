@@ -72,7 +72,7 @@ G envelope:
 ```json
 {
   "ok": true,
-  "version": "2.1.0",
+  "version": "2.1.1",
   "command": ["stack", "view"],
   "data": {}
 }

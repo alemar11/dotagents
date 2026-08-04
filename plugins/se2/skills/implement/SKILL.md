@@ -120,7 +120,7 @@ not workflow transitions.
 | review-decision | decision | in-session review result is bound to current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
 | publish-pr | action | native review is clean and the declared publication scope is resolved | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
 | stack-reconcile | validation | a stacked PR was published or its parent, base, link, or exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
-| ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
+| ready-monitor | action | PR identity and exact published HEAD are verified; the initial cycle observes the automatic ready-triggered review, while each post-fix HEAD uses one explicit request lineage | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
 | final-verify | validation | current PR, topology, CI, review, task, checkout, and HEAD evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read, durable | none |
 | assignment-blocked | action | one assignment cannot progress but independent work may remain | schedule | durable | none |
 | assignment-deferred | action | one assignment awaits bounded user authorization | schedule | durable | none |

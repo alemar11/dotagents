@@ -75,11 +75,15 @@ class ReviewsContractTests(unittest.TestCase):
         clock.now.return_value = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
         return clock
 
-    def automated_review_api(self, *, reviews=None, inline=None, comments=None, reactions=None):
+    def automated_review_api(
+        self, *, reviews=None, inline=None, comments=None, reactions=None,
+        issue_reactions=None,
+    ):
         payloads = {
             "pulls/12/reviews": reviews or [],
             "pulls/12/comments": inline or [],
             "issues/12/comments": comments or [],
+            "issues/12/reactions": issue_reactions or [],
             "issues/comments/99/reactions": reactions or [],
         }
 
@@ -186,14 +190,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "2.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "2.1.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.1.0")
+        self.assertEqual(payload["version"], "2.1.1")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -577,7 +581,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "2.1.0")
+        self.assertEqual(payload["version"], "2.1.1")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -606,7 +610,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.1.0")
+        self.assertEqual(payload["version"], "2.1.1")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -1088,6 +1092,42 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(payload["review_state"], "stale")
         self.assertEqual(payload["error_code"], "head_drift")
+
+    def test_ready_review_accepts_post_ready_provider_thumb_up_on_pr(self) -> None:
+        head = "b" * 40
+        pull = {
+            "head": {"sha": head}, "draft": False, "base": {"ref": "main"},
+            "body": "body", "html_url": "https://github.com/owner/repo/pull/12",
+        }
+        reactions = [
+            {
+                "id": 90, "content": "+1", "created_at": "2026-07-20T12:04:00Z",
+                "user": {"login": "chatgpt-codex-connector[bot]"},
+            },
+            {
+                "id": 91, "content": "+1", "created_at": "2026-07-20T12:06:00Z",
+                "user": {"login": "someone-else"},
+            },
+            {
+                "id": 92, "content": "+1", "created_at": "2026-07-20T12:07:00Z",
+                "user": {"login": "chatgpt-codex-connector[bot]"},
+            },
+        ]
+        with mock.patch.object(cli, "gh_json", return_value=pull), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(issue_reactions=reactions),
+        ):
+            payload = cli.check_ready_automated_review(
+                "owner/repo", 12, "codex", head, self.ready_trigger(head)
+            )
+
+        self.assertEqual(payload["review_state"], "clean")
+        self.assertEqual(payload["evidence"]["kind"], "clean-reaction")
+        self.assertEqual(payload["evidence"]["object_id"], 92)
+        self.assertEqual(payload["evidence"]["head"], head)
+        self.assertEqual(payload["clean_reaction"], {"count": 1, "latest_id": 92})
+        self.assertEqual(payload["certificate"]["review_state"], "clean")
 
     def test_ready_trigger_rejects_tampered_fingerprint(self) -> None:
         trigger = self.ready_trigger("c" * 40)

@@ -1241,6 +1241,7 @@ def check_ready_automated_review(
     reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
     inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
     conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+    issue_reactions = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/reactions")
 
     provider_reviews = [
         item for item in reviews
@@ -1262,6 +1263,12 @@ def check_ready_automated_review(
             continue
         if _provider_timestamp(parsed.get("created_at"), "created_at") > ready_at:
             terminal_comments.append(parsed)
+    clean_reactions = [
+        item for item in issue_reactions
+        if authored_by(item, provider)
+        and str(item.get("content") or "") == "+1"
+        and _provider_timestamp(item.get("created_at"), "created_at") > ready_at
+    ]
 
     formal_outcomes: set[str] = set()
     for item in provider_reviews:
@@ -1273,7 +1280,8 @@ def check_ready_automated_review(
     if top_level_findings:
         formal_outcomes.add("findings")
     terminal_outcomes = {str(item["outcome"]) for item in terminal_comments}
-    outcomes = formal_outcomes | terminal_outcomes
+    reaction_outcomes = {"clean"} if clean_reactions else set()
+    outcomes = formal_outcomes | terminal_outcomes | reaction_outcomes
 
     evidence: dict[str, Any] = {
         "kind": "none",
@@ -1297,6 +1305,21 @@ def check_ready_automated_review(
         )
     elif top_level_findings:
         evidence = _ready_artifact("inline-finding", top_level_findings[0], "findings")
+    elif clean_reactions:
+        latest_reaction = max(
+            clean_reactions,
+            key=lambda item: str(item.get("created_at") or ""),
+        )
+        evidence = {
+            "kind": "clean-reaction",
+            "object_id": latest_reaction.get("id"),
+            "object_url": pull.get("html_url") or trigger["ready_ref"],
+            "actor": _item_login(latest_reaction),
+            "body_fingerprint": None,
+            "created_at": latest_reaction.get("created_at"),
+            "outcome": "clean",
+            "head": expected_head,
+        }
 
     if not head_is_current or not ready_is_current or not base_is_current or not body_is_current:
         review_state = "stale"
@@ -1332,6 +1355,10 @@ def check_ready_automated_review(
         "terminal_comment": {
             "count": len(terminal_comments),
             "outcomes": sorted(terminal_outcomes),
+        },
+        "clean_reaction": {
+            "count": len(clean_reactions),
+            "latest_id": evidence.get("object_id") if evidence.get("kind") == "clean-reaction" else None,
         },
         "evidence": evidence,
         "failure_kind": "head-drift" if review_state == "stale" else "ambiguous-provider-evidence" if review_state == "ambiguous" else None,
