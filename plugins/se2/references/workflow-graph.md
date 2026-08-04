@@ -1,12 +1,12 @@
 # SE2 Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE2
-workflows. It applies to Learn, Idea, Feature, and Implement without turning
+workflows. It applies to Learn, Idea, Feature, Implement, and Audit without turning
 every skill into a Feature or Task graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 marker and hosted Idea shape. This reference owns workflow structure only.
-Feature still owns its Feature/Task semantics; Learn, Idea, and Implement own
+Feature still owns its Feature/Task semantics; Learn, Idea, Implement, and Audit own
 their skill-specific registries and branch details.
 
 ## Graph model
@@ -54,7 +54,7 @@ configuration merely to persist a graph run.
 - A terminal node has no outgoing transitions.
 
 Feature keeps its existing step files and registry as its local source of
-truth. Learn, Idea, and Implement keep their registries in their SKILL.md files
+truth. Learn, Idea, Implement, and Audit keep their registries in their SKILL.md files
 while branch-specific details remain in routed references.
 
 ## Common terminal meanings
@@ -70,13 +70,17 @@ Each skill declares the subset it supports. Feature retains its existing
 complete and blocked terminal contract. Learn uses all four meanings. Idea
 uses reported, deferred, complete, and blocked.
 Implement uses complete, deferred, and blocked.
+Audit uses reported and blocked.
 
 ## Authority and side effects
 
-Preview and read-only branches must not inspect or mutate hosted state. A
-durable or hosted side effect requires an explicit authority decision and the
-owning publication workflow's availability gate. Ambiguous external results
-must transition to reconciliation before any retry.
+Preview branches declared local-only must not inspect provider or tracker
+hosted state. A read-only branch may inspect external state only when its owning
+skill explicitly requires observational reads, as Audit does for application
+sessions, and must never mutate that state. A durable or hosted side effect
+requires an explicit authority decision and the owning publication workflow's
+availability gate. Ambiguous external results must transition to reconciliation
+before any retry.
 
 The graph records authority and side effects as run facts. It must not turn
 caller-owned publication choices, task state, or provider availability into

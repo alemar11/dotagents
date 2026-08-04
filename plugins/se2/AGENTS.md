@@ -1,9 +1,9 @@
 # SE2 Plugin Maintenance
 
 plugins/se2/ is an experimental graph-first workflow package. Learn, Idea,
-Feature, and Implement expose distinct workflow graphs; Feature additionally
-owns the Feature/Task graph. SE2 is independent from plugins/se/; do not
-silently merge its graph contract into the existing SE plugin.
+Feature, Implement, and Audit expose distinct workflow graphs; Feature
+additionally owns the Feature/Task graph. SE2 is independent from plugins/se/;
+do not silently merge its graph contract into the existing SE plugin.
 
 ## Ownership map
 
@@ -44,6 +44,12 @@ silently merge its graph contract into the existing SE plugin.
   workflow registry, preview/publish routing, and the capture-only terminal
   boundary. Its references own the canonical body, Idea source handoff, and
   publication recovery details.
+- skills/audit/SKILL.md owns explicit-only active-session discovery, frozen
+  cohort monitoring, evidence-calibrated graph-conformance reconstruction,
+  finding classification, stopping behavior, and its read-only report.
+- skills/audit/agents/openai.yaml owns Audit discovery metadata and must keep
+  implicit invocation disabled. Audit has no scripts, ledger, task profile, or
+  persistent output.
 - .agents/plugins/marketplace.json owns repo-local discovery registration.
 
 ## Maintenance contract
@@ -68,6 +74,9 @@ silently merge its graph contract into the existing SE plugin.
 - Keep Idea hosted output behind the G-owned issue workflow and the shared
   fail-closed dependency gate. Never add a direct tracker transport or a
   compatibility alias for a missing dependency.
+- Keep Audit strictly observational. Attribute SE2 use only from task-visible
+  evidence, treat missing visibility as indeterminate, and never add task
+  contact, repository/GitHub mutation, delegation, or persistent audit state.
 - Keep repository context discovery rooted at AGENTS.md hierarchy and generic:
   do not add a global context-document taxonomy or encode context discovery as
   graph nodes. Keep future tracker capabilities separate from the initial
@@ -90,6 +99,9 @@ silently merge its graph contract into the existing SE plugin.
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, and terminal nodes without outgoing edges.
+- Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
+  registry/projection reconciliation, the intentional refresh loop, terminal
+  reachability, evidence classifications, and prohibited mutation behavior.
 - Run the Implement run-state CLI help, version, read-only doctor, and focused
   standard-library tests against temporary databases.
 - Check that the marketplace path and plugin metadata point to this package.

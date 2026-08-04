@@ -1,8 +1,8 @@
 # SE2
 
 SE2 is an experimental issue-first, graph-first workflow plugin for durable
-repository context, Idea capture, Feature planning, and verified Feature
-implementation.
+repository context, Idea capture, Feature planning, verified Feature
+implementation, and read-only live session auditing.
 
 Its skills are deliberately separated by responsibility:
 
@@ -11,7 +11,7 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, Feature, and Implement workflow graphs. Feature keeps its separate
+  Idea, Feature, Implement, and Audit workflow graphs. Feature keeps its separate
   Feature/Task dependency DAG; the Implement workflow consumes that DAG without
   becoming or rewriting it.
 - references/task-preflight.md and references/task-handoff.md are root-level
@@ -26,6 +26,12 @@ Its skills are deliberately separated by responsibility:
   It maintains evidence-backed Project Context, ADRs, localization memory,
   Code Review Rules, and proposal-first AGENTS.md compaction without tracker,
   publication, task, or worker behavior. Invoke it explicitly as se2:learn.
+- skills/audit/ is the explicit read-only live-monitoring entry point. It
+  freezes an attributable active-session cohort, reconstructs each observed
+  SE2 workflow path from positive evidence, and reports feedback, bugs,
+  regressions, graph violations, and graph-design improvements. It never
+  contacts monitored sessions, writes repositories, or persists audit state.
+  Invoke it explicitly as `se2:audit`.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
   to planner, orchestrator, and worker tasks; titles remain display metadata.
 - skills/implement/ accepts one or more complete authoritative GitHub Features

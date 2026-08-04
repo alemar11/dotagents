@@ -1,0 +1,214 @@
+---
+name: audit
+description: "Monitor active Codex App sessions that visibly use SE2-owned skills, reconstruct their workflow-graph conformance from positive evidence, and report feedback, bugs, regressions, graph violations, and graph-design improvements read-only; use only after an explicit $se2:audit invocation."
+---
+
+# Audit SE2 Sessions
+
+## Scope
+
+Use this skill only after an explicit `$se2:audit` invocation. Observe the
+initial cohort of active application sessions that can be attributed directly
+to Learn, Idea, Feature, Implement, or another non-monitoring skill owned by the
+current SE2 plugin. Monitor that frozen cohort until every selected session
+becomes terminal or the user stops the audit.
+
+Keep the audit read-only and return its report in the invoking session. Do not
+persist transcripts, findings, checkpoints, or monitor state. This skill owns
+no model profile, worker topology, task creation, or delegation behavior.
+
+Read the shared
+[workflow-graph.md](../../references/workflow-graph.md) before evaluating any
+SE2 graph. For each selected session, read the exact active contract for every
+confirmed SE2 skill before assessing it.
+
+## Workflow graph
+
+The registry is the structural source of truth. Mermaid is its maintained
+projection.
+
+| node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| intake | action | Resolve explicit scope and stopping policy. | explicit `$se2:audit` invocation | user request | frozen audit scope and stop policy | capability-check when scope is valid; blocked when invocation or scope is invalid | invocation is not explicit or targets mutation | none | none |
+| capability-check | validation | Establish a reliable live inventory and authoritative-read boundary. | audit scope is frozen | live application capabilities | capability and coverage record | discover when a reliable subset is observable; blocked when no responsible observation is possible | inventory and authoritative reads are both unavailable | read | none |
+| discover | action | Freeze the initial active-session cohort and coverage boundary. | minimum live capabilities are available | active-session inventory | frozen cohort and coverage boundary | attribute when candidates exist; reported when none exist; blocked when inventory evidence is unusable | no reliable cohort boundary can be established | read, transient | none |
+| attribute | validation | Retain only sessions with direct SE2-use evidence. | initial cohort is frozen | candidate sessions and task-visible evidence | attributed cohort and exclusions | observe when attributable sessions exist; reported when none qualify | none | read, transient | none |
+| observe | action | Read selected sessions and advance their evidence frontiers. | at least one session is attributable | attributed cohort and prior frontiers | fresh session observations and evidence gaps | assess when responsible evidence exists; blocked when no selected session can be assessed | all selected evidence is unavailable or unusable | read, transient | none |
+| assess | validation | Reconstruct graph conformance and classify evidence-backed findings. | fresh session evidence and skill contracts are available | observations, graph registries, and contract baselines | conformance map, feedback, and finding registry | monitor-decision when assessment is responsible; blocked when no contract or evidence boundary supports assessment | every required baseline or evidence frontier is unusable | read, transient | none |
+| monitor-decision | decision | Continue monitoring or return the current terminal report. | selected-session states and evidence gaps are known | assessed cohort and user-stop state | refresh decision or terminal report | refresh while any selected session is active and the user has not stopped; reported when cohort is terminal, empty, or user-stopped; blocked when no responsible report remains possible | none | none | none |
+| refresh | action | Perform a bounded authoritative wait or read refresh. | at least one selected session remains active | active cohort and evidence frontiers | refreshed states or bounded no-change evidence | observe after each bounded refresh | user stops during the wait | read, transient | none |
+| reported | terminal | Return a complete or explicitly partial read-only report. | no attributable sessions, terminal cohort, or user stop | report artifacts and coverage record | final Markdown report | none | terminal | none | reported |
+| blocked | terminal | Report why no responsible audit result can be established. | minimum inventory, contract, or evidence boundary is unavailable | retained evidence and exact blocker | blocker report and smallest recovery input | none | terminal | none | blocked |
+
+~~~mermaid
+flowchart TD
+    intake --> capability-check
+    intake --> blocked
+    capability-check --> discover
+    capability-check --> blocked
+    discover --> attribute
+    discover --> reported
+    discover --> blocked
+    attribute --> observe
+    attribute --> reported
+    observe --> assess
+    observe --> blocked
+    assess --> monitor-decision
+    assess --> blocked
+    monitor-decision --> refresh
+    monitor-decision --> reported
+    monitor-decision --> blocked
+    refresh --> observe
+~~~
+
+The `refresh` loop is intentional: it represents monitoring over time, not an
+implementation Task DAG. Terminal nodes have no outgoing transitions.
+
+## Cohort discovery and attribution
+
+At `capability-check`, inspect current live application capabilities. Require a
+way to inventory recent sessions across available projects and hosts, read a
+selected session authoritatively, and refresh its state. If full active-session
+coverage cannot be established but a reliable subset is available, continue
+with `coverage: partial`; do not claim complete coverage.
+
+At `discover`, freeze the initial cohort of sessions that are active at that
+observation boundary. Newly started sessions are outside the run and require a
+new or explicitly broadened audit. Exclude:
+
+- the current audit session and other audit or monitor sessions;
+- inactive sessions at the discovery boundary;
+- unrelated chats and sessions that expose only a skill catalog;
+- sessions whose only SE2 signal is a title, description, project path,
+  repository proximity, cache entry, or behavior resemblance.
+
+At `attribute`, confirm SE2 use only from task-visible evidence such as an
+explicit canonical `$se2:<skill>` invocation, a direct SE2 skill source link,
+or a verified SE2-owned handoff/profile reference and role. G-owned activity
+alone is not SE2 use. Record exact session identity, host, project and
+repository when exposed, current state, confirmed skills, comparison-contract
+source, and evidence frontier.
+
+If the session's loaded SE2 version or source revision cannot be established,
+record `contract-baseline-unverified`. Compare cautiously with the auditor's
+current contract, but keep every contract-derived skill bug, graph violation,
+and regression `provisional` or `indeterminate`. Only baseline-independent
+runtime, repository, dependency, or user-condition findings may be confirmed.
+
+## Observation and stopping
+
+Read each selected session without sending messages or changing its lifecycle.
+Treat timeout, truncation, missing history, or failed reads as evidence gaps.
+One unreadable session does not block the cohort when other responsible results
+remain possible.
+
+Refresh a selected session after a material state transition, an incomplete or
+truncated read, a monitoring gap, and immediately before final judgment. Use
+bounded waits for batches supported by the live runtime; otherwise use bounded
+authoritative reads and report reduced coverage.
+
+Continue until:
+
+- every selected session is terminal;
+- no session was attributable; or
+- the user stops the monitor.
+
+A user stop returns `reported` with the evidence collected so far, explicit
+partial coverage, and every unfinished session identified. Use `blocked` only
+when inventory, contract, or evidence loss prevents any responsible report.
+A stalled or input-waiting selected session remains active: no-progress alone
+does not invent a terminal state or an overall audit timeout. Keep each wait or
+read bounded, then continue the monitor until the session becomes terminal or
+the user stops it.
+
+## Graph-conformance reconstruction
+
+For each confirmed skill, use its registry as the structural authority and its
+Mermaid only as a projection. Record positively evidenced node entries,
+artifacts, authority decisions, side effects, transitions, and terminal state.
+Classify each relevant relation as:
+
+- `confirmed`: direct evidence establishes the node or transition;
+- `compatible-unobserved`: visible behavior is compatible but the internal
+  transition is not exposed;
+- `indeterminate`: available evidence cannot support a judgment;
+- `violated`: fresh evidence contradicts the active graph contract.
+
+Confirm `graph-violation` only when evidence proves at least one of:
+
+- a transition absent from the registry;
+- entry without a required entry condition;
+- a prohibited side effect or authority crossing;
+- continuation from a terminal node;
+- a terminal claim incompatible with required evidence.
+
+Missing narration or hidden reasoning is never automatically a violation. For
+Implement's hierarchical graph, combine orchestrator and worker evidence only
+through independently established session identities and SE2 handoffs.
+
+A conforming run may still support `graph-design-improvement` when repeated
+loops, ambiguous ownership, weak stopping rules, or unavoidable evidence gaps
+show that the declared graph itself causes material friction.
+
+## Findings
+
+Keep explicit feedback separate from defect classification:
+
+- **Feedback**: observed strengths, explicit user or agent feedback, and
+  evidence-backed friction.
+- **skill-bug**: SE2-owned behavior contradicts the active skill contract.
+- **graph-violation**: observed execution contradicts the registered graph.
+- **graph-design-improvement**: execution may conform, but graph structure or
+  semantics cause evidenced friction.
+- **runtime-limitation**: the application cannot expose or preserve required
+  observations.
+- **repository-condition**: repository state, dependencies, or instructions
+  constrain the run.
+- **user-choice**: an explicit user decision explains the path or stop.
+
+Use run-local IDs in first-seen order (`AUD-001`, `AUD-002`, ...). Keep one
+entry per root cause with `provisional`, `confirmed`, `resolved`, or `withdrawn`
+status. A regression is an evidence-backed flag on a finding, not a standalone
+category; require a prior verified baseline for the same behavior and contract.
+
+Prioritize findings:
+
+- `P0`: data loss, security failure, unauthorized mutation, or complete audit
+  failure;
+- `P1`: workflow blocker, graph escape, or repeated materially wrong behavior;
+- `P2`: meaningful degradation or recurring operator friction;
+- `P3`: clarity, instruction cost, documentation, or polish.
+
+Do not classify model behavior, runtime availability, repository state, user
+input, or a dependency's failure as an SE2 bug unless SE2 owns the missing
+guardrail.
+
+## Terminal report
+
+Return compact Markdown in this order:
+
+1. **Monitored sessions** — identity, host, project/repository, terminal state,
+   confirmed SE2 skills, and comparison baseline.
+2. **Coverage and performance** — coverage boundary, compliant behavior,
+   strengths, and evidence gaps.
+3. **Feedback** — explicit strengths and friction with evidence.
+4. **Graph conformance** — per skill, observed path, relation classifications,
+   violations, and confidence.
+5. **Finding registry** — ID, status, priority, category, regression flag,
+   affected skill/node, impact, evidence frontier, owner, and smallest remedy.
+6. **Graph improvements** — proposal, observed motivation, expected value,
+   risk, and priority.
+7. **Priority order** — highest-value next actions.
+8. **Terminal assessment** — assess each used skill separately and distinguish
+   SE2 defects from runtime, repository, dependency, and user conditions.
+
+## Mutation boundary
+
+Do not create, message, resume, rename, pin, archive, fork, or hand off
+application sessions. Do not create Goals, edit repositories, write report
+files, run Git mutations, or mutate GitHub. Do not invoke another SE2 workflow
+implicitly. If the user requests a fix, finish the audit report and require an
+explicit transition to the owning implementation or maintenance workflow.
+
+No script or persistent ledger belongs to this skill. Live application state
+is authoritative and all audit state is transient.

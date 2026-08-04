@@ -1,7 +1,7 @@
 {
   "name": "se2",
-  "version": "0.8.0",
-  "description": "Traverse graph-first Learn, Idea, Feature, and GitHub-Feature-to-PR implementation workflows.",
+  "version": "0.9.0",
+  "description": "Traverse graph-first Learn, Idea, Feature, Implement, and live session Audit workflows.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SE2",
-    "shortDescription": "Traverse graph-first Learn, Idea, Feature, and Implement workflows.",
-    "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit durable-context, Idea capture, Feature planning, and GitHub-Feature-to-PR implementation entry points. Learn maintains evidence-backed repository context, ADRs, localization memory, and proposal-first AGENTS.md compaction. Idea captures transient session context and publishes only through an explicitly authorized G-owned terminal operation. Feature converges authoritative Feature issues, vertical Task issues, and acyclic Task dependency graphs. Implement accepts one or more complete GitHub Feature bundles, coordinates a Sol/medium control plane with adaptive Sol workers that perform exact-HEAD review in their own sessions, routes defective specifications through Feature Contract Repair, and returns independently verified PR outputs. Its minimal SQLite WAL ledger prevents concurrent orchestrators on the same Feature, stores durable checkpoints and idempotent side effects, and uses explicit drop-and-recreate instead of migrations. Root contracts standardize live task preflight, destination and identity observation, update relay, and reconciliation.",
+    "shortDescription": "Traverse graph-first Learn, Idea, Feature, Implement, and Audit workflows.",
+    "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit durable-context, Idea capture, Feature planning, GitHub-Feature-to-PR implementation, and live session Audit entry points. Learn maintains evidence-backed repository context, ADRs, localization memory, and proposal-first AGENTS.md compaction. Idea captures transient session context and publishes only through an explicitly authorized G-owned terminal operation. Feature converges authoritative Feature issues, vertical Task issues, and acyclic Task dependency graphs. Implement coordinates a Sol/medium control plane with adaptive Sol workers, exact-HEAD in-session review, Feature Contract Repair, verified PR outputs, and a minimal SQLite WAL recovery ledger. Audit observes active SE2 sessions read-only, reconstructs workflow-graph conformance from positive evidence, and reports feedback, bugs, regressions, graph violations, and graph-design improvements without persistent state. Root contracts standardize graph vocabulary, live task preflight, destination and identity observation, update relay, and reconciliation.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -22,7 +22,7 @@
     "defaultPrompt": [
       "Use $se2:learn for durable repository knowledge or $se2:idea for transient capture and explicit GitHub publication.",
       "Use $se2:feature to plan or repair authoritative GitHub Features and Task DAGs through its graph-first workflow.",
-      "Use $se2:implement to turn authoritative GitHub Features into verified PRs with isolated workers and in-session review."
+      "Use $se2:implement for verified Feature-to-PR delivery, or $se2:audit to monitor active SE2 graph runs read-only."
     ],
     "brandColor": "#BE185D"
   }

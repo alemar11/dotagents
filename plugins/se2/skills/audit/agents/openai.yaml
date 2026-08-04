@@ -1,0 +1,7 @@
+interface:
+  display_name: "SE2 Session Audit"
+  short_description: "Monitor active SE2 graph runs read-only."
+  brand_color: "#166534"
+  default_prompt: "Use $se2:audit explicitly to monitor active SE2 skill sessions and report evidence-backed graph conformance, feedback, bugs, regressions, and improvements without mutations."
+policy:
+  allow_implicit_invocation: false
