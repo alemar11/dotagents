@@ -28,7 +28,9 @@ terminal_states: []
 # Reconcile and Verify
 
 Read back every Feature, Task, relation, metadata projection, dependency
-relationship, and maintenance changelog result. Distinguish verified created,
+relationship, and maintenance changelog result. Require the hosted Feature body
+to contain the exact current acceptance IDs, monotonic high-water marks, and
+Feature-to-Task-and-Task-criterion coverage map. Distinguish verified created,
 updated, reused, missing, and ambiguous operations. Retry only an operation
 proven absent; preserve successful effects and block when hosted evidence cannot
 establish a safe continuation.

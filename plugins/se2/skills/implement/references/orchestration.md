@@ -153,16 +153,28 @@ another task, worktree, or ownership identity.
 
 ## Contract Repair
 
-A worker may request Contract Repair only with portable evidence identifying:
+A worker may request Contract Repair with one internal repair record
+identifying:
 
 - the exact Feature and Task refs;
 - the stable field that is incomplete, contradictory, or wrong;
 - the conflicting source and implementation evidence;
-- the current worker, worktree, branch, and full HEAD;
+- the current worker and task identity, `project_root`, worktree, repository,
+  branch, and full HEAD;
 - the safe boundary where implementation stopped.
 
 Record one active repair ID and incrementing `contract_generation` per
 assignment. Preserve the worker and its useful changes while repair is active.
+The internal record may retain local control-plane paths and identities. Before
+creating the planner handoff or any hosted Feature/Task/changelog content, load
+the shared
+[hosted-content-safety.md](../../../references/hosted-content-safety.md) and
+derive separate portable publication evidence. Convert repository-contained
+paths to repo-relative form and represent external `project_root` or worktree
+context only by repository identity, branch, and full SHA. Exclude worker/task,
+host, prompt, and irrelevant transcript identity. Fail closed when that
+projection cannot be established.
+
 Create one separate non-implementation planner task that invokes `se2:feature`
 with `entry_route=maintenance` and only the portable evidence. The planner owns
 the proposed or published Feature/Task correction; the orchestrator and worker
@@ -193,11 +205,17 @@ incompatible assignment returns to scheduling for controlled replacement.
 ## Aggregate completion
 
 A Feature is delivery-ready only when every required Task assignment and PR
-output passes final verification. The run is complete only when every selected
-Feature is delivery-ready and terminal reconciliation has released every claim
-owned by the run. Preserve claims for resumable blocked or deferred runs and
-preserve one aggregate vector:
+output passes final verification and every `F-AC-NN` criterion is verified from
+the coverage map and current Task acceptance matrices. Aggregate one Feature
+acceptance row with the criterion ID and current text, owning Task and
+`T-AC-NN` IDs, `verified`, `unverified`, or `blocked` status, evidence
+references, and candidate-SHA vector. The orchestrator aggregates worker-owned
+proof but does not replace or reinterpret it. The run is complete only when
+every selected Feature is delivery-ready and terminal reconciliation has
+released every claim owned by the run. Preserve claims for resumable blocked or
+deferred runs and preserve one aggregate vector:
 
 `feature_ref, task_refs, repository_identity, delivery_mode, parent_pr,
 base_branch, base_sha, head_branch, head_sha, pr_url, stack_order,
-stack_link_status, readiness_state`.
+stack_link_status, task_acceptance_evidence_refs,
+feature_acceptance_evidence_ref, readiness_state`.

@@ -5,6 +5,11 @@ default publish branch. The G-owned GitHub issue workflow remains the only
 transport and owns safe body handling, issue creation, verification, and
 partial-failure mechanics.
 
+Load the shared
+[hosted-content-safety.md](../../../references/hosted-content-safety.md) before
+the first write. SE2 owns the final portable title/body projection; G owns safe
+file transport and readback but does not sanitize semantic content.
+
 This reference is the only external terminal phase of the Idea workflow. The
 capture and preview paths must not load the G dependency preflight, inspect
 GitHub, or mutate hosted state.
@@ -52,10 +57,12 @@ report; only the explicitly published issue is durable.
 Publish in checkpoints:
 
 1. reconcile the exact target and current collision state;
-2. create one missing Idea with its final title and body;
-3. read the result back before processing the next candidate;
-4. verify title, open state, body, and absent native Issue Type;
-5. record the durable qualified ref.
+2. apply the shared hosted-content safety gate to the exact final title and body
+   immediately before the write;
+3. create one missing Idea with that verified title and body;
+4. read the result back before processing the next candidate;
+5. verify title, open state, body, and absent native Issue Type;
+6. record the durable qualified ref.
 
 Do not set a native Issue Type or apply workflow-state metadata. Open questions
 in an Idea body do not imply a workflow state.

@@ -114,6 +114,12 @@ The shared [workflow-graph.md](../../references/workflow-graph.md) owns the
 structural registry and terminal meanings. It does not replace the hosted Idea
 contract above.
 
+The shared
+[hosted-content-safety.md](../../references/hosted-content-safety.md) is the
+canonical owner for portable hosted content. Load it after the final Idea title
+and body are rendered and apply its complete gate immediately before each
+hosted write.
+
 ## Dependency boundary
 
 All hosted issue reads and writes belong to the repository's G-owned GitHub
@@ -151,8 +157,9 @@ tracker-owning repository for every candidate from explicit user scope and
 repository evidence. A task identity, saved project, filesystem location, or
 display title is not repository ownership evidence.
 
-For each candidate, keep a portable source description. Do not publish local
-absolute paths, private prompt machinery, or irrelevant transcript fragments.
+For each candidate, keep a portable source description under the shared hosted
+content safety contract. Keep Idea-specific source selection tentative and
+relevant; do not redefine the common portability rules here.
 
 ### 2. Extract and normalize candidates
 
@@ -229,10 +236,10 @@ For run_mode=publish, load
 [`references/publishing.md`](references/publishing.md). Hand off only the
 normalized issue operation owned by the G workflow. The publication reference
 performs the dependency preflight, current hosted duplicate/collision checks,
-metadata checks, mutations, and readback only after the local bundle is
-complete. Use the already reconciled in-memory bundle as the publication
-source, and verify each result before moving to the next candidate. The hosted
-issue is the durable output; the bundle remains transient.
+metadata checks, final hosted-content safety gate, mutations, and readback only
+after the local bundle is complete. Use the already reconciled in-memory bundle
+as the publication source, and verify each result before moving to the next
+candidate. The hosted issue is the durable output; the bundle remains transient.
 
 ### 5. Recover and report
 

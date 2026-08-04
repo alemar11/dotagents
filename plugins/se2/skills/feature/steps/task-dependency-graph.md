@@ -10,6 +10,8 @@ inputs:
   - tasks
   - acceptance-criteria
   - acceptance-coverage-candidate
+  - feature-acceptance-high-water
+  - task-acceptance-high-water
   - linked-feature-references
   - repository-context
   - documentation-update-ownership
@@ -33,6 +35,8 @@ stop_if:
   - dependency-id-does-not-resolve-to-a-local-task
   - task-dependency-graph-contains-a-cycle
   - feature-criterion-has-no-owning-task
+  - acceptance-criterion-id-is-missing-duplicate-or-ambiguous
+  - acceptance-high-water-is-missing-invalid-or-decreases
 side_effects:
   - none
 terminal_states: []
@@ -49,7 +53,13 @@ Require:
 - every `dependency_id` resolves to a Task under the same Feature and
   repository;
 - no self-dependencies, duplicate edges, or cycles;
-- every Feature acceptance criterion maps to one or more Tasks;
+- every Feature acceptance-criterion ID maps to one or more Task IDs and one or
+  more Task acceptance-criterion IDs that prove its complete observable outcome;
+- every `F-AC-NN` ID is unique within its Feature and every `T-AC-NN` ID is
+  unique across the complete Task set under that Feature;
+- the Feature body owns monotonic Feature and Task acceptance high-water marks,
+  every current or retired ID is at or below its matching mark, and neither
+  mark decreases during maintenance;
 - every Task has an independent outcome, safe scope, and validation proof;
 - path overlap is identified through `allowed_paths` and every external
   scope-overlap gate is recorded separately from dependency IDs;

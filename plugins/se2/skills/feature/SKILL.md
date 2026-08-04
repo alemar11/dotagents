@@ -89,6 +89,11 @@ not broaden scope. The explicit Feature request implicitly authorizes the
 exact in-scope hosted writes for its selected publish operation; read-after-
 write verification remains mandatory.
 
+Before the first Feature, Task, comment, or changelog write, load the shared
+[hosted-content-safety.md](../../references/hosted-content-safety.md). Feature
+owns the final portable title/body/comment projection and applies that gate
+again immediately before every write; G owns transport and readback only.
+
 ## Source route and terminal operation
 
 Resolve `source_route` from Intake evidence:
@@ -225,6 +230,30 @@ The Feature definition is the canonical contract. There is no separate Spec
 entity in this plugin. When published, the Feature is a GitHub issue of type
 Feature; that type is publication metadata and never carries the semantics.
 
+Every acceptance criterion has one stable bracketed identity. Feature criteria
+use `F-AC-NN`; Task criteria use `T-AC-NN`. Render them as ordinary list items,
+for example `- [F-AC-01] <criterion>` and `- [T-AC-01] <criterion>`. These are
+not Markdown checkboxes and never encode execution progress. Feature IDs are
+unique within the Feature; Task IDs are unique across its complete Task set.
+The exact case-sensitive form is the matching uppercase prefix followed by a
+positive, zero-padded decimal number of at least two digits; `00`, unpadded
+single digits, lowercase forms, and compatibility aliases are invalid.
+Retain an ID across non-semantic wording clarification, reordering, and Task
+movement. The Feature issue durably owns monotonic
+`feature_acceptance_high_water` and `task_acceptance_high_water` values that
+include retired IDs. Never decrease a mark or reuse an ID at or below it; assign
+the next number above the matching mark when semantics change. The uppercase ID
+spelling is an explicit external rendered-contract syntax exception to the
+repository's normal lower-kebab assigned-value rule. A missing, duplicate,
+malformed, ambiguously reused, or high-water-inconsistent criterion ID makes the
+bundle non-ready.
+
+The hosted Feature body also owns the authoritative acceptance coverage map:
+each `F-AC-NN` maps to one or more owning Task IDs and one or more `T-AC-NN`
+proof targets. Publish or update that map only after Task identities are known,
+and require exact readback with the criteria and high-water marks. A terminal
+report may project this map but is never its sole durable owner.
+
 Every Task must:
 
 - reference exactly one Feature through the tracker's parent/sub-issue relation
@@ -328,10 +357,10 @@ Load steps/feature.md and templates/feature.md. Draft, review, or update one
 repository-owned Feature definition and its Feature issue per affected
 repository. On maintenance, review the canonical Feature definition against
 the explicit indication and rehydrate stable content before proposing changes.
-Require unique, individually provable acceptance criteria, explicit links to
-peer Features, and an explicit failure policy for constrained validation. A
-complete Feature definition must be stable enough to derive Tasks without
-inventing requirements.
+Require unique, individually provable acceptance criteria with stable
+`F-AC-NN` identities, explicit links to peer Features, and an explicit failure
+policy for constrained validation. A complete Feature definition must be
+stable enough to derive Tasks without inventing requirements.
 
 Resolve one durable Feature identity for each affected repository. For an
 existing Feature, preserve stable identity and calculate only justified body
@@ -352,19 +381,21 @@ required layer in each Task's safe path envelope, preserve the Feature
 boundary, and record any documentation update required by repository context.
 
 Compress redundant candidates before freezing generated IDs. Retain a Task
-only when it has independent value, distinct acceptance and validation proof,
-and a safe landing state once its real dependencies finish. Re-harden changed
-unpublished Tasks after any graph repair.
+only when it has independent value, distinct `T-AC-NN` acceptance identities
+and validation proof, and a safe landing state once its real dependencies
+finish. Re-harden changed unpublished Tasks after any graph repair.
 
 ### Task Dependency Graph
 
 Load steps/task-dependency-graph.md for each repository run. Recalculate and
 reconcile the desired Task dependency graph against current relationships, then
-validate Feature criterion coverage, dependency ID resolution, acyclicity, path
-overlap, cross-Feature boundaries, readiness, and the derived topological
-waves. Withhold the bundle when any criterion lacks an owning Task or when an
-edge encodes preference rather than necessity. A valid graph transitions to
-`terminal-operation`; an invalid graph transitions to `blocked`.
+validate the hosted Feature-owned criterion-ID coverage through Task criterion
+IDs, dependency ID resolution, acyclicity, path overlap, cross-Feature
+boundaries, readiness, and the derived topological waves. Withhold the bundle
+when any criterion lacks an owning Task and Task criterion proof target, any
+criterion ID is missing or ambiguous, or an edge encodes preference rather than
+necessity. A valid graph transitions to `terminal-operation`; an invalid graph
+transitions to `blocked`.
 
 ### Terminal Operation
 
@@ -414,7 +445,8 @@ A complete report must contain:
 - Task dependency edges, theoretical execution waves, and planning rationale;
 - `allowed_paths`, overlap evidence, theoretical execution waves, and
   scope-overlap gates kept separate from Task dependency edges;
-- Feature-criterion-to-Task coverage;
+- Feature-criterion-ID-to-Task-and-Task-criterion-ID coverage;
+- monotonic Feature and Task acceptance high-water marks;
 - loaded repository-context sources and required documentation updates;
 - readiness and issue-relation evidence;
 - the calculated bundle and the selected operation evidence;

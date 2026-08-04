@@ -38,7 +38,9 @@ the conceptual result remains the complete Feature-and-Task bundle.
 
 - feature_id: <stable-feature-identity>
 - feature_slug: <lower-kebab-feature-slug>
-- acceptance_criteria: <complete or missing items>
+- acceptance_criteria: <complete stable ID set or missing items>
+- feature_acceptance_high_water: <highest assigned F-AC-NN>
+- task_acceptance_high_water: <highest assigned T-AC-NN>
 - documentation_updates: <complete or none>
 
 ## Tasks
@@ -62,9 +64,9 @@ necessary. Feature links are not Task dependencies.>
 
 ## Acceptance Coverage
 
-| feature_criterion | owning_task_ids |
-| --- | --- |
-| <criterion> | <Task-IDs> |
+| feature_criterion_id | owning_task_ids | task_criterion_ids |
+| --- | --- | --- |
+| <F-AC-NN> | <Task-IDs> | <T-AC-NN IDs> |
 
 ## Publication Evidence
 

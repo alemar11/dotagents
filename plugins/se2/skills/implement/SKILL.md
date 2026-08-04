@@ -10,16 +10,23 @@ description: "Execute one or more authoritative GitHub SE2 Features through a ma
 Use this skill only for an explicit request to implement or resume one or more
 published SE2 Features from GitHub. Every input Feature must resolve to one
 authoritative Feature issue, its complete Task issue set, Task dependencies,
-repository identities, acceptance criteria, validation policy, and readiness
-evidence. Do not start from an isolated Task, local draft, Idea, or unbounded
-implementation request.
+repository identities, stable acceptance-criterion IDs, acceptance coverage,
+monotonic Feature and Task acceptance high-water marks, validation policy, and
+readiness evidence. The acceptance coverage must come from the authoritative
+hosted Feature body, not only a planner report. Do not start from an isolated
+Task, local draft, Idea, or unbounded implementation request. A legacy checkbox
+or a missing, duplicate, malformed, ambiguous, or high-water-inconsistent
+criterion ID makes the bundle non-ready; block with Feature maintenance as the
+smallest recovery instead of inventing or normalizing IDs inside Implement.
 
 The expected terminal output is one verified pull-request delivery topology.
 Return a complete mapping from each selected Feature and Task set to its
 repositories, branches, exact HEADs, PR references, and standalone or stacked
-relationships. `complete` means every selected Feature has a verified
-`standalone-ready` or `stack-ready` PR output; this skill never merges, deploys,
-releases, or performs post-merge closure.
+relationships and acceptance-evidence matrices. `complete` means every Task and
+Feature criterion is verified against the current candidate HEAD vector and
+every selected Feature has a verified `standalone-ready` or `stack-ready` PR
+output; this skill never merges, deploys, releases, or performs post-merge
+closure.
 
 Implement has no local-only or preview execution mode. GitHub interaction is
 mandatory: the run reads authoritative Feature and Task contracts, uses hosted
@@ -43,6 +50,13 @@ verification belong to the G-owned workflows. The explicit Implement request
 implicitly authorizes the exact in-scope GitHub writes required for its
 selected Features; the dependency gate verifies availability and does not
 broaden that scope.
+
+Before the first hosted write, load the shared
+[hosted-content-safety.md](../../references/hosted-content-safety.md). Apply its
+complete gate immediately before every issue, comment, PR title/body, review
+request, or review-text write, including content returned by workers or tools.
+Implement owns the final portable projection; G owns transport and readback and
+must not be asked to invent semantic conversions.
 
 Implement keeps the ownership split explicit: workers own implementation
 semantics, conflict resolution, validation, and candidate evidence; G-owned
@@ -110,18 +124,18 @@ not workflow transitions.
 | schedule | decision | run is ready for another wave or aggregate terminal reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | one or more unfinished assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | worker identity and implementation worktree are verified | candidate, contract-conflict, assignment-blocked, blocked | durable, hosted | none |
+| implement-validate | action | worker identity, implementation worktree, and Task criterion IDs are verified | candidate, contract-conflict, assignment-blocked, blocked | durable, hosted | none |
 | contract-conflict | action | worker reports an evidence-backed stable contract conflict | repair-authority, assignment-blocked, blocked | durable | none |
 | repair-authority | decision | conflict and proposed semantic boundary are known | repair-task, assignment-deferred, blocked | none | none |
 | repair-task | action | repair is authorized or requires no material contract mutation | repair-readback, assignment-blocked, blocked | durable, hosted | none |
 | repair-readback | validation | Feature planner returned a repair result | implement-validate, schedule, assignment-blocked, blocked | hosted, durable | none |
-| candidate | validation | worker reports committed, validated candidate HEAD | native-review, assignment-blocked, blocked | read, durable | none |
+| candidate | validation | worker reports committed candidate HEAD with every Task criterion verified by current-head evidence | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
 | publish-pr | action | native review is clean and the declared publication scope is resolved | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
 | stack-reconcile | validation | a stacked PR was published or its parent, base, link, or exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
 | ready-monitor | action | PR identity and exact published HEAD are verified; the initial cycle observes the automatic ready-triggered review, while each post-fix HEAD uses one explicit request lineage | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
-| final-verify | validation | current PR, topology, CI, review, task, checkout, and HEAD evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read, durable | none |
+| final-verify | validation | current PR, topology, CI, review, task, checkout, HEAD, and acceptance evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read, durable | none |
 | assignment-blocked | action | one assignment cannot progress but independent work may remain | schedule | durable | none |
 | assignment-deferred | action | one assignment awaits bounded user authorization | schedule | durable | none |
 | release-claims | action | every selected Feature is delivery-ready and no assignment remains active | complete, blocked | durable | none |
@@ -294,14 +308,18 @@ retry and never justifies a second orchestrator.
 
 Each implementation worker owns one eligible Task assignment in its verified
 implementation worktree. It owns technical design, code, tests, validation,
-candidate evidence, exact-HEAD native review in the same worker session,
-finding decisions, and fixes. The worker hands local Git transport and hosted
-GitHub transport to their G-owned workflows, then independently checks the
-returned evidence. Review runs only after the candidate is committed and the
-same worktree is clean at its exact HEAD.
-Any HEAD change invalidates the prior review and requires a new in-session
-review cycle. The orchestrator receives review evidence but never performs or
-judges the review.
+criterion-level acceptance evidence, candidate evidence, exact-HEAD native
+review in the same worker session, finding decisions, and fixes. For every
+`T-AC-NN`, return one matrix row with criterion ID and text, Task ref,
+`verified`, `unverified`, or `blocked` status, evidence reference, and candidate
+SHA. A candidate may advance only when every required Task criterion is
+`verified`. The worker hands local Git transport and hosted GitHub transport to
+their G-owned workflows, then independently checks the returned evidence.
+Review runs only after the candidate is committed and the same worktree is
+clean at its exact HEAD. Any HEAD change invalidates the prior acceptance and
+review evidence and requires fresh criterion verification, validation, and a
+new in-session review cycle. The orchestrator receives that evidence but never
+performs or judges the worker's semantic verification or review.
 
 A stacked child worker starts from the verified parent candidate SHA in its own
 isolated worktree. If the parent later changes, the orchestrator invalidates the
@@ -356,6 +374,14 @@ logs, or routine worker technical state. A ledger failure blocks only a new
 side effect or recovery step that requires durable idempotency; it does not
 turn ordinary live dialogue into a database operation.
 
+Acceptance matrices remain worker-task evidence, not a new ledger table or a
+copy of the Feature/Task bodies. The existing assignment checkpoint stores the
+stable `worker_task_id` and exact `candidate_sha`. On recovery, reread that
+worker task's authoritative final report and require its complete Task
+acceptance matrix to name the same Task ref, contract generation, and candidate
+SHA before reuse. Missing task visibility or a mismatch blocks reuse. No new
+assignment field, schema, runtime contract, envelope, or CLI version is needed.
+
 ## Terminal report
 
 Return one aggregate report with:
@@ -364,11 +390,14 @@ Return one aggregate report with:
 - every implementation worker identity and verified destination;
 - execution-wave and blocked/deferred evidence;
 - Contract Repair generations and authorization outcomes;
+- one Task acceptance row per `T-AC-NN` and one aggregated Feature acceptance
+  row per `F-AC-NN`, each with status, evidence references, and exact candidate
+  SHA or candidate-SHA vector;
 - candidate, review, publication, CI, stack, and final exact-HEAD evidence;
 - one output row per PR with Feature refs, repository, delivery mode, parent PR
   when present, base, branch, full HEAD, PR URL, stack order and receipt when
   present, and `standalone-ready` or `stack-ready` readiness state;
 - aggregate `outcome: complete`, `deferred`, or `blocked`.
 
-Never claim completion while any selected Feature lacks its required verified
-PR output.
+Never claim completion while any required acceptance criterion is not verified
+or any selected Feature lacks its required verified PR output.

@@ -40,7 +40,14 @@ definition, not a separate Spec artifact.>
 
 ## Acceptance Criteria
 
-- [ ] <Unique, individually provable Feature criterion.>
+- [F-AC-01] <Unique, individually provable Feature criterion.>
+
+## Acceptance Identity
+
+- feature_acceptance_high_water: F-AC-01
+- task_acceptance_high_water: <highest assigned T-AC-NN>
+
+These monotonic high-water marks include retired IDs and never decrease.
 
 ## Validation
 
@@ -61,3 +68,9 @@ definition, not a separate Spec artifact.>
 
 Tasks are attached to this Feature. Task `dependency_ids` are local to this
 Feature and repository; Feature links are not Task dependencies.
+
+## Acceptance Coverage
+
+| feature_criterion_id | owning_task_ids | task_criterion_ids |
+| --- | --- | --- |
+| F-AC-01 | <Task-IDs> | <T-AC-NN IDs> |

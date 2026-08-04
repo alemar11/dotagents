@@ -50,7 +50,8 @@ goal, scope, constraints, or criteria.>
 
 ## Acceptance Criteria
 
-- [ ] <Unique, individually provable Task criterion.>
+- [T-AC-NN] <Unique, individually provable Task criterion; replace NN with the
+  next unused Task-criterion number in the Feature bundle.>
 
 ## Validation
 

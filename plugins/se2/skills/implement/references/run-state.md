@@ -123,6 +123,12 @@ blocks the checkpoint; assignment state never establishes Feature ownership.
 Feature, Task, and repository identity are immutable after creation, and
 `contract_generation` may stay unchanged or advance by exactly one.
 
+Criterion-level acceptance evidence remains in the authoritative worker task
+report. The assignment's existing `worker_task_id`, `candidate_sha`, Task ref,
+and contract generation form its recovery key. On resume, reread the worker
+report and require its acceptance matrix to match that complete key; never add
+the matrix, issue body, or an opaque evidence field to the ledger.
+
 `run checkpoint` and `assignment checkpoint` accept only documented,
 allowlisted fields and one expected revision. They record durable boundaries,
 not every graph transition. A run can become `complete` only after at least one

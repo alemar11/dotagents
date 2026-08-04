@@ -44,6 +44,17 @@ current Feature attachments and Task dependency edges, and retain the
 indication as maintenance evidence. Do not create, update, delete, or comment
 on issues in this step.
 
+Rehydrate acceptance-criterion IDs separately from criterion prose. Preserve
+every valid existing ID through non-semantic clarification, reordering, and Task
+movement. Rehydrate the Feature-owned monotonic Feature and Task acceptance
+high-water marks and never recycle an ID at or below them. A legacy criterion
+rendered as a Markdown checkbox has no stable ID: report one migration that
+assigns fresh IDs in preserved text/order and initializes both high-water marks
+from the migrated set. Do not interpret checked or unchecked legacy markers as
+acceptance evidence. If bracketed IDs exist without their high-water marks, or a
+mark is below a current ID, block instead of inferring missing retirement
+history.
+
 Start context discovery from each repository's `AGENTS.md` and follow the
 applicable descendant instructions before deciding what additional documents or
 code must be read. Record any context-justified documentation update candidate

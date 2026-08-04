@@ -43,9 +43,10 @@ is required; leave native Issue Type unset.
 
 - Preserve the exact section order.
 - Use `None recorded.` when no open question remains.
-- Use repo-relative paths, hosted links, qualified issue refs, or a concise
-  conversation description for Source.
-- Do not publish machine-specific absolute paths.
+- Render Source through the shared
+  [hosted-content-safety.md](../../../references/hosted-content-safety.md)
+  contract. For Idea-specific provenance, prefer a hosted link, qualified issue
+  ref, repository-relative source, or concise relevant conversation description.
 - Do not add planning outcomes, goals, non-goals, acceptance criteria,
   implementation steps, dependencies, delivery policy, readiness claims,
   memory handoffs, or Feature fields.

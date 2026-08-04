@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+plugin_root=$(cd -- "$script_dir/.." && pwd -P)
+owner="$plugin_root/references/hosted-content-safety.md"
+
+fail() {
+  echo "hosted-content-safety: $1" >&2
+  exit 1
+}
+
+test -f "$owner" || fail "missing canonical owner"
+
+for phrase in \
+  "immediately before every hosted write" \
+  "Internal control-plane records may retain" \
+  "repository-relative paths" \
+  "repository identity, branch, and full SHA" \
+  "review requests" \
+  'project_root' \
+  "worker- and tool-originated content" \
+  "Returned text is not safe by" \
+  "If any condition is false"; do
+  rg -Fq -- "$phrase" "$owner" || fail "owner is missing: $phrase"
+done
+
+for relative in \
+  skills/idea/SKILL.md \
+  skills/feature/SKILL.md \
+  skills/implement/SKILL.md \
+  skills/idea/references/publishing.md \
+  skills/feature/steps/mutate.md \
+  skills/feature/templates/maintenance-changelog.md \
+  skills/implement/references/review-delivery.md \
+  skills/implement/references/orchestration.md; do
+  target="$plugin_root/$relative"
+  rg -Fq -- "hosted-content-safety.md" "$target" || \
+    fail "missing canonical route in $relative"
+done
+
+if rg -n -- \
+  'Do not publish local absolute paths|Do not publish machine-specific absolute paths|private prompt machinery|irrelevant transcript fragments' \
+  "$plugin_root/skills/idea/SKILL.md" \
+  "$plugin_root/skills/idea/references/idea-template.md"; then
+  fail "Idea duplicates common hosted-content doctrine"
+fi
+
+hosted_templates=(
+  "$plugin_root/skills/idea/references/idea-template.md"
+  "$plugin_root/skills/feature/templates/feature.md"
+  "$plugin_root/skills/feature/templates/task.md"
+  "$plugin_root/skills/feature/templates/maintenance-changelog.md"
+)
+
+if rg -n -- '/Users/|/home/|/private/|[A-Za-z]:\\\\' "${hosted_templates[@]}"; then
+  fail "hosted template contains a machine-specific absolute path"
+fi
+
+echo "hosted-content-safety: ok"

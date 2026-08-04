@@ -19,6 +19,11 @@ Its skills are deliberately separated by responsibility:
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
+- references/hosted-content-safety.md owns the portable-content projection and
+  fail-closed check immediately before every SE2-hosted issue, comment, PR, or
+  review write. SE2 owns semantics; G owns transport and readback.
+- scripts/validate-hosted-content-safety checks the shared owner routes, removed
+  Idea duplication, and hosted templates for machine-specific absolute paths.
 - skills/idea/references/idea-source.md owns the typed transient handoff from
   Idea capture to later Feature Intake; it never adds an automatic runtime
   dependency between the skills.
@@ -47,6 +52,10 @@ Its skills are deliberately separated by responsibility:
   represents a true same-repository code dependency, never serialization alone;
   G owns PR publication and pairwise stack linking. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
+  Feature and Task acceptance criteria use stable bracketed IDs rather than
+  Markdown checkbox state; workers bind Task criterion evidence to candidate
+  HEADs and the orchestrator aggregates Feature coverage without rewriting
+  issue bodies.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.
@@ -64,7 +73,9 @@ Its skills are deliberately separated by responsibility:
   instruction hierarchy; no documentation system is imposed.
 - the prototype returns one Feature plus vertical Task dependency graphs,
   including multi-repository Feature links and local dependency waves, without
-  implementing code; Feature publishes through an explicit terminal
+  implementing code. Acceptance criteria are ordinary list items with stable
+  `F-AC-NN` and `T-AC-NN` identities and explicit coverage. Feature publishes
+  through an explicit terminal
   preview/publish subgraph with publish as the default and preview only by
   explicit request. Hosted publication requires the G preflight and
   read-after-write verification; the explicit SE2 request implicitly
@@ -75,6 +86,9 @@ Its skills are deliberately separated by responsibility:
 - task-managed Feature and Implement runs pass their skill-owned profiles to
   the shared preflight; task creation scope and GitHub mutation scope remain
   independent, with no runtime fallback for a missing required role.
+- Idea, Feature, and Implement keep local control-plane records separate from
+  hosted artifacts and apply one shared portable-content gate immediately
+  before each hosted write, including content returned by workers and tools.
 
 SE2 is a parallel design surface and does not replace or mutate the existing
 se plugin.

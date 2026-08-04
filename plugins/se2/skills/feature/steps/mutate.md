@@ -23,9 +23,15 @@ terminal_states: []
 
 # Mutate
 
-Use only the G-owned GitHub issue workflow for the normalized operations. Re-read
-the complete current state immediately before mutation, then create or update
+Use only the G-owned GitHub issue workflow for the normalized operations. Load
+the shared
+[hosted-content-safety.md](../../../references/hosted-content-safety.md), re-read
+the complete current state, and apply its gate to the exact final title/body or
+comment immediately before each mutation. Then create or update
 repository-owned Features, link peer Features, create or attach Tasks, apply
 authorized type metadata, reconcile local Task dependency relationships, and
-publish the maintenance changelog comment when required. Verify operations one
-at a time through the next reconciliation node.
+publish the maintenance changelog comment when required. After Task identities
+are resolved, create or update the Feature body with the complete acceptance
+criteria, monotonic Feature and Task high-water marks, and authoritative
+Feature-to-Task-and-Task-criterion coverage map. Verify operations one at a time
+through the next reconciliation node.

@@ -22,6 +22,11 @@ do not silently merge its graph contract into the existing SE plugin.
   expectations. It does not own Idea hosted metadata or Feature/Task semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before any SE2 workflow uses a required G-owned GitHub workflow.
+- references/hosted-content-safety.md owns the final portable-content projection
+  and fail-closed gate immediately before every hosted write produced by Idea,
+  Feature, or Implement. G owns transport and readback, not semantic cleanup.
+- scripts/validate-hosted-content-safety owns the static owner-routing,
+  duplicate-doctrine, and hosted-template path checks for that contract.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
   capture, localization, Code Review Rules, and AGENTS.md compaction
   proposals and its workflow registry; its references own branch-specific
@@ -62,6 +67,13 @@ do not silently merge its graph contract into the existing SE plugin.
   or local draft, and returns a verified standalone or stacked PR topology.
   Contract Repair must re-enter Feature maintenance instead of silently
   rewriting the Feature graph or inheriting its planner profile.
+- Keep acceptance criteria as ordinary list items with stable bracketed
+  `F-AC-NN` and `T-AC-NN` identities, never Markdown checkbox state. Feature
+  owns identity assignment, monotonic retirement high-water marks, and durable
+  hosted coverage; workers own Task criterion proof at the exact candidate
+  HEAD; the orchestrator aggregates Feature proof without rewriting issue
+  bodies or adding criterion state to the ledger. The uppercase bracketed IDs
+  are an explicit rendered-contract syntax exception to lower-kebab values.
 - Keep Implement execution waves separate from PR delivery topology.
   Serialization, capacity, and path overlap do not create a stack. Stack only a
   true same-repository code dependency from one green exact-HEAD parent; keep
@@ -89,6 +101,11 @@ do not silently merge its graph contract into the existing SE plugin.
 - Keep Idea hosted output behind the G-owned issue workflow and the shared
   fail-closed dependency gate. Never add a direct tracker transport or a
   compatibility alias for a missing dependency.
+- Keep internal orchestration records distinct from hosted content. Internal
+  records may retain local task/project/worktree facts; every hosted projection
+  must pass references/hosted-content-safety.md immediately before write,
+  including worker/tool-originated content, and fail closed when portable
+  identity cannot be established.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
   hosted rehydration through the shared G dependency gate before hosted reads,
   and route the default Feature publication through its terminal preflight and
@@ -130,9 +147,16 @@ do not silently merge its graph contract into the existing SE plugin.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery-gate and stack-reconcile paths.
+- Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
+  Implement, their write-owning references, and Contract Repair route through
+  the one canonical hosted-content owner without duplicate Idea doctrine.
 - Validate that Feature and Implement both route every created task through the
   shared title-reconciliation outcome before normal monitoring or update relay,
   and that resume paths cannot repeat an uncertain adjustment.
+- Validate the canonical bracketed acceptance syntax, Feature-local and
+  bundle-wide uniqueness, monotonic high-water marks, hosted coverage
+  publication/readback, malformed and legacy-checkbox rejection, and
+  worker-task-report acceptance recovery bound to the current candidate SHA.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, exact transition-condition coverage, the
   intentional refresh loop, terminal reachability, evidence classifications,

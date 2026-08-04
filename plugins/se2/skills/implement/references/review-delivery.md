@@ -34,6 +34,12 @@ do not require that hosted gate, but they are never a local-only Implement
 result. Every run must continue through the authoritative hosted source and
 verified PR-delivery path.
 
+Before every hosted write in this reference, load and apply the shared
+[hosted-content-safety.md](../../../references/hosted-content-safety.md) to the
+exact final title/body, comment, reply, review text, or review request. This
+includes worker- and tool-originated content. A typed review request with only
+its required portable marker and full SHA still passes the same final gate.
+
 | Operation | Semantic owner | Required authority and readback |
 | --- | --- | --- |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
@@ -66,10 +72,12 @@ run a new review cycle in the same worker session against the new exact SHA.
 ## PR publication
 
 Publish only after native review is clean and the exact publication scope is
-resolved from the explicit Implement request. Use the G-owned single-PR publication workflow to push the
-committed candidate and create or reuse a draft PR. Independently read back
-repository, base, branch, full PR HEAD, URL, body, issue linkage, and draft
-state. The PR HEAD must equal the reviewed candidate HEAD.
+resolved from the explicit Implement request. Apply the shared hosted-content
+safety gate to the exact final PR title and body immediately before publication.
+Use the G-owned single-PR publication workflow to push the committed candidate
+and create or reuse a draft PR. Independently read back repository, base,
+branch, full PR HEAD, URL, body, issue linkage, and draft state. The PR HEAD must
+equal the reviewed candidate HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
 PR base. Require the G-owned workflow to identify exactly one open parent PR in
@@ -144,8 +152,14 @@ perform post-merge closure.
 The orchestrator performs read-only final verification. Require:
 
 - exact Feature and Task refs and current accepted contract generation;
+- exact current `F-AC-NN` and `T-AC-NN` sets with no missing, duplicate,
+  malformed, or ambiguous IDs;
+- authoritative hosted Feature coverage and monotonic Feature/Task acceptance
+  high-water marks consistent with every current criterion ID;
 - implementation worker task/project/worktree identity;
 - clean implementation worktree and exact current HEAD;
+- a complete Task acceptance matrix whose every `T-AC-NN` is `verified` by
+  evidence bound to the exact current candidate HEAD;
 - current-head validation and native review evidence;
 - PR publication readback and exact PR HEAD equality;
 - `standalone` default-base evidence, or stacked parent identity, unchanged
@@ -155,6 +169,19 @@ The orchestrator performs read-only final verification. Require:
   receipt plus its clean current-head review result after one or more fix
   pushes;
 - required CI, mergeability, and zero unresolved actionable review threads.
+
+After every required Task passes these checks, aggregate each `F-AC-NN`
+through the authoritative Feature-to-Task-and-Task-criterion coverage map.
+Require every owning `T-AC-NN` row to remain verified at its current candidate
+SHA and retain the exact candidate-SHA vector. Any uncovered, unverified,
+blocked, stale, or ambiguous criterion prevents delivery readiness. This
+acceptance verification is evidence-only and never edits the Feature or Task
+issue body.
+
+On recovery, use the assignment's stored `worker_task_id` and `candidate_sha`
+to reread the worker's final Task acceptance matrix. Accept it only when its
+Task ref, contract generation, and candidate SHA exactly match current
+authoritative state; task invisibility or drift invalidates the matrix.
 
 Return repairable evidence mismatches to the worker without diagnosis. The
 worker owns repair and replacement evidence. Final verification never edits

@@ -21,6 +21,7 @@ outputs:
   - feature-issue-ref
   - feature-set
   - acceptance-criteria
+  - feature-acceptance-high-water
   - linked-feature-references
   - feature-type-projection
   - documentation-update-plan
@@ -32,6 +33,8 @@ transitions:
     when: feature-definition-or-feature-relationship-is-conflicted
 stop_if:
   - acceptance-criteria-are-not-individually-provable
+  - acceptance-criterion-id-is-missing-duplicate-or-reused
+  - feature-acceptance-high-water-is-missing-or-decreases
   - feature-target-is-ambiguous
   - repository-scope-is-missing
 side_effects:
@@ -50,8 +53,16 @@ updates, and validation policy. There is no separate Spec entity.
 For a new Feature, render templates/feature.md. For an existing Feature,
 preserve its identity and stable content, compare it with the explicit
 maintenance indication when present, and calculate only justified updates.
-Require unique, individually provable acceptance criteria and a failure policy
-for constrained validation before Tasks are derived.
+Require unique, individually provable acceptance criteria with stable IDs and a
+failure policy for constrained validation before Tasks are derived. Render each
+criterion as `- [F-AC-NN] <criterion>`, starting at `F-AC-01`. Keep IDs unique
+within the Feature, retain them across non-semantic wording clarification and
+reordering, and never reuse a retired ID. A semantic replacement receives the
+next ID above the durable `feature_acceptance_high_water`, then advances that
+monotonic high-water mark. Bracketed IDs are contract identity, not Markdown
+checkboxes or execution state; do not render `[ ]` or `[x]` markers. The
+uppercase ID spelling is an explicit external rendered-contract syntax
+exception to the repository's normal lower-kebab assigned-value rule.
 
 In a multi-repository feature, create or retain exactly one Feature per
 repository and link those Features with globally qualified issue references or
