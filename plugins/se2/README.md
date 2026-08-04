@@ -52,6 +52,10 @@ Its skills are deliberately separated by responsibility:
   represents a true same-repository code dependency, never serialization alone;
   G owns PR publication and pairwise stack linking. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
+  Final provider readiness comes from the exact-head
+  `g:github-delivery-status` contract; `ready` and
+  `ready-with-manual-action` are accepted without granting Implement any merge,
+  auto-merge, bypass, or queue authority.
   Feature and Task acceptance criteria use stable bracketed IDs rather than
   Markdown checkbox state; workers bind Task criterion evidence to candidate
   HEADs and the orchestrator aggregates Feature coverage without rewriting

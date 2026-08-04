@@ -25,7 +25,9 @@ repositories, branches, exact HEADs, PR references, and standalone or stacked
 relationships, acceptance-evidence matrices, and exact Task-only
 `closing_issue_refs`. `complete` means every Task and Feature criterion is
 verified against the current candidate HEAD vector, every selected Feature has
-a verified `standalone-ready` or `stack-ready` PR output, and each PR's GitHub
+a verified `standalone-ready` or `stack-ready` PR output backed by a current
+`$g:github-delivery-status` disposition of `ready` or
+`ready-with-manual-action`, and each PR's GitHub
 closing references equal its fully satisfied Task issue set while excluding
 Feature and Idea issues. This skill never merges, deploys, releases, or performs
 post-merge closure; GitHub closes the linked Tasks when an eligible PR merges,
@@ -53,6 +55,13 @@ verification belong to the G-owned workflows. The explicit Implement request
 implicitly authorizes the exact in-scope GitHub writes required for its
 selected Features; the dependency gate verifies availability and does not
 broaden that scope.
+
+Require `$g:github-delivery-status` for exact-HEAD provider readiness. Its
+automation observations are facts, not authority: repository auto-merge
+capability, an existing PR auto-merge request, or a merge-queue entry never
+authorize Implement and are not blockers by themselves. Implement never
+merges, bypasses protections, enables or disables auto-merge, or enqueues or
+dequeues a PR.
 
 Before the first hosted write, load the shared
 [hosted-content-safety.md](../../references/hosted-content-safety.md). Apply its
@@ -299,7 +308,8 @@ or deferred assignment does not stop independent Features; shared prerequisites
 remain binding.
 
 Before bootstrapping a stacked child, verify the parent is still
-`delivery-ready`, its required CI and reviews remain clean, its exact HEAD is
+`delivery-ready`, its current G delivery disposition is accepted, its required
+reviews remain clean, its exact HEAD is
 unchanged, and the required G publication and official stack capability are
 available. A pending, failing, stale, or ambiguous parent keeps the child out of
 the runnable wave. Never install a missing stack dependency or silently publish
@@ -407,12 +417,13 @@ Return one aggregate report with:
 - one Task acceptance row per `T-AC-NN` and one aggregated Feature acceptance
   row per `F-AC-NN`, each with status, evidence references, and exact candidate
   SHA or candidate-SHA vector;
-- candidate, review, publication, CI, stack, and final exact-HEAD evidence;
+- candidate, review, publication, G delivery-status, stack, and final exact-HEAD evidence;
 - exact Task-only `closing_issue_refs` and verified PR-body/GitHub closing
   references for every delivery;
 - one output row per PR with Feature refs, repository, delivery mode, parent PR
   when present, base, branch, full HEAD, PR URL, stack order and receipt when
-  present, and `standalone-ready` or `stack-ready` readiness state;
+  present, GitHub delivery disposition, `merge_boundary`, and
+  `standalone-ready` or `stack-ready` readiness state;
 - aggregate `outcome: complete`, `deferred`, or `blocked`.
 
 Never claim completion while any required acceptance criterion is not verified

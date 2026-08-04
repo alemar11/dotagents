@@ -74,8 +74,9 @@ complete prerequisite HEAD vector, or wait for an authoritative merged base.
 
 A stacked child is dependency-ready only after the immediate parent assignment
 is `delivery-ready` at `final-verify`, the live parent PR is open and ready, its
-required CI and reviews are clean, and its full head still equals the reviewed
-candidate SHA. Verify the G-owned single-PR publication workflow and official
+current exact-head `$g:github-delivery-status` disposition is `ready` or
+`ready-with-manual-action`, its hosted review is clean, and its full head still
+equals the reviewed candidate SHA. Verify the G-owned single-PR publication workflow and official
 stack capability before creating the child worker. Missing, failing, stale, or
 ambiguous evidence keeps only that child out of the runnable wave; continue
 independent assignments and never degrade to a standalone PR.
@@ -217,5 +218,6 @@ deferred runs and preserve one aggregate vector:
 
 `feature_ref, task_refs, repository_identity, delivery_mode, parent_pr,
 base_branch, base_sha, head_branch, head_sha, pr_url, stack_order,
-stack_link_status, task_acceptance_evidence_refs,
+stack_link_status, github_delivery_disposition, merge_boundary,
+github_delivery_evidence_ref, task_acceptance_evidence_refs,
 feature_acceptance_evidence_ref, readiness_state`.

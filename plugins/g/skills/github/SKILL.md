@@ -57,6 +57,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | GitHub issue lifecycle and relationships | `$g:github-issues` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$g:github-investigation` |
 | Actions inspection or explicit CI repair | `$g:github-actions` |
+| Exact-head PR delivery readiness, merge policy, rulesets, checks, queue, and automation state | `$g:github-delivery-status` |
 | Automated review check/wait, review feedback, implementation, replies, resolution | `$g:github-review-threads` |
 | Tags, releases, notes, assets, packages | `$g:github-releases` |
 | Stars and star lists | `$g:github-stars` |

@@ -8,6 +8,7 @@ from typing import Any
 from . import __version__
 from . import ci, portfolio, reviews, stack, stars
 from .common import GError, envelope, error_envelope, resolve_pr, resolve_repo
+from .delivery_status import inspect_delivery_status
 from .health import doctor, doctor_text
 from .provider_text import worktree_snapshot
 from .publish import open_pr, preflight
@@ -38,6 +39,10 @@ def parser() -> Parser:
     pr_resolve = pr_sub.add_parser("resolve", help="Resolve a PR number/URL or current-branch PR.")
     pr_resolve.add_argument("--repo")
     pr_resolve.add_argument("--pr")
+    pr_delivery = pr_sub.add_parser("delivery-status", help="Inspect exact-head GitHub delivery readiness read-only.")
+    pr_delivery.add_argument("--repo", required=True)
+    pr_delivery.add_argument("--pr", required=True, type=int)
+    pr_delivery.add_argument("--expected-head")
     ci_parser = commands.add_parser("ci", help="Inspect failing GitHub Actions checks.")
     ci_parser.add_argument("args", nargs=argparse.REMAINDER)
     portfolio_parser = commands.add_parser("portfolio", help="Scan multiple repositories read-only.")
@@ -131,7 +136,11 @@ def main(argv: list[str] | None = None) -> int:
             _emit(data, ["repo", args.verb], args.json)
             return 0
         if args.domain == "pr":
-            _emit(resolve_pr(args.repo, args.pr), ["pr", "resolve"], args.json)
+            if args.verb == "resolve":
+                data = resolve_pr(args.repo, args.pr)
+            else:
+                data = inspect_delivery_status(args.repo, args.pr, args.expected_head)
+            _emit(data, ["pr", args.verb], args.json)
             return 0
         if args.domain == "ci":
             return _forward(ci, args.args, args.json, "inspect")

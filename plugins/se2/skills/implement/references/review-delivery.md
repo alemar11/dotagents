@@ -47,7 +47,8 @@ its required portable marker and full SHA still passes the same final gate.
 | One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and branch and Task-only `closing_issue_refs`; read back repository, base, branch, full PR HEAD, URL, canonical closing lines, `closingIssuesReferences`, and draft state. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
-| CI, review, mergeability, and review-thread observation | G-owned hosted read/review workflows | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
+| Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | `$g:github-delivery-status` | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
+| Hosted Codex review and actionable review-thread observation | G-owned review workflow | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
 | Merge, deploy, release, or post-merge closure | No Implement owner; outside this skill | Never perform these operations as part of Implement completion. |
 
 The worker may decide that evidence is insufficient and return to
@@ -151,12 +152,14 @@ lineages. Keep them separate:
    SHA. Repeat this fix, publish, explicit-request, and wait cycle until the
    current full PR HEAD has a clean terminal result.
 
-Monitor CI, mergeability, and review threads alongside that provider-review
-cycle. Pending, timed-out, stale, ambiguous, draft-only, missing-ready-receipt,
-or request-correlation evidence is not terminal. One bounded wait may return a
-pending state at its caller-owned deadline; when continued monitoring remains
-authorized, the orchestrator resumes through later bounded waits without
-posting a duplicate request or resetting the existing lineage.
+Monitor `$g:github-delivery-status` and actionable review threads alongside
+that provider-review cycle. Bind every delivery-status observation to the exact
+published full HEAD. Pending, timed-out, stale, ambiguous, draft-only,
+missing-ready-receipt, request-correlation, or incomplete provider evidence is
+not terminal. One bounded wait may return a pending state at its caller-owned
+deadline; when continued monitoring remains authorized, the orchestrator
+resumes through later bounded waits without posting a duplicate request or
+resetting the existing lineage.
 
 For a stacked child, also monitor the immediate parent PR and base relationship.
 Any parent HEAD or readiness change invalidates the child's ancestry, review,
@@ -168,6 +171,32 @@ If hosted review produces an actionable finding, preserve its exact provider,
 PR, head, artifact, and observation fingerprint when returning it to the same
 implementation worker. Never force-push, merge, enqueue, deploy, release, or
 perform post-merge closure.
+
+## Provider delivery status
+
+After publication and again during final verification, invoke
+`$g:github-delivery-status` with the exact repository, PR, and full candidate
+HEAD. Accept only these current-head dispositions:
+
+- `ready`: GitHub reports the PR technically mergeable with observed required
+  provider gates satisfied; record `merge_boundary=none`;
+- `ready-with-manual-action`: the same evidence is satisfied and G attributes
+  the remaining provider boundary to a restricted manual branch update; record
+  `merge_boundary=manual`.
+
+Treat `pending`, `blocked`, `conflicting`, and `unknown`, a head mismatch, or
+incomplete evidence as non-ready. Return repairable current-HEAD mismatches to
+the same worker only when implementation evidence must change; otherwise keep
+the orchestrator in bounded provider monitoring or report the provider blocker.
+Do not reinterpret raw GitHub `mergeStateStatus` values inside Implement.
+
+Repository auto-merge capability, an existing PR auto-merge request, and a
+merge-queue entry remain reported automation facts. They neither block
+delivery readiness nor grant authority. Implement must not enable, disable,
+enqueue, dequeue, bypass, or merge, even when the current actor has permission.
+If another actor merges or closes the PR during the run, observe the changed
+lifecycle, stop normal delivery reconciliation, and report the external event
+without post-merge work.
 
 ## Final verification
 
@@ -193,7 +222,9 @@ The orchestrator performs read-only final verification. Require:
   certificate for an unchanged initial HEAD, or the latest explicit-request
   receipt plus its clean current-head review result after one or more fix
   pushes;
-- required CI, mergeability, and zero unresolved actionable review threads.
+- a complete current-head `$g:github-delivery-status` certificate whose
+  disposition is `ready` or `ready-with-manual-action`, plus zero unresolved
+  actionable review threads.
 
 After every required Task passes these checks, aggregate each `F-AC-NN`
 through the authoritative Feature-to-Task-and-Task-criterion coverage map.
@@ -212,7 +243,8 @@ Return repairable evidence mismatches to the worker without diagnosis. The
 worker owns repair and replacement evidence. Final verification never edits
 code, reruns review, mutates issues, or merges.
 
-Report a standalone PR as `standalone-ready`. Report a child as `stack-ready`
+Report a standalone PR as `standalone-ready` with its exact GitHub delivery
+disposition and `merge_boundary`. Report a child as `stack-ready`
 only when every lower parent in the selected chain is current and
 delivery-ready, while recognizing that the child is not independently
 mergeable ahead of those parents.
