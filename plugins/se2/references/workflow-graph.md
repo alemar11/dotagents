@@ -5,7 +5,7 @@ workflows. It applies to Learn, Idea, Feature, Implement, and Audit without turn
 every skill into a Feature or Task graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
-marker and hosted Idea shape. This reference owns workflow structure only.
+hosted shape. This reference owns workflow structure only.
 Feature still owns its Feature/Task semantics; Learn, Idea, Implement, and Audit own
 their skill-specific registries and branch details.
 

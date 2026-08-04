@@ -54,8 +54,11 @@ necessary. Feature links are not Task dependencies.>
 
 ## Execution Waves
 
-- Wave 0: <Tasks that can start immediately.>
-- Wave 1: <Tasks unblocked after Wave 0.>
+- allowed_paths: <smallest-complete path envelope per Feature/Task>
+- overlap: <shared-path pairs or none, with affected Features/Tasks>
+- theoretical_waves: <Wave 0, Wave 1, and the graph/scope rationale>
+- scope_overlap_gates: <shared paths, affected Features or Tasks, any proposed
+  order or rebase constraint, and why each gate is not a dependency edge>
 
 ## Acceptance Coverage
 

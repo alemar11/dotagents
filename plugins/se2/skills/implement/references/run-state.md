@@ -77,6 +77,16 @@ Keep only five tables:
 Do not store Feature/Task bodies, prompts, messages, findings, logs, arbitrary
 JSON, model/reasoning profiles, code state, or worker technical state.
 
+Path claims are transient control-plane reservations, not a sixth ledger table.
+The orchestrator must normalize an assignment's `allowed_paths`, atomically
+claim the resulting envelope before worker bootstrap, and release or
+reconcile it at the assignment boundary. Never infer path ownership from an
+active Feature claim, a theoretical Feature wave, or a stale assignment
+checkpoint. On resume, independently re-read the authoritative bundle and
+current repository/base/HEAD evidence, then reacquire the path claim before
+execution. The five-table ledger remains a recovery index; it does not prove a
+live path claim.
+
 ## Command families
 
 ```text

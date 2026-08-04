@@ -268,17 +268,24 @@ For a multi-repository feature, link repository-owned Features with globally
 qualified issue references or URLs. Tasks and Task dependencies stay local to
 their Feature; do not introduce a cross-repository integration issue.
 
-Execution waves are derived from the graph and scope:
+The Feature planner calculates a theoretical execution plan from the graph and
+scope:
 
-- Tasks with no unfinished incoming edges may run in parallel;
+- Tasks with no unfinished incoming edges may be proposed in parallel;
 - a Task waits until every incoming dependency is proven complete;
-- overlapping allowed paths may force serial execution even when the DAG has no
-  edge;
+- overlapping `allowed_paths` are reported as scope-overlap gates even when the
+  DAG has no edge;
 - independent outcomes with disjoint safe scopes should remain parallel;
 - do not add a scheduling option merely to force parallelism or serialism.
 
-Report the topological waves, the reason for every serialized edge, and any
-scope-overlap gate that prevents otherwise independent execution.
+Report `allowed_paths`, the theoretical topological waves, the reason for every
+serialized edge, and any scope-overlap gate that would require runtime
+serialization for otherwise independent work. Keep scope-overlap gates separate
+from `dependency_ids`: list the affected Features/Tasks, shared paths, any
+proposed order or rebase constraint, and why the overlap does not create a
+logical prerequisite or a GitStack stack.
+The Feature planner reports this handoff evidence; `se2:implement` owns runtime
+serialization, path claims, current base/HEAD checks, and worker rebase/readback.
 
 ## Workflow rules
 
@@ -367,8 +374,9 @@ complete Feature-and-Task bundle is calculated. Treat an omitted mode as
   loading the G dependency gate or inspecting hosted state, unless hosted
   rehydration was already required by the source route.
 - `publish` transitions through steps/publish.md and steps/preflight.md. The
-  preflight must pass before hosted checks, duplicate/collision reads, or any
-  hosted mutation.
+  preflight is a hard hosted-access barrier and must pass before hosted checks,
+  duplicate/collision reads, repository metadata reads, or any hosted mutation.
+  No hosted operation may be used to establish the preflight result itself.
 - missing publication authority or unresolved dependency transitions to
   `blocked`; never convert the default publish branch to preview.
 
@@ -401,8 +409,9 @@ A complete report must contain:
   identity;
 - every Task issue reference, Feature attachment, vertical outcome, and scope;
 - cross-repository Feature links;
-- Task dependency edges, topological execution waves, and parallel or serial
-  reasons;
+- Task dependency edges, theoretical execution waves, and planning rationale;
+- `allowed_paths`, overlap evidence, theoretical execution waves, and
+  scope-overlap gates kept separate from Task dependency edges;
 - Feature-criterion-to-Task coverage;
 - loaded repository-context sources and required documentation updates;
 - readiness and issue-relation evidence;

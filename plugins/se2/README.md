@@ -16,7 +16,7 @@ Its skills are deliberately separated by responsibility:
   becoming or rewriting it.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
-- references/workflow-contract.md owns Idea metadata, while
+- references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
 - skills/idea/references/idea-source.md owns the typed transient handoff from

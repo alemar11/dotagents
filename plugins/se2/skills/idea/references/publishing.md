@@ -2,8 +2,8 @@
 
 Read this reference when `run_mode=publish` has been resolved, including the
 default publish branch. The G-owned GitHub issue workflow remains the only
-transport and owns safe body handling, issue creation, label administration,
-verification, and partial-failure mechanics.
+transport and owns safe body handling, issue creation, verification, and
+partial-failure mechanics.
 
 This reference is the only external terminal phase of the Idea workflow. The
 capture and preview paths must not load the G dependency preflight, inspect
@@ -14,7 +14,6 @@ GitHub, or mutate hosted state.
 Each durable Idea is an open issue with:
 
 - title `Idea: <Name>`;
-- the exact `idea` marker from the SE2 workflow contract;
 - native Issue Type unset;
 - the seven sections from `idea-template.md`.
 
@@ -26,18 +25,16 @@ the canonical hosted URL. A bare issue number is not a source identity.
 Before the first hosted mutation:
 
 1. resolve the exact `owner/repository` target for every accepted candidate;
-2. verify the SE2 workflow contract and exact `idea` marker;
+2. verify the SE2 workflow contract and hosted Idea shape;
 3. inspect open issues for exact and near title matches, then inspect candidate
-   bodies, labels, state, and native Issue Type;
+   bodies, state, and native Issue Type;
 4. reuse only an exact equivalent with the same substantive proposal, owner,
-   marker, compatible open state, and absent native Issue Type;
+   compatible open state, and absent native Issue Type;
 5. ask for a decision on a materially different collision; do not silently
-   edit, relabel, reopen, or remove an Issue Type;
-6. confirm the exact `idea` marker is available for every candidate.
+   edit, reopen, or remove an Issue Type.
 
-If the marker is missing, its creation is allowed only as the single exact
-metadata operation authorized by the resolved publish operation. Verify it before
-creating an Idea. Do not create additional taxonomy.
+The `Idea:` title prefix and canonical body are the complete semantic hosted
+shape.
 
 ## Handoff and verification
 
@@ -54,22 +51,22 @@ report; only the explicitly published issue is durable.
 
 Publish in checkpoints:
 
-1. create or reuse the exact marker and verify it;
-2. create one missing Idea with its final title, body, and marker;
+1. reconcile the exact target and current collision state;
+2. create one missing Idea with its final title and body;
 3. read the result back before processing the next candidate;
-4. verify title, open state, body, marker, and absent native Issue Type;
+4. verify title, open state, body, and absent native Issue Type;
 5. record the durable qualified ref.
 
-Do not set a native Issue Type or apply workflow-state labels. Open questions
+Do not set a native Issue Type or apply workflow-state metadata. Open questions
 in an Idea body do not imply a workflow state.
 
 ## Failure and recovery
 
 If an operation returns an error, no result, or ambiguous acknowledgement, stop
-the batch and inspect the current hosted marker and issue state. Reuse a
-verified issue that the attempted operation actually created. Retry only a
-missing marker, issue, or assignment proven absent. Never replay the complete
-batch from the original candidate list.
+the batch and inspect the current hosted issue state. Reuse a verified issue
+that the attempted operation actually created. Retry only an issue or
+assignment proven absent. Never replay the complete batch from the original
+candidate list.
 
 On partial publication, report verified created and reused refs, the exact
 missing work, and the safe resume point. Clean up transient composition

@@ -29,6 +29,31 @@ safe. Serialize real dependencies and unsafe overlap. Do not create synthetic
 dependencies, impose a fixed worker cap, or stop independent Features because
 one assignment is blocked or deferred.
 
+## Feature Bundle handoff and path ownership
+
+The Feature Bundle Report is planning evidence, not an execution authorization.
+It may contain each Feature or Task's `allowed_paths`, theoretical execution
+waves, observed path overlap, and a `scope-overlap-gate` explaining why shared
+scope is not a logical dependency or a GitStack parent. Implement must
+independently read back the current repository identity, checkout, branch,
+base, and full HEAD before scheduling; stale or incomplete Feature planning
+evidence is not a substitute for current repository state.
+
+Implement owns the operational decision for every runnable wave. Before a
+worker is bootstrapped, the orchestrator must establish an atomic path claim
+for the assignment's normalized `allowed_paths` envelope. A conflicting claim
+serializes only the overlapping assignments and never creates a synthetic Task
+dependency or PR stack. Disjoint claims may proceed concurrently when their
+contracts and current base/HEAD evidence are valid.
+
+For a worker that will touch a shared path, claim readback and the current
+base/full-HEAD readback are required immediately before execution. If the
+base or HEAD has drifted, invalidate the affected scheduling and candidate
+evidence; the owning worker must rebase its own branch through the G-owned
+transport, read back the resulting full HEAD, and revalidate before executing
+or reviewing. The orchestrator coordinates and records this boundary but does
+not edit, rebase, or resolve worker code.
+
 ## Execution and delivery topology
 
 Keep scheduling and PR delivery as separate projections of the authoritative

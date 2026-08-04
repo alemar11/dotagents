@@ -36,8 +36,8 @@ instead of inventing decisions.
 - <Portable conversation, document, issue, or repository evidence.>
 ```
 
-The hosted title supplies `Idea: <Name>`. Apply only the workflow contract's
-`idea` marker. Leave native Issue Type unset.
+The hosted title supplies `Idea: <Name>`. No additional hosted classification
+is required; leave native Issue Type unset.
 
 ## Capture limits
 

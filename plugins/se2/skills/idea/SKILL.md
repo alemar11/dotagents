@@ -29,8 +29,8 @@ implicitly.
 Read the shared [workflow-graph.md](../../references/workflow-graph.md) for the
 common graph vocabulary. Read
 [workflow-contract.md](../../references/workflow-contract.md) for the Idea
-marker and hosted shape. The registry below is the structural source of truth
-for Idea; Mermaid is its projection.
+hosted shape. The registry below is the structural source of truth for Idea;
+Mermaid is its projection.
 
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |
@@ -106,7 +106,7 @@ the exact missing authority.
 
 The workflow contract in
 [`../../references/workflow-contract.md`](../../references/workflow-contract.md)
-owns the exact Idea marker and metadata. Load it before resolving hosted
+owns the exact Idea hosted shape and metadata. Load it before resolving hosted
 metadata; do not repair or redefine it during a run.
 
 The shared [workflow-graph.md](../../references/workflow-graph.md) owns the
@@ -115,11 +115,11 @@ contract above.
 
 ## Dependency boundary
 
-All hosted issue and label reads and writes belong to the repository's
-G-owned GitHub issue workflow. Do not call a provider API directly, construct
-an alternative transport, or return executable provider commands to the user.
-Capture and explicit preview are fully local: they must not load G, inspect
-hosted issues or labels, or claim current hosted duplicate/collision state.
+All hosted issue reads and writes belong to the repository's G-owned GitHub
+issue workflow. Do not call a provider API directly, construct an alternative
+transport, or return executable provider commands to the user. Capture and
+explicit preview are fully local: they must not load G, inspect hosted issues,
+or claim current hosted duplicate/collision state.
 
 Only after the default or explicit `run_mode=publish` is resolved, before its
 first hosted read or write, load
@@ -128,6 +128,14 @@ and complete its read-only availability gate. If the required G workflow is
 missing, disabled, malformed, or unresolvable, fail closed before hosted
 access; remediation is advisory and must never install, enable, refresh, or
 substitute the dependency.
+
+This is a hard hosted-access barrier. Until the preflight produces verified
+G-dependency evidence, do not inspect hosted issues, repository metadata,
+duplicate or collision state, native Issue Types, relations, or any other
+hosted state. Resolve tracker ownership only from explicit local or session
+evidence. If a hosted read is attempted before this barrier, stop and report a
+preflight-order blocker instead of continuing or treating the read as a valid
+preflight result.
 
 The dependency gate authorizes the next workflow handoff only. It does not
 authorize publication. `publish` still requires explicit user authority for
@@ -201,8 +209,8 @@ Complete the local capture bundle before choosing the terminal operation:
 After the local bundle is frozen, enter the terminal-operation decision. Do not
 inspect hosted state or load the publication dependency before that decision.
 
-Do not inspect hosted issues, labels, native Issue Types, or current duplicate
-and collision state in this phase. Those checks belong to the publish terminal
+Do not inspect hosted issues, native Issue Types, or current duplicate and
+collision state in this phase. Those checks belong to the publish terminal
 operation. Preview must report that hosted equivalence and collision evidence
 was not consulted rather than claiming that no conflict exists.
 

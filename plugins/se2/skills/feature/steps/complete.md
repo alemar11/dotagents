@@ -11,6 +11,8 @@ inputs:
   - task-dependency-graph
   - acceptance-coverage-map
   - execution-waves
+  - overlap
+  - scope-overlap-gates
   - readiness-evidence
   - repository-context
   - linked-feature-references
@@ -41,8 +43,8 @@ Report the complete desired bundle after the selected terminal operation has
 finished. For each affected repository, retain its Feature definition, Feature
 issue, every vertical Task, Feature attachment, Task dependency relationships,
 criterion coverage, context evidence, required documentation updates, GitHub
-issue state, and topological execution waves. The complete bundle also includes
-the linked repository-owned Features.
+issue state, topological execution waves, and scope-overlap gates. The complete
+bundle also includes the linked repository-owned Features.
 
 Preview enters this node with a non-durable report artifact. Publish enters this
 node only after `reconcile-verify` has independently confirmed every hosted
@@ -51,5 +53,6 @@ retry, or recovery side effect; failures transition to `blocked` from the
 operation node that owns the missing evidence.
 
 The final report must state the Feature reference, Task references, Task
-dependency edges, execution waves, acceptance coverage, readiness evidence,
-selected mode, and any unvalidated assumptions.
+dependency edges, `allowed_paths`, overlap evidence, theoretical execution
+waves, scope-overlap gates, acceptance coverage, readiness evidence, selected
+mode, and any unvalidated assumptions.

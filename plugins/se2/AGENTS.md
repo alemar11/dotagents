@@ -15,8 +15,8 @@ do not silently merge its graph contract into the existing SE plugin.
 - references/task-handoff.md owns the shared task assignment, observation,
   partial/final relay, deterministic emoji title grammar, bounded title
   reconciliation, and terminal-report evidence.
-- references/workflow-contract.md owns the semantic Idea marker and hosted
-  shape for SE2 Idea capture.
+- references/workflow-contract.md owns the semantic Idea hosted shape for SE2
+  Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
   registry rules, terminal meanings, authority boundaries, and validation
   expectations. It does not own Idea hosted metadata or Feature/Task semantics.

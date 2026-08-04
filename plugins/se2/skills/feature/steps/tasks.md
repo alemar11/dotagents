@@ -27,7 +27,7 @@ transitions:
 stop_if:
   - candidate-is-only-an-architecture-layer
   - task-would-have-no-independent-outcome
-  - task-scope-overlaps-unsafely
+  - individual-task-scope-cannot-be-made-safe
 side_effects:
   - none
 terminal_states: []
@@ -54,6 +54,9 @@ For every candidate:
 Compress redundant candidates before freezing IDs. Retain stable Task
 identities, create only justified missing Tasks, and calculate removals only
 when the explicit maintenance indication and current state make them safe.
-Block on duplicates, stale bodies, conflicting Feature relationships, or
-unsafe overlap. The GitHub type `Task` is publication metadata; Task content,
-Feature attachment, and the Task dependency graph remain authoritative.
+Block on duplicates, stale bodies, conflicting Feature relationships, or an
+individual Task scope that cannot be made safe. Report overlap between
+otherwise valid Features or Tasks as planning evidence in the Feature Bundle
+Report; do not turn it into a Task dependency. The GitHub type `Task` is
+publication metadata; Task content, Feature attachment, and the Task dependency
+graph remain authoritative.

@@ -253,8 +253,12 @@ control-plane messages with them. It must not inspect or edit worker
 code, choose implementation or review fixes, judge findings, rewrite Feature
 contracts, or mirror routine worker dialogue into the ledger.
 
-Derive execution waves from each Feature Task DAG, repository and path overlap,
-and verified runtime capacity. Derive delivery topology separately. Operational
+Use each Feature Bundle Report only as planning input: it may provide
+`allowed_paths`, theoretical execution waves, overlap evidence, and
+scope-overlap gates. Independently revalidate the current repository identity,
+checkout, branch, base, and full HEAD before scheduling any worker. Implement
+then owns the runnable waves, atomic path claims, and serialization of
+conflicting assignments. Derive delivery topology separately. Operational
 serialization, path overlap, and runtime capacity never create a PR stack. A
 single same-repository prerequisite may produce a stacked child only when the
 parent assignment passed `final-verify`, its current PR HEAD equals its reviewed
@@ -274,6 +278,10 @@ the child as standalone.
 Before scheduling, atomically claim the complete sorted input Feature set in
 the ledger. An active claim held by another run blocks startup for that Feature
 set; never create a second orchestrator, split the claim, or steal ownership.
+This Feature claim is run ownership only; it does not establish ownership of
+any implementation path. Path claims are a separate Implement scheduling
+boundary and must be acquired from the normalized assignment `allowed_paths`
+before worker bootstrap.
 After every selected Feature is delivery-ready, `release-claims` uses current
 claim revisions to release all claims before `complete`. Preserve active claims
 for resumable blocked or deferred runs. Claim release is one all-or-none

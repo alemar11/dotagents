@@ -18,14 +18,17 @@ inputs:
 outputs:
   - task-dependency-graph
   - acceptance-coverage-map
+  - allowed_paths
+  - overlap
   - execution-waves
+  - scope-overlap-gates
   - readiness-evidence
   - task-dependency-change-set
 transitions:
   - to: terminal-operation
     when: task-dag-is-acyclic-covered-and-agent-ready
   - to: blocked
-    when: task-dependency-coverage-or-overlap-validation-fails
+    when: task-dependency-coverage-or-scope-validation-fails
 stop_if:
   - dependency-id-does-not-resolve-to-a-local-task
   - task-dependency-graph-contains-a-cycle
@@ -48,7 +51,8 @@ Require:
 - no self-dependencies, duplicate edges, or cycles;
 - every Feature acceptance criterion maps to one or more Tasks;
 - every Task has an independent outcome, safe scope, and validation proof;
-- path overlap is safely combined or ordered by a necessary Task edge;
+- path overlap is identified through `allowed_paths` and every external
+  scope-overlap gate is recorded separately from dependency IDs;
 - linked Features resolve to the intended repository-owned Feature issues;
 - every context-justified documentation update has one owner and validation;
 - every Task satisfies readiness without unresolved questions or placeholders.
@@ -57,9 +61,13 @@ Feature-to-Task attachment expresses belonging. Dependency edges exist only
 between Tasks. Cross-repository Feature links are not Task dependencies and do
 not create a cross-repository integration Task.
 
-Derive topological execution waves. Tasks with no unfinished incoming edges
-may run in parallel only when their allowed paths do not create unsafe
-concurrent edits. Record the reason for every serialized edge and every scope
-overlap gate. On maintenance, report added, retained, removed, or changed
-Task dependency relationships before Terminal Operation reconciles the selected
-publication mode.
+Calculate theoretical topological execution waves. Tasks with no unfinished
+incoming edges may be proposed in parallel only when their `allowed_paths` do
+not identify unsafe concurrent edits. Record the reason for every serialized
+edge and every scope-overlap gate, including shared paths, affected Features or
+Tasks, any proposed order or rebase constraint, and why the gate is not a
+logical dependency edge. This node reports planning evidence for the
+Implement handoff; it does not claim paths, serialize workers, inspect current
+base/HEAD state, or rebase a worker. On maintenance, report added, retained,
+removed, or changed Task dependency relationships before Terminal Operation
+reconciles the selected publication mode.
