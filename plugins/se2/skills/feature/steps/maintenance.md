@@ -25,7 +25,8 @@ stop_if:
   - existing-feature-is-ambiguous
   - current-task-or-dependency-state-cannot-be-reconciled
 side_effects:
-  - none
+  - read
+  - hosted
 terminal_states: []
 ---
 
@@ -35,9 +36,11 @@ Use this step only as the alternate entry route for an explicit Feature
 maintenance request. Start from the existing Feature issue, its Task issues,
 current Task dependency relationships, and the external change indication.
 
-Re-read the authoritative current state and rehydrate one complete transient
-bundle per affected repository. Preserve stable Feature and Task identities,
-record current Feature attachments and Task dependency edges, and retain the
+When hosted state must be rehydrated, pass the shared G dependency preflight
+before the first hosted read and use the G-owned GitHub issue workflow. Re-read
+the authoritative current state and rehydrate one complete transient bundle per
+affected repository. Preserve stable Feature and Task identities, record
+current Feature attachments and Task dependency edges, and retain the
 indication as maintenance evidence. Do not create, update, delete, or comment
 on issues in this step.
 
@@ -48,6 +51,6 @@ without imposing a documentation system.
 
 Pass the rehydrated bundle to Feature. The canonical path then reviews the
 Feature definition, recalculates vertical Tasks and coverage, validates the
-Task dependency graph, and reaches the same `complete` terminal node. Missing
-references, foreign state, conflicts, or an indication that is not specific
-enough to justify a change transition to `blocked`.
+Task dependency graph, and reaches `terminal-operation`. Missing references,
+foreign state, conflicts, or an indication that is not specific enough to
+justify a change transition to `blocked`.

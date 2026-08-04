@@ -34,6 +34,14 @@ All GitHub transport, mutation safety, publication, and read-after-write
 verification belong to the G-owned workflows. A passing dependency gate does
 not grant GitHub mutation authority.
 
+Implement keeps the ownership split explicit: workers own implementation
+semantics, conflict resolution, validation, and candidate evidence; G-owned
+workflows own local Git transport and every hosted GitHub operation. The shared
+dependency gate applies before the first hosted read or write, not before local
+worktree editing or validation. Read
+[review-delivery.md](references/review-delivery.md) for the operation-by-operation
+owner and readback matrix.
+
 Before creating, resuming, or monitoring application tasks, load:
 
 - [task-profile.md](references/task-profile.md) for orchestrator and worker
@@ -250,9 +258,11 @@ retry and never justifies a second orchestrator.
 
 Each implementation worker owns one eligible Task assignment in its verified
 implementation worktree. It owns technical design, code, tests, validation,
-commits, exact-HEAD native review in the same worker session, finding decisions and fixes,
-and publication evidence within the accepted contract. Review runs only after
-the candidate is committed and the same worktree is clean at its exact HEAD.
+candidate evidence, exact-HEAD native review in the same worker session,
+finding decisions, and fixes. The worker hands local Git transport and hosted
+GitHub transport to their G-owned workflows, then independently checks the
+returned evidence. Review runs only after the candidate is committed and the
+same worktree is clean at its exact HEAD.
 Any HEAD change invalidates the prior review and requires a new in-session
 review cycle. The orchestrator receives review evidence but never performs or
 judges the review.

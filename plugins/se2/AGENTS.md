@@ -27,7 +27,8 @@ do not silently merge its graph contract into the existing SE plugin.
   proposals and its workflow registry; its references own branch-specific
   detail.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
-  registry, Feature/Task invariants, and terminal states.
+  registry, Feature/Task invariants, terminal-operation branches, and terminal
+  states.
 - skills/feature/references/task-profile.md owns the principal Feature planner
   role and its model, reasoning, and topology selection.
 - skills/feature/steps/ owns the Markdown node contracts. Every step file
@@ -88,6 +89,10 @@ do not silently merge its graph contract into the existing SE plugin.
 - Keep Idea hosted output behind the G-owned issue workflow and the shared
   fail-closed dependency gate. Never add a direct tracker transport or a
   compatibility alias for a missing dependency.
+- Keep Feature preview local-only. Route Feature maintenance or existing-source
+  hosted rehydration through the shared G dependency gate before hosted reads,
+  and route Feature publication through its explicit terminal preflight and
+  G-owned issue workflow before any hosted mutation.
 - Keep Audit strictly observational. Attribute SE2 use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.
@@ -111,6 +116,10 @@ do not silently merge its graph contract into the existing SE plugin.
   targets a registered node, and every step has the standard front matter.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
+- Validate Feature terminal-operation preview/publish reachability, the
+  preflight-before-hosted-access boundary, reconciliation to `complete` or
+  `blocked`, and the absence of side effects or outgoing edges on terminal
+  nodes.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery-gate and stack-reconcile paths.

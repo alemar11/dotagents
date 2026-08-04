@@ -22,7 +22,7 @@ outputs:
   - readiness-evidence
   - task-dependency-change-set
 transitions:
-  - to: complete
+  - to: terminal-operation
     when: task-dag-is-acyclic-covered-and-agent-ready
   - to: blocked
     when: task-dependency-coverage-or-overlap-validation-fails
@@ -61,4 +61,5 @@ Derive topological execution waves. Tasks with no unfinished incoming edges
 may run in parallel only when their allowed paths do not create unsafe
 concurrent edits. Record the reason for every serialized edge and every scope
 overlap gate. On maintenance, report added, retained, removed, or changed
-Task dependency relationships before Complete reconciles them.
+Task dependency relationships before Terminal Operation reconciles the selected
+publication mode.

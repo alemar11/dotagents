@@ -1,6 +1,6 @@
 {
   "name": "se2",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Traverse graph-first Learn, Idea, Feature, Implement, and live session Audit workflows.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE2",
     "shortDescription": "Traverse graph-first Learn, Idea, Feature, Implement, and Audit workflows.",
-    "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit durable-context, Idea capture, Feature planning, GitHub-Feature-to-PR implementation, and live session Audit entry points. Learn maintains evidence-backed repository context, ADRs, localization memory, and proposal-first AGENTS.md compaction. Idea captures transient session context and publishes only through an explicitly authorized G-owned terminal operation. Feature converges authoritative Feature issues, vertical Task issues, and acyclic Task dependency graphs. Implement coordinates a Sol/medium control plane with adaptive Sol workers, separates execution waves from standalone or stacked delivery, gates stacked children on a green exact-HEAD parent, reconciles parent drift, routes defective specifications through Feature Contract Repair, and keeps a minimal SQLite WAL recovery ledger. Audit observes active SE2 sessions read-only, reconstructs workflow-graph conformance from positive evidence, and reports feedback, bugs, regressions, graph violations, and graph-design improvements without persistent state. Root contracts standardize graph vocabulary, live task preflight, destination and identity observation, bounded display-title reconciliation, update relay, and recovery.",
+    "longDescription": "SE2 is an experimental issue-first, graph-first plugin with explicit durable-context, Idea capture, Feature planning, GitHub-Feature-to-PR implementation, and live session Audit entry points. Learn maintains evidence-backed repository context, ADRs, localization memory, and proposal-first AGENTS.md compaction. Idea captures transient session context and publishes only through an explicitly authorized G-owned terminal operation. Feature converges authoritative Feature issues, vertical Task issues, acyclic Task dependency graphs, and an explicit terminal preview/publish/reconciliation subgraph. Implement coordinates a Sol/medium control plane with adaptive Sol workers, separates execution waves from standalone or stacked delivery, maps Git and GitHub transport to G-owned workflows, gates stacked children on a green exact-HEAD parent, reconciles parent drift, routes defective specifications through Feature Contract Repair, and keeps a minimal SQLite WAL recovery ledger. Audit observes active SE2 sessions read-only, reconstructs workflow-graph conformance from positive evidence, and reports feedback, bugs, regressions, graph violations, and graph-design improvements without persistent state. Root contracts standardize graph vocabulary, live task preflight, destination and identity observation, bounded display-title reconciliation, update relay, and recovery.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [

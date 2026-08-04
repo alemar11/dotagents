@@ -16,8 +16,9 @@ Its skills are deliberately separated by responsibility:
   becoming or rewriting it.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
-- references/workflow-contract.md and references/codex-dependency-preflight.md
-  are the SE2-owned contracts for Idea metadata and the G dependency gate.
+- references/workflow-contract.md owns Idea metadata, while
+  references/codex-dependency-preflight.md owns the G dependency gate for Idea,
+  Feature, and Implement hosted handoffs.
 - skills/idea/references/idea-source.md owns the typed transient handoff from
   Idea capture to later Feature Intake; it never adds an automatic runtime
   dependency between the skills.
@@ -60,8 +61,9 @@ Its skills are deliberately separated by responsibility:
   instruction hierarchy; no documentation system is imposed.
 - the prototype returns one Feature plus vertical Task dependency graphs,
   including multi-repository Feature links and local dependency waves, without
-  implementing code; GitHub publication is the internal final operation and
-  requires explicit authorization plus read-after-write verification.
+  implementing code; Feature exposes an explicit terminal preview/publish
+  subgraph, and hosted publication requires the G preflight, explicit
+  authorization, and read-after-write verification.
 - Feature maintenance is an alternate entry into the same graph: it rehydrates
   the current Feature/Task bundle, reconciles it, and emits a lateral Feature
   changelog comment for each significant published change.

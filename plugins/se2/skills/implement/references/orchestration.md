@@ -119,9 +119,10 @@ its stable task, project, repository, worktree, branch, and contract-generation
 identity until it is complete, formally superseded, or authoritatively
 unrecoverable. A worker never creates another worker or planner task.
 
-After producing a committed, validated candidate HEAD, the same worker runs the
-runtime's native code-review capability in its own session and worktree. Review
-does not create another task, worktree, or ownership identity.
+After producing a validated candidate, the worker uses the G-owned local Git
+workflow to create the candidate commit, then runs the runtime's native
+code-review capability in its own session and worktree. Review does not create
+another task, worktree, or ownership identity.
 
 ## Contract Repair
 

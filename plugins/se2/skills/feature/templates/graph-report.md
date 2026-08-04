@@ -4,12 +4,16 @@
 
 - entry_route: <create-or-maintenance>
 - run_mode: <preview-or-publish>
+- terminal_operation: <preview-or-publish>
 - source_route: <new-source-or-existing-source>
 - terminal_state: <complete-or-blocked>
 - conceptual_result: <complete-Feature-and-Task-bundle>
+- operation_evidence: <frozen-preview-or-hosted-readback>
 
-The operational mode is internal to the final bundle step. It is not a graph
-node or a separate conceptual result.
+The `terminal-operation` subgraph owns final mode selection, publication
+preflight, hosted checks, mutation, and reconciliation. It is operational
+evidence, not a separate conceptual result: the conceptual result remains the
+complete Feature-and-Task bundle.
 
 ## Repository Runs
 
@@ -64,6 +68,7 @@ necessary. Feature links are not Task dependencies.>
 - feature_attachment: <verified Feature-to-Task evidence>
 - task_dependency_relationships: <verified evidence>
 - issue_type_projection: <Feature/Task mapping or not-applicable>
+- preflight_evidence: <G availability and handoff evidence or not-applicable>
 - read_after_write: <publish-only evidence or not-applicable>
 
 ## Feature Maintenance Changelog

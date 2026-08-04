@@ -6,12 +6,16 @@ installation or maintenance procedure.
 
 ## When to run
 
-For Idea preview, do not load this gate and do not access GitHub. For Idea or
-Feature publication, run it only after publish is explicitly resolved and
-immediately before the first hosted read or write. For Implement, run it before
-the first authoritative GitHub Feature, Task, PR, review, label, or relation
-read. A passing gate authorizes only the next handoff to the applicable G-owned
-workflow; it does not grant mutation authority.
+For Idea preview, do not load this gate and do not access GitHub. For a
+new-source Feature preview, keep the run local and do not load this gate. For
+Feature maintenance or an existing-source route that must rehydrate hosted
+state, run it before the first hosted read. For Idea publication and Feature
+publication, run it after publish is explicitly resolved and immediately before
+the first hosted read or write; in Feature this is the terminal `preflight`
+node. For Implement, run it before the first authoritative GitHub Feature,
+Task, PR, review, label, or relation read. A passing gate authorizes only the
+next handoff to the applicable G-owned workflow; it does not grant mutation
+authority.
 
 ## Required evidence
 

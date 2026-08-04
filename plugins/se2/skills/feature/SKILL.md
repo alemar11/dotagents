@@ -71,6 +71,21 @@ Task creation permission and GitHub issue mutation permission remain separate.
 The Feature graph may calculate its complete bundle without turning either
 permission into a graph transition.
 
+## Hosted publication dependency
+
+All hosted Feature, Task, relation, label, type, and changelog operations use
+the G-owned GitHub issue workflow. Do not call a provider directly or construct
+an alternate transport. For a maintenance route or an existing-source route
+that requires hosted rehydration, pass the shared
+[G dependency preflight](../../references/codex-dependency-preflight.md) before
+the first hosted read. For a new-source preview, keep the run local and do not
+load that gate. The terminal `preflight` node performs the same gate for the
+publish branch immediately before hosted publication checks.
+
+A passing dependency gate establishes only G workflow availability. It never
+grants GitHub mutation authority; the publish branch still requires explicit
+authority for its exact operations and read-after-write verification.
+
 ## Source route and terminal operation
 
 Resolve `source_route` from Intake evidence:
@@ -80,17 +95,19 @@ Resolve `source_route` from Intake evidence:
   or the complete linked Feature set for a multi-repository feature, unless the
   invocation explicitly supplies a separate semantic repair request.
 
-Every graph node calculates transient artifacts. Only the `complete` terminal
-node chooses the internal operation after the complete bundle is calculated:
+Every graph node calculates transient artifacts. After the complete bundle is
+calculated, the `terminal-operation` decision resolves the final operation:
 
 - preview: retain the bundle as report data without external writes;
 - publish: publish the same bundle to GitHub only when the invocation
   explicitly authorizes it, with read-after-write verification for every
   mutation.
 
-These operations are not graph nodes, are not Mermaid branches, and are never
-presented as the conceptual result. The conceptual result is always the
-complete Feature-and-Task bundle.
+Preview and publish are final operation branches of the Feature graph. They are
+operational phases, not separate conceptual results: the conceptual result is
+always the complete Feature-and-Task bundle. Hosted failures must reach the
+registered `blocked` terminal through reconciliation; they must not be encoded
+as a second terminal state on `complete`.
 
 Resolve `entry_route` as either `create` or `maintenance`. Maintenance is an
 alternate entry into this same graph: it starts from an existing Feature issue,
@@ -141,14 +158,27 @@ flowchart TD
     feature -->|conflict or incomplete| blocked
     tasks -->|slices complete| task-dependency-graph
     tasks -->|incomplete| blocked
-    task-dependency-graph -->|acyclic and covered| complete
+    task-dependency-graph -->|acyclic and covered| terminal-operation
     task-dependency-graph -->|invalid| blocked
+    terminal-operation -->|preview| preview
+    terminal-operation -->|publish| publish
+    terminal-operation -->|authority or mode unresolved| blocked
+    preview --> complete
+    publish --> preflight
+    preflight --> hosted-checks
+    preflight --> blocked
+    hosted-checks --> mutate
+    hosted-checks --> blocked
+    mutate --> reconcile-verify
+    reconcile-verify --> complete
+    reconcile-verify --> blocked
 ~~~
 
 Mermaid is the human-readable projection applied once per repository run. The
 node registry and standardized headers are the structural contract. Never infer
-a transition from Mermaid alone, and never add a context, linking, preview, or
-publication node to this graph.
+a transition from Mermaid alone, and never add a context or linking node to this
+graph. The terminal-operation nodes make final preview, publication, and
+reconciliation explicit without turning transport commands into graph nodes.
  Entry routes are resolved before entering the graph; they are not additional
  nodes in the Mermaid projection.
 
@@ -161,8 +191,15 @@ publication node to this graph.
 | clarification | steps/clarification.md | decision | material unknowns remain | feature, blocked |
 | feature | steps/feature.md | action | bounded intent or rehydrated Feature bundle | tasks, blocked |
 | tasks | steps/tasks.md | action | Feature definition is stable | task-dependency-graph, blocked |
-| task-dependency-graph | steps/task-dependency-graph.md | validation | Tasks have been derived | complete, blocked |
-| complete | steps/complete.md | terminal | bundle and graph are calculated | none |
+| task-dependency-graph | steps/task-dependency-graph.md | validation | Tasks have been derived | terminal-operation, blocked |
+| terminal-operation | steps/terminal-operation.md | decision | bundle and graph are valid | preview, publish, blocked |
+| preview | steps/preview.md | action | preview mode is resolved | complete |
+| publish | steps/publish.md | action | publish mode and authority are resolved | preflight |
+| preflight | steps/preflight.md | validation | publish branch is selected | hosted-checks, blocked |
+| hosted-checks | steps/hosted-checks.md | validation | G dependency is available | mutate, blocked |
+| mutate | steps/mutate.md | action | hosted publication is normalized and authorized | reconcile-verify |
+| reconcile-verify | steps/reconcile-verify.md | validation | hosted result may be ambiguous or partial | complete, blocked |
+| complete | steps/complete.md | terminal | selected operation is complete or verified | none |
 | blocked | steps/blocked.md | terminal | a required contract cannot be satisfied | none |
 
 Only files under steps/ are local graph nodes. Templates are resources and
@@ -312,33 +349,43 @@ reconcile the desired Task dependency graph against current relationships, then
 validate Feature criterion coverage, dependency ID resolution, acyclicity, path
 overlap, cross-Feature boundaries, readiness, and the derived topological
 waves. Withhold the bundle when any criterion lacks an owning Task or when an
-edge encodes preference rather than necessity.
+edge encodes preference rather than necessity. A valid graph transitions to
+`terminal-operation`; an invalid graph transitions to `blocked`.
+
+### Terminal Operation
+
+Load steps/terminal-operation.md and resolve `run_mode` exactly once after the
+complete Feature-and-Task bundle is calculated.
+
+- `preview` transitions to steps/preview.md and then to `complete` without
+  loading the G dependency gate or inspecting hosted state.
+- `publish` transitions through steps/publish.md and steps/preflight.md. The
+  preflight must pass before hosted checks, duplicate/collision reads, or any
+  hosted mutation.
+- unresolved mode or missing publication authority transitions to `blocked`.
+
+Load steps/hosted-checks.md for current hosted duplicate, relation, metadata,
+and collision evidence. Load steps/mutate.md for the normalized G-owned issue
+operations, one operation at a time. Load steps/reconcile-verify.md after every
+hosted result, including partial or ambiguous results; retry only a missing
+operation proven absent by authoritative readback.
 
 ### Complete
 
 Load steps/complete.md and templates/graph-report.md. Always calculate the
 complete repository bundles, linked Features, Task attachments, issue state,
 relationships, coverage, required documentation updates, and Task dependency
-projection before deciding how to operate them.
-
-In preview, retain that projection as report data without writing. In publish,
-re-read the complete current state immediately before mutation, publish the
-repository-owned Feature issues to GitHub, link the Feature set, publish and
-attach every Task through the parent/sub-issue relation or canonical issue
-reference, apply the authorized Feature/Task issue-type projection as
-publication metadata only, create local Task dependency relationships, and
-verify read-after-write state for every mutation. For maintenance, emit a separate
-Feature-issue changelog comment for every significant change, covering the
-reason, Feature definition changes, affected Tasks, and dependency changes;
-verify that comment after publication. Inspect current state before any retry;
-never replay an uncertain mutation blindly.
+projection before entering `terminal-operation`. Enter `complete` only after a
+preview report is frozen or the publish branch has verified every hosted result.
+The complete node reports the conceptual bundle and retained operation
+evidence; it performs no publication or recovery side effect.
 
 ## Graph state and terminal reporting
 
 Keep current_node_id, entry_route, run_mode, source_route, Feature identities,
-Task identities, rehydrated maintenance evidence, artifacts, blockers,
-transition evidence, and terminal state explicit and transient. Do not store
-runtime state in Markdown files.
+Task identities, rehydrated maintenance evidence, artifacts, operation evidence,
+blockers, transition evidence, and terminal state explicit and transient. Do not
+store runtime state in Markdown files.
 
 A complete report must contain:
 
@@ -351,7 +398,7 @@ A complete report must contain:
 - Feature-criterion-to-Task coverage;
 - loaded repository-context sources and required documentation updates;
 - readiness and issue-relation evidence;
-- the calculated bundle and, only for publish, persistence verification;
+- the calculated bundle and the selected operation evidence;
 - for maintenance, the lateral changelog plan or verified Feature comment;
 - retained identities, no-op operations, or missing operations when applicable.
 
