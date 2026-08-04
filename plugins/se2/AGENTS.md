@@ -1,9 +1,9 @@
 # SE2 Plugin Maintenance
 
-plugins/se2/ is an experimental graph-first workflow package. Learn, Idea, and
-Feature expose distinct workflow graphs; Feature additionally owns the
-Feature/Task graph. SE2 is independent from plugins/se/; do not silently merge
-its graph contract into the existing SE plugin.
+plugins/se2/ is an experimental graph-first workflow package. Learn, Idea,
+Feature, and Implement expose distinct workflow graphs; Feature additionally
+owns the Feature/Task graph. SE2 is independent from plugins/se/; do not
+silently merge its graph contract into the existing SE plugin.
 
 ## Ownership map
 
@@ -20,7 +20,7 @@ its graph contract into the existing SE plugin.
   registry rules, terminal meanings, authority boundaries, and validation
   expectations. It does not own Idea hosted metadata or Feature/Task semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
-  gate before an Idea publish run uses the G-owned issue workflow.
+  gate before any SE2 workflow uses a required G-owned GitHub workflow.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
   capture, localization, Code Review Rules, and AGENTS.md compaction
   proposals and its workflow registry; its references own branch-specific
@@ -33,10 +33,13 @@ its graph contract into the existing SE plugin.
   keeps the standard front matter and its declared transitions synchronized.
 - skills/feature/templates/ owns reusable authoring templates and is not a
   node namespace.
-- skills/implement/SKILL.md and skills/implement/references/task-profile.md
-  own the implementation workflow, its orchestrator/worker roles, and its
-  model, reasoning, and topology selection; they consume the Feature bundle
-  and root task contracts without redefining them.
+- skills/implement/SKILL.md owns the GitHub-Feature-to-PR workflow registry and
+  Mermaid projection. Its references own multi-Feature orchestration,
+  orchestrator/worker profiles, Contract Repair, worker-session review and delivery,
+  and the SQLite WAL run-state contract.
+- skills/implement/scripts/run-state is the shipped checkpoint and idempotency
+  CLI. Its version constants and schema are runtime sources of truth; focused
+  tests live under skills/implement/tests/.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,
   workflow registry, preview/publish routing, and the capture-only terminal
   boundary. Its references own the canonical body, Idea source handoff, and
@@ -45,11 +48,19 @@ its graph contract into the existing SE plugin.
 
 ## Maintenance contract
 
-- Keep Feature planning free of implementation authority. The separate
-  Implement skill may execute an explicitly selected Task, but it must not
-  silently change the Feature graph or inherit its task profile. External
-  issue publication is allowed only through an explicit publish run and must
-  remain separate from node planning semantics.
+- Keep Feature planning free of implementation authority. Implement accepts
+  one or more complete authoritative GitHub Features, never an isolated Task
+  or local draft, and aims to return one or more independently verified PRs.
+  Contract Repair must re-enter Feature maintenance instead of silently
+  rewriting the Feature graph or inheriting its planner profile.
+- Keep the Implement ledger a minimal recovery index, not a second workflow
+  engine. Preserve five tables, including exclusive active Feature claims,
+  SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
+  message logs, findings, and routine worker state. The orchestrator is its only
+  runtime client; workers supply evidence but never access the ledger.
+- Keep Task dependency edges executable: a downstream candidate must contain
+  every exact prerequisite HEAD through verified merged, stacked, or
+  worker-composed ancestry. PR readiness alone never satisfies a dependency.
 - Keep Idea capture independent from Feature/Task and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -77,6 +88,10 @@ its graph contract into the existing SE plugin.
   targets a registered node, and every step has the standard front matter.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
+- Validate Implement registry/projection reconciliation, registered transition
+  targets, terminal reachability, and terminal nodes without outgoing edges.
+- Run the Implement run-state CLI help, version, read-only doctor, and focused
+  standard-library tests against temporary databases.
 - Check that the marketplace path and plugin metadata point to this package.
 - Validate Learn front matter, UI metadata, routed references, explicit-only
   invocation, and independence from the existing SE Learn package.

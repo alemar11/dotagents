@@ -57,7 +57,7 @@ and Feature workflows plus verified Task handoffs. It does not replace SE:
 | `se2:learn` | Traverse a graph-first repository-context workflow for Project Context, ADRs, localization memory, Code Review Rules, and proposal-first AGENTS.md compaction. |
 | `se2:feature` | Traverse the graph-first Feature workflow, then converge linked Feature issues and vertical Task graphs in the invoking local project without creating a worktree. |
 | `se2:idea` | Traverse a graph-first session-capture workflow, preview locally, publish only with explicit authority, and expose a transient idea-source handoff for later Feature planning. |
-| `se2:implement` | Execute agent-ready Tasks through skill-owned orchestrator/worker profiles and the shared task preflight and handoff contracts. |
+| `se2:implement` | Execute authoritative GitHub Features through a graph-first orchestrator, isolated workers with in-session review, Contract Repair, and verified PR outputs. |
 
 ## Reusable Skills
 
@@ -118,6 +118,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
 - `se2:idea` traverses a graph-first in-memory capture workflow; preview stays entirely local, while explicitly authorized publish uses the bundle as the single source for verified GitHub Idea publication. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
 - `se2:learn` runs in the invoking task and maintains evidence-backed repository context only; it has no task profile, GitHub transport, publication, or worker delegation contract.
+- `se2:implement` accepts only complete authoritative GitHub Feature bundles and aims to return one or more PRs. A Sol/medium orchestrator schedules dependency-ready Tasks without micromanaging; adaptive Sol workers implement, run exact-HEAD review in their own session, and fix findings, while final verification binds every PR to its exact reviewed HEAD. A minimal SQLite WAL ledger prevents concurrent orchestrators on the same Feature and stores durable checkpoints and idempotent side effects only; schema changes use explicit drop-and-recreate, never migrations.
 - Multi-repository runs additionally validate the complete linked Feature Spec Set and finish with one independently verified GitHub PR per repository plus one exact HEAD vector.
 
 ## Project-Local Skills

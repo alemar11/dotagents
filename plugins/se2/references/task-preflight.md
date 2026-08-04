@@ -94,8 +94,8 @@ Record these decisions independently:
 
 - `task_creation_authorization`: permission to create or resume the task in
   the application;
-- `github_mutation_authorization`: permission to create, update, relate, or
-  comment on GitHub issues.
+- `github_mutation_authorization`: permission for the exact requested GitHub
+  issue, branch, pull-request, review, relation, label, or comment mutation.
 
 One authorization never implies the other. A granted task permission does not
 authorize GitHub mutation. A granted GitHub publication permission does not

@@ -1,0 +1,71 @@
+# Implement Review And Delivery
+
+This reference owns exact-HEAD worker-session review, PR publication, provider
+review monitoring, and final exact-HEAD evidence.
+
+## Candidate boundary
+
+The implementation worker operates only in its application-managed worktree.
+After validation and commit, freeze one candidate with exact repository, base
+branch, base SHA, head branch, and full head SHA. The worktree must be clean and
+pinned to that candidate before review. Do not create a reviewer task or a
+second review worktree.
+
+For a dependency-bearing assignment, also freeze the exact prerequisite HEAD
+vector and prove every member is an ancestor of the candidate. The candidate's
+integration base and intended PR base must preserve that ancestry; a
+prerequisite PR being ready is not sufficient proof.
+
+## Native review loop
+
+Before review, independently verify worker/worktree identity, candidate
+cleanliness, base and prerequisite ancestry, and exact full SHA. The worker
+runs the available native code-review capability in the same session against
+the declared base using its resolved Sol reasoning level. The required outcome
+is an independently reported exact-HEAD finding set or clean result; the skill
+does not encode an application operation or interface.
+
+Bind every finding and clean result to the exact candidate SHA. The worker
+decides whether a finding is actionable, owns every fix, reruns validation, and
+creates a new candidate. Any new HEAD invalidates the previous review evidence;
+run a new review cycle in the same worker session against the new exact SHA.
+
+## PR publication
+
+Publish only after native review is clean and GitHub mutation is explicitly
+authorized. Use the G-owned publication workflow to push the committed
+candidate and create or reuse a draft PR. Independently read back repository,
+base, branch, full PR HEAD, URL, body, issue linkage, and draft state. The PR
+HEAD must equal the reviewed candidate HEAD.
+
+When validation, body, and required CI are stable, mark the PR ready through
+the G-owned workflow and independently observe the transition. A draft review
+is consultative and never satisfies the ready cycle.
+
+## Hosted review monitoring
+
+Monitor the ready-triggered provider review, CI, mergeability, and review
+threads for the current full PR HEAD. Pending, timed-out, stale, ambiguous, or
+draft-only review evidence is not terminal.
+
+If hosted review produces an actionable finding, return evidence to the same
+implementation worker. The worker fixes, validates, commits, and publishes the
+new HEAD; then repeat native review in the same worker session and request a
+new hosted review bound to that exact SHA. Never force-push, merge, enqueue,
+deploy, release, or perform post-merge closure.
+
+## Final verification
+
+The orchestrator performs read-only final verification. Require:
+
+- exact Feature and Task refs and current accepted contract generation;
+- implementation worker task/project/worktree identity;
+- clean implementation worktree and exact current HEAD;
+- current-head validation and native review evidence;
+- PR publication readback and exact PR HEAD equality;
+- ready-transition and current-head hosted review evidence;
+- required CI, mergeability, and zero unresolved actionable review threads.
+
+Return repairable evidence mismatches to the worker without diagnosis. The
+worker owns repair and replacement evidence. Final verification never edits
+code, reruns review, mutates issues, or merges.

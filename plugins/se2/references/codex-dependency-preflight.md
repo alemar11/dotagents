@@ -1,16 +1,17 @@
 # SE2 G Dependency Preflight
 
-This reference owns the fail-closed availability gate for the SE2 Idea
-workflow's hosted issue handoff. It is a runtime prerequisite, not a plugin
+This reference owns the fail-closed availability gate for every SE2 handoff to
+the G-owned GitHub workflows. It is a runtime prerequisite, not a plugin
 installation or maintenance procedure.
 
 ## When to run
 
-Run this read-only gate only after `run_mode=publish` is explicitly resolved,
-immediately before the first hosted issue or label read or write. Preview does
-not load this gate and must not access GitHub. A passing gate authorizes only
-the next handoff to the G-owned issue workflow; it does not grant publication
-authority.
+For Idea preview, do not load this gate and do not access GitHub. For Idea or
+Feature publication, run it only after publish is explicitly resolved and
+immediately before the first hosted read or write. For Implement, run it before
+the first authoritative GitHub Feature, Task, PR, review, label, or relation
+read. A passing gate authorizes only the next handoff to the applicable G-owned
+workflow; it does not grant mutation authority.
 
 ## Required evidence
 
@@ -21,7 +22,8 @@ Establish all of the following from the current host:
   resolved;
 - that plugin is installed and enabled;
 - its declared source root is present and internally consistent;
-- the bundled GitHub issue workflow is present and resolvable;
+- every bundled G workflow required by the invoking SE2 path is present and
+  resolvable;
 - the explicit handoff can be reached without using a compatibility alias.
 
 Do not infer availability from a display name, an installed cache directory,
@@ -36,7 +38,7 @@ these lower-kebab outcomes:
 - `codex-runtime-error`: the host capability inspection cannot be trusted;
 - `plugin-missing`: the exact G plugin is not installed;
 - `plugin-disabled`: the exact plugin exists but is disabled;
-- `skill-unresolvable`: the plugin root or issue workflow is missing or
+- `skill-unresolvable`: the plugin root or a required G workflow is missing or
   malformed;
 - `codex-dependency-unresolved`: the explicit G handoff fails after local
   availability checks pass.

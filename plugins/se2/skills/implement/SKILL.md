@@ -1,97 +1,270 @@
 ---
 name: implement
-description: "Execute agent-ready SE2 Tasks through explicitly authorized and independently monitored task handoffs; preserve the Feature, Task, and dependency contracts and report verified outcomes."
+description: "Execute one or more authoritative GitHub SE2 Features through a graph-first multi-Feature orchestrator, isolated implementation workers with exact-HEAD in-session review, Contract Repair, and one or more PR-ready outputs; use only for explicit implementation or resume requests."
 ---
 
-# Implement Task
+# Implement Graph
 
-## Purpose and invocation
+## Input and output invariant
 
-Use this skill only for an explicit request to implement one or more agent-
-ready SE2 Tasks. It consumes the complete Feature bundle produced by
-`se2:feature`; it does not replace the Feature graph, redesign the Feature
-definition, or invent missing Task dependencies.
+Use this skill only for an explicit request to implement or resume one or more
+published SE2 Features from GitHub. Every input Feature must resolve to one
+authoritative Feature issue, its complete Task issue set, Task dependencies,
+repository identities, acceptance criteria, validation policy, and readiness
+evidence. Do not start from an isolated Task, local draft, Idea, or unbounded
+implementation request.
 
-The task is implementation work in the verified repository destination. The
-skill may change code and repository-owned documentation only within the Task
-contract's scope and must return validation evidence for the Task's acceptance
-criteria. A GitHub issue mutation is a separate authorization boundary.
+The expected terminal output is one or more independently verified pull
+requests. Return a complete mapping from each selected Feature and Task set to
+its repositories, branches, exact HEADs, and PR references. `complete` means
+every selected Feature has its required PR output ready for merge; this skill
+never merges, deploys, releases, or performs post-merge closure.
 
-## Task profile ownership
+## Shared contracts and dependencies
 
-Load the skill-owned [task-profile.md](references/task-profile.md) before
-startup. It defines two mandatory roles: a Sol/medium orchestrator and a
-Luna/max worker. The implementation profile and topology belong to this skill,
-not to the root-level task contract.
+Read the shared [workflow-graph.md](../../references/workflow-graph.md) before
+using the registry below. The registry is the structural source of truth;
+Mermaid is its maintained projection.
 
-Pass the complete profile to the shared preflight before starting either role.
-The preflight must verify both roles first. If Luna/max or any other required
-role is unavailable, fail closed with `unsupported-runtime`; do not start the
-orchestrator, substitute a role, lower a reasoning level, or change topology.
-Use the profile's canonical emoji title for the orchestrator and each worker;
-title initialization/readback is best-effort and never a task identity or
-recovery key.
+Before the first GitHub Feature, Task, issue, PR, or review read or write, load
+the shared
+[codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
+All GitHub transport, mutation safety, publication, and read-after-write
+verification belong to the G-owned workflows. A passing dependency gate does
+not grant GitHub mutation authority.
 
-## Common task preflight
+Before creating, resuming, or monitoring application tasks, load:
 
-Before creating, resuming, or monitoring an implementation task, load:
+- [task-profile.md](references/task-profile.md) for orchestrator and worker
+  profiles;
+- [task-preflight.md](../../references/task-preflight.md) for capability,
+  destination, identity, authorization, observation, and recovery gates;
+- [task-handoff.md](../../references/task-handoff.md) for assignments, title
+  metadata, update relay, reconciliation, and terminal reports.
 
-- [task-profile.md](references/task-profile.md) for the mandatory orchestrator
-  and worker roles;
-- [task-preflight.md](../../references/task-preflight.md) for explicit
-  invocation, live capability, destination, authorization, observation, and
-  recovery gates;
-- [task-handoff.md](../../references/task-handoff.md) for the assignment,
-  independent observation, update relay, reconciliation, and final-report
-  contract.
+Load [orchestration.md](references/orchestration.md) when scheduling workers,
+handling worker dialogue, or repairing a Feature contract. Load
+[review-delivery.md](references/review-delivery.md) when a candidate HEAD is
+ready for review or publication. Load [run-state.md](references/run-state.md)
+before preparing, resuming, checkpointing, or resetting the ledger.
 
-Do not duplicate those contracts in this skill. The preflight must separately
-record permission to create or resume a task and permission to mutate GitHub.
-The first never grants the second.
+## Workflow graph
 
-If the live application, task creation, independent observation, monitoring, or
-update relay is unavailable, fail closed. Do not fabricate a task identity,
-relay a stale update, claim a final state, or retry an ambiguous operation.
+| node_id | kind | entry condition | transitions | side effects | terminal state |
+| --- | --- | --- | --- | --- | --- |
+| intake | action | explicit implementation or resume request with one or more GitHub Feature refs | source-preflight, blocked | none | none |
+| source-preflight | validation | complete Feature and Task bundles are readable | runtime-preflight, blocked | hosted | none |
+| runtime-preflight | validation | authoritative bundles and target repositories are known | prepare-run, blocked | read | none |
+| prepare-run | action | every required role and destination passed preflight | schedule, blocked | durable | none |
+| schedule | decision | run is ready for another wave or aggregate terminal reconciliation | worker-bootstrap, release-claims, deferred, blocked | none | none |
+| worker-bootstrap | action | one or more assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
+| implement-validate | action | worker identity and implementation worktree are verified | candidate, contract-conflict, assignment-blocked, blocked | durable, hosted | none |
+| contract-conflict | action | worker reports an evidence-backed stable contract conflict | repair-authority, assignment-blocked, blocked | durable | none |
+| repair-authority | decision | conflict and proposed semantic boundary are known | repair-task, assignment-deferred, blocked | none | none |
+| repair-task | action | repair is authorized or requires no material contract mutation | repair-readback, assignment-blocked, blocked | durable, hosted | none |
+| repair-readback | validation | Feature planner returned a repair result | implement-validate, schedule, assignment-blocked, blocked | hosted, durable | none |
+| candidate | validation | worker reports committed, validated candidate HEAD | native-review, assignment-blocked, blocked | read, durable | none |
+| native-review | action | worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
+| review-decision | decision | in-session review result is bound to current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
+| publish-pr | action | native review is clean and GitHub mutation is authorized | ready-monitor, assignment-blocked, blocked | hosted, durable | none |
+| ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, final-verify, assignment-blocked, blocked | hosted, durable | none |
+| final-verify | validation | current PR, CI, review, task, checkout, and HEAD evidence are available | schedule, assignment-blocked, blocked | read, durable | none |
+| assignment-blocked | action | one assignment cannot progress but independent work may remain | schedule | durable | none |
+| assignment-deferred | action | one assignment awaits bounded user authorization | schedule | durable | none |
+| release-claims | action | every selected Feature is delivery-ready and no assignment remains active | complete, blocked | durable | none |
+| deferred | terminal | a material contract change awaits user authorization | none | none | deferred |
+| complete | terminal | every selected Feature maps to verified PR-ready output | none | none | complete |
+| blocked | terminal | required evidence, capability, identity, authority, or reconciliation is unavailable | none | none | blocked |
 
-## Execution path
+~~~mermaid
+flowchart TD
+    subgraph orchestrator_subgraph ["Orchestrator control plane"]
+        intake
+        source-preflight
+        runtime-preflight
+        prepare-run
+        schedule
+        worker-bootstrap
+        contract-conflict
+        repair-authority
+        repair-task
+        repair-readback
+        final-verify
+        assignment-blocked
+        assignment-deferred
+        release-claims
+        deferred
+        complete
+        blocked
+    end
+    subgraph worker_subgraph ["Worker lifecycle"]
+        implement-validate
+        candidate
+        native-review
+        review-decision
+        publish-pr
+        ready-monitor
+    end
+    intake --> source-preflight
+    intake --> blocked
+    source-preflight --> runtime-preflight
+    source-preflight --> blocked
+    runtime-preflight --> prepare-run
+    runtime-preflight --> blocked
+    prepare-run --> schedule
+    prepare-run --> blocked
+    schedule --> worker-bootstrap
+    schedule --> release-claims
+    schedule --> deferred
+    schedule --> blocked
+    worker-bootstrap --> implement-validate
+    worker-bootstrap --> assignment-blocked
+    worker-bootstrap --> blocked
+    implement-validate --> candidate
+    implement-validate --> contract-conflict
+    implement-validate --> assignment-blocked
+    implement-validate --> blocked
+    contract-conflict --> repair-authority
+    contract-conflict --> assignment-blocked
+    contract-conflict --> blocked
+    repair-authority --> repair-task
+    repair-authority --> assignment-deferred
+    repair-authority --> blocked
+    repair-task --> repair-readback
+    repair-task --> assignment-blocked
+    repair-task --> blocked
+    repair-readback --> implement-validate
+    repair-readback --> schedule
+    repair-readback --> assignment-blocked
+    repair-readback --> blocked
+    candidate --> native-review
+    candidate --> assignment-blocked
+    candidate --> blocked
+    native-review --> review-decision
+    native-review --> assignment-blocked
+    native-review --> blocked
+    review-decision --> implement-validate
+    review-decision --> publish-pr
+    review-decision --> assignment-blocked
+    review-decision --> blocked
+    publish-pr --> ready-monitor
+    publish-pr --> assignment-blocked
+    publish-pr --> blocked
+    ready-monitor --> implement-validate
+    ready-monitor --> final-verify
+    ready-monitor --> assignment-blocked
+    ready-monitor --> blocked
+    final-verify --> schedule
+    final-verify --> assignment-blocked
+    final-verify --> blocked
+    assignment-blocked --> schedule
+    assignment-deferred --> schedule
+    release-claims --> complete
+    release-claims --> blocked
+~~~
 
-1. Confirm the explicit implementation request and select the bounded Task
-   set from a complete Feature bundle.
-2. Re-read each Task contract, its Feature reference, `dependency_ids`, allowed
-   paths, repository identity, acceptance criteria, validation policy, and
-   documentation obligations.
-3. Resolve the implementation profile and topology owned by this skill, then
-   verify both required roles before startup.
-4. Run the shared task preflight for every task destination. For a
-   multi-repository Feature, keep each Task in its repository-local project;
-   cross-repository Feature links do not make a Task destination portable.
-5. Create or resume the task only after the preflight is ready, then record the
-   exact independently observed task, project, host, repository, and state.
-6. Relay partial updates with their observed state and preserve the final
-   update as a distinct terminal report.
-7. After any timeout, error, or monitoring gap, reconcile the original effect
-   before considering a retry. An unknown effect blocks.
-8. Finish only with independently observed final state, Task acceptance and
-   validation evidence, documentation evidence when required, and the
-   authorization record referenced from preflight.
+This is one hierarchical workflow graph. The two subgraphs have separate role
+rules and communicate only through the registered cross-subgraph transitions;
+they are not independent runs. `native-review` is a load-bearing worker node,
+not an application task, separate reviewer, or second worktree.
 
-The dependency graph determines which Tasks are eligible to start. A Task may
-start only after every unfinished incoming dependency is proven complete and
-its repository scope is independently verified. Do not turn a preferred order
-into a dependency or mutate the graph from this skill without an explicit
-maintenance request governed by `se2:feature`.
+`assignment-blocked` and `assignment-deferred` checkpoint one affected
+assignment and return control to `schedule`; they never terminate independent
+Features. `schedule` enters terminal `deferred` only when all remaining work is
+waiting for user authority, and terminal `blocked` only for an aggregate or
+unrecoverable prerequisite that prevents every remaining path.
 
-## GitHub boundary
+## Orchestrator boundary
 
-Creating or monitoring an implementation task in the ChatGPT/Codex application
-does not authorize creating, updating, relating, or commenting on GitHub
-issues. Such changes require the invoking workflow's explicit GitHub
-authorization and its read-after-write evidence. If that authorization is
-absent, report the implementation result without claiming tracker mutation.
+The Sol/medium orchestrator is control plane only. It may coordinate multiple
+Features and Task assignments in parallel or serial execution waves, create or
+resume the required worker tasks, monitor bounded progress, and exchange
+control-plane messages with them. It must not inspect or edit worker
+code, choose implementation or review fixes, judge findings, rewrite Feature
+contracts, or mirror routine worker dialogue into the ledger.
+
+Derive execution waves from each Feature Task DAG, repository and path overlap,
+and verified runtime capacity. Do not add a numeric worker cap or invent
+cross-Feature dependencies. A blocked or deferred assignment does not stop
+independent Features; shared prerequisites remain binding.
+
+Before scheduling, atomically claim the complete sorted input Feature set in
+the ledger. An active claim held by another run blocks startup for that Feature
+set; never create a second orchestrator, split the claim, or steal ownership.
+After every selected Feature is delivery-ready, `release-claims` uses current
+claim revisions to release all claims before `complete`. Preserve active claims
+for resumable blocked or deferred runs. Claim release is one all-or-none
+transaction for the complete selected set; an interruption is reconciled before
+retry and never justifies a second orchestrator.
+
+## Worker and review boundary
+
+Each implementation worker owns one eligible Task assignment in its verified
+implementation worktree. It owns technical design, code, tests, validation,
+commits, exact-HEAD native review in the same worker session, finding decisions and fixes,
+and publication evidence within the accepted contract. Review runs only after
+the candidate is committed and the same worktree is clean at its exact HEAD.
+Any HEAD change invalidates the prior review and requires a new in-session
+review cycle. The orchestrator receives review evidence but never performs or
+judges the review.
+
+## Contract Repair boundary
+
+When a worker proves that the authoritative Feature or Task issue is
+semantically incomplete or contradictory, preserve the worker, worktree,
+branch, HEAD, and useful changes; record the assignment as awaiting Contract
+Repair. The orchestrator creates one separate planner task that explicitly uses
+`se2:feature` through its maintenance route. That planner is not an
+implementation worker and must not access the worker worktree.
+
+The orchestrator independently determines whether the proposed repair changes
+stable semantics. Outcome, scope, non-goals, requirements, acceptance criteria,
+allowed paths, validation policy, dependencies, repository identity, or
+readiness changes require user authorization unless the current invocation
+already grants that exact contract mutation. Ask only for that material change;
+continue independent Features while awaiting the answer.
+
+Resume the same worker only after authoritative complete-bundle readback proves
+the repair applied and execution identity remains compatible. Otherwise retain
+the old evidence and return the assignment to scheduling for a controlled
+replacement. Never infer repair success from the planner report alone.
+
+## Ledger boundary
+
+The SQLite WAL ledger is a durable checkpoint and recovery index, not a second
+workflow engine. The graph and orchestrator own live control flow; GitHub, Git,
+and the application remain authoritative for external state.
+
+The orchestrator is the ledger's only reader and writer during a run. Workers
+never call the ledger or derive decisions from it; they send bounded evidence
+to the orchestrator, which records only a verified durable boundary. This
+single-writer authority does not replace SQLite transactions or compare-and-swap
+guards, which still protect concurrent orchestrators and recovery.
+
+The ledger also owns exclusive active orchestration claims. One authoritative
+GitHub Feature may belong to only one active Implement run at a time, while one
+run may claim multiple Features atomically.
+
+Write ledger checkpoints only at durable boundaries: run start, assignment and
+task binding, candidate HEAD, review cycle, PR publication, Contract Repair,
+reconciliation, and terminal verification. Do not store prompts, message
+bodies, model/reasoning profiles, Feature or Task bodies, findings, validation
+logs, or routine worker technical state. A ledger failure blocks only a new
+side effect or recovery step that requires durable idempotency; it does not
+turn ordinary live dialogue into a database operation.
 
 ## Terminal report
 
-Return a handoff report that points to the canonical task-handoff record and
-contains the selected Feature/Task references, observed task identities and
-destinations, partial/final relay evidence, validation results, changed paths,
-reconciliation evidence, and one terminal `outcome` of `complete` or `blocked`.
+Return one aggregate report with:
+
+- every input GitHub Feature and its complete Task set;
+- every implementation worker identity and verified destination;
+- execution-wave and blocked/deferred evidence;
+- Contract Repair generations and authorization outcomes;
+- candidate, review, publication, CI, and final exact-HEAD evidence;
+- one output row per PR with Feature refs, repository, base, branch, full HEAD,
+  PR URL, and readiness state;
+- aggregate `outcome: complete`, `deferred`, or `blocked`.
+
+Never claim completion while any selected Feature lacks its required verified
+PR output.

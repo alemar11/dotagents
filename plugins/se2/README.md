@@ -1,7 +1,8 @@
 # SE2
 
 SE2 is an experimental issue-first, graph-first workflow plugin for durable
-repository context, Idea capture, Feature planning, and verified Task handoff.
+repository context, Idea capture, Feature planning, and verified Feature
+implementation.
 
 Its skills are deliberately separated by responsibility:
 
@@ -10,8 +11,9 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, and Feature workflow graphs. Feature keeps its separate Feature/Task
-  dependency DAG; Learn and Idea do not become Task graphs.
+  Idea, Feature, and Implement workflow graphs. Feature keeps its separate
+  Feature/Task dependency DAG; the Implement workflow consumes that DAG without
+  becoming or rewriting it.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
 - references/workflow-contract.md and references/codex-dependency-preflight.md
@@ -26,9 +28,13 @@ Its skills are deliberately separated by responsibility:
   publication, task, or worker behavior. Invoke it explicitly as se2:learn.
 - task-handoff.md applies the established `se:implement` emoji-title grammar
   to planner, orchestrator, and worker tasks; titles remain display metadata.
-- skills/implement/ is the Task execution entry point and owns its task
-  profile and topology instead of inheriting the Feature profile; its required
-  orchestrator and worker roles are checked before startup.
+- skills/implement/ accepts one or more complete authoritative GitHub Features
+  and aims to return one or more independently verified PRs. Its graph owns
+  multi-Feature scheduling, isolated Sol workers with exact-HEAD in-session review,
+  Contract Repair through Feature maintenance, and final exact-HEAD evidence.
+  Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
+  and side-effect idempotency, with explicit drop-and-recreate instead of
+  migrations.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle, previews non-durable Ideas entirely locally, or publishes
   verified hosted Ideas through the G-owned issue workflow as its terminal

@@ -1,7 +1,7 @@
 interface:
-  display_name: "Implement Task"
-  short_description: "Execute verified SE2 Tasks through monitored handoffs."
+  display_name: "Implement Features"
+  short_description: "Turn GitHub Features into independently verified PRs."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:implement only for an explicit SE2 Task implementation request; load the skill-owned profiles and shared task preflight/handoff contracts, request deterministic emoji titles for the orchestrator and workers, verify the repository project destination, and return independently observed progress or a fail-closed blocker."
+  default_prompt: "Use $se2:implement only for an explicit request to implement or resume one or more complete authoritative GitHub Features. Traverse the Implement graph, verify the Sol orchestrator and adaptive Sol workers, keep each implementation isolated, require exact-HEAD in-session review, use Contract Repair for defective Feature specifications, checkpoint only durable boundaries, and return one or more independently verified PR outputs or a fail-closed blocker."
 policy:
   allow_implicit_invocation: false

@@ -1,13 +1,13 @@
 # SE2 Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE2
-workflows. It applies to Learn, Idea, and Feature without turning every skill
-into a Feature or Task graph.
+workflows. It applies to Learn, Idea, Feature, and Implement without turning
+every skill into a Feature or Task graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 marker and hosted Idea shape. This reference owns workflow structure only.
-Feature still owns its Feature/Task semantics; Learn and Idea own their
-skill-specific registries and branch details.
+Feature still owns its Feature/Task semantics; Learn, Idea, and Implement own
+their skill-specific registries and branch details.
 
 ## Graph model
 
@@ -53,9 +53,9 @@ configuration merely to persist a graph run.
   the owning skill explicitly registers them.
 - A terminal node has no outgoing transitions.
 
-Feature keeps its existing step files and registry as its local source of truth.
-Learn and Idea keep their registries in their SKILL.md files while their
-branch-specific details remain in routed references.
+Feature keeps its existing step files and registry as its local source of
+truth. Learn, Idea, and Implement keep their registries in their SKILL.md files
+while branch-specific details remain in routed references.
 
 ## Common terminal meanings
 
@@ -69,6 +69,7 @@ branch-specific details remain in routed references.
 Each skill declares the subset it supports. Feature retains its existing
 complete and blocked terminal contract. Learn uses all four meanings. Idea
 uses reported, deferred, complete, and blocked.
+Implement uses complete, deferred, and blocked.
 
 ## Authority and side effects
 
