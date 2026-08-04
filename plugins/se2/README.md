@@ -24,9 +24,11 @@ Its skills are deliberately separated by responsibility:
   dependency between the skills.
 - skills/learn/ is the explicit repository-knowledge entry point and owns a
   workflow registry for scope, evidence, confirmation, apply, and verification.
-  It maintains evidence-backed Project Context, ADRs, localization memory,
-  Code Review Rules, and proposal-first AGENTS.md compaction without tracker,
-  publication, task, or worker behavior. Invoke it explicitly as se2:learn.
+  It performs only authorized local-repository context changes and maintains
+  evidence-backed Project Context, ADRs, localization memory, Code Review
+  Rules, and proposal-first AGENTS.md compaction without external preflight,
+  tracker, publication, task, or worker behavior. Invoke it explicitly as
+  se2:learn.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
   freezes an attributable active-session cohort, reconstructs each observed
   SE2 workflow path from positive evidence, and reports feedback, bugs,
@@ -43,14 +45,15 @@ Its skills are deliberately separated by responsibility:
   workers with exact-HEAD in-session review, Contract Repair through Feature
   maintenance, stack reconciliation, and final exact-HEAD evidence. A stack
   represents a true same-repository code dependency, never serialization alone;
-  G owns PR publication and pairwise stack linking.
+  G owns PR publication and pairwise stack linking. GitHub interaction is
+  mandatory end to end; there is no local-only or preview execution mode.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.
 - skills/idea/ is the explicit capture entry point. It builds a transient
-  session bundle, previews non-durable Ideas entirely locally, or publishes
-  verified hosted Ideas through the G-owned issue workflow as its terminal
-  operation. It owns a workflow registry and can expose a transient
+  session bundle and publishes verified hosted Ideas through the G-owned issue
+  workflow by default. An explicitly requested preview remains entirely local
+  and non-durable. It owns a workflow registry and can expose a transient
   idea-source handoff for later Feature planning; it never writes project memory
   or starts an application task.
   Invoke it explicitly as `se2:idea`.
@@ -61,8 +64,9 @@ Its skills are deliberately separated by responsibility:
   instruction hierarchy; no documentation system is imposed.
 - the prototype returns one Feature plus vertical Task dependency graphs,
   including multi-repository Feature links and local dependency waves, without
-  implementing code; Feature exposes an explicit terminal preview/publish
-  subgraph, and hosted publication requires the G preflight, explicit
+  implementing code; Feature publishes through an explicit terminal
+  preview/publish subgraph with publish as the default and preview only by
+  explicit request. Hosted publication requires the G preflight, explicit
   authorization, and read-after-write verification.
 - Feature maintenance is an alternate entry into the same graph: it rehydrates
   the current Feature/Task bundle, reconciles it, and emits a lateral Feature

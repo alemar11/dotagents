@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Execute one or more authoritative GitHub SE2 Features through a graph-first multi-Feature orchestrator, isolated implementation workers, exact-HEAD review, verified standalone or stacked PR delivery, and Contract Repair; use only for explicit implementation or resume requests."
+description: "Execute one or more authoritative GitHub SE2 Features through a mandatory GitHub-backed graph-first multi-Feature orchestrator, isolated implementation workers, exact-HEAD review, verified standalone or stacked PR delivery, and Contract Repair; use only for explicit implementation or resume requests."
 ---
 
 # Implement Graph
@@ -21,14 +21,22 @@ relationships. `complete` means every selected Feature has a verified
 `standalone-ready` or `stack-ready` PR output; this skill never merges, deploys,
 releases, or performs post-merge closure.
 
+Implement has no local-only or preview execution mode. GitHub interaction is
+mandatory: the run reads authoritative Feature and Task contracts, uses hosted
+state for readiness and delivery decisions, and completes only with verified
+GitHub PR outputs. Local worktrees and local Git transport are execution
+surfaces inside that flow, never an alternative terminal result. If the
+required hosted dependency or authoritative GitHub state is unavailable, block
+the run rather than converting it into a local-only implementation.
+
 ## Shared contracts and dependencies
 
 Read the shared [workflow-graph.md](../../references/workflow-graph.md) before
 using the registry below. The registry is the structural source of truth;
 Mermaid is its maintained projection.
 
-Before the first GitHub Feature, Task, issue, PR, or review read or write, load
-the shared
+Before the mandatory first GitHub Feature, Task, issue, PR, or review read or
+write, load the shared
 [codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
 All GitHub transport, mutation safety, publication, and read-after-write
 verification belong to the G-owned workflows. A passing dependency gate does
@@ -76,7 +84,7 @@ before preparing, resuming, checkpointing, or resetting the ledger.
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |
 | intake | action | explicit implementation or resume request with one or more GitHub Feature refs | source-preflight, blocked | none | none |
-| source-preflight | validation | complete Feature and Task bundles are readable | runtime-preflight, blocked | hosted | none |
+| source-preflight | validation | complete Feature and Task bundles are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
 | runtime-preflight | validation | authoritative bundles and target repositories are known | prepare-run, blocked | read | none |
 | prepare-run | action | every required role and destination passed preflight | schedule, blocked | durable | none |
 | schedule | decision | run is ready for another wave or aggregate terminal reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |

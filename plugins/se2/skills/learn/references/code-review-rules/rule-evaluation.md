@@ -39,13 +39,11 @@ scope or wording. If it suppresses ordinary bug finding, split or remove it.
 
 ## Forward Validation
 
-When a representative pull request and Codex Code Review are available, run the
-violation, safe, and unrelated cases through the hosted review surface. Preserve
-tests, branch protection, and human approval regardless of the outcome.
-
-If hosted forward validation is unavailable or outside the user's mutation
-authority, do not create branches or pull requests merely to test the rule.
-Return the static matrix and label the proposal `not forward-validated`.
+Learn is local-repository-only and never creates a branch, pull request, or
+hosted review run to validate a rule. If the caller supplies prior hosted
+evidence, record it as external evidence without contacting or mutating the
+provider. Otherwise return the local static matrix and label the proposal
+`not forward-validated`.
 
 The evaluation result is one of:
 

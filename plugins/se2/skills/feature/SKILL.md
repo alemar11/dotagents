@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Traverse a graph-first repository-scoped Feature workflow that converges Feature issues and complete vertical Task dependency graphs with explicit dependencies, execution waves, repository context from AGENTS.md hierarchy, and readiness evidence; never implement code."
+description: "Traverse a graph-first repository-scoped Feature workflow that converges Feature issues and complete vertical Task dependency graphs with explicit dependencies, execution waves, repository context from AGENTS.md hierarchy, and readiness evidence; publish to GitHub by default, allow preview only by explicit request, and never implement code."
 ---
 
 # Feature Graph
@@ -78,9 +78,11 @@ the G-owned GitHub issue workflow. Do not call a provider directly or construct
 an alternate transport. For a maintenance route or an existing-source route
 that requires hosted rehydration, pass the shared
 [G dependency preflight](../../references/codex-dependency-preflight.md) before
-the first hosted read. For a new-source preview, keep the run local and do not
-load that gate. The terminal `preflight` node performs the same gate for the
-publish branch immediately before hosted publication checks.
+the first hosted read, regardless of the eventual terminal mode. For a
+new-source run, the default publish branch reaches the terminal `preflight`
+node immediately before hosted publication checks. A preview run is local only
+when it was requested explicitly and the source route does not require hosted
+rehydration.
 
 A passing dependency gate establishes only G workflow availability. It never
 grants GitHub mutation authority; the publish branch still requires explicit
@@ -96,18 +98,21 @@ Resolve `source_route` from Intake evidence:
   invocation explicitly supplies a separate semantic repair request.
 
 Every graph node calculates transient artifacts. After the complete bundle is
-calculated, the `terminal-operation` decision resolves the final operation:
+calculated, the `terminal-operation` decision resolves the final operation. If
+the caller does not provide `run_mode`, resolve it as `publish`:
 
-- preview: retain the bundle as report data without external writes;
-- publish: publish the same bundle to GitHub only when the invocation
-  explicitly authorizes it, with read-after-write verification for every
-  mutation.
+- publish (default): publish the same bundle to GitHub with read-after-write
+  verification for every mutation, subject to explicit mutation authority;
+- preview: retain the bundle as report data without external writes, only when
+  the caller explicitly requests preview.
 
 Preview and publish are final operation branches of the Feature graph. They are
 operational phases, not separate conceptual results: the conceptual result is
 always the complete Feature-and-Task bundle. Hosted failures must reach the
 registered `blocked` terminal through reconciliation; they must not be encoded
-as a second terminal state on `complete`.
+as a second terminal state on `complete`. Missing publish authority or G
+availability blocks the default publish branch; it never silently falls back to
+preview.
 
 Resolve `entry_route` as either `create` or `maintenance`. Maintenance is an
 alternate entry into this same graph: it starts from an existing Feature issue,
@@ -160,9 +165,9 @@ flowchart TD
     tasks -->|incomplete| blocked
     task-dependency-graph -->|acyclic and covered| terminal-operation
     task-dependency-graph -->|invalid| blocked
-    terminal-operation -->|preview| preview
-    terminal-operation -->|publish| publish
-    terminal-operation -->|authority or mode unresolved| blocked
+    terminal-operation -->|explicit preview| preview
+    terminal-operation -->|default or explicit publish| publish
+    terminal-operation -->|publish selected and authority unresolved| blocked
     preview --> complete
     publish --> preflight
     preflight --> hosted-checks
@@ -192,9 +197,9 @@ reconciliation explicit without turning transport commands into graph nodes.
 | feature | steps/feature.md | action | bounded intent or rehydrated Feature bundle | tasks, blocked |
 | tasks | steps/tasks.md | action | Feature definition is stable | task-dependency-graph, blocked |
 | task-dependency-graph | steps/task-dependency-graph.md | validation | Tasks have been derived | terminal-operation, blocked |
-| terminal-operation | steps/terminal-operation.md | decision | bundle and graph are valid | preview, publish, blocked |
-| preview | steps/preview.md | action | preview mode is resolved | complete |
-| publish | steps/publish.md | action | publish mode and authority are resolved | preflight |
+| terminal-operation | steps/terminal-operation.md | decision | bundle and graph are valid; mode absent or resolved | preview, publish, blocked |
+| preview | steps/preview.md | action | preview was explicitly requested | complete |
+| publish | steps/publish.md | action | default or explicit publish and authority are resolved | preflight |
 | preflight | steps/preflight.md | validation | publish branch is selected | hosted-checks, blocked |
 | hosted-checks | steps/hosted-checks.md | validation | G dependency is available | mutate, blocked |
 | mutate | steps/mutate.md | action | hosted publication is normalized and authorized | reconcile-verify |
@@ -355,14 +360,17 @@ edge encodes preference rather than necessity. A valid graph transitions to
 ### Terminal Operation
 
 Load steps/terminal-operation.md and resolve `run_mode` exactly once after the
-complete Feature-and-Task bundle is calculated.
+complete Feature-and-Task bundle is calculated. Treat an omitted mode as
+`publish`; accept `preview` only when the invocation explicitly requests it.
 
 - `preview` transitions to steps/preview.md and then to `complete` without
-  loading the G dependency gate or inspecting hosted state.
+  loading the G dependency gate or inspecting hosted state, unless hosted
+  rehydration was already required by the source route.
 - `publish` transitions through steps/publish.md and steps/preflight.md. The
   preflight must pass before hosted checks, duplicate/collision reads, or any
   hosted mutation.
-- unresolved mode or missing publication authority transitions to `blocked`.
+- missing publication authority or unresolved dependency transitions to
+  `blocked`; never convert the default publish branch to preview.
 
 Load steps/hosted-checks.md for current hosted duplicate, relation, metadata,
 and collision evidence. Load steps/mutate.md for the normalized G-owned issue

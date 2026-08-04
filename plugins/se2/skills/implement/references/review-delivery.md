@@ -29,8 +29,10 @@ resolution, validation, and the decision that a candidate is ready for review.
 It does not select an alternate Git or GitHub transport. Every Git transport
 operation is routed through a G-owned workflow, and every hosted GitHub read or
 write is routed through the G-owned workflow for that domain. The shared SE2
-dependency preflight gates hosted access; local worktree edits and validation do
-not require that hosted gate.
+dependency preflight gates hosted access; local worktree edits and validation
+do not require that hosted gate, but they are never a local-only Implement
+result. Every run must continue through the authoritative hosted source and
+verified PR-delivery path.
 
 | Operation | Semantic owner | Required authority and readback |
 | --- | --- | --- |

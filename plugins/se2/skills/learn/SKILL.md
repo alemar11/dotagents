@@ -1,6 +1,6 @@
 ---
 name: learn
-description: "Maintain evidence-backed durable repository knowledge—Project Context, ADRs, localization conventions, confirmed corrections, Code Review Rules, and explicit AGENTS.md compaction proposals—in Git repositories. Use only after an explicit request for repository-knowledge inspection, capture, update, or routing."
+description: "Maintain evidence-backed durable repository knowledge—Project Context, ADRs, localization conventions, confirmed corrections, Code Review Rules, and explicit AGENTS.md compaction proposals—through authorized local repository changes only. Use only after an explicit request for repository-knowledge inspection, capture, update, or routing."
 ---
 
 # Learn Project Context
@@ -24,6 +24,12 @@ The skill owns repository knowledge only. Tracker routing, issue metadata,
 publication, delivery policy, branches, pull requests, provider transport,
 task graphs, and worker configuration belong to their own workflows and must
 never be stored in project-context/.
+
+Learn is local-repository-only. It may inspect and, when authorized, modify
+the selected repository's context files, AGENTS.md surfaces, ADRs, and related
+local documentation. It never contacts GitHub or another hosted provider, does
+not load the G dependency preflight, and has no publish or preview delivery
+mode.
 
 Use the smallest requested memory_slice. Load
 references/options.md before resolving a branch and reject noncanonical

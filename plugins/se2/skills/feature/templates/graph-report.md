@@ -3,17 +3,18 @@
 ## Operational Evidence
 
 - entry_route: <create-or-maintenance>
-- run_mode: <preview-or-publish>
-- terminal_operation: <preview-or-publish>
+- run_mode: <publish-by-default-or-explicit-preview>
+- terminal_operation: <publish-or-explicit-preview>
 - source_route: <new-source-or-existing-source>
 - terminal_state: <complete-or-blocked>
 - conceptual_result: <complete-Feature-and-Task-bundle>
 - operation_evidence: <frozen-preview-or-hosted-readback>
 
-The `terminal-operation` subgraph owns final mode selection, publication
-preflight, hosted checks, mutation, and reconciliation. It is operational
-evidence, not a separate conceptual result: the conceptual result remains the
-complete Feature-and-Task bundle.
+An omitted `run_mode` is reported as `publish`; `preview` is valid only when
+explicitly requested. The `terminal-operation` subgraph owns final mode
+selection, publication preflight, hosted checks, mutation, and
+reconciliation. It is operational evidence, not a separate conceptual result:
+the conceptual result remains the complete Feature-and-Task bundle.
 
 ## Repository Runs
 

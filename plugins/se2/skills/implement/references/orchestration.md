@@ -11,7 +11,9 @@ assignment states, and PR outputs. Derive runnable waves from Task dependencies,
 path overlap, repository isolation, and observed runtime capacity.
 
 Implement is one hierarchical graph with an orchestrator control-plane
-subgraph and one worker-lifecycle traversal per assignment. Cross-subgraph
+subgraph and one worker-lifecycle traversal per assignment. GitHub interaction
+is mandatory for every run: source Features and Tasks, readiness, PR delivery,
+and hosted review evidence remain authoritative. Cross-subgraph
 edges carry verified assignment, conflict, candidate, mismatch, and terminal
 evidence. They do not grant either role the other role's authority.
 

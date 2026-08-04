@@ -1,9 +1,9 @@
 # SE2 Idea Publication
 
-Read this reference only when `run_mode=publish` has been explicitly resolved.
-The G-owned GitHub issue workflow remains the only transport and owns safe
-body handling, issue creation, label administration, verification, and
-partial-failure mechanics.
+Read this reference when `run_mode=publish` has been resolved, including the
+default publish branch. The G-owned GitHub issue workflow remains the only
+transport and owns safe body handling, issue creation, label administration,
+verification, and partial-failure mechanics.
 
 This reference is the only external terminal phase of the Idea workflow. The
 capture and preview paths must not load the G dependency preflight, inspect
@@ -36,7 +36,7 @@ Before the first hosted mutation:
 6. confirm the exact `idea` marker is available for every candidate.
 
 If the marker is missing, its creation is allowed only as the single exact
-metadata operation authorized by the explicit publish request. Verify it before
+metadata operation authorized by the resolved publish operation. Verify it before
 creating an Idea. Do not create additional taxonomy.
 
 ## Handoff and verification

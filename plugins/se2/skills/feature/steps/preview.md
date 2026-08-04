@@ -3,7 +3,7 @@ node_id: preview
 kind: action
 purpose: retain-the-complete-bundle-as-a-local-preview
 entry_conditions:
-  - preview-mode-is-resolved
+  - preview-mode-is-explicitly-requested
 inputs:
   - frozen-feature-bundle
   - run_mode

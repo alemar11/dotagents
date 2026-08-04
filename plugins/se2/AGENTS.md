@@ -91,8 +91,12 @@ do not silently merge its graph contract into the existing SE plugin.
   compatibility alias for a missing dependency.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
   hosted rehydration through the shared G dependency gate before hosted reads,
-  and route Feature publication through its explicit terminal preflight and
-  G-owned issue workflow before any hosted mutation.
+  and route the default Feature publication through its terminal preflight and
+  G-owned issue workflow before any hosted mutation. Preview is opt-in and must
+  never be selected implicitly when publish authority or G is unavailable.
+- Keep Implement GitHub-backed end to end. It has no local-only or preview
+  execution mode: authoritative hosted Features and Tasks are mandatory input,
+  and a verified hosted PR topology is mandatory output.
 - Keep Audit strictly observational. Attribute SE2 use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.
@@ -120,6 +124,8 @@ do not silently merge its graph contract into the existing SE plugin.
   preflight-before-hosted-access boundary, reconciliation to `complete` or
   `blocked`, and the absence of side effects or outgoing edges on terminal
   nodes.
+- Validate Idea default-publish/explicit-preview routing, Learn's local-only
+  boundary, and Implement's mandatory hosted-source and PR-output path.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery-gate and stack-reconcile paths.

@@ -1,6 +1,6 @@
 ---
 name: idea
-description: "Capture concrete proposals from the current session as tentative GitHub Ideas for later planning. Use only after an explicit request to save or preview an Idea; do not trigger for ordinary brainstorming."
+description: "Capture concrete proposals from the current session as tentative GitHub Ideas for later planning. Use only after an explicit request to save or preview an Idea; save/capture defaults to GitHub publication and preview is opt-in; do not trigger for ordinary brainstorming."
 ---
 
 # Idea Capture
@@ -8,10 +8,11 @@ description: "Capture concrete proposals from the current session as tentative G
 ## Purpose and boundary
 
 Use `se2:idea` only after an explicit request to capture, select, save, or
-preview an Idea from the current session or supplied input. It first builds a
-transient in-memory capture bundle from the relevant session context, then
-uses that same bundle for preview or verified hosted output. It preserves a
-tentative proposal for later Feature planning and then stops.
+preview an Idea from the current session or supplied input. A capture or save
+request defaults to the publish branch; preview is available only when
+requested explicitly. The skill first builds a transient in-memory capture
+bundle, then uses that same bundle for preview or verified hosted output. It
+preserves a tentative proposal for later Feature planning and then stops.
 
 The workflow is:
 
@@ -37,9 +38,9 @@ for Idea; Mermaid is its projection.
 | normalize | action | source evidence is available | clarify-select, reported, blocked | transient | none |
 | clarify-select | decision | candidate set is normalized | freeze, deferred, blocked | none | none |
 | freeze | action | selected candidates are complete locally | terminal-operation | transient | none |
-| terminal-operation | decision | frozen bundle and run mode are resolved | preview, publish | none | none |
-| preview | action | preview was explicitly resolved | reported | none | none |
-| publish | action | publish and authority were explicitly resolved | preflight | transient | none |
+| terminal-operation | decision | frozen bundle and default or explicit operation are resolved | preview, publish, blocked | none | none |
+| preview | action | preview was explicitly requested | reported | none | none |
+| publish | action | default or explicit publish and authority are resolved | preflight | transient | none |
 | preflight | validation | publish branch is selected | hosted-checks, blocked | dependency-read | none |
 | hosted-checks | validation | publication dependency is available | mutate, blocked | hosted-read | none |
 | mutate | action | hosted operation is normalized | reconcile-verify | hosted-write | none |
@@ -60,8 +61,9 @@ flowchart TD
     clarify-select --> deferred
     clarify-select --> blocked
     freeze --> terminal-operation
-    terminal-operation --> preview
-    terminal-operation --> publish
+    terminal-operation -->|explicit preview| preview
+    terminal-operation -->|default or explicit publish| publish
+    terminal-operation -->|publish selected and authority unavailable| blocked
     preview --> reported
     publish --> preflight
     preflight --> hosted-checks
@@ -82,22 +84,25 @@ hosted issue itself is the explicitly authorized durable output.
 ## Workflow overview
 
 Capture, normalization, clarification, freezing, and the terminal-operation
-decision are local. Only the publish branch may load the publication dependency
-or inspect and mutate hosted state.
+decision are local. The default publish branch may load the publication
+dependency or inspect and mutate hosted state; the explicit preview branch may
+not.
 
 
 ## Run contract
 
-Resolve `run_mode` once at the start. The only accepted values are:
+Resolve `run_mode` once after the local bundle is frozen. The only accepted
+values are:
 
-- `preview`: calculate and report proposed Ideas without hosted mutations;
-- `publish`: publish authorized Ideas and verify each hosted result.
+- `publish` (default): publish authorized Ideas and verify each hosted result;
+- `preview`: calculate and report proposed Ideas without hosted mutations.
 
-Resolve an explicit request to inspect, draft, or avoid writes as `preview`.
-Resolve an explicit request to save or create durable Ideas as `publish`.
-Never silently upgrade, downgrade, or invent aliases for these values. If the
-request does not establish publication authority, use `preview` and state that
-the refs are non-durable.
+Resolve an explicit request to inspect, draft, preview, or avoid writes as
+`preview`. Resolve an explicit request to save or create durable Ideas as
+`publish`; an omitted mode also selects `publish`. Never silently downgrade a
+publish request to preview because authority or a dependency is missing. If
+publication authority is absent, block or defer the publish branch and report
+the exact missing authority.
 
 The workflow contract in
 [`../../references/workflow-contract.md`](../../references/workflow-contract.md)
@@ -113,11 +118,11 @@ contract above.
 All hosted issue and label reads and writes belong to the repository's
 G-owned GitHub issue workflow. Do not call a provider API directly, construct
 an alternative transport, or return executable provider commands to the user.
-Capture and preview are fully local: they must not load G, inspect hosted
-issues or labels, or claim current hosted duplicate/collision state.
+Capture and explicit preview are fully local: they must not load G, inspect
+hosted issues or labels, or claim current hosted duplicate/collision state.
 
-Only after `run_mode=publish` is resolved, before its first hosted read or
-write, load
+Only after the default or explicit `run_mode=publish` is resolved, before its
+first hosted read or write, load
 [`../../references/codex-dependency-preflight.md`](../../references/codex-dependency-preflight.md)
 and complete its read-only availability gate. If the required G workflow is
 missing, disabled, malformed, or unresolvable, fail closed before hosted
@@ -204,7 +209,8 @@ was not consulted rather than claiming that no conflict exists.
 ### 4. Preview or publish
 
 The terminal-operation node must resolve the run mode exactly once. For
-run_mode=preview, return the relevant in-memory bundle contents: each
+run_mode=preview, which must have been explicitly requested, return the relevant
+in-memory bundle contents: each
 candidate's intended target, title, canonical body, metadata, publication
 order, and deterministic `proposed-idea:` ref. Mark every proposed ref
 non-durable. Do not load the G dependency preflight, read GitHub, request a
@@ -249,8 +255,8 @@ own Feature and Task fields.
 - Keep this skill self-contained and independent from other Idea skill
   implementations; do not import, alias, copy, or modify them.
 - Keep GitHub transport in the existing G-owned issue workflow.
-- Keep GitHub completely outside capture and preview; hosted state is a
-  terminal publish concern.
+- Keep GitHub completely outside capture and explicit preview; hosted state is
+  a terminal publish concern, and publish is the default terminal branch.
 - Keep caller publication authority separate from dependency availability.
 - Never treat a preview ref as a hosted identity.
 - Never infer ownership from task metadata or filesystem proximity.
