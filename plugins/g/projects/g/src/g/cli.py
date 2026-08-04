@@ -112,6 +112,26 @@ def _json_option_index(argv: list[str]) -> int | None:
     return None
 
 
+def _normalize_stack_passthrough(argv: list[str]) -> list[str]:
+    """Keep option-like gh-stack arguments inside the stack subparser."""
+
+    if len(argv) >= 2 and argv[0] == "--json" and argv[1] == "stack":
+        stack_index = 1
+    elif argv and argv[0] == "stack":
+        stack_index = 0
+    else:
+        return argv
+
+    verb_index = stack_index + 1
+    if verb_index >= len(argv) or argv[verb_index] not in stack.STACK_COMMANDS:
+        return argv
+
+    args_index = verb_index + 1
+    if args_index >= len(argv) or argv[args_index] == "--":
+        return argv
+    return [*argv[:args_index], "--", *argv[args_index:]]
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = list(argv if argv is not None else sys.argv[1:])
     if raw == ["--version"]:
@@ -122,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     if json_mode and json_index is not None:
         raw.pop(json_index)
         raw.insert(0, "--json")
+    raw = _normalize_stack_passthrough(raw)
     try:
         args = parser().parse_args(raw)
         if args.domain is None:
@@ -157,7 +178,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.domain == "stack" and args.verb == "raw":
             return stack.execute_raw(args.args, json_mode=args.json)
         if args.domain == "stack":
-            return stack.execute(args.verb, args.args, json_mode=args.json)
+            forwarded = list(args.args)
+            if forwarded and forwarded[0] == "--":
+                forwarded.pop(0)
+            return stack.execute(args.verb, forwarded, json_mode=args.json)
         if args.domain == "publish" and args.verb == "preflight":
             data = preflight(args.repo)
         elif args.domain == "publish" and args.verb == "open":

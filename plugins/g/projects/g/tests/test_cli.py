@@ -69,6 +69,24 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         execute.assert_called_once_with(["--", "view"], json_mode=True)
 
+    def test_typed_stack_arguments_are_forwarded_without_an_explicit_separator(self) -> None:
+        cases = [
+            (
+                ["--json", "stack", "init", "--base", "main", "layer-a", "layer-b"],
+                "init",
+                ["--base", "main", "layer-a", "layer-b"],
+            ),
+            (["--json", "stack", "rebase", "--upstack"], "rebase", ["--upstack"]),
+            (["--json", "stack", "submit", "--auto"], "submit", ["--auto"]),
+            (["--json", "stack", "view", "--json"], "view", ["--json"]),
+        ]
+        for argv, command, expected_args in cases:
+            with self.subTest(argv=argv), mock.patch.object(cli.stack, "execute", return_value=0) as execute:
+                code = cli.main(argv)
+
+            self.assertEqual(code, 0)
+            execute.assert_called_once_with(command, expected_args, json_mode=True)
+
     def test_review_mutation_help_requires_g_reservation_only(self) -> None:
         for command in ("request", "comment", "reply", "resolve"):
             output = io.StringIO()

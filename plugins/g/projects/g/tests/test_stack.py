@@ -403,8 +403,15 @@ class StackContractTests(unittest.TestCase):
                 "    (root / 'installed').write_text('installed', encoding='utf-8')\n"
                 "    print('installed')\n"
                 "    raise SystemExit(0)\n"
-                "if args[:2] == ['stack', 'view'] and '--json' in args:\n"
+                "if args == ['stack', 'view', '--json']:\n"
                 "    print('{\"branches\": []}')\n"
+                "    raise SystemExit(0)\n"
+                "if args in (\n"
+                "    ['stack', 'init', '--base', 'main', 'layer-a', 'layer-b'],\n"
+                "    ['stack', 'rebase', '--upstack'],\n"
+                "    ['stack', 'submit', '--auto'],\n"
+                "):\n"
+                "    print('ok')\n"
                 "    raise SystemExit(0)\n"
                 "print('unexpected fake gh arguments', args, file=sys.stderr)\n"
                 "raise SystemExit(2)\n",
@@ -424,7 +431,31 @@ class StackContractTests(unittest.TestCase):
                 check=False,
             )
             viewed = subprocess.run(
-                [str(SCRIPT), "--json", "stack", "view"],
+                [str(SCRIPT), "--json", "stack", "view", "--json"],
+                cwd=root,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            initialized = subprocess.run(
+                [str(SCRIPT), "--json", "stack", "init", "--base", "main", "layer-a", "layer-b"],
+                cwd=root,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            rebased = subprocess.run(
+                [str(SCRIPT), "--json", "stack", "rebase", "--upstack"],
+                cwd=root,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            submitted = subprocess.run(
+                [str(SCRIPT), "--json", "stack", "submit", "--auto"],
                 cwd=root,
                 env=environment,
                 capture_output=True,
@@ -453,6 +484,9 @@ class StackContractTests(unittest.TestCase):
         self.assertEqual(installed_payload["data"]["publisher_verification"], "not-verified")
         self.assertEqual(viewed.returncode, 0, viewed.stderr)
         self.assertEqual(json.loads(viewed.stdout)["data"], {"branches": []})
+        for command in (initialized, rebased, submitted):
+            self.assertEqual(command.returncode, 0, command.stderr)
+            self.assertEqual(json.loads(command.stdout)["data"], {"stdout": "ok\n", "stderr": None})
         self.assertEqual(failed_install.returncode, 12)
         self.assertEqual(json.loads(failed_install.stdout)["error"]["code"], "extension_install_failed")
         self.assertNotIn("shipped-secret", failed_install.stdout)
