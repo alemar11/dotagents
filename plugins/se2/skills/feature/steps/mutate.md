@@ -1,9 +1,9 @@
 ---
 node_id: mutate
 kind: action
-purpose: apply-the-authorized-feature-task-publication-through-g
+purpose: apply-the-in-scope-feature-task-publication-through-g
 entry_conditions:
-  - hosted-state-is-compatible-and-mutation-is-authorized
+  - hosted-state-is-compatible-and-mutation-is-in-scope
 inputs:
   - mutation-ready-publication
   - current-feature-task-state
@@ -15,7 +15,7 @@ transitions:
   - to: reconcile-verify
     when: hosted-operation-returned-or-may-have-returned
 stop_if:
-  - mutation-authority-is-missing
+  - target-or-operation-is-out-of-scope
 side_effects:
   - hosted
 terminal_states: []

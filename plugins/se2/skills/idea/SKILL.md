@@ -40,7 +40,7 @@ Mermaid is its projection.
 | freeze | action | selected candidates are complete locally | terminal-operation | transient | none |
 | terminal-operation | decision | frozen bundle and default or explicit operation are resolved | preview, publish, blocked | none | none |
 | preview | action | preview was explicitly requested | reported | none | none |
-| publish | action | default or explicit publish and authority are resolved | preflight | transient | none |
+| publish | action | default or explicit publish and exact scope are resolved | preflight | transient | none |
 | preflight | validation | publish branch is selected | hosted-checks, blocked | dependency-read | none |
 | hosted-checks | validation | publication dependency is available | mutate, blocked | hosted-read | none |
 | mutate | action | hosted operation is normalized | reconcile-verify | hosted-write | none |
@@ -63,7 +63,7 @@ flowchart TD
     freeze --> terminal-operation
     terminal-operation -->|explicit preview| preview
     terminal-operation -->|default or explicit publish| publish
-    terminal-operation -->|publish selected and authority unavailable| blocked
+    terminal-operation -->|publish selected but target or operation unresolved| blocked
     preview --> reported
     publish --> preflight
     preflight --> hosted-checks
@@ -94,15 +94,16 @@ not.
 Resolve `run_mode` once after the local bundle is frozen. The only accepted
 values are:
 
-- `publish` (default): publish authorized Ideas and verify each hosted result;
+- `publish` (default): publish Ideas in the exact explicit request's scope and
+  verify each hosted result;
 - `preview`: calculate and report proposed Ideas without hosted mutations.
 
 Resolve an explicit request to inspect, draft, preview, or avoid writes as
 `preview`. Resolve an explicit request to save or create durable Ideas as
 `publish`; an omitted mode also selects `publish`. Never silently downgrade a
-publish request to preview because authority or a dependency is missing. If
-publication authority is absent, block or defer the publish branch and report
-the exact missing authority.
+publish request to preview because a dependency is missing. If the target or
+operation is ambiguous, block the publish branch and report the exact missing
+scope evidence.
 
 The workflow contract in
 [`../../references/workflow-contract.md`](../../references/workflow-contract.md)
@@ -137,9 +138,9 @@ evidence. If a hosted read is attempted before this barrier, stop and report a
 preflight-order blocker instead of continuing or treating the read as a valid
 preflight result.
 
-The dependency gate authorizes the next workflow handoff only. It does not
-authorize publication. `publish` still requires explicit user authority for
-the resolved Idea operations.
+The dependency gate authorizes the next workflow handoff only. The explicit
+Idea request already authorizes the resolved in-scope Idea operations; the gate
+does not broaden that scope.
 
 ## Workflow
 
@@ -265,7 +266,8 @@ own Feature and Task fields.
 - Keep GitHub transport in the existing G-owned issue workflow.
 - Keep GitHub completely outside capture and explicit preview; hosted state is
   a terminal publish concern, and publish is the default terminal branch.
-- Keep caller publication authority separate from dependency availability.
+- Keep the caller's declared publication scope separate from dependency
+  availability.
 - Never treat a preview ref as a hosted identity.
 - Never infer ownership from task metadata or filesystem proximity.
 - Never replay an uncertain mutation blindly.

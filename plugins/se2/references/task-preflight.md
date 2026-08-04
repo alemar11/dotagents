@@ -105,14 +105,18 @@ Record these decisions independently:
   the application;
 - `title_adjustment_authorization`: permission to correct the same declared
   deterministic title at most once after the stable task identity is observed;
-- `github_mutation_authorization`: permission for the exact requested GitHub
-  issue, branch, pull-request, review, relation, label, or comment mutation.
+- `github_mutation_scope`: the exact requested GitHub issue, branch,
+  pull-request, review, relation, label, or comment mutations in scope for the
+  explicit invoking SE2 request. These writes are implicitly authorized by the
+  invocation; no second confirmation is required.
 
-Task creation and GitHub authorization never imply each other. A granted task
-permission does not authorize GitHub mutation, and a granted GitHub publication
-permission does not authorize creating or monitoring an application task. If
-the invoking skill needs both, it must obtain and verify both explicitly. Keep
-the bounded title-adjustment authority separately visible as described below.
+Task creation and GitHub scope remain separate. A task permission does not
+broaden the GitHub mutation scope, and the GitHub mutation scope does not
+authorize creating or monitoring an application task. The explicit SE2
+invocation supplies the in-scope GitHub write authority; the workflow must
+still verify exact repository, operation, identity, and read-after-write
+evidence. Keep bounded title-adjustment authority separately visible as
+described below.
 
 When an explicit invocation authorizes creation of a task whose skill-owned
 profile declares a canonical title, the bounded correction of that same title
@@ -167,7 +171,7 @@ preflight:
   authorization:
     task_creation: granted
     title_adjustment: granted-for-declared-title
-    github_mutation: not-requested
+    github_mutation_scope: implicit-for-declared-request
   outcome: ready
 ```
 

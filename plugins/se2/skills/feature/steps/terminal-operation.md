@@ -7,18 +7,18 @@ entry_conditions:
 inputs:
   - calculated-feature-bundle
   - run-mode-request
-  - github-mutation-authority
+  - github-mutation-scope
 outputs:
   - frozen-feature-bundle
   - run_mode
-  - operation-authority
+  - operation-scope
 transitions:
   - to: preview
     when: preview-mode-is-explicitly-requested
   - to: publish
-    when: publish-mode-is-explicit-or-default-and-exact-authority-is-resolved
+    when: publish-mode-is-explicit-or-default-and-exact-scope-is-resolved
   - to: blocked
-    when: publish-selected-and-required-publication-authority-is-unresolved
+    when: publish-selected-and-target-or-operation-is-unresolved
 stop_if:
   - bundle-is-incomplete
 side_effects:
@@ -31,7 +31,7 @@ terminal_states: []
 Freeze the complete Feature-and-Task bundle before choosing the final operation.
 Resolve `run_mode` exactly once: an omitted mode means `publish`, while
 `preview` is valid only when explicitly requested. Preview is local and
-non-durable; publish is the hosted operation and still requires exact mutation
-authority. Do not inspect hosted state or load the G dependency gate from this
+non-durable; publish is the hosted operation implicitly authorized for the
+exact explicit Feature request. Do not inspect hosted state or load the G dependency gate from this
 node; those belong to the selected publish path or an earlier hosted
 rehydration boundary.

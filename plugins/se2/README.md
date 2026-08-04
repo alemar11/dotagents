@@ -66,15 +66,15 @@ Its skills are deliberately separated by responsibility:
   including multi-repository Feature links and local dependency waves, without
   implementing code; Feature publishes through an explicit terminal
   preview/publish subgraph with publish as the default and preview only by
-  explicit request. Hosted publication requires the G preflight, explicit
-  authorization, and read-after-write verification.
+  explicit request. Hosted publication requires the G preflight and
+  read-after-write verification; the explicit SE2 request implicitly
+  authorizes the exact in-scope GitHub writes.
 - Feature maintenance is an alternate entry into the same graph: it rehydrates
   the current Feature/Task bundle, reconciles it, and emits a lateral Feature
   changelog comment for each significant published change.
 - task-managed Feature and Implement runs pass their skill-owned profiles to
-  the shared preflight; task creation authorization and GitHub mutation
-  authorization remain independent, with no runtime fallback for a missing
-  required role.
+  the shared preflight; task creation scope and GitHub mutation scope remain
+  independent, with no runtime fallback for a missing required role.
 
 SE2 is a parallel design surface and does not replace or mutate the existing
 se plugin.

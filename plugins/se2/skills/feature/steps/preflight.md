@@ -26,5 +26,6 @@ terminal_states: []
 
 Load and pass the shared G dependency preflight before the first hosted read or
 write. Verify the exact G plugin identity and every G-owned workflow required
-for Feature/Task issue publication. A passing gate does not grant mutation
-authority and must not install, enable, refresh, or substitute a dependency.
+for Feature/Task issue publication. A passing gate does not broaden the
+request's mutation scope and must not install, enable, refresh, or substitute
+a dependency.

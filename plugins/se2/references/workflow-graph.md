@@ -98,9 +98,11 @@ Preview branches declared local-only must not inspect provider or tracker
 hosted state. A read-only branch may inspect external state only when its owning
 skill explicitly requires observational reads, as Audit does for application
 sessions, and must never mutate that state. A durable or hosted side effect
-requires an explicit authority decision and the owning publication workflow's
-availability gate. Ambiguous external results must transition to reconciliation
-before any retry.
+requires an in-scope authority decision from the explicit invoking workflow and
+the owning publication workflow's availability gate. The invocation implicitly
+authorizes the exact hosted writes required by that workflow; it does not
+authorize unrelated operations. Ambiguous external results must transition to
+reconciliation before any retry.
 
 The graph records authority and side effects as run facts. It must not turn
 caller-owned publication choices, task state, or provider availability into

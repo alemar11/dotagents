@@ -39,8 +39,10 @@ Before the mandatory first GitHub Feature, Task, issue, PR, or review read or
 write, load the shared
 [codex-dependency-preflight.md](../../references/codex-dependency-preflight.md).
 All GitHub transport, mutation safety, publication, and read-after-write
-verification belong to the G-owned workflows. A passing dependency gate does
-not grant GitHub mutation authority.
+verification belong to the G-owned workflows. The explicit Implement request
+implicitly authorizes the exact in-scope GitHub writes required for its
+selected Features; the dependency gate verifies availability and does not
+broaden that scope.
 
 Implement keeps the ownership split explicit: workers own implementation
 semantics, conflict resolution, validation, and candidate evidence; G-owned
@@ -116,7 +118,7 @@ not workflow transitions.
 | candidate | validation | worker reports committed, validated candidate HEAD | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
-| publish-pr | action | native review is clean and GitHub mutation is authorized | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
+| publish-pr | action | native review is clean and the declared publication scope is resolved | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
 | stack-reconcile | validation | a stacked PR was published or its parent, base, link, or exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
 | ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
 | final-verify | validation | current PR, topology, CI, review, task, checkout, and HEAD evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read, durable | none |

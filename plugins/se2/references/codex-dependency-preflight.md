@@ -17,7 +17,10 @@ gate before the first hosted rehydration read, regardless of the eventual
 terminal mode. Implement has no local-only or preview mode: run the gate before
 its mandatory first authoritative GitHub Feature, Task, PR, review, label, or
 relation read. A passing gate authorizes only the next handoff to the
-applicable G-owned workflow; it does not grant mutation authority.
+applicable G-owned workflow; it does not broaden the mutation scope. For an
+explicit SE2 request, the exact hosted writes required by that selected
+workflow are already implicitly authorized; the gate only verifies that the
+owner is available.
 
 ## Required evidence
 

@@ -202,6 +202,7 @@ The final relay must preserve the exact task identity and include:
 - reconciliation evidence for every interrupted or retried operation;
 - an explicit `outcome` of `complete` or `blocked`.
 
-Task creation and monitoring evidence never grants GitHub mutation authority.
-Any GitHub issue change must still satisfy the invoking skill's explicit
-publication boundary and its own read-after-write verification contract.
+Task creation and monitoring evidence does not broaden GitHub mutation scope.
+Any GitHub issue change must still be within the invoking skill's explicit
+request and satisfy its own read-after-write verification contract; no second
+user confirmation is required for that in-scope write.

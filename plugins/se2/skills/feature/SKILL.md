@@ -84,9 +84,10 @@ node immediately before hosted publication checks. A preview run is local only
 when it was requested explicitly and the source route does not require hosted
 rehydration.
 
-A passing dependency gate establishes only G workflow availability. It never
-grants GitHub mutation authority; the publish branch still requires explicit
-authority for its exact operations and read-after-write verification.
+A passing dependency gate establishes only G workflow availability and does
+not broaden scope. The explicit Feature request implicitly authorizes the
+exact in-scope hosted writes for its selected publish operation; read-after-
+write verification remains mandatory.
 
 ## Source route and terminal operation
 
@@ -102,7 +103,8 @@ calculated, the `terminal-operation` decision resolves the final operation. If
 the caller does not provide `run_mode`, resolve it as `publish`:
 
 - publish (default): publish the same bundle to GitHub with read-after-write
-  verification for every mutation, subject to explicit mutation authority;
+  verification for every mutation, using the implicit authority of the exact
+  explicit Feature request;
 - preview: retain the bundle as report data without external writes, only when
   the caller explicitly requests preview.
 
@@ -110,7 +112,7 @@ Preview and publish are final operation branches of the Feature graph. They are
 operational phases, not separate conceptual results: the conceptual result is
 always the complete Feature-and-Task bundle. Hosted failures must reach the
 registered `blocked` terminal through reconciliation; they must not be encoded
-as a second terminal state on `complete`. Missing publish authority or G
+as a second terminal state on `complete`. Missing target/operation scope or G
 availability blocks the default publish branch; it never silently falls back to
 preview.
 
@@ -167,7 +169,7 @@ flowchart TD
     task-dependency-graph -->|invalid| blocked
     terminal-operation -->|explicit preview| preview
     terminal-operation -->|default or explicit publish| publish
-    terminal-operation -->|publish selected and authority unresolved| blocked
+    terminal-operation -->|publish selected but target or operation unresolved| blocked
     preview --> complete
     publish --> preflight
     preflight --> hosted-checks
@@ -199,10 +201,10 @@ reconciliation explicit without turning transport commands into graph nodes.
 | task-dependency-graph | steps/task-dependency-graph.md | validation | Tasks have been derived | terminal-operation, blocked |
 | terminal-operation | steps/terminal-operation.md | decision | bundle and graph are valid; mode absent or resolved | preview, publish, blocked |
 | preview | steps/preview.md | action | preview was explicitly requested | complete |
-| publish | steps/publish.md | action | default or explicit publish and authority are resolved | preflight |
+| publish | steps/publish.md | action | default or explicit publish and exact scope are resolved | preflight |
 | preflight | steps/preflight.md | validation | publish branch is selected | hosted-checks, blocked |
 | hosted-checks | steps/hosted-checks.md | validation | G dependency is available | mutate, blocked |
-| mutate | steps/mutate.md | action | hosted publication is normalized and authorized | reconcile-verify |
+| mutate | steps/mutate.md | action | hosted publication is normalized and in scope | reconcile-verify |
 | reconcile-verify | steps/reconcile-verify.md | validation | hosted result may be ambiguous or partial | complete, blocked |
 | complete | steps/complete.md | terminal | selected operation is complete or verified | none |
 | blocked | steps/blocked.md | terminal | a required contract cannot be satisfied | none |
@@ -377,8 +379,8 @@ complete Feature-and-Task bundle is calculated. Treat an omitted mode as
   preflight is a hard hosted-access barrier and must pass before hosted checks,
   duplicate/collision reads, repository metadata reads, or any hosted mutation.
   No hosted operation may be used to establish the preflight result itself.
-- missing publication authority or unresolved dependency transitions to
-  `blocked`; never convert the default publish branch to preview.
+- unresolved dependency, target, or operation transitions to `blocked`; never
+  convert the default publish branch to preview.
 
 Load steps/hosted-checks.md for current hosted duplicate, relation, metadata,
 and collision evidence. Load steps/mutate.md for the normalized G-owned issue
