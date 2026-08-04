@@ -43,19 +43,24 @@ Every task created by SE2 receives a deterministic display-title request using
 the established `se:implement` grammar:
 
 ```text
-<emoji> <outcome specific>
+<emoji> <role or workflow> · <scope or outcome>
 ```
 
 Apply these shared rules to the Feature planner task, the Implement
 orchestrator, and every Implement worker:
 
 - begin with exactly one contextual emoji, followed by one space;
-- keep the outcome short, concrete, and result-oriented;
+- keep the role, scope, or outcome short, concrete, and deterministic;
 - derive the emoji and wording deterministically from the active skill role and
-  bounded Feature/Task outcome; never choose them randomly;
+  either an immutable selected scope or a bounded Feature/Task outcome; never
+  choose them randomly;
 - use the skill-owned profile template for the role's content, while retaining
-  the shared grammar and the existing `📚` planner, `🤖` controller, and `🛠️`
-  worker convention;
+  the shared grammar and the existing `📚` planner, `🤖` orchestrator, and
+  `🛠️` worker convention;
+- for an Implement orchestrator, use `1 Feature` for one selected Feature and
+  `<feature_count> Features` for multiple selected Features. Freeze that count
+  from the authoritative run scope; do not derive it from worker count,
+  completion progress, or serial versus parallel execution;
 - treat the title as display metadata only. It is never task identity,
   authorization, state, claim, branch, or recovery evidence.
 

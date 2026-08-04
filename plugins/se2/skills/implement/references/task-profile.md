@@ -14,7 +14,9 @@ roles:
     model: gpt-5.6-sol
     reasoning: medium
     topology: single-orchestrator-task
-    title_template: "🤖 Implement Feature · <Feature outcome>"
+    title_templates:
+      singular: "🤖 Orchestrator · 1 Feature"
+      plural: "🤖 Orchestrator · <feature_count> Features"
   - role: worker
     model: gpt-5.6-sol
     default_reasoning: medium
@@ -23,7 +25,7 @@ roles:
       - high
       - xhigh
     topology: one-worker-per-task
-    title_template: "🛠️ Implement Task · <Task outcome>"
+    title_template: "🛠️ Worker · <Task outcome>"
 ```
 
 The orchestrator coordinates the selected Task set with the fixed Sol/medium
@@ -35,6 +37,14 @@ mandatory; neither is a fallback for the other.
 The worker runs exact-HEAD native review in its own session and implementation worktree
 with its already resolved `gpt-5.6-sol` reasoning level. Review is a phase of
 the worker lifecycle, not another task profile or topology role.
+
+The orchestrator uses the singular title when the authoritative selected
+Feature set contains one Feature and the plural title when it contains more
+than one. Freeze `<feature_count>` from that selected set before scheduling;
+the count includes selected Features whose Tasks are waiting or blocked. It is
+not a worker count, completed-Feature count, or execution-mode marker, and the
+title must not change as waves or statuses change. Serial and parallel
+execution use the same title rule.
 
 ## Worker reasoning resolution
 
@@ -67,9 +77,10 @@ incomplete Task contract. If the selected model or reasoning value cannot be
 verified from live capability evidence before worker creation, fail closed with
 `unsupported-runtime`.
 
-The title templates reuse the established planner, controller, and worker emoji
-convention. Replace only the outcome placeholder with a short, concrete,
-deterministic result; do not use titles as task identity or recovery evidence.
+The title templates reuse the established planner, orchestrator, and worker
+emoji convention. Replace only the worker's outcome placeholder with a short,
+concrete, deterministic result; do not use titles as task identity or recovery
+evidence.
 
 There is no automatic model, reasoning, or topology fallback. If the live
 runtime cannot verify the Sol/medium orchestrator or an adaptive Sol worker
