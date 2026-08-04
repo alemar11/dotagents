@@ -79,6 +79,24 @@ contract. Load
 ready for review or publication. Load [run-state.md](references/run-state.md)
 before preparing, resuming, checkpointing, or resetting the ledger.
 
+## Transition-condition ownership
+
+The registry below lists target node IDs only. Each source-node group has one
+canonical condition owner:
+
+| Source nodes | Canonical condition owner |
+| --- | --- |
+| `intake`, `source-preflight`, `runtime-preflight`, `prepare-run` | This skill's input invariant and shared-contract sections. |
+| `schedule`, `delivery-gate`, `worker-bootstrap`, `assignment-blocked`, `assignment-deferred`, `release-claims` | [orchestration.md](references/orchestration.md), including control-plane, execution/delivery-topology, and aggregate-completion rules. |
+| `implement-validate`, `contract-conflict`, `repair-authority`, `repair-task`, `repair-readback` | [orchestration.md](references/orchestration.md), including assignment-ownership, Contract Repair, and authorization rules. |
+| `candidate`, `native-review`, `review-decision`, `publish-pr`, `stack-reconcile`, `ready-monitor`, `final-verify` | [review-delivery.md](references/review-delivery.md). |
+| `deferred`, `complete`, `blocked` | This skill's terminal definitions; terminal nodes have no outgoing conditions. |
+
+Each owner must define the conditions for every declared outgoing target from
+its assigned source nodes and must not add an edge absent from the registry.
+[run-state.md](references/run-state.md) owns persistence and recovery evidence,
+not workflow transitions.
+
 ## Workflow graph
 
 | node_id | kind | entry condition | transitions | side effects | terminal state |

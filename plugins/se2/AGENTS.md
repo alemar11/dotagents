@@ -116,8 +116,9 @@ do not silently merge its graph contract into the existing SE plugin.
 - Parse the plugin manifest as JSON.
 - Validate the Idea skill front matter and UI metadata, canonical references,
   explicit-only invocation, and independent hosted-output boundary.
-- Validate that every registered local node exists, every local transition
-  targets a registered node, and every step has the standard front matter.
+- Validate that every table-owned registry row matches its declared field order
+  and arity, every registered local node exists, every local transition targets
+  a registered node, and every step has the standard front matter.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Feature terminal-operation preview/publish reachability, the

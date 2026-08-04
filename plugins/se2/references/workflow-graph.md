@@ -42,6 +42,8 @@ configuration merely to persist a graph run.
 ## Registry and Mermaid rules
 
 - The skill-owned registry is the structural source of truth.
+- Every table-owned registry row must contain the declared fields in the same
+  order and arity as its header.
 - Every transition target must be registered in the same graph.
 - Every local node must be reachable from an entry route or be explicitly
   declared as a terminal outcome.
@@ -120,6 +122,7 @@ Tasks, dependencies, implementation plans, and readiness claims.
 For every changed graph, perform read-only checks for:
 
 - front matter and metadata validity;
+- registry-row field order and arity;
 - registry/projection reconciliation;
 - registered transition targets;
 - transition-condition coverage for every declared edge;
