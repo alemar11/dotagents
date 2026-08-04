@@ -31,7 +31,7 @@ Each graph registry declares the following fields:
 | entry_conditions | Evidence required before entering the node. |
 | inputs | Caller or prior-node data consumed by the node. |
 | outputs | Transient artifacts produced for later nodes. |
-| transitions | A list of target node IDs with explicit conditions. |
+| transitions | A list of target node IDs. Conditions belong to the owning node contract or its canonical transition-condition matrix. |
 | stop_if | Conditions that stop the run at this node. |
 | side_effects | Read, transient, durable, hosted, or none. |
 | terminal_states | Empty for non-terminal nodes; the terminal state for terminal nodes. |
@@ -52,6 +52,24 @@ configuration merely to persist a graph run.
 - Entry-route labels and internal execution envelopes are not graph nodes unless
   the owning skill explicitly registers them.
 - A terminal node has no outgoing transitions.
+
+## Transition conditions
+
+Keep the `transitions` field structural: it lists target node IDs and nothing
+else. When a registry needs branch conditions, define them in one canonical
+Markdown surface owned by the skill:
+
+- a transition-condition matrix in the same `SKILL.md` for a table-owned
+  registry;
+- the standard node header for Feature step contracts; or
+- a routed node reference explicitly assigned by the skill's ownership map.
+
+The owning skill must make condition ownership explicit and cover exactly the
+declared edges. A routed reference may own the conditions for the node
+contracts it governs. Do not encode conditions as free prose inside the target
+list, move outgoing conditions into `entry_conditions`, or treat Mermaid labels
+as the source of truth. Explanatory prose may clarify a condition but must not
+add an unregistered edge.
 
 Feature keeps its existing step files and registry as its local source of
 truth. Learn, Idea, Implement, and Audit keep their registries in their SKILL.md files
@@ -104,6 +122,7 @@ For every changed graph, perform read-only checks for:
 - front matter and metadata validity;
 - registry/projection reconciliation;
 - registered transition targets;
+- transition-condition coverage for every declared edge;
 - terminal reachability and absence of outgoing terminal edges;
 - acyclicity where the owning graph requires it;
 - local reference integrity;

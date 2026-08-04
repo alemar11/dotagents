@@ -29,16 +29,41 @@ projection.
 
 | node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| intake | action | Resolve explicit scope and stopping policy. | explicit `$se2:audit` invocation | user request | frozen audit scope and stop policy | capability-check when scope is valid; blocked when invocation or scope is invalid | invocation is not explicit or targets mutation | none | none |
-| capability-check | validation | Establish a reliable live inventory and authoritative-read boundary. | audit scope is frozen | live application capabilities | capability and coverage record | discover when a reliable subset is observable; blocked when no responsible observation is possible | inventory and authoritative reads are both unavailable | read | none |
-| discover | action | Freeze the initial active-session cohort and coverage boundary. | minimum live capabilities are available | active-session inventory | frozen cohort and coverage boundary | attribute when candidates exist; reported when none exist; blocked when inventory evidence is unusable | no reliable cohort boundary can be established | read, transient | none |
-| attribute | validation | Retain only sessions with direct SE2-use evidence. | initial cohort is frozen | candidate sessions and task-visible evidence | attributed cohort and exclusions | observe when attributable sessions exist; reported when none qualify | none | read, transient | none |
-| observe | action | Read selected sessions and advance their evidence frontiers. | at least one session is attributable | attributed cohort and prior frontiers | fresh session observations and evidence gaps | assess when responsible evidence exists; blocked when no selected session can be assessed | all selected evidence is unavailable or unusable | read, transient | none |
-| assess | validation | Reconstruct graph conformance and classify evidence-backed findings. | fresh session evidence and skill contracts are available | observations, graph registries, and contract baselines | conformance map, feedback, and finding registry | monitor-decision when assessment is responsible; blocked when no contract or evidence boundary supports assessment | every required baseline or evidence frontier is unusable | read, transient | none |
-| monitor-decision | decision | Continue monitoring or return the current terminal report. | selected-session states and evidence gaps are known | assessed cohort and user-stop state | refresh decision or terminal report | refresh while any selected session is active and the user has not stopped; reported when cohort is terminal, empty, or user-stopped; blocked when no responsible report remains possible | none | none | none |
-| refresh | action | Perform a bounded authoritative wait or read refresh. | at least one selected session remains active | active cohort and evidence frontiers | refreshed states or bounded no-change evidence | observe after each bounded refresh | user stops during the wait | read, transient | none |
+| intake | action | Resolve explicit scope and stopping policy. | explicit `$se2:audit` invocation | user request | frozen audit scope and stop policy | capability-check, blocked | invocation is not explicit or targets mutation | none | none |
+| capability-check | validation | Establish a reliable live inventory and authoritative-read boundary. | audit scope is frozen | live application capabilities | capability and coverage record | discover, blocked | inventory and authoritative reads are both unavailable | read | none |
+| discover | action | Freeze the initial active-session cohort and coverage boundary. | minimum live capabilities are available | active-session inventory | frozen cohort and coverage boundary | attribute, reported, blocked | no reliable cohort boundary can be established | read, transient | none |
+| attribute | validation | Retain only sessions with direct SE2-use evidence. | initial cohort is frozen | candidate sessions and task-visible evidence | attributed cohort and exclusions | observe, reported | none | read, transient | none |
+| observe | action | Read selected sessions and advance their evidence frontiers. | at least one session is attributable | attributed cohort and prior frontiers | fresh session observations and evidence gaps | assess, blocked | all selected evidence is unavailable or unusable | read, transient | none |
+| assess | validation | Reconstruct graph conformance and classify evidence-backed findings. | fresh session evidence and skill contracts are available | observations, graph registries, and contract baselines | conformance map, feedback, and finding registry | monitor-decision, blocked | every required baseline or evidence frontier is unusable | read, transient | none |
+| monitor-decision | decision | Continue monitoring or return the current terminal report. | selected-session states and evidence gaps are known | assessed cohort and user-stop state | refresh, reported, blocked | none | none | none |
+| refresh | action | Perform a bounded authoritative wait or read refresh. | at least one selected session remains active | active cohort and evidence frontiers | refreshed states or bounded no-change evidence | observe | user stops during the wait | read, transient | none |
 | reported | terminal | Return a complete or explicitly partial read-only report. | no attributable sessions, terminal cohort, or user stop | report artifacts and coverage record | final Markdown report | none | terminal | none | reported |
 | blocked | terminal | Report why no responsible audit result can be established. | minimum inventory, contract, or evidence boundary is unavailable | retained evidence and exact blocker | blocker report and smallest recovery input | none | terminal | none | blocked |
+
+## Transition conditions
+
+The `transitions` column lists target IDs only. This matrix is the canonical
+condition map for the Audit registry; Mermaid remains its projection.
+
+| from | to | when |
+| --- | --- | --- |
+| intake | capability-check | scope is valid |
+| intake | blocked | invocation or scope is invalid |
+| capability-check | discover | a reliable subset is observable |
+| capability-check | blocked | no responsible observation is possible |
+| discover | attribute | candidates exist |
+| discover | reported | no candidates exist |
+| discover | blocked | inventory evidence is unusable |
+| attribute | observe | attributable sessions exist |
+| attribute | reported | no sessions qualify |
+| observe | assess | responsible evidence exists |
+| observe | blocked | no selected session can be assessed |
+| assess | monitor-decision | assessment is responsible |
+| assess | blocked | no contract or evidence boundary supports assessment |
+| monitor-decision | refresh | a selected session remains active and the user has not stopped |
+| monitor-decision | reported | the cohort is terminal, empty, or user-stopped |
+| monitor-decision | blocked | no responsible report remains possible |
+| refresh | observe | after each bounded refresh |
 
 ~~~mermaid
 flowchart TD

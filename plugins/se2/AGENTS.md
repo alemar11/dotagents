@@ -133,8 +133,9 @@ do not silently merge its graph contract into the existing SE plugin.
   shared title-reconciliation outcome before normal monitoring or update relay,
   and that resume paths cannot repeat an uncertain adjustment.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
-  registry/projection reconciliation, the intentional refresh loop, terminal
-  reachability, evidence classifications, and prohibited mutation behavior.
+  registry/projection reconciliation, exact transition-condition coverage, the
+  intentional refresh loop, terminal reachability, evidence classifications,
+  and prohibited mutation behavior.
 - Run the Implement run-state CLI help, version, read-only doctor, and focused
   standard-library tests against temporary databases.
 - Check that the marketplace path and plugin metadata point to this package.
