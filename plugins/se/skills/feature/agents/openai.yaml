@@ -1,0 +1,7 @@
+interface:
+  display_name: "📚 Feature Planning"
+  short_description: "Turn related requests into clear Features and Macro Tasks."
+  brand_color: "#BE185D"
+  default_prompt: "Use $se:feature to analyze one or more related requests, ask any material questions together, create separate Features when the outcomes are genuinely distinct, split each Feature into a complete set of Macro Tasks, and publish the plan by default without writing code."
+policy:
+  allow_implicit_invocation: false

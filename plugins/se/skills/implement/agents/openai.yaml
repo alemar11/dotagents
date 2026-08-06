@@ -1,0 +1,7 @@
+interface:
+  display_name: "🛠️ Implement Features"
+  short_description: "Deliver planned Features through reviewed pull requests."
+  brand_color: "#BE185D"
+  default_prompt: "Use $se:implement to implement or resume a published Feature Plan Set. Deliver each eligible Feature in its own pull request, include that Feature and all of its Macro Tasks in the closing references, verify the final code and pull-request state, and leave merge and post-merge closure to the user."
+policy:
+  allow_implicit_invocation: false

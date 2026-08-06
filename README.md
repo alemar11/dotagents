@@ -39,16 +39,17 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 
-SE2 is the repository's issue-first, graph-first workflow plugin for Learn,
-Idea, Feature, Implement, and live Audit workflows:
+SE is the repository's software-delivery workflow plugin. It turns ideas into
+Feature plans, delivers them through reviewed pull requests, maintains project
+knowledge, and audits active work:
 
 | Skill | Purpose |
 | --- | --- |
-| `se2:learn` | Preflight and, when authorized, organize the applicable AGENTS.md pointer to CONTEXT.md, then maintain Project Context, ADRs, localization memory, Code Review Rules, and proposal-first AGENTS.md compaction. |
-| `se2:feature` | Analyze one or more source issues into a Feature Plan Set of genuinely distinct sibling Features, use optional read-only analysts and a critic when delegation is available, present one consolidated question batch, split each Feature into a closed local set of macro-vertical child Tasks with same-parent-only planning dependencies, and publish every parent/child projection by default without creating a container, worktree, or technical execution graph. |
-| `se2:idea` | Traverse a graph-first session-capture workflow and publish to GitHub by default; an explicitly requested preview stays local, with a transient idea-source handoff for later Feature planning. |
-| `se2:implement` | Execute authoritative GitHub Feature Plan Sets and verified sibling/Macro projections through a mandatory GitHub-backed orchestrator, schedule Feature-level dependencies, derive technical execution units per Feature, use isolated Feature Workers with optional delegated support and serial fallback, derive each `closing_issue_refs` from only that Feature plus its associated Macro Tasks, and return verified standalone or stacked PR delivery only for real same-repository code dependencies. |
-| `se2:audit` | Monitor attributable active SE2 sessions read-only, reconstruct graph conformance from positive evidence, and report feedback, bugs, regressions, and graph improvements. |
+| `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
+| `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
+| `se:feature` | Turn related requests into clear Features, acceptance criteria, and practical Macro Tasks without writing code. |
+| `se:implement` | Deliver planned Features through reviewed pull requests and verify their final delivery state. |
+| `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 ## Reusable Skills
 
@@ -102,11 +103,11 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   not the default.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- The G-dependent SE2 skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
-- `se2:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
-- `se2:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
-- `se2:implement` accepts only complete authoritative GitHub Feature Plan Sets with verified sibling Feature and same-parent Macro Task projections and stable Feature acceptance IDs, then returns a verified standalone or stacked PR topology per Feature. GitHub interaction is mandatory end to end; it has no local-only or preview execution mode. A Sol/medium orchestrator verifies the set registry, Feature-level dependencies, parent/child Macro Task registries, interprets each textual Feature and macro context, derives technical execution units and delivery dependencies separately from runtime waves, and creates isolated Feature Workers. Each Worker may use bounded delegated support for code analysis, execution-unit assistance, validation, or critique when delegation and capacity are observed; unavailable or unknown delegation falls back to serial parent execution and never blocks the required Worker. Functional order and cross-repository dependencies remain standalone; only a true same-repository code dependency may justify a stack from a green, exact-HEAD-verified parent PR. Workers own implementation semantics, validation, and local Feature/Macro Task evidence bound to the exact candidate HEAD; the orchestrator aggregates plan evidence without rewriting the plan. Each PR closes only its parent Feature plus every associated local Macro Task, regardless of internal technical realization. Product-level contradictions are surfaced to the user rather than causing an automatic Feature-planning relaunch. Final provider readiness is supplied by `g:github-delivery-status`, whose `ready` and `ready-with-manual-action` dispositions do not grant Implement merge, auto-merge, bypass, or queue authority. Idea, Feature, and Implement apply one shared portable-content gate immediately before each hosted write; G owns transport and readback rather than semantic cleanup. Parent drift invalidates descendant evidence for bottom-to-top worker reconciliation. A minimal SQLite WAL ledger prevents concurrent orchestrators on the same Feature Plan Set and stores durable checkpoints and idempotent side effects only; schema changes use explicit drop-and-recreate, never migrations.
-- `se2:audit` runs only after explicit invocation and observes a frozen cohort of active SE2 sessions until terminal state or user stop. It keeps all evidence transient, treats missing visibility as indeterminate rather than a violation, and never contacts tasks or mutates repositories and GitHub.
+- The G-dependent SE skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
+- `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
+- `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
+- `se:implement` accepts only complete authoritative GitHub Feature Plan Sets with verified sibling Feature and same-parent Macro Task projections and stable Feature acceptance IDs, then returns a verified standalone or stacked PR topology per Feature. GitHub interaction is mandatory end to end; it has no local-only or preview execution mode. A Sol/medium orchestrator verifies the set registry, Feature-level dependencies, parent/child Macro Task registries, interprets each textual Feature and macro context, derives technical execution units and delivery dependencies separately from runtime waves, and creates isolated Feature Workers. Each Worker may use bounded delegated support for code analysis, execution-unit assistance, validation, or critique when delegation and capacity are observed; unavailable or unknown delegation falls back to serial parent execution and never blocks the required Worker. Functional order and cross-repository dependencies remain standalone; only a true same-repository code dependency may justify a stack from a green, exact-HEAD-verified parent PR. Workers own implementation semantics, validation, and local Feature/Macro Task evidence bound to the exact candidate HEAD; the orchestrator aggregates plan evidence without rewriting the plan. Each PR closes only its parent Feature plus every associated local Macro Task, regardless of internal technical realization. Product-level contradictions are surfaced to the user rather than causing an automatic Feature-planning relaunch. Final provider readiness is supplied by `g:github-delivery-status`, whose `ready` and `ready-with-manual-action` dispositions do not grant Implement merge, auto-merge, bypass, or queue authority. Idea, Feature, and Implement apply one shared portable-content gate immediately before each hosted write; G owns transport and readback rather than semantic cleanup. Parent drift invalidates descendant evidence for bottom-to-top worker reconciliation. A minimal SQLite WAL ledger prevents concurrent orchestrators on the same Feature Plan Set and stores durable checkpoints and idempotent side effects only; schema changes use explicit drop-and-recreate, never migrations.
+- `se:audit` runs only after explicit invocation and observes a frozen cohort of active SE sessions until terminal state or user stop. It keeps all evidence transient, treats missing visibility as indeterminate rather than a violation, and never contacts tasks or mutates repositories and GitHub.
 - Multi-repository runs additionally validate the complete linked Feature Plan Set and finish with one independently verified GitHub PR per implementation-eligible Feature plus one exact HEAD vector.
 
 ## Project-Local Skills
@@ -128,14 +129,14 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add g@alemar11
-codex plugin add se2@alemar11
+codex plugin add se@alemar11
 ```
 
 If the `alemar11` marketplace is already registered, install G directly:
 
 ```sh
 codex plugin add g@alemar11
-codex plugin add se2@alemar11
+codex plugin add se@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -144,16 +145,16 @@ of the GitHub source, then install the same plugin:
 ```sh
 codex plugin marketplace add /path/to/dotagents
 codex plugin add g@alemar11
-codex plugin add se2@alemar11
+codex plugin add se@alemar11
 ```
 
 During local development, validate the changed plugin and reinstall each
-versioned plugins from the repository source. G has a dedicated helper; SE2 is
+versioned plugins from the repository source. G has a dedicated helper; SE is
 reinstalled directly:
 
 ```sh
 plugins/g/projects/g/scripts/reinstall-local
-codex plugin add se2@alemar11 --json
+codex plugin add se@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
@@ -162,16 +163,16 @@ For a Git-backed marketplace checkout, refresh the marketplace before reinstalli
 codex plugin marketplace upgrade alemar11
 codex plugin remove g@alemar11
 codex plugin add g@alemar11
-codex plugin remove se2@alemar11
-codex plugin add se2@alemar11
+codex plugin remove se@alemar11
+codex plugin add se@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old
-installation before installing SE2:
+installation before installing SE:
 
 ```sh
 codex plugin remove feature-flow@alemar11
-codex plugin add se2@alemar11
+codex plugin add se@alemar11
 ```
 
 Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.

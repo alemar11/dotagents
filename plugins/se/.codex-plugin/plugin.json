@@ -1,0 +1,29 @@
+{
+  "name": "se",
+  "version": "2.0.0",
+  "description": "Turn ideas into clear Feature plans, deliver them through reviewed pull requests, maintain project knowledge, and audit active work.",
+  "author": {
+    "name": "alemar11",
+    "url": "https://github.com/alemar11"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SE",
+    "shortDescription": "Plan Features, deliver reviewed pull requests, and maintain project knowledge.",
+    "longDescription": "SE supports a complete software-delivery workflow. Learn maintains durable project knowledge and decisions. Idea captures proposals for later planning. Feature turns one or more source issues into a clear Feature Plan Set, with separate Feature issues and practical Macro Tasks. Implement delivers each Feature through a dedicated worker and a reviewed pull request, verifies the final pull-request state, and leaves merge and post-merge closure to the user. Audit observes active SE work and reports problems or workflow improvements without making changes.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Use $se:learn to maintain durable repository knowledge, or $se:idea to save a proposal for later planning.",
+      "Use $se:feature to turn related requests into clear Feature issues, acceptance criteria, and Macro Tasks without writing code.",
+      "Use $se:implement to deliver planned Features through reviewed pull requests, or $se:audit to observe active SE work without changing it."
+    ],
+    "brandColor": "#BE185D"
+  }
+}

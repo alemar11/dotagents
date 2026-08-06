@@ -1,7 +1,0 @@
-interface:
-  display_name: "📚 Feature Planning"
-  short_description: "Analyze issues and publish a verified Feature Plan Set."
-  brand_color: "#BE185D"
-  default_prompt: "Use $se2:feature for an explicit Feature Plan Set run; analyze one or more source issues, use bounded read-only analysts and an independent critic when delegation is available, present one consolidated batch of material questions, converge genuinely distinct sibling Features, preserve Feature-level dependencies, split each Feature into a closed set of local macro-vertical Task projections with same-parent-only planning dependencies, and publish every parent Feature plus its child Tasks by default without creating a container, deriving technical execution units, or writing code."
-policy:
-  allow_implicit_invocation: false

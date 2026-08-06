@@ -17,10 +17,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "se2",
+      "name": "se",
       "source": {
         "source": "local",
-        "path": "./plugins/se2"
+        "path": "./plugins/se"
       },
       "policy": {
         "installation": "AVAILABLE",

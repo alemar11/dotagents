@@ -1,0 +1,1014 @@
+#!/usr/bin/env python3
+"""Minimal SQLite WAL checkpoint ledger for se:implement."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sqlite3
+import sys
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+CLI_VERSION = "3.0.0"
+CONTRACT_VERSION = "3.0.0"
+SCHEMA_VERSION = 3
+ENVELOPE = "se-implement/ledger-envelope"
+ENVELOPE_VERSION = "3.0.0"
+RESET_TOKEN = "drop-and-recreate"
+TIMEOUT_MS = 5000
+DEFAULT_DB = Path.home() / ".cache/dotagents/plugins/se/skills/implement/run-state.sqlite3"
+
+KEBAB = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+GITHUB_ISSUE_REF = re.compile(
+    r"^([a-z0-9](?:[a-z0-9-]{0,38}))/([a-z0-9._-]{1,100})#([1-9][0-9]*)$",
+    re.IGNORECASE,
+)
+GITHUB_ISSUE_URL = re.compile(
+    r"^https://github\.com/([a-z0-9](?:[a-z0-9-]{0,38}))/"
+    r"([a-z0-9._-]{1,100})/issues/([1-9][0-9]*)$",
+    re.IGNORECASE,
+)
+FULL_SHA = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
+FINAL_OPERATION_STATES = {"applied", "not-applied", "unknown", "blocked"}
+ASSIGNMENT_FIELDS = {
+    "feature_ref", "repository_identity", "status", "checkpoint",
+    "worker_task_id", "worker_project_id", "implementation_worktree",
+    "base_branch", "head_branch", "base_sha", "candidate_sha", "pr_url",
+}
+REQUIRED_ASSIGNMENT_FIELDS = {
+    "feature_ref", "repository_identity", "status", "checkpoint"
+}
+IMMUTABLE_ASSIGNMENT_FIELDS = {"feature_ref", "repository_identity"}
+TABLE_COLUMNS = {
+    "runtime_metadata": (
+        "singleton", "schema_version", "runtime_contract_version",
+        "runtime_cli_version", "runtime_artifact_sha256",
+    ),
+    "runs": (
+        "run_id", "orchestrator_task_id", "status", "checkpoint", "revision",
+        "created_at", "updated_at",
+    ),
+    "feature_claims": (
+        "feature_ref", "run_id", "status", "revision", "created_at", "updated_at",
+    ),
+    "assignments": (
+        "run_id", "assignment_id", "feature_ref",
+        "repository_identity", "status", "checkpoint", "worker_task_id",
+        "worker_project_id", "implementation_worktree", "base_branch", "head_branch",
+        "base_sha", "candidate_sha", "pr_url",
+        "revision", "created_at", "updated_at",
+    ),
+    "operations": (
+        "operation_id", "run_id", "assignment_id", "action", "subject_id",
+        "status", "receipt_ref", "readback_ref", "created_at", "updated_at",
+    ),
+}
+
+SCHEMA_SQL = """
+CREATE TABLE runtime_metadata (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  schema_version INTEGER NOT NULL CHECK (schema_version = 3),
+  runtime_contract_version TEXT NOT NULL,
+  runtime_cli_version TEXT NOT NULL,
+  runtime_artifact_sha256 TEXT NOT NULL
+);
+CREATE TABLE runs (
+  run_id TEXT PRIMARY KEY,
+  orchestrator_task_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  checkpoint TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE feature_claims (
+  feature_ref TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active', 'released')),
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE RESTRICT
+);
+CREATE TABLE assignments (
+  run_id TEXT NOT NULL,
+  assignment_id TEXT NOT NULL,
+  feature_ref TEXT NOT NULL,
+  repository_identity TEXT NOT NULL,
+  status TEXT NOT NULL,
+  checkpoint TEXT NOT NULL,
+  worker_task_id TEXT,
+  worker_project_id TEXT,
+  implementation_worktree TEXT,
+  base_branch TEXT,
+  head_branch TEXT,
+  base_sha TEXT,
+  candidate_sha TEXT,
+  pr_url TEXT,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, assignment_id),
+  UNIQUE (run_id, feature_ref),
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+CREATE TABLE operations (
+  operation_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  assignment_id TEXT,
+  action TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (
+    status IN ('pending', 'applied', 'not-applied', 'unknown', 'blocked')
+  ),
+  receipt_ref TEXT,
+  readback_ref TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (run_id, action, subject_id),
+  FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id, assignment_id)
+    REFERENCES assignments(run_id, assignment_id) ON DELETE CASCADE
+);
+CREATE INDEX assignments_status_idx ON assignments(run_id, status);
+CREATE INDEX feature_claims_run_idx ON feature_claims(run_id, status);
+CREATE INDEX operations_status_idx ON operations(run_id, status);
+"""
+
+
+class LedgerError(Exception):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def artifact_hash() -> str:
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def text(value: str | None, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise LedgerError("invalid-input", f"{field} must be non-empty")
+    return value.strip()
+
+
+def kebab(value: str, field: str) -> str:
+    if not KEBAB.fullmatch(value):
+        raise LedgerError("invalid-input", f"{field} must be lower-kebab")
+    return value
+
+
+def canonical_issue_ref(value: str, field: str) -> str:
+    candidate = text(value, field)
+    match = GITHUB_ISSUE_REF.fullmatch(candidate) or GITHUB_ISSUE_URL.fullmatch(candidate)
+    if match is None:
+        raise LedgerError(
+            "invalid-input",
+            f"{field} must be owner/repository#number or its canonical GitHub issue URL",
+        )
+    owner, repository, number = match.groups()
+    return f"{owner.lower()}/{repository.lower()}#{number}"
+
+
+def safe_path(value: Path) -> Path:
+    path = value.expanduser().absolute()
+    if (
+        path.name != "run-state.sqlite3"
+        or path.parent.resolve() in {Path("/"), Path.home().resolve()}
+    ):
+        raise LedgerError(
+            "unsafe-database-path",
+            "database must be a narrowly scoped path named run-state.sqlite3",
+        )
+    return path
+
+
+def verify_permissions(path: Path) -> None:
+    if path.is_symlink() or not path.is_file():
+        raise LedgerError("unsafe-database-file", "ledger must be a regular file")
+    if path.stat().st_mode & 0o777 != 0o600:
+        raise LedgerError("unsafe-database-permissions", "ledger mode must be 0600")
+    if path.parent.stat().st_mode & 0o777 != 0o700:
+        raise LedgerError("unsafe-database-permissions", "ledger directory mode must be 0700")
+
+
+def database_header_uses_wal(path: Path) -> bool:
+    try:
+        with path.open("rb") as stream:
+            header = stream.read(20)
+    except OSError as error:
+        raise LedgerError("state-read-error", f"cannot read ledger header: {error}")
+    return (
+        len(header) == 20
+        and header[:16] == b"SQLite format 3\x00"
+        and header[18] == 2
+        and header[19] == 2
+    )
+
+
+def connect(path: Path, *, readonly: bool = False) -> sqlite3.Connection:
+    uri = False
+    if readonly:
+        wal = Path(f"{path}-wal")
+        shm = Path(f"{path}-shm")
+        if wal.exists() != shm.exists():
+            raise LedgerError(
+                "invalid-state-sidecars",
+                "ledger WAL sidecars are incomplete and require explicit preparation",
+            )
+        options = "?mode=ro" if wal.exists() else "?mode=ro&immutable=1"
+        target = f"{path.resolve().as_uri()}{options}"
+        uri = True
+    else:
+        target = str(path)
+    db = sqlite3.connect(
+        target, uri=uri, timeout=TIMEOUT_MS / 1000, isolation_level=None
+    )
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys = ON")
+    db.execute(f"PRAGMA busy_timeout = {TIMEOUT_MS}")
+    if readonly:
+        db.execute("PRAGMA query_only = ON")
+    return db
+
+
+def normalized_schema_objects(db: sqlite3.Connection) -> tuple[tuple[str, str, str, str], ...]:
+    return tuple(
+        (row[0], row[1], row[2], " ".join(row[3].split()))
+        for row in db.execute(
+            "SELECT type,name,tbl_name,sql FROM sqlite_master "
+            "WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL "
+            "ORDER BY type,name"
+        )
+    )
+
+
+def expected_schema_objects() -> tuple[tuple[str, str, str, str], ...]:
+    expected = sqlite3.connect(":memory:")
+    try:
+        expected.executescript(SCHEMA_SQL)
+        return normalized_schema_objects(expected)
+    finally:
+        expected.close()
+
+
+def verify_schema(db: sqlite3.Connection) -> dict[str, Any]:
+    if normalized_schema_objects(db) != expected_schema_objects():
+        raise LedgerError(
+            "invalid-state-schema",
+            f"ledger tables, constraints, foreign keys, or indexes do not match schema {SCHEMA_VERSION}",
+        )
+    rows = db.execute("SELECT * FROM runtime_metadata").fetchall()
+    if len(rows) != 1 or rows[0]["singleton"] != 1:
+        raise LedgerError("invalid-state-schema", "runtime metadata is invalid")
+    metadata = dict(rows[0])
+    if metadata["schema_version"] != SCHEMA_VERSION:
+        raise LedgerError("invalid-state-schema", "ledger schema version is incompatible")
+    if metadata["runtime_contract_version"] != CONTRACT_VERSION:
+        raise LedgerError(
+            "incompatible-runtime-contract", "explicit state reset is required"
+        )
+    return metadata
+
+
+def require_db(path: Path) -> sqlite3.Connection:
+    if not path.is_file():
+        raise LedgerError("state-not-prepared", "run state prepare explicitly")
+    verify_permissions(path)
+    db = connect(path)
+    metadata = verify_schema(db)
+    if (
+        metadata["runtime_cli_version"] != CLI_VERSION
+        or metadata["runtime_artifact_sha256"] != artifact_hash()
+    ):
+        db.close()
+        raise LedgerError("runtime-artifact-mismatch", "run state prepare must pin this artifact")
+    if db.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
+        db.close()
+        raise LedgerError("invalid-state-journal", "run state prepare must restore WAL")
+    return db
+
+
+def prepare(path: Path) -> dict[str, Any]:
+    if path.is_symlink():
+        raise LedgerError("unsafe-database-file", "refusing a symlink ledger")
+    if path.parent.is_symlink():
+        raise LedgerError("unsafe-database-path", "refusing a symlink ledger directory")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except OSError as error:
+        raise LedgerError("state-prepare-error", f"cannot create ledger directory: {error}")
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise LedgerError("unsafe-database-path", "ledger directory must be a real directory")
+    os.chmod(path.parent, 0o700)
+    created = not path.exists()
+    if not created:
+        if not path.is_file():
+            raise LedgerError("unsafe-database-file", "ledger must be a regular file")
+        os.chmod(path, 0o600)
+    db = connect(path)
+    try:
+        if created:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.executescript(SCHEMA_SQL)
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "INSERT INTO runtime_metadata VALUES (1, ?, ?, ?, ?)",
+                (SCHEMA_VERSION, CONTRACT_VERSION, CLI_VERSION, artifact_hash()),
+            )
+        else:
+            db.execute("BEGIN IMMEDIATE")
+            verify_schema(db)
+            db.execute(
+                "UPDATE runtime_metadata SET runtime_cli_version=?, "
+                "runtime_artifact_sha256=? WHERE singleton=1",
+                (CLI_VERSION, artifact_hash()),
+            )
+        db.execute("COMMIT")
+        journal = db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+        if journal != "wal":
+            raise LedgerError("invalid-state-journal", "SQLite WAL is unavailable")
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+    os.chmod(path, 0o600)
+    return {"database": str(path), "created": created, "journal_mode": journal,
+            "schema_version": SCHEMA_VERSION}
+
+
+def doctor(path: Path) -> dict[str, Any]:
+    base = {"database": str(path), "offline": True, "auth_required": False}
+    if path.is_symlink():
+        raise LedgerError("unsafe-database-file", "refusing a symlink ledger")
+    if not path.exists():
+        return {**base, "database_state": "absent", "ready": False}
+    verify_permissions(path)
+    db = connect(path, readonly=True)
+    try:
+        metadata = verify_schema(db)
+        sidecars_exist = Path(f"{path}-wal").exists()
+        journal = (
+            db.execute("PRAGMA journal_mode").fetchone()[0]
+            if sidecars_exist
+            else "wal" if database_header_uses_wal(path) else "delete"
+        )
+        if journal != "wal":
+            raise LedgerError("invalid-state-journal", "run state prepare must restore WAL")
+        if (
+            metadata["runtime_cli_version"] != CLI_VERSION
+            or metadata["runtime_artifact_sha256"] != artifact_hash()
+        ):
+            raise LedgerError(
+                "runtime-artifact-mismatch", "run state prepare must pin this artifact"
+            )
+    finally:
+        db.close()
+    return {
+        **base, "database_state": "ready", "ready": True, "journal_mode": journal,
+        "schema_version": metadata["schema_version"],
+        "artifact_matches": True,
+    }
+
+
+def reset(path: Path, confirmation: str) -> dict[str, Any]:
+    if confirmation != RESET_TOKEN:
+        raise LedgerError(
+            "reset-confirmation-required", f"use --confirm {RESET_TOKEN}"
+        )
+    if path.is_symlink():
+        raise LedgerError("unsafe-database-file", "refusing a symlink ledger")
+    removed = []
+    for target in (path, Path(f"{path}-wal"), Path(f"{path}-shm")):
+        if target.exists():
+            target.unlink()
+            removed.append(str(target))
+    result = prepare(path)
+    result["removed"] = removed
+    return result
+
+
+def one(row: sqlite3.Row | None, code: str, message: str) -> dict[str, Any]:
+    if row is None:
+        raise LedgerError(code, message)
+    return dict(row)
+
+
+def run_start(path: Path, run_id: str, orchestrator_id: str) -> dict[str, Any]:
+    run_id, orchestrator_id = text(run_id, "run_id"), text(orchestrator_id, "orchestrator_task_id")
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if existing:
+            if existing["orchestrator_task_id"] != orchestrator_id:
+                raise LedgerError("run-conflict", "run belongs to another orchestrator")
+            db.execute("COMMIT")
+            return {"created": False, "run": dict(existing)}
+        now = timestamp()
+        db.execute(
+            "INSERT INTO runs VALUES (?, ?, 'active', 'prepare-run', 0, ?, ?)",
+            (run_id, orchestrator_id, now, now),
+        )
+        db.execute("COMMIT")
+        row = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        return {"created": True, "run": dict(row)}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def run_show(path: Path, run_id: str) -> dict[str, Any]:
+    db = require_db(path)
+    try:
+        run = one(db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone(),
+                  "run-not-found", f"run {run_id} was not found")
+        features = [dict(row) for row in db.execute(
+            "SELECT * FROM feature_claims WHERE run_id=? ORDER BY feature_ref", (run_id,)
+        )]
+        assignments = [dict(row) for row in db.execute(
+            "SELECT * FROM assignments WHERE run_id=? ORDER BY assignment_id", (run_id,)
+        )]
+        operations = [dict(row) for row in db.execute(
+            "SELECT * FROM operations WHERE run_id=? ORDER BY created_at, operation_id",
+            (run_id,),
+        )]
+        return {
+            "run": run, "feature_claims": features, "assignments": assignments,
+            "operations": operations,
+        }
+    finally:
+        db.close()
+
+
+def run_checkpoint(path: Path, run_id: str, revision: int, status: str,
+                   checkpoint: str) -> dict[str, Any]:
+    kebab(status, "status"); kebab(checkpoint, "checkpoint")
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if current is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if current["revision"] != revision:
+            raise LedgerError("revision-conflict", "run revision changed")
+        if current["status"] == "complete":
+            raise LedgerError("run-complete", "a complete run is immutable")
+        if status == "complete":
+            if checkpoint != "complete":
+                raise LedgerError("invalid-run-terminal", "complete status requires complete checkpoint")
+            if db.execute(
+                "SELECT 1 FROM feature_claims WHERE run_id=? AND status='active' LIMIT 1",
+                (run_id,),
+            ).fetchone():
+                raise LedgerError("active-feature-claims", "release all Feature claims first")
+            if not db.execute(
+                "SELECT 1 FROM feature_claims WHERE run_id=? AND status='released' LIMIT 1",
+                (run_id,),
+            ).fetchone():
+                raise LedgerError("missing-feature-claims", "complete requires released Feature claims")
+            if not db.execute(
+                "SELECT 1 FROM assignments WHERE run_id=? LIMIT 1", (run_id,)
+            ).fetchone():
+                raise LedgerError("assignments-not-ready", "complete requires verified assignments")
+            if db.execute(
+                "SELECT 1 FROM assignments WHERE run_id=? "
+                "AND NOT (status='delivery-ready' AND checkpoint='final-verify') LIMIT 1",
+                (run_id,),
+            ).fetchone():
+                raise LedgerError(
+                    "assignments-not-ready",
+                    "all assignments must be delivery-ready at final-verify",
+                )
+            if db.execute(
+                "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
+                (run_id,),
+            ).fetchone():
+                raise LedgerError("operations-unresolved", "reconcile all side effects first")
+        cursor = db.execute(
+            "UPDATE runs SET status=?, checkpoint=?, revision=revision+1, updated_at=? "
+            "WHERE run_id=? AND revision=?",
+            (status, checkpoint, timestamp(), run_id, revision),
+        )
+        if cursor.rowcount != 1:
+            db.execute("ROLLBACK")
+            raise LedgerError("revision-conflict", "run revision changed or run is absent")
+        db.execute("COMMIT")
+        return {"run": dict(db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone())}
+    finally:
+        db.close()
+
+
+def feature_input(path: Path) -> list[str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LedgerError("invalid-input", f"cannot read Feature input: {error}")
+    refs = payload.get("feature_refs") if isinstance(payload, dict) else None
+    if not isinstance(refs, list) or not refs:
+        raise LedgerError("invalid-input", "feature input requires a non-empty feature_refs list")
+    normalized = []
+    for value in refs:
+        if not isinstance(value, str):
+            raise LedgerError("invalid-input", "every feature_ref must be text")
+        normalized.append(canonical_issue_ref(value, "feature_ref"))
+    if len(set(normalized)) != len(normalized):
+        raise LedgerError("invalid-input", "feature_refs must be unique")
+    return sorted(normalized)
+
+
+def feature_claim(path: Path, run_id: str, input_path: Path) -> dict[str, Any]:
+    refs = feature_input(input_path)
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        run = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if run is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if run["status"] != "active":
+            raise LedgerError("run-not-active", "Feature claims require an active run")
+        placeholders = ",".join("?" for _ in refs)
+        current = {
+            row["feature_ref"]: row
+            for row in db.execute(
+                f"SELECT * FROM feature_claims WHERE feature_ref IN ({placeholders})",
+                refs,
+            )
+        }
+        conflicts = sorted(
+            ref for ref, row in current.items()
+            if row["status"] == "active" and row["run_id"] != run_id
+        )
+        if conflicts:
+            raise LedgerError(
+                "feature-already-claimed",
+                f"active Feature claims belong to another run: {conflicts}",
+            )
+        now = timestamp()
+        for ref in refs:
+            row = current.get(ref)
+            if row is None:
+                db.execute(
+                    "INSERT INTO feature_claims VALUES (?, ?, 'active', 0, ?, ?)",
+                    (ref, run_id, now, now),
+                )
+            elif row["status"] == "released":
+                db.execute(
+                    "UPDATE feature_claims SET run_id=?,status='active',revision=revision+1,"
+                    "updated_at=? WHERE feature_ref=? AND status='released'",
+                    (run_id, now, ref),
+                )
+        db.execute("COMMIT")
+        rows = [dict(row) for row in db.execute(
+            f"SELECT * FROM feature_claims WHERE feature_ref IN ({placeholders}) "
+            "ORDER BY feature_ref", refs,
+        )]
+        return {"feature_claims": rows}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def release_input(path: Path) -> list[tuple[str, int]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LedgerError("invalid-input", f"cannot read release input: {error}")
+    claims = payload.get("feature_claims") if isinstance(payload, dict) else None
+    if not isinstance(claims, list) or not claims:
+        raise LedgerError("invalid-input", "release input requires feature_claims")
+    normalized = []
+    for claim in claims:
+        if not isinstance(claim, dict) or set(claim) != {"feature_ref", "expected_revision"}:
+            raise LedgerError("invalid-input", "each release claim requires exact ref and revision")
+        revision = claim["expected_revision"]
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+            raise LedgerError("invalid-input", "expected_revision must be an integer >= 0")
+        normalized.append((canonical_issue_ref(claim["feature_ref"], "feature_ref"), revision))
+    if len({ref for ref, _ in normalized}) != len(normalized):
+        raise LedgerError("invalid-input", "release claims must be unique")
+    return sorted(normalized)
+
+
+def feature_release(path: Path, run_id: str, input_path: Path) -> dict[str, Any]:
+    expected = release_input(input_path)
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        run = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if run is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if run["status"] != "active" or run["checkpoint"] != "release-claims":
+            raise LedgerError("release-not-ready", "run must be active at release-claims")
+        observed = [
+            (row["feature_ref"], row["revision"])
+            for row in db.execute(
+                "SELECT * FROM feature_claims WHERE run_id=? AND status='active' ORDER BY feature_ref",
+                (run_id,),
+            )
+        ]
+        if observed != expected:
+            raise LedgerError("revision-conflict", "release input must match the complete active claim set")
+        if db.execute(
+            "SELECT 1 FROM feature_claims f LEFT JOIN assignments a "
+            "ON a.run_id=f.run_id AND a.feature_ref=f.feature_ref "
+            "WHERE f.run_id=? AND f.status='active' GROUP BY f.feature_ref "
+            "HAVING COUNT(a.assignment_id)=0 LIMIT 1",
+            (run_id,),
+        ).fetchone():
+            raise LedgerError("assignments-not-ready", "every Feature requires an assignment")
+        if db.execute(
+            "SELECT 1 FROM assignments WHERE run_id=? "
+            "AND NOT (status='delivery-ready' AND checkpoint='final-verify') LIMIT 1",
+            (run_id,),
+        ).fetchone():
+            raise LedgerError(
+                "assignments-not-ready",
+                "all assignments must be delivery-ready at final-verify",
+            )
+        if db.execute(
+            "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
+            (run_id,),
+        ).fetchone():
+            raise LedgerError("operations-unresolved", "reconcile all side effects first")
+        now = timestamp()
+        for feature_ref, revision in expected:
+            cursor = db.execute(
+                "UPDATE feature_claims SET status='released',revision=revision+1,updated_at=? "
+                "WHERE feature_ref=? AND run_id=? AND status='active' AND revision=?",
+                (now, feature_ref, run_id, revision),
+            )
+            if cursor.rowcount != 1:
+                raise LedgerError("revision-conflict", "Feature claim changed during release")
+        db.execute("COMMIT")
+        rows = [dict(row) for row in db.execute(
+            "SELECT * FROM feature_claims WHERE run_id=? ORDER BY feature_ref", (run_id,)
+        )]
+        return {"changed": True, "feature_claims": rows}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def assignment_input(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LedgerError("invalid-input", f"cannot read assignment input: {error}")
+    if not isinstance(payload, dict) or not payload:
+        raise LedgerError("invalid-input", "assignment input must be a non-empty object")
+    unknown = set(payload) - ASSIGNMENT_FIELDS
+    if unknown:
+        raise LedgerError("invalid-input", f"unknown assignment fields: {sorted(unknown)}")
+    for field in ("status", "checkpoint"):
+        if field in payload:
+            if not isinstance(payload[field], str):
+                raise LedgerError("invalid-input", f"{field} must be text")
+            kebab(text(payload[field], field), field)
+    for field, value in payload.items():
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise LedgerError("invalid-input", f"{field} must be text or null")
+        payload[field] = text(value, field)
+    for field in ("base_sha", "candidate_sha"):
+        if field in payload and payload[field] is not None and not FULL_SHA.fullmatch(payload[field]):
+            raise LedgerError("invalid-input", f"{field} must be a full lowercase Git SHA")
+    if "feature_ref" in payload:
+        payload["feature_ref"] = canonical_issue_ref(payload["feature_ref"], "feature_ref")
+    if "repository_identity" in payload:
+        repository = payload["repository_identity"]
+        if not repository.startswith("github:") or repository != repository.lower():
+            raise LedgerError(
+                "invalid-input",
+                "repository_identity must be canonical github:owner/repository",
+            )
+        if "feature_ref" in payload:
+            feature_repository = payload["feature_ref"].split("#", 1)[0]
+            if repository != f"github:{feature_repository}":
+                raise LedgerError(
+                    "invalid-input",
+                    "feature_ref must belong to repository_identity",
+                )
+    return payload
+
+
+def assignment_checkpoint(path: Path, run_id: str, assignment_id: str,
+                          revision: int, input_path: Path) -> dict[str, Any]:
+    payload = assignment_input(input_path)
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        run = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if run is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if run["status"] != "active":
+            raise LedgerError("run-not-active", "assignment checkpoints require an active run")
+        current = db.execute(
+            "SELECT * FROM assignments WHERE run_id=? AND assignment_id=?",
+            (run_id, assignment_id),
+        ).fetchone()
+        feature_ref = payload.get("feature_ref") or (
+            current["feature_ref"] if current is not None else None
+        )
+        if feature_ref is not None and not db.execute(
+            "SELECT 1 FROM feature_claims "
+            "WHERE feature_ref=? AND run_id=? AND status='active'",
+            (feature_ref, run_id),
+        ).fetchone():
+            raise LedgerError(
+                "feature-claim-required",
+                f"run {run_id} has no active claim for Feature {feature_ref}",
+            )
+        if current is not None:
+            changed_identity = sorted(
+                field for field in IMMUTABLE_ASSIGNMENT_FIELDS
+                if field in payload and payload[field] != current[field]
+            )
+            if changed_identity:
+                raise LedgerError(
+                    "immutable-assignment-identity",
+                    f"cannot change assignment identity fields: {changed_identity}",
+                )
+        now = timestamp()
+        if current is None:
+            missing = REQUIRED_ASSIGNMENT_FIELDS - set(payload)
+            if missing:
+                raise LedgerError("invalid-input", f"missing fields: {sorted(missing)}")
+            if db.execute(
+                "SELECT 1 FROM assignments WHERE run_id=? AND feature_ref=? LIMIT 1",
+                (run_id, payload["feature_ref"]),
+            ).fetchone():
+                raise LedgerError(
+                    "feature-assignment-exists",
+                    f"Feature {payload['feature_ref']} already has an assignment in run {run_id}",
+                )
+            if revision != 0:
+                raise LedgerError("revision-conflict", "new assignment requires revision 0")
+            columns = ["run_id", "assignment_id", *payload, "revision", "created_at", "updated_at"]
+            values = [run_id, assignment_id, *payload.values(), 0, now, now]
+            db.execute(
+                f"INSERT INTO assignments ({','.join(columns)}) VALUES "
+                f"({','.join('?' for _ in values)})", values,
+            )
+            created = True
+        else:
+            if current["revision"] != revision:
+                raise LedgerError(
+                    "revision-conflict",
+                    f"expected revision {revision}, observed {current['revision']}",
+                )
+            changed = {key: value for key, value in payload.items() if current[key] != value}
+            if changed:
+                clauses = ",".join(f"{key}=?" for key in changed)
+                values = [*changed.values(), now, run_id, assignment_id, revision]
+                cursor = db.execute(
+                    f"UPDATE assignments SET {clauses},revision=revision+1,updated_at=? "
+                    "WHERE run_id=? AND assignment_id=? AND revision=?", values,
+                )
+                if cursor.rowcount != 1:
+                    raise LedgerError("revision-conflict", "assignment revision changed")
+            created = False
+        db.execute("COMMIT")
+        row = db.execute(
+            "SELECT * FROM assignments WHERE run_id=? AND assignment_id=?",
+            (run_id, assignment_id),
+        ).fetchone()
+        return {"created": created, "assignment": dict(row)}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def operation_begin(path: Path, run_id: str, assignment_id: str | None,
+                    action: str, subject: str) -> dict[str, Any]:
+    kebab(action, "action"); subject = text(subject, "subject_id")
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        run = db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        if run is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if run["status"] != "active":
+            raise LedgerError("run-not-active", "side effects require an active run")
+        if assignment_id and not db.execute(
+            "SELECT 1 FROM assignments WHERE run_id=? AND assignment_id=?",
+            (run_id, assignment_id),
+        ).fetchone():
+            raise LedgerError("assignment-not-found", f"assignment {assignment_id} was not found")
+        if assignment_id:
+            claimed = db.execute(
+                "SELECT 1 FROM assignments a JOIN feature_claims f "
+                "ON f.feature_ref=a.feature_ref AND f.run_id=a.run_id "
+                "WHERE a.run_id=? AND a.assignment_id=? AND f.status='active'",
+                (run_id, assignment_id),
+            ).fetchone()
+        else:
+            claimed = db.execute(
+                "SELECT 1 FROM feature_claims WHERE run_id=? AND status='active' LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if not claimed:
+            raise LedgerError("feature-claim-required", "side effect requires active Feature ownership")
+        current = db.execute(
+            "SELECT * FROM operations WHERE run_id=? AND action=? AND subject_id=?",
+            (run_id, action, subject),
+        ).fetchone()
+        if current:
+            if current["assignment_id"] != assignment_id:
+                raise LedgerError("operation-conflict", "subject belongs to another assignment")
+            db.execute("COMMIT")
+            return {"created": False, "operation": dict(current)}
+        operation_id, now = str(uuid.uuid4()), timestamp()
+        db.execute(
+            "INSERT INTO operations "
+            "(operation_id,run_id,assignment_id,action,subject_id,status,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,'pending',?,?)",
+            (operation_id, run_id, assignment_id, action, subject, now, now),
+        )
+        db.execute("COMMIT")
+        row = db.execute("SELECT * FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+        return {"created": True, "operation": dict(row)}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def operation_finish(path: Path, operation_id: str, status: str,
+                     receipt: str | None, readback: str | None) -> dict[str, Any]:
+    if status not in FINAL_OPERATION_STATES:
+        raise LedgerError("invalid-input", f"invalid operation status: {status}")
+    receipt = receipt.strip() if receipt and receipt.strip() else None
+    readback = readback.strip() if readback and readback.strip() else None
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute(
+            "SELECT * FROM operations WHERE operation_id=?", (operation_id,)
+        ).fetchone()
+        if not current:
+            raise LedgerError("operation-not-found", f"operation {operation_id} was not found")
+        if current["status"] == "unknown" and receipt is None:
+            receipt = current["receipt_ref"]
+        if readback is None or status in {"applied", "unknown"} and receipt is None:
+            raise LedgerError(
+                "operation-evidence-required",
+                "every result requires authoritative readback; applied and unknown also require a receipt",
+            )
+        if current["status"] != "pending":
+            if (current["status"], current["receipt_ref"], current["readback_ref"]) == (
+                status, receipt, readback
+            ):
+                db.execute("COMMIT")
+                return {"changed": False, "operation": dict(current)}
+            if current["status"] != "unknown" or status == "unknown":
+                raise LedgerError("operation-conflict", "definitive operation result is immutable")
+        cursor = db.execute(
+            "UPDATE operations SET status=?,receipt_ref=?,readback_ref=?,updated_at=? "
+            "WHERE operation_id=? AND status=?",
+            (status, receipt, readback, timestamp(), operation_id, current["status"]),
+        )
+        if cursor.rowcount != 1:
+            raise LedgerError("operation-conflict", "operation completion raced")
+        db.execute("COMMIT")
+        row = db.execute("SELECT * FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+        return {"changed": True, "operation": dict(row)}
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
+def capabilities() -> dict[str, Any]:
+    return {
+        "database_schema": SCHEMA_VERSION,
+        "json_envelope": {"schema": ENVELOPE, "schema_version": ENVELOPE_VERSION},
+        "journal_mode": "wal", "busy_timeout_ms": TIMEOUT_MS, "migrations": False,
+        "reset_confirmation": RESET_TOKEN, "tables": sorted(TABLE_COLUMNS),
+        "command_families": ["state", "run", "feature", "assignment", "operation"],
+    }
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(description=__doc__)
+    root.add_argument("--version", action="version", version=CLI_VERSION)
+    root.add_argument("--json", action="store_true", help="emit stable JSON")
+    root.add_argument("--db", type=Path, default=DEFAULT_DB, help="ledger database path")
+    commands = root.add_subparsers(dest="command", required=True)
+    commands.add_parser("capabilities", help="show the static contract")
+    commands.add_parser("doctor", help="inspect readiness without writing")
+
+    state = commands.add_parser("state").add_subparsers(dest="state_command", required=True)
+    state.add_parser("prepare", help="create or verify the current schema")
+    reset_parser = state.add_parser("reset", help="drop and recreate the resolved ledger")
+    reset_parser.add_argument("--confirm", required=True, help=f"must be {RESET_TOKEN}")
+
+    run = commands.add_parser("run").add_subparsers(dest="run_command", required=True)
+    start = run.add_parser("start"); start.add_argument("--run-id", required=True); start.add_argument("--orchestrator-task-id", required=True)
+    show = run.add_parser("show"); show.add_argument("--run-id", required=True)
+    checkpoint = run.add_parser("checkpoint"); checkpoint.add_argument("--run-id", required=True); checkpoint.add_argument("--expected-revision", type=int, required=True); checkpoint.add_argument("--status", required=True); checkpoint.add_argument("--checkpoint", required=True)
+
+    feature = commands.add_parser("feature").add_subparsers(dest="feature_command", required=True)
+    claim = feature.add_parser("claim"); claim.add_argument("--run-id", required=True); claim.add_argument("--input", type=Path, required=True)
+    release = feature.add_parser("release"); release.add_argument("--run-id", required=True); release.add_argument("--input", type=Path, required=True)
+
+    assignment = commands.add_parser("assignment").add_subparsers(dest="assignment_command", required=True)
+    assignment_checkpoint_parser = assignment.add_parser("checkpoint")
+    assignment_checkpoint_parser.add_argument("--run-id", required=True); assignment_checkpoint_parser.add_argument("--assignment-id", required=True); assignment_checkpoint_parser.add_argument("--expected-revision", type=int, required=True); assignment_checkpoint_parser.add_argument("--input", type=Path, required=True)
+
+    operation = commands.add_parser("operation").add_subparsers(dest="operation_command", required=True)
+    begin = operation.add_parser("begin"); begin.add_argument("--run-id", required=True); begin.add_argument("--assignment-id"); begin.add_argument("--action", required=True); begin.add_argument("--subject-id", required=True)
+    finish = operation.add_parser("finish"); finish.add_argument("--operation-id", required=True); finish.add_argument("--status", required=True); finish.add_argument("--receipt-ref"); finish.add_argument("--readback-ref")
+    return root
+
+
+def dispatch(args: argparse.Namespace, path: Path) -> dict[str, Any]:
+    route = (args.command, getattr(args, f"{args.command}_command", None))
+    if args.command == "capabilities": return capabilities()
+    if args.command == "doctor": return doctor(path)
+    if route == ("state", "prepare"): return prepare(path)
+    if route == ("state", "reset"): return reset(path, args.confirm)
+    if route == ("run", "start"): return run_start(path, args.run_id, args.orchestrator_task_id)
+    if route == ("run", "show"): return run_show(path, args.run_id)
+    if route == ("run", "checkpoint"): return run_checkpoint(path, args.run_id, args.expected_revision, args.status, args.checkpoint)
+    if route == ("feature", "claim"): return feature_claim(path, args.run_id, args.input)
+    if route == ("feature", "release"): return feature_release(path, args.run_id, args.input)
+    if route == ("assignment", "checkpoint"): return assignment_checkpoint(path, args.run_id, args.assignment_id, args.expected_revision, args.input)
+    if route == ("operation", "begin"): return operation_begin(path, args.run_id, args.assignment_id, args.action, args.subject_id)
+    if route == ("operation", "finish"): return operation_finish(path, args.operation_id, args.status, args.receipt_ref, args.readback_ref)
+    raise LedgerError("unsupported-command", "command is not implemented")
+
+
+def output(command: str, result: dict[str, Any] | None, error: LedgerError | None,
+           json_mode: bool) -> None:
+    payload = {
+        "schema": ENVELOPE, "schema_version": ENVELOPE_VERSION, "ok": error is None,
+        "command": command, "cli_version": CLI_VERSION,
+        "runtime_contract_version": CONTRACT_VERSION,
+    }
+    if error: payload["error"] = {"code": error.code, "message": str(error)}
+    else: payload["result"] = result
+    if json_mode:
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+    elif error:
+        print(f"{command}: {error.code}: {error}", file=sys.stderr)
+    else:
+        print(f"{command}: ok")
+        for key, value in (result or {}).items(): print(f"{key}: {value}")
+
+
+def main() -> int:
+    args = parser().parse_args()
+    command = " ".join(
+        value for value in (
+            args.command, getattr(args, "state_command", None),
+            getattr(args, "run_command", None), getattr(args, "assignment_command", None),
+            getattr(args, "feature_command", None), getattr(args, "operation_command", None),
+        ) if value
+    )
+    try:
+        output(command, dispatch(args, safe_path(args.db)), None, args.json)
+        return 0
+    except LedgerError as error:
+        output(command, None, error, args.json)
+        return 2
+    except sqlite3.Error as error:
+        output(command, None, LedgerError("sqlite-error", str(error)), args.json)
+        return 3
+    except OSError as error:
+        output(command, None, LedgerError("filesystem-error", str(error)), args.json)
+        return 4
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

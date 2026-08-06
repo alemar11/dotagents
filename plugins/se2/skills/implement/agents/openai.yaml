@@ -1,7 +1,0 @@
-interface:
-  display_name: "🛠️ Implement Features"
-  short_description: "Implement Feature Plan Sets with Workers and optional support."
-  brand_color: "#BE185D"
-  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Feature Plan Sets, verify the sibling Feature registry and each same-parent Macro Task registry, derive transient execution units per Feature, create one isolated Feature Worker and one PR per implementation-eligible Feature, use Feature-level blocked_by only as scheduling context, justify stacks only from real same-repository code dependencies, keep functional-order and cross-repository work standalone, derive each PR closing set from its own parent Feature plus its own Macro Tasks, optionally use bounded delegated support when live capability and capacity are observed, otherwise continue serially in the parent, require exact-HEAD acceptance and review evidence, surface product-level contradictions to the user, and return verified topology or a fail-closed blocker."
-policy:
-  allow_implicit_invocation: false
