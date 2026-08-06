@@ -19,7 +19,7 @@ loaded only when their scope or `Read when` condition applies.
 5. Read `project-context/adr/index.md` when it exists, then the relevant ADRs.
 
 The current Git repository is the default selected root. Explicit user scope or
-a validated linked Feature Spec Set may authorize additional repository
+a validated linked Feature Plan set may authorize additional repository
 identities, but a composed caller must supply candidate local Git roots and
 verify each root against exactly one identity. Reject extra or unmatched roots.
 Never fabricate a path from a hosted ref, saved project, common parent, or path

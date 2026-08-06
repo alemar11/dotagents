@@ -1,7 +1,7 @@
 # Idea Source Handoff
 
 This reference owns the transient source artifact that an explicit Idea
-capture may hand to a later Feature planning run. It is not a Feature Spec and
+capture may hand to a later Feature planning run. It is not a Feature Plan and
 does not authorize an automatic skill invocation.
 
 ## Canonical shape
@@ -27,7 +27,7 @@ The artifact may contain only these fields:
 ## Excluded fields
 
 The artifact must not contain Feature outcome, non-goals, requirements,
-acceptance criteria, allowed paths, validation policy, Tasks, dependency IDs,
+acceptance criteria, allowed paths, validation policy, execution units, dependency IDs,
 implementation plans, readiness claims, or durable project-memory content.
 
 ## Lifecycle
@@ -38,4 +38,4 @@ Idea may be verified, but the handoff remains transient.
 
 When Feature Intake receives this artifact, it keeps source_route as
 new-source, reloads repository context, preserves open questions as
-clarification evidence, and derives all Feature and Task fields independently.
+clarification evidence, and derives all Feature Plan fields independently.

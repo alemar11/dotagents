@@ -11,9 +11,9 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, Feature, Implement, and Audit workflow graphs. Feature keeps its separate
-  Feature/Task dependency DAG; the Implement workflow consumes that DAG without
-  becoming or rewriting it.
+  Idea, Feature, Implement, and Audit workflow graphs. Feature owns the textual
+  Feature Plan graph; Implement derives its execution units and runtime graph
+  from that plan.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
 - references/workflow-contract.md owns the Idea hosted shape, while
@@ -47,12 +47,12 @@ Its skills are deliberately separated by responsibility:
   to planner, orchestrator, and Feature Worker tasks, with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
   metadata.
-- skills/implement/ accepts one or more complete authoritative GitHub Features
-  and returns a verified standalone or stacked PR topology. Its graph owns
-  multi-Feature scheduling, a separate delivery projection, one isolated Sol
-  Feature Worker and one PR per implementation-eligible Feature, serial Task-DAG
-  execution inside that Feature worktree, exact-HEAD in-session review, Contract Repair through Feature
-  maintenance, stack reconciliation, and final exact-HEAD evidence. A stack
+- skills/implement/ accepts one or more complete authoritative GitHub Feature
+  Plans and returns a verified standalone or stacked PR topology. Its graph
+  owns multi-Feature scheduling, derives execution units from each textual
+  plan, creates one isolated Sol Feature Worker and one PR per
+  implementation-eligible plan member, performs exact-HEAD in-session review,
+  and handles stack reconciliation and final exact-HEAD evidence. A stack
   represents a true same-repository code dependency, never serialization alone;
   G owns PR publication and pairwise stack linking, while Send remains agnostic
   about whether an explicit PR base participates in a stack. GitHub interaction is
@@ -61,11 +61,11 @@ Its skills are deliberately separated by responsibility:
   `g:github-delivery-status` contract; `ready` and
   `ready-with-manual-action` are accepted without granting Implement any merge,
   auto-merge, bypass, or queue authority.
-  Feature and Task acceptance criteria use stable bracketed IDs rather than
-  Markdown checkbox state; Feature Workers bind every Task criterion to the
-  same final Feature candidate HEAD and the orchestrator aggregates Feature
-  coverage without rewriting issue bodies. Zero-delta Features route through
-  Contract Repair and never receive empty commits, cosmetic edits, or empty PRs.
+  Feature acceptance criteria use stable bracketed IDs rather than Markdown
+  checkbox state; Feature Workers bind every Feature criterion to the same
+  final candidate HEAD and the orchestrator aggregates plan evidence without
+  rewriting the plan. Product-level plan contradictions are surfaced to the
+  user; ordinary technical interpretation does not relaunch Feature.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.
@@ -81,23 +81,22 @@ Its skills are deliberately separated by responsibility:
   belong only to the separate Implement workflow.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
-- the prototype consolidates caller-proposed same-repository Feature splits
-  that lack exclusive observable outcomes, then returns one minimal Feature
-  plus vertical Task dependency graphs, including multi-repository Feature
-  links and local dependency waves, without implementing code. Acceptance
-  criteria are ordinary list items with stable
-  `F-AC-NN` and `T-AC-NN` identities and explicit coverage. Feature publishes
-  through an explicit terminal
-  preview/publish subgraph with publish as the default and preview only by
-  explicit request. Hosted publication requires the G preflight and
-  read-after-write verification; the explicit SE2 request implicitly
-  authorizes the exact in-scope GitHub writes.
-- Feature maintenance is an alternate entry into the same graph: it rehydrates
-  the current Feature/Task bundle, reconciles it, and emits a lateral Feature
-  changelog comment for each significant published change.
+- the prototype analyzes one or more source issues, runs optional bounded
+  read-only analysts and an independent critic when delegation is available,
+  presents one consolidated batch of material questions, and returns one
+  textual Feature Plan per repository-owned outcome. Acceptance criteria are
+  ordinary list items with stable `F-AC-NN` identities. Feature publishes the
+  plan through one publication adapter by default; explicit preview remains
+  local and non-durable. Hosted publication requires G preflight and
+  read-after-write verification.
+- Feature maintenance is an alternate entry into the same plan graph:
+  it rehydrates the existing plan, reconciles an explicit indication, and
+  republishes the revised plan when requested. It does not rehydrate or
+  repair Implement execution units.
 - task-managed Feature and Implement runs pass their skill-owned profiles to
   the shared preflight; task creation scope and GitHub mutation scope remain
-  independent, with no runtime fallback for a missing required role.
+  independent. Feature delegation is optional and falls back to serial
+  planner analysis, while the principal planner role remains required.
 - Idea, Feature, and Implement keep local control-plane records separate from
   hosted artifacts and apply one shared portable-content gate immediately
   before each hosted write, including content returned by workers and tools.

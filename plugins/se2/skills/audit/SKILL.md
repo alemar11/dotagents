@@ -103,7 +103,7 @@ flowchart TD
 ~~~
 
 The `refresh` loop is intentional: it represents monitoring over time, not an
-implementation Task DAG. Terminal nodes have no outgoing transitions.
+implementation execution graph. Terminal nodes have no outgoing transitions.
 
 ## Cohort discovery and attribution
 

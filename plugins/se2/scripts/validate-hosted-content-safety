@@ -30,7 +30,7 @@ for relative in \
   skills/feature/SKILL.md \
   skills/implement/SKILL.md \
   skills/idea/references/publishing.md \
-  skills/feature/steps/mutate.md \
+  skills/feature/steps/plan-publication.md \
   skills/feature/templates/maintenance-changelog.md \
   skills/implement/references/review-delivery.md \
   skills/implement/references/orchestration.md; do
@@ -48,8 +48,7 @@ fi
 
 hosted_templates=(
   "$plugin_root/skills/idea/references/idea-template.md"
-  "$plugin_root/skills/feature/templates/feature.md"
-  "$plugin_root/skills/feature/templates/task.md"
+  "$plugin_root/skills/feature/templates/plan.md"
   "$plugin_root/skills/feature/templates/maintenance-changelog.md"
 )
 

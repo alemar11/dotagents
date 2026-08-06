@@ -1,7 +1,7 @@
 interface:
   display_name: "📚 Feature Planning"
-  short_description: "Consolidate a feature and derive ready tasks."
+  short_description: "Analyze issues and publish a clear Feature Plan."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:feature for an explicit repository-scoped Feature graph run; consolidate caller-proposed splits into the smallest independently deliverable Feature boundary, derive stable acceptance criteria and vertical Task dependencies, support maintenance through the same graph, and return the complete bundle without implementing code."
+  default_prompt: "Use $se2:feature for an explicit Feature Plan run; analyze one or more source issues, use bounded read-only analysts and an independent critic when delegation is available, present one consolidated batch of material questions, converge repository-owned plan members, and publish the complete textual plan by default without deriving implementation units or writing code."
 policy:
   allow_implicit_invocation: false

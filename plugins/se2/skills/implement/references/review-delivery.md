@@ -1,16 +1,20 @@
 # Implement Review And Delivery
 
-This reference owns exact-HEAD Feature Worker-session review, PR publication, provider
-review monitoring, and final exact-HEAD evidence.
+This reference owns exact-HEAD Feature Worker-session review, PR publication,
+provider review monitoring, and final exact-HEAD evidence.
 
 ## Candidate boundary
 
 The Feature Worker operates only in its application-managed worktree. After it
-implements every Task in the Feature, validates the complete Feature, and
-commits, freeze one candidate with exact repository, base
-branch, base SHA, head branch, and full head SHA. The worktree must be clean and
-pinned to that candidate before review. Do not create a reviewer task or a
-second review worktree.
+implements every derived execution unit for one Feature Plan member, validates
+the complete outcome, and commits, freeze one candidate with exact repository,
+base branch, base SHA, head branch, and full head SHA. The worktree must be
+clean and pinned to that candidate before review. Do not create a reviewer task
+or a second review worktree.
+
+Execution-unit criteria are transient Implement evidence. The authoritative
+requirements remain the current published plan and its stable F-AC-NN criteria;
+no hosted Task issue set or T-AC-NN registry is required.
 
 For a dependency-bearing assignment, also freeze the exact prerequisite HEAD
 vector and prove every member is an ancestor of the candidate. The candidate's
@@ -20,8 +24,8 @@ prerequisite PR being ready is not sufficient proof.
 Freeze one transient delivery record before review. A standalone candidate uses
 the verified default branch. A stacked candidate names exactly one immediate
 parent assignment and PR, the parent head branch, the exact parent candidate
-SHA used as `base_sha`, and its bottom-to-top position. Do not infer a parent
-from branch naming, issue order, display metadata, or operational serialization.
+SHA used as base_sha, and its bottom-to-top position. Do not infer a parent from
+branch naming, plan order, display metadata, or operational serialization.
 
 ## Git and GitHub operation ownership
 
@@ -36,19 +40,19 @@ result. Every run must continue through the authoritative hosted source and
 verified PR-delivery path.
 
 Before every hosted write in this reference, load and apply the shared
-[hosted-content-safety.md](../../../references/hosted-content-safety.md) to the
-exact final title/body, comment, reply, review text, or review request. This
-includes Feature Worker- and tool-originated content. A typed review request with only
-its required portable marker and full SHA still passes the same final gate.
+hosted-content-safety.md contract to the exact final title/body, comment,
+reply, review text, or review request. This includes Feature Worker- and
+tool-originated content. A typed review request with only its required
+portable marker and full SHA still passes the same final gate.
 
 | Operation | Semantic owner | Required authority and readback |
 | --- | --- | --- |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; Feature Worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Feature-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; Feature Worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
-| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and branch and Task-only `closing_issue_refs`; read back repository, base, branch, full PR HEAD, URL, canonical closing lines, `closingIssuesReferences`, and draft state. |
+| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository, plan-member publication scope, and optional closing_issue_refs; read back repository, base, branch, full PR HEAD, URL, body, closingIssuesReferences, and draft state. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
-| Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | `$g:github-delivery-status` | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
+| Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | $g:github-delivery-status | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
 | Hosted Codex review and actionable review-thread observation | G-owned review workflow | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
 | Merge, deploy, release, or post-merge closure | No Implement owner; outside this skill | Never perform these operations as part of Implement completion. |
 
@@ -60,55 +64,58 @@ reconciled independently.
 ## Native review loop
 
 Before review, independently verify Feature Worker/worktree identity, candidate
-cleanliness, base and prerequisite ancestry, and exact full SHA. The Feature Worker
-runs the available native code-review capability in the same session against
-the declared base using its resolved Sol reasoning level. The required outcome
-is an independently reported exact-HEAD finding set or clean result; the skill
-does not encode an application operation or interface.
+cleanliness, base and prerequisite ancestry, and exact full SHA. The Feature
+Worker runs the available native code-review capability in the same session
+against the declared base using its resolved Sol reasoning level. The required
+outcome is an independently reported exact-HEAD finding set or clean result;
+the skill does not encode an application operation or interface.
 
-Bind every finding and clean result to the exact candidate SHA. The Feature Worker
-decides whether a finding is actionable, owns every fix, reruns validation, and
-creates a new candidate. Any new HEAD invalidates the previous review evidence;
-run a new review cycle in the same Feature Worker session against the new exact SHA.
+Bind every finding and clean result to the exact candidate SHA. The Feature
+Worker decides whether a finding is actionable, owns every fix, reruns
+validation, and creates a new candidate. Any new HEAD invalidates the previous
+review evidence; run a new review cycle in the same Feature Worker session
+against the new exact SHA.
 
 ## PR publication
 
 Publish only after native review is clean and the exact publication scope is
 resolved from the explicit Implement request.
 
-Before constructing the PR body, derive one exact `closing_issue_refs` set from
-the authoritative assignment and current candidate evidence:
+The default closing_issue_refs set for a Feature Plan implementation is empty.
+The published Feature Plan remains open as the durable product record; the PR
+body may identify it as the plan source without implicitly closing it. If the
+explicit Implement request authorizes issue closure, derive one exact set from
+that request and the current plan-member evidence:
 
-- include every Task issue in this Feature; each Task's complete accepted scope
-  and current `T-AC-NN` set must be satisfied by the same candidate;
-- exclude every Feature and Idea issue even when all of its Tasks are complete;
-  Implement delivery intentionally leaves the owning Feature open;
-- reject a missing, extra, duplicate, partially satisfied, or repository-
-  ambiguous Task ref instead of silently publishing without closure linkage;
-- never treat a narrative `Task #N`, `Feature #N`, `Related to`, or
-  `## References` entry as a substitute for a closing keyword.
+- every requested ref must be a real, repository-unambiguous plan or source
+  issue in the declared publication scope;
+- reject a missing, extra, duplicate, or ambiguous ref instead of silently
+  changing closure semantics;
+- never invent hosted Task refs, T-AC-NN identifiers, or closure obligations
+  from narrative plan text;
+- never close an Idea or unrelated source issue unless the explicit request
+  names that exact mutation.
 
-Pass the verified nonempty set unchanged to the G-owned single-PR publication
-workflow. G renders one canonical `Closes` line per Task under `## Issues` and
-reads back the exact body and `closingIssuesReferences` set. The delivery mode,
-not Send, determines the intended base: a standalone candidate uses the
-verified default branch, while a stacked child uses the verified parent branch.
-Keep the exact Task closure set on every PR; a non-default child is not blocked
-merely because it carries those references.
+Pass the verified set unchanged to the G-owned single-PR publication workflow.
+G renders the canonical closing lines, if any, and reads back the exact body
+and closingIssuesReferences set. An empty set is a valid default and must
+remain empty on readback. The delivery mode, not Send, determines the intended
+base: a standalone candidate uses the verified default branch, while a stacked
+child uses the verified parent branch.
 
-Apply the shared hosted-content safety gate to the exact final PR title and body
-immediately before publication. Use the G-owned single-PR publication workflow
-to push the committed candidate and create or reuse a draft PR. Independently
-read back repository, base, branch, full PR HEAD, URL, body, draft state, and
-GitHub `closingIssuesReferences`. Require the read-back closing issue set to
-equal `closing_issue_refs` exactly and require every canonical Task `Closes`
-line exactly once. The PR HEAD must equal the reviewed candidate HEAD.
+Apply the shared hosted-content safety gate to the exact final PR title and
+body immediately before publication. Use the G-owned single-PR publication
+workflow to push the committed candidate and create or reuse a draft PR.
+Independently read back repository, base, branch, full PR HEAD, URL, body,
+draft state, and GitHub closingIssuesReferences. Require the read-back closing
+issue set to equal closing_issue_refs exactly. The PR HEAD must equal the
+reviewed candidate HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
 PR base. Use the G-owned single-PR publication workflow to publish only the
 current Feature Worker branch, then invoke the separate G-owned pairwise
 stack-link workflow with the already verified parent/current PR identities.
-Preserve the parent identity and `stack_link_receipt` from that separate
+Preserve the parent identity and stack_link_receipt from that separate
 operation. Do not use a stack-wide publication, push, sync, rebase, or merge
 operation from normal publication, and never install a missing stack dependency
 implicitly.
@@ -119,18 +126,19 @@ is consultative and never satisfies the ready cycle.
 
 ## Stack reconciliation
 
-After a stacked publication and separate stack-link operation, the orchestrator independently verifies the exact
-repository, parent and child PR identities, unchanged draft states, child base,
-both full heads, immediate parent relationship, stack order, and link receipt.
-The child base must equal the parent head branch, the live parent head must equal
-the frozen `base_sha`, and the child head must equal the reviewed candidate.
+After a stacked publication and separate stack-link operation, the orchestrator
+independently verifies the exact repository, parent and child PR identities,
+unchanged draft states, child base, both full heads, immediate parent
+relationship, stack order, and link receipt. The child base must equal the
+parent head branch, the live parent head must equal the frozen base_sha, and
+the child head must equal the reviewed candidate.
 
 Treat a confirmed child PR and an unverified stack link as separate effects.
 Preserve successful publication evidence, record an ambiguous link as unknown,
 and reconcile authoritative provider state before any repair. Never recreate or
 repush the child merely because stack readback failed. A proven stale base or
-parent HEAD returns the same child Feature Worker to implementation; an unreconciled
-link blocks only that assignment while independent work continues.
+parent HEAD returns the same child Feature Worker to implementation; an
+unreconciled link blocks only that assignment while independent work continues.
 
 ## Hosted review monitoring
 
@@ -138,25 +146,23 @@ The first hosted Codex review and every later re-review have different trigger
 lineages. Keep them separate:
 
 1. After the G-owned draft-to-ready transition, persist its exact typed ready
-   receipt and invoke the G-owned `ready-wait` operation for the published full
+   receipt and invoke the G-owned ready-wait operation for the published full
    PR HEAD. This observes the automatic review configured for a PR opened for
-   review and never posts `@codex review`. Do not invoke `reviews request` for
-   this initial cycle.
+   review and never posts an explicit review request for this initial cycle.
 2. Accept only G-normalized current-head terminal evidence. A clean formal
    review, authenticated terminal comment, or clean provider reaction may be a
    clean outcome; actionable inline or terminal findings return the assignment
-   to the same Feature Worker. Absence of comments, zero unresolved
-   threads, zero CI checks, or a generic `not-requested` observation is not a
-   clean result.
-3. After findings, the Feature Worker fixes and validates, creates a new candidate,
-   repeats native review, and publishes the new exact HEAD to the existing PR.
-   Only then invoke the G-owned `request` operation with a new request key,
-   persist its exact request receipt, and invoke `wait` against that same full
-   SHA. Repeat this fix, publish, explicit-request, and wait cycle until the
-   current full PR HEAD has a clean terminal result.
+   to the same Feature Worker. Absence of comments, zero unresolved threads,
+   zero CI checks, or a generic not-requested observation is not a clean result.
+3. After findings, the Feature Worker fixes and validates, creates a new
+   candidate, repeats native review, and publishes the new exact HEAD to the
+   existing PR. Only then invoke the G-owned request operation with a new
+   request key, persist its exact request receipt, and invoke wait against that
+   same full SHA. Repeat this fix, publish, explicit-request, and wait cycle
+   until the current full PR HEAD has a clean terminal result.
 
-Monitor `$g:github-delivery-status` and actionable review threads alongside
-that provider-review cycle. Bind every delivery-status observation to the exact
+Monitor $g:github-delivery-status and actionable review threads alongside that
+provider-review cycle. Bind every delivery-status observation to the exact
 published full HEAD. Pending, timed-out, stale, ambiguous, draft-only,
 missing-ready-receipt, request-correlation, or incomplete provider evidence is
 not terminal. One bounded wait may return a pending state at its caller-owned
@@ -167,37 +173,38 @@ resetting the existing lineage.
 For a stacked child, also monitor the immediate parent PR and base relationship.
 Any parent HEAD or readiness change invalidates the child's ancestry, review,
 CI, and readiness evidence even when the child head itself did not move. Wait
-for the parent to pass final verification, then require the child Feature Worker to
-rebase onto the new parent HEAD and repeat its complete candidate cycle.
+for the parent to pass final verification, then require the child Feature Worker
+to rebase onto the new parent HEAD and repeat its complete candidate cycle.
 
 If hosted review produces an actionable finding, preserve its exact provider,
 PR, head, artifact, and observation fingerprint when returning it to the same
-Feature Worker. Never force-push, merge, enqueue, deploy, release, or
-perform post-merge closure.
+Feature Worker. Never force-push, merge, enqueue, deploy, release, or perform
+post-merge closure.
 
 ## Provider delivery status
 
 After publication and again during final verification, invoke
-`$g:github-delivery-status` with the exact repository, PR, and full candidate
+$g:github-delivery-status with the exact repository, PR, and full candidate
 HEAD. Accept only these current-head dispositions:
 
 - `ready`: GitHub reports the PR technically mergeable with observed required
-  provider gates satisfied; record `merge_boundary=none`;
+  provider gates satisfied; record merge_boundary=none;
 - `ready-with-manual-action`: the same evidence is satisfied and G attributes
   the remaining provider boundary to a restricted manual branch update; record
-  `merge_boundary=manual`.
+  merge_boundary=manual.
 
 Treat `pending`, `blocked`, `conflicting`, and `unknown`, a head mismatch, or
 incomplete evidence as non-ready. Return repairable current-HEAD mismatches to
-the same Feature Worker only when implementation evidence must change; otherwise keep
-the orchestrator in bounded provider monitoring or report the provider blocker.
-Do not reinterpret raw GitHub `mergeStateStatus` values inside Implement.
+the same Feature Worker only when implementation evidence must change;
+otherwise keep the orchestrator in bounded provider monitoring or report the
+provider blocker. Do not reinterpret raw GitHub mergeStateStatus values inside
+Implement.
 
 Repository auto-merge capability, an existing PR auto-merge request, and a
-merge-queue entry remain reported automation facts. They neither block
-delivery readiness nor grant authority. Implement must not enable, disable,
-enqueue, dequeue, bypass, or merge, even when the current actor has permission.
-If another actor merges or closes the PR during the run, observe the changed
+merge-queue entry remain reported automation facts. They neither block delivery
+readiness nor grant authority. Implement must not enable, disable, enqueue,
+dequeue, bypass, or merge, even when the current actor has permission. If
+another actor merges or closes the PR during the run, observe the changed
 lifecycle, stop normal delivery reconciliation, and report the external event
 without post-merge work.
 
@@ -205,51 +212,47 @@ without post-merge work.
 
 The orchestrator performs read-only final verification. Require:
 
-- exact Feature and Task refs and current accepted contract generation;
-- exact current `F-AC-NN` and `T-AC-NN` sets with no missing, duplicate,
-  malformed, or ambiguous IDs;
-- authoritative hosted Feature coverage and monotonic Feature/Task acceptance
+- exact Feature Plan refs, repository members, current plan revision, and
+  complete hosted readback;
+- exact current F-AC-NN set with no missing, duplicate, malformed, or
+  ambiguous IDs;
+- authoritative hosted plan coverage and monotonic Feature acceptance
   high-water marks consistent with every current criterion ID;
 - Feature Worker task/project/worktree identity;
 - clean implementation worktree and exact current HEAD;
-- a complete acceptance matrix for every Task in the Feature whose every
-  `T-AC-NN` is `verified` by evidence bound to the same exact current candidate
-  HEAD;
+- a complete acceptance matrix for every F-AC-NN whose evidence is bound to
+  the same exact current candidate HEAD;
 - current-head validation and native review evidence;
 - PR publication readback and exact PR HEAD equality;
-- exact Task-only `closing_issue_refs`, one canonical `Closes` line per Task,
-  and an equal GitHub `closingIssuesReferences` set, with no Feature or Idea
-  issue present;
-- `standalone` default-base evidence, or stacked parent identity, unchanged
+- the exact optional closing_issue_refs set and equal GitHub
+  closingIssuesReferences set, with no unrequested source closure;
+- standalone default-base evidence, or stacked parent identity, unchanged
   parent HEAD, exact child base, stack order, and verified link receipt;
 - ready-transition receipt plus a clean current-head automatic-review
   certificate for an unchanged initial HEAD, or the latest explicit-request
   receipt plus its clean current-head review result after one or more fix
   pushes;
-- a complete current-head `$g:github-delivery-status` certificate whose
+- a complete current-head $g:github-delivery-status certificate whose
   disposition is `ready` or `ready-with-manual-action`, plus zero unresolved
   actionable review threads.
 
-After every required Task passes these checks, aggregate each `F-AC-NN`
-through the authoritative Feature-to-Task-and-Task-criterion coverage map.
-Require every owning `T-AC-NN` row to remain verified at the Feature candidate
-SHA and retain that exact SHA. Any uncovered, unverified,
-blocked, stale, or ambiguous criterion prevents delivery readiness. This
-acceptance verification is evidence-only and never edits the Feature or Task
-issue body.
+Aggregate every current F-AC-NN through the Feature Worker evidence map and
+retain the exact candidate SHA. Any uncovered, unverified, blocked, stale, or
+ambiguous criterion prevents delivery readiness. This acceptance verification
+is evidence-only and never edits the Feature Plan.
 
-On recovery, use the assignment's stored `worker_task_id` and `candidate_sha`
-to reread the Feature Worker's final acceptance matrix. Accept it only when its
-Feature ref, complete Task-ref set, contract generation, and candidate SHA
-exactly match current authoritative state; task invisibility or drift
-invalidates the matrix.
+On recovery, use the assignment's stored worker_task_id and candidate_sha to
+reread the Feature Worker's final acceptance matrix. Accept it only when its
+Feature Plan ref, complete F-AC-NN set, plan revision, and candidate SHA
+exactly match current authoritative state. Plan drift or worker-report
+invisibility invalidates the matrix.
 
-Return repairable evidence mismatches to the Feature Worker without diagnosis. The
-Feature Worker owns repair and replacement evidence. Final verification never edits
-code, reruns review, mutates issues, or merges.
+Return repairable evidence mismatches to the Feature Worker without diagnosis.
+The Feature Worker owns repair and replacement evidence. Final verification
+never edits code, reruns review, mutates issues, or merges.
 
-Report a standalone PR as `standalone-ready` with its exact GitHub delivery
-disposition and `merge_boundary`. Report a child as `stack-ready`
-only when every lower parent in the selected chain is current and
-delivery-ready, while recognizing that the child is not independently
-mergeable ahead of those parents.
+Report a standalone PR as standalone-ready with its exact GitHub delivery
+disposition and merge_boundary. Report a child as stack-ready only when every
+lower parent in the selected chain is current and delivery-ready, while
+recognizing that the child is not independently mergeable ahead of those
+parents.

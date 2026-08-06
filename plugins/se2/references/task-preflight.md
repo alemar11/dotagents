@@ -22,7 +22,8 @@ The contract owns the common gates for task creation and observation:
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
 - repository and project destination verification;
-- recovery after an ambiguous effect.
+- recovery after an ambiguous effect;
+- optional runtime capabilities declared by the invoking skill.
 
 The invoking skill owns its task profile and topology. This contract contains
 no model, reasoning, worker, or topology default. GitHub issue planning and
@@ -58,10 +59,26 @@ Documentation, cached metadata, an earlier receipt, or a static validator is
 not evidence that a live capability is available. If creation, observation, or
 monitoring cannot be verified, fail closed before creating or retrying a task.
 
-The profile capability check is equally strict. If any required role is not
-supported by the live runtime, the preflight result is `blocked` with
-`blocker: unsupported-runtime`. There is no automatic model, reasoning, worker,
-or topology fallback.
+The profile capability check is equally strict for required roles. If any
+required role is not supported by the live runtime, the preflight result is
+`blocked` with `blocker: unsupported-runtime`. There is no automatic model,
+reasoning, or required-topology fallback. A skill may declare optional roles
+or optional capabilities with an explicit parent or serial fallback. Those
+facts must be recorded and must not be reported as delegated work unless a
+worker was actually started and independently observed.
+
+### Optional runtime capabilities
+
+When the invoking skill declares them, inspect delegation and goal capability
+once before the first optional effect. Record delegation as available,
+unavailable, or unknown, and record any observed worker capacity separately
+from workers that actually started. Delegation unavailability selects the
+skill-owned fallback and does not block a required parent task.
+
+Goal tools are also optional. When unavailable, preserve the skill's objective
+in its task or run report and continue. A resumable user-input wait must not be
+converted into a blocked goal merely because the goal runtime has no explicit
+unblock operation.
 
 For every role whose profile declares a deterministic display title, also
 inspect the live capability to request that title, observe it independently,
@@ -162,6 +179,11 @@ preflight:
     relay_final_update: available
     request_display_title: available
     adjust_display_title: available
+  optional_capabilities:
+    delegation: available
+    observed_worker_capacity: null
+    goals: available
+    effective_mode: parallel-analysis
   target:
     repository_identity: "<independently observed repository>"
     project_identity: "<independently observed project>"

@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "2.0.0"
-CONTRACT_VERSION = "2.0.0"
-SCHEMA_VERSION = 2
+CLI_VERSION = "3.0.0"
+CONTRACT_VERSION = "3.0.0"
+SCHEMA_VERSION = 3
 ENVELOPE = "se2-implement/ledger-envelope"
-ENVELOPE_VERSION = "2.0.0"
+ENVELOPE_VERSION = "3.0.0"
 RESET_TOKEN = "drop-and-recreate"
 TIMEOUT_MS = 5000
 DEFAULT_DB = Path.home() / ".cache/dotagents/plugins/se2/skills/implement/run-state.sqlite3"
@@ -40,8 +40,7 @@ FINAL_OPERATION_STATES = {"applied", "not-applied", "unknown", "blocked"}
 ASSIGNMENT_FIELDS = {
     "feature_ref", "repository_identity", "status", "checkpoint",
     "worker_task_id", "worker_project_id", "implementation_worktree",
-    "base_branch", "head_branch", "base_sha", "candidate_sha", "pr_url", "repair_id",
-    "contract_generation",
+    "base_branch", "head_branch", "base_sha", "candidate_sha", "pr_url",
 }
 REQUIRED_ASSIGNMENT_FIELDS = {
     "feature_ref", "repository_identity", "status", "checkpoint"
@@ -63,8 +62,8 @@ TABLE_COLUMNS = {
         "run_id", "assignment_id", "feature_ref",
         "repository_identity", "status", "checkpoint", "worker_task_id",
         "worker_project_id", "implementation_worktree", "base_branch", "head_branch",
-        "base_sha", "candidate_sha", "pr_url", "repair_id",
-        "contract_generation", "revision", "created_at", "updated_at",
+        "base_sha", "candidate_sha", "pr_url",
+        "revision", "created_at", "updated_at",
     ),
     "operations": (
         "operation_id", "run_id", "assignment_id", "action", "subject_id",
@@ -75,7 +74,7 @@ TABLE_COLUMNS = {
 SCHEMA_SQL = """
 CREATE TABLE runtime_metadata (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-  schema_version INTEGER NOT NULL CHECK (schema_version = 2),
+  schema_version INTEGER NOT NULL CHECK (schema_version = 3),
   runtime_contract_version TEXT NOT NULL,
   runtime_cli_version TEXT NOT NULL,
   runtime_artifact_sha256 TEXT NOT NULL
@@ -113,8 +112,6 @@ CREATE TABLE assignments (
   base_sha TEXT,
   candidate_sha TEXT,
   pr_url TEXT,
-  repair_id TEXT,
-  contract_generation INTEGER NOT NULL DEFAULT 1 CHECK (contract_generation >= 1),
   revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -492,13 +489,12 @@ def run_checkpoint(path: Path, run_id: str, revision: int, status: str,
                 raise LedgerError("assignments-not-ready", "complete requires verified assignments")
             if db.execute(
                 "SELECT 1 FROM assignments WHERE run_id=? "
-                "AND NOT ((status='delivery-ready' AND checkpoint='final-verify') "
-                "OR (status='contract-resolved' AND checkpoint='repair-readback')) LIMIT 1",
+                "AND NOT (status='delivery-ready' AND checkpoint='final-verify') LIMIT 1",
                 (run_id,),
             ).fetchone():
                 raise LedgerError(
                     "assignments-not-ready",
-                    "all assignments must be delivery-ready or authoritatively contract-resolved",
+                    "all assignments must be delivery-ready at final-verify",
                 )
             if db.execute(
                 "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
@@ -642,13 +638,12 @@ def feature_release(path: Path, run_id: str, input_path: Path) -> dict[str, Any]
             raise LedgerError("assignments-not-ready", "every Feature requires an assignment")
         if db.execute(
             "SELECT 1 FROM assignments WHERE run_id=? "
-            "AND NOT ((status='delivery-ready' AND checkpoint='final-verify') "
-            "OR (status='contract-resolved' AND checkpoint='repair-readback')) LIMIT 1",
+            "AND NOT (status='delivery-ready' AND checkpoint='final-verify') LIMIT 1",
             (run_id,),
         ).fetchone():
             raise LedgerError(
                 "assignments-not-ready",
-                "all assignments must be delivery-ready or authoritatively contract-resolved",
+                "all assignments must be delivery-ready at final-verify",
             )
         if db.execute(
             "SELECT 1 FROM operations WHERE run_id=? AND status IN ('pending','unknown') LIMIT 1",
@@ -692,13 +687,8 @@ def assignment_input(path: Path) -> dict[str, Any]:
             if not isinstance(payload[field], str):
                 raise LedgerError("invalid-input", f"{field} must be text")
             kebab(text(payload[field], field), field)
-    generation = payload.get("contract_generation")
-    if generation is not None and (
-        not isinstance(generation, int) or isinstance(generation, bool) or generation < 1
-    ):
-        raise LedgerError("invalid-input", "contract_generation must be an integer >= 1")
     for field, value in payload.items():
-        if field == "contract_generation" or value is None:
+        if value is None:
             continue
         if not isinstance(value, str):
             raise LedgerError("invalid-input", f"{field} must be text or null")
@@ -761,14 +751,6 @@ def assignment_checkpoint(path: Path, run_id: str, assignment_id: str,
                 raise LedgerError(
                     "immutable-assignment-identity",
                     f"cannot change assignment identity fields: {changed_identity}",
-                )
-            generation = payload.get("contract_generation", current["contract_generation"])
-            if generation not in {
-                current["contract_generation"], current["contract_generation"] + 1
-            }:
-                raise LedgerError(
-                    "invalid-contract-generation",
-                    "contract_generation may stay unchanged or advance by one",
                 )
         now = timestamp()
         if current is None:

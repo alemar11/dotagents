@@ -35,7 +35,7 @@ class RunStateTests(unittest.TestCase):
         version = subprocess.run(
             [str(SCRIPT), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "2.0.0")
+        self.assertEqual(version.stdout.strip(), "3.0.0")
         db = self.root / "nested/run-state.sqlite3"
         result = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertEqual(result["database_state"], "absent")
@@ -160,7 +160,7 @@ class RunStateTests(unittest.TestCase):
         missing = self.invoke(db, "run", "show", "--run-id", "run-1", check=False)
         self.assertEqual(self.payload(missing)["error"]["code"], "run-not-found")
 
-    def test_authoritatively_absorbed_feature_can_complete_without_pr(self) -> None:
+    def test_plan_question_assignment_cannot_release_claims(self) -> None:
         db = self.root / "run-state.sqlite3"
         self.invoke(db, "state", "prepare")
         self.invoke(db, "run", "start", "--run-id", "run-1",
@@ -175,8 +175,8 @@ class RunStateTests(unittest.TestCase):
         assignment.write_text(json.dumps({
             "feature_ref": "owner/repo#10",
             "repository_identity": "github:owner/repo",
-            "status": "contract-resolved", "checkpoint": "repair-readback",
-            "worker_task_id": "feature-worker-1", "repair_id": "repair-1",
+            "status": "plan-question", "checkpoint": "plan-question",
+            "worker_task_id": "feature-worker-1",
         }), encoding="utf-8")
         self.invoke(db, "assignment", "checkpoint", "--run-id", "run-1",
                     "--assignment-id", "feature-10", "--expected-revision", "0",
@@ -188,14 +188,13 @@ class RunStateTests(unittest.TestCase):
         release.write_text(json.dumps({"feature_claims": [{
             "feature_ref": "owner/repo#10", "expected_revision": 0
         }]}), encoding="utf-8")
-        self.invoke(db, "feature", "release", "--run-id", "run-1",
-                    "--input", str(release))
-        completed = self.payload(self.invoke(
-            db, "run", "checkpoint", "--run-id", "run-1",
-            "--expected-revision", "1", "--status", "complete",
-            "--checkpoint", "complete",
-        ))
-        self.assertEqual(completed["result"]["run"]["status"], "complete")
+        rejected = self.invoke(
+            db, "feature", "release", "--run-id", "run-1",
+            "--input", str(release), check=False,
+        )
+        self.assertEqual(
+            self.payload(rejected)["error"]["code"], "assignments-not-ready"
+        )
 
     def test_rejects_unsafe_database_name(self) -> None:
         result = self.invoke(self.root / "other.sqlite3", "doctor", check=False)
@@ -448,7 +447,7 @@ class RunStateTests(unittest.TestCase):
         )
         self.assertEqual(self.payload(invalid_sha)["error"]["code"], "invalid-input")
 
-    def test_assignment_identity_is_immutable_and_generation_is_monotonic(self) -> None:
+    def test_assignment_identity_is_immutable(self) -> None:
         db = self.root / "run-state.sqlite3"
         self.invoke(db, "state", "prepare")
         self.invoke(db, "run", "start", "--run-id", "run-1",
@@ -489,16 +488,6 @@ class RunStateTests(unittest.TestCase):
         self.assertEqual(
             self.payload(duplicate)["error"]["code"], "feature-assignment-exists"
         )
-        source.write_text(json.dumps({"contract_generation": 3}), encoding="utf-8")
-        skipped = self.invoke(
-            db, "assignment", "checkpoint", "--run-id", "run-1",
-            "--assignment-id", "assignment-1", "--expected-revision", "0",
-            "--input", str(source), check=False,
-        )
-        self.assertEqual(
-            self.payload(skipped)["error"]["code"], "invalid-contract-generation"
-        )
-
     def test_concurrent_operation_begin_and_finish_are_serialized(self) -> None:
         db = self.root / "run-state.sqlite3"
         self.invoke(db, "state", "prepare")

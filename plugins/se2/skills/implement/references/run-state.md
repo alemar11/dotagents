@@ -16,10 +16,10 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `2.0.0` |
-| Runtime contract | `2.0.0` |
-| Database schema | integer `2` |
-| JSON envelope | `se2-implement/ledger-envelope` version `2.0.0` |
+| CLI | `3.0.0` |
+| Runtime contract | `3.0.0` |
+| Database schema | integer `3` |
+| JSON envelope | `se2-implement/ledger-envelope` version `3.0.0` |
 
 The default database is:
 
@@ -67,26 +67,25 @@ Keep only five tables:
 - `runs`: one multi-Feature run, orchestrator identity, coarse checkpoint,
   aggregate status, and revision;
 - `feature_claims`: exclusive active ownership from one authoritative GitHub
-  Feature to one Implement run, with revision and explicit release state;
-- `assignments`: one immutable Feature ref, Feature Worker identity and worktree, branches,
-  SHAs, PR ref, repair identity, contract generation, checkpoint, status, and
-  revision;
+  Feature Plan to one Implement run, with revision and explicit release state;
+- `assignments`: one immutable Feature Plan ref, Feature Worker identity and
+  worktree, branches, SHAs, PR ref, plan-question identity, checkpoint, status,
+  and revision;
 - `operations`: one idempotency reservation for a side effect, its subject,
   status, receipt ref, and readback ref.
 
-Do not store Feature/Task bodies, prompts, messages, findings, logs, arbitrary
+Do not store plan bodies, prompts, messages, findings, logs, arbitrary
 JSON, model/reasoning profiles, code state, or Feature Worker technical state.
 
 Path claims are transient control-plane reservations, not a sixth ledger table.
-The orchestrator must normalize the union of every Task's `allowed_paths` in a
-Feature assignment, atomically claim the resulting envelope before Feature
-Worker bootstrap, and release or
-reconcile it at the assignment boundary. Never infer path ownership from an
-active Feature claim, a theoretical Feature wave, or a stale assignment
-checkpoint. On resume, independently re-read the authoritative bundle and
-current repository/base/HEAD evidence, then reacquire the path claim before
-execution. The five-table ledger remains a recovery index; it does not prove a
-live path claim.
+The orchestrator must normalize the union of the derived execution-unit path
+envelopes in a plan-member assignment, atomically claim the resulting envelope
+before Feature Worker bootstrap, and release or reconcile it at the assignment
+boundary. Never infer path ownership from an active plan claim, a theoretical
+wave, or a stale assignment checkpoint. On resume, independently reread the
+authoritative plan and current repository/base/HEAD evidence, then reacquire
+the path claim before execution. The five-table ledger remains a recovery
+index; it does not prove a live path claim.
 
 ## Command families
 
@@ -112,33 +111,32 @@ set or changes nothing; an active claim from another run returns
 `owner/repository#number` identity before lookup or storage, including an
 equivalent GitHub issue URL. `feature release` accepts the complete active claim
 set and expected revision for every member, verifies the run is at
-`release-claims`, every assignment is either delivery-ready at `final-verify`
-or authoritatively `contract-resolved` at `repair-readback`, and no operation
-remains pending or unknown, then releases the whole set in one
+`release-claims`, every assignment is delivery-ready at `final-verify`, and no
+operation remains pending or unknown, then releases the whole set in one
 transaction. It never releases one Feature independently. Preserve claims for
-resumable blocked or deferred runs. Never infer release from task or PR state
+resumable blocked or deferred runs. Never infer release from plan or PR state
 without terminal reconciliation.
 
-Exactly one assignment may exist per claimed Feature in a run. An assignment
+Exactly one assignment may exist per claimed Feature Plan member in a run. An assignment
 may be created or moved only while its `feature_ref` has an
 active claim owned by the same run. A released, missing, or foreign claim
 blocks the checkpoint; assignment state never establishes Feature ownership.
-Feature and repository identity are immutable after creation, and
-`contract_generation` may stay unchanged or advance by exactly one.
+Feature Plan and repository identity are immutable after creation. The current
+plan revision is recovered from the authoritative hosted plan and is never
+copied into the ledger assignment.
 
-Criterion-level acceptance evidence remains in the authoritative Feature
-Worker task report. The assignment's existing `worker_task_id`, `candidate_sha`,
-Feature ref, and contract generation form its recovery key. On resume, reread
-the Feature Worker report and require its complete Task-ref set and acceptance
-matrix to match the current authoritative Feature bundle and that recovery key;
-never add the matrix, issue body, or an opaque evidence field to the ledger.
+Criterion-level acceptance evidence remains in the Feature Worker report. The
+assignment's worker_task_id, candidate_sha, Feature Plan ref, and checkpoint
+revision form its recovery key. On resume, reread the Feature Worker report and
+require its Feature-criterion matrix to match the current authoritative plan
+and candidate SHA; never add the matrix, plan body, or an opaque evidence field
+to the ledger.
 
 `run checkpoint` and `assignment checkpoint` accept only documented,
 allowlisted fields and one expected revision. They record durable boundaries,
 not every graph transition. A run can become `complete` only after at least one
 Feature claim has been released, at least one assignment exists, every
-assignment is delivery-ready at `final-verify` or authoritatively
-`contract-resolved` at `repair-readback`, and all operations are resolved.
+assignment is delivery-ready at `final-verify`, and all operations are resolved.
 An empty run can never complete. `operation begin` is idempotent for one
 `run_id, action, subject_id`; duplicate calls return the original operation.
 Beginning a side effect requires an active run and the assignment's active
@@ -153,13 +151,14 @@ Treat a bounded application-task title adjustment as an application side
 effect. Before applying it, reserve an operation with
 `action=task-title-adjust` and a stable subject derived from the exact task
 identity alone. Retain the exact requested title in the operation's referenced
-effect evidence. Bind Feature Worker and Contract Repair planner reservations to their
+effect evidence. Bind Feature Worker and plan-question reservations to their
 assignment; the orchestrator owns every reservation and readback. Finish the
 operation from the adjustment evidence and authoritative title observation.
 On resume, reconcile a pending or `unknown` reservation and never begin a
-second adjustment for that subject, even when Contract Repair changes the task
-outcome or canonical title. This usage reuses the existing operations contract
-and requires no schema, runtime-contract, envelope, or CLI-version change.
+second adjustment for that subject, even when a plan question changes the
+implementation outcome or canonical title. This usage reuses the existing
+operations contract and requires no schema, runtime-contract, envelope, or
+CLI-version change.
 
 Delivery topology does not add a table or assignment field. Reconstruct it from
 real Feature-level code dependencies and assignment `base_branch`, `base_sha`,
@@ -179,7 +178,7 @@ runtime-contract, envelope, or CLI-version change.
 ## Recovery boundary
 
 On resume, read the last ledger checkpoint, then independently observe current
-application tasks, worktrees, repositories, Feature/Task issues, PRs, and
+application tasks, worktrees, repositories, Feature Plan issues, PRs, and
 reviews. For stacked assignments, also re-read parent/child bases, full heads,
 stack order, and link state. Reconcile differences before another side effect.
 Ledger text never proves external state.
@@ -187,7 +186,8 @@ Ledger text never proves external state.
 For title recovery, the current display title can verify a match but cannot
 prove whether a missing or different title was never adjusted. When the
 operation reservation or retained attempt evidence is missing or ambiguous,
-do not adjust again; preserve the task and report the shared title warning.
+do not adjust again; preserve the application task and report the shared title
+warning.
 
 A ledger failure blocks only a new side effect or recovery step that requires
 durable idempotency. It does not prevent ordinary live dialogue or read-only

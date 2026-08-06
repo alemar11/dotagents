@@ -2,24 +2,26 @@
 
 This reference owns the shared structural vocabulary for graph-first SE2
 workflows. It applies to Learn, Idea, Feature, Implement, and Audit without turning
-every skill into a Feature or Task graph.
+every skill into an implementation graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 hosted shape. This reference owns workflow structure only.
-Feature still owns its Feature/Task semantics; Learn, Idea, Implement, and Audit own
-their skill-specific registries and branch details.
+Feature owns Feature Plan semantics; Implement owns the derived implementation
+units and delivery graph. Learn, Idea, and Audit own their skill-specific
+registries and branch details.
 
 ## Graph model
 
 A workflow graph describes control state and authority boundaries for one skill
-run. It is distinct from the Feature Task DAG:
+run. It is distinct from the Feature Plan and Implement execution graph:
 
 - a workflow node describes what phase the skill is in;
-- a Task node describes an independently valuable implementation outcome;
+- an execution-unit node describes an independently valuable implementation
+  outcome;
 - a workflow graph may contain decisions, validations, actions, and terminal
   outcomes;
-- a Feature Task DAG may contain only implementation Tasks and real
-  prerequisite edges.
+- Implement execution edges may contain only real implementation prerequisites;
+  Feature planning does not publish those edges.
 
 Each graph registry declares the following fields:
 
@@ -73,8 +75,8 @@ list, move outgoing conditions into `entry_conditions`, or treat Mermaid labels
 as the source of truth. Explanatory prose may clarify a condition but must not
 add an unregistered edge.
 
-Feature keeps its existing step files and registry as its local source of
-truth. Learn, Idea, Implement, and Audit keep their registries in their SKILL.md files
+Feature keeps its planning step files and registry as its local source of truth.
+Learn, Idea, Implement, and Audit keep their registries in their SKILL.md files
 while branch-specific details remain in routed references.
 
 ## Common terminal meanings
@@ -116,8 +118,8 @@ reload its own repository context, and derive its own planning fields.
 
 The Idea-to-Feature handoff is owned by
 skills/idea/references/idea-source.md. It preserves tentative source evidence
-and open questions while excluding Feature requirements, acceptance criteria,
-Tasks, dependencies, implementation plans, and readiness claims.
+and open questions while excluding Feature Plan requirements, acceptance
+criteria, execution dependencies, implementation plans, and readiness claims.
 
 ## Validation
 

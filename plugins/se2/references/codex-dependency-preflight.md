@@ -9,14 +9,14 @@ installation or maintenance procedure.
 For Learn, do not load this gate: Learn is local-repository-only and has no
 hosted dependency. For Idea, `publish` is the default; run the gate before its
 first hosted read or write, while an explicitly requested `preview` remains
-local and does not access GitHub. For Feature, `publish` is the default and
-reaches the terminal `preflight` node before its first hosted read or write;
-an explicitly requested `preview` does not load this gate for a new local
-source. Feature maintenance or an existing-source route must still run the
-gate before the first hosted rehydration read, regardless of the eventual
-terminal mode. Implement has no local-only or preview mode: run the gate before
-its mandatory first authoritative GitHub Feature, Task, PR, review, label, or
-relation read. A passing gate authorizes only the next handoff to the
+local and does not access GitHub. For Feature Plans, `publish` is the default
+and the `plan-publication` node reaches this gate before its first hosted read
+or write; an explicitly requested `preview` does not load this gate for a new
+local source. Feature maintenance or an existing-source route must still run
+the gate before the first hosted plan rehydration read, regardless of the
+eventual terminal mode. Implement has no local-only or preview mode: run the
+gate before its mandatory first authoritative GitHub Feature Plan, PR, review,
+label, or relation read. A passing gate authorizes only the next handoff to the
 applicable G-owned workflow; it does not broaden the mutation scope. For an
 explicit SE2 request, the exact hosted writes required by that selected
 workflow are already implicitly authorized; the gate only verifies that the

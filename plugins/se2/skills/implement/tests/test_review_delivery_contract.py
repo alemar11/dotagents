@@ -11,48 +11,45 @@ RUN_STATE = Path(__file__).resolve().parents[1] / "references/run-state.md"
 
 
 class ReviewDeliveryContractTests(unittest.TestCase):
-    def test_one_feature_worker_owns_each_feature_and_its_single_pr(self) -> None:
+    def test_one_feature_worker_owns_each_plan_member_and_its_single_pr(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")
         profile = TASK_PROFILE.read_text(encoding="utf-8")
         run_state = RUN_STATE.read_text(encoding="utf-8")
 
-        self.assertIn("one-feature-worker-per-feature", profile)
+        self.assertIn("one-feature-worker-per-plan-member", profile)
         self.assertIn('title_template: "🛠️ Feature Worker · <Feature outcome>"', profile)
-        self.assertIn("Create exactly one Feature Worker per selected Feature", orchestration)
-        self.assertIn("implements every Task serially in Task-DAG order", orchestration)
-        self.assertIn("Tasks may define semantic prerequisites", " ".join(skill.split()))
-        self.assertIn("they never\ncreate Task workers, Task branches, Task worktrees, or Task PRs", skill)
-        self.assertIn("Exactly one assignment may exist per claimed Feature", run_state)
-        self.assertIn("never create an empty commit, empty\nPR, cosmetic change, or artificial proof", skill)
+        self.assertIn("For every plan member, bootstrap exactly one Feature Worker", orchestration)
+        self.assertIn("executes its derived units in deterministic prerequisite order", " ".join(orchestration.split()))
+        self.assertIn("An authoritative hosted Task issue set, Task dependency graph, T-AC identifiers", skill)
+        self.assertIn("Exactly one assignment may exist per claimed Feature Plan member", run_state)
+        self.assertIn(
+            "must not receive an empty commit, empty PR, cosmetic change, or artificial proof",
+            " ".join(skill.split()),
+        )
 
-    def test_pr_delivery_closes_tasks_but_not_features_or_ideas(self) -> None:
+    def test_pr_delivery_preserves_plan_and_allows_only_explicit_closures(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
-        skill = SKILL.read_text(encoding="utf-8")
 
         for required in (
-            "Task-only `closing_issue_refs`",
-            "exclude every Feature and Idea issue",
-            "one canonical `Closes` line per Task",
-            "GitHub `closingIssuesReferences`",
-            "`## References` entry as a substitute",
+            "default closing_issue_refs set for a Feature Plan implementation is empty",
+            "published Feature Plan remains open",
+            "closingIssuesReferences set",
+            "never invent hosted Task refs",
+            "An empty set is a valid default",
         ):
             self.assertIn(required, reference)
 
-        self.assertIn("exact Task-only\n`closing_issue_refs`", skill)
-        self.assertIn("while the Feature remains open", skill)
-
-    def test_stacked_children_keep_task_closures_and_link_separately(self) -> None:
+    def test_stacked_children_link_separately(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")
         normalized = " ".join(reference.split())
         orchestration_normalized = " ".join(orchestration.split())
 
-        self.assertIn("a non-default child is not blocked merely because it carries those references", normalized)
         self.assertIn("separate G-owned pairwise stack-link workflow", normalized)
-        self.assertIn("orchestrator invokes the separate G-owned pairwise stack-link workflow", orchestration_normalized)
-        self.assertNotIn("pending Task closure set", normalized)
-        self.assertNotIn("stop on the G issue-linkage gate", normalized)
+        self.assertIn("Before bootstrapping a stacked child", orchestration_normalized)
+        self.assertNotIn("Task-only", normalized)
+        self.assertNotIn("Task closure set", normalized)
 
     def test_delivery_status_is_exact_head_and_has_two_accepted_dispositions(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")

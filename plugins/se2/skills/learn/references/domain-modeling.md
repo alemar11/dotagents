@@ -59,7 +59,7 @@ ownership ambiguous.
   memory-owning root selected by the setup scope, even when evidence supports
   only a minimal entry point with explicit unknowns. Outside setup/bootstrap,
   use repository evidence and create it only with authorized durable content.
-  Explicit user scope or a durable linked Feature Spec Set authorizes
+  Explicit user scope or a durable linked Feature Plan set authorizes
   repository identities. A composed cross-repository caller supplies candidate
   local Git roots separately, verifies each root against one authorized
   identity, and runs this workflow independently in each verified repository.

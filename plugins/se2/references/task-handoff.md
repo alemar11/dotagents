@@ -25,7 +25,7 @@ topology. Do not invent a common profile or topology here.
 The handoff must contain, or link to:
 
 - the explicit user request and bounded objective;
-- the source Feature/Task or other durable input references;
+- the source Feature Plan, source issue, or other durable input references;
 - the exact repository destination and allowed scope;
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
@@ -201,7 +201,7 @@ The final relay must preserve the exact task identity and include:
 
 - the final independently observed task, project, host, repository, and state;
 - the final title-reconciliation status and any display-metadata warning;
-- the Feature/Task outcome and validation evidence;
+- the Feature Plan outcome and validation evidence;
 - any repository or documentation changes actually made by the task;
 - the preflight authorization record by reference;
 - reconciliation evidence for every interrupted or retried operation;

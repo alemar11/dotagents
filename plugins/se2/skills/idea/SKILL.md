@@ -18,8 +18,8 @@ The workflow is:
 
 `Idea -> Feature -> Implement`
 
-Idea capture does not write Feature Specs, acceptance criteria, implementation
-plans, task graphs, project memory, architecture decisions, or code. It does
+Idea capture does not write Feature Plans, acceptance criteria, implementation
+plans, execution graphs, project memory, architecture decisions, or code. It does
 not create an application task, select a model profile, or delegate to another
 task. Ordinary brainstorming must never create or prepare a durable Idea
 implicitly.
@@ -262,9 +262,9 @@ The handoff is a typed artifact, not an automatic invocation of Feature.
 Keep the handoff tentative: preserve the proposal summary, problem or
 opportunity, proposed direction, evidence, repository identity, and open
 questions. Do not add Feature requirements, acceptance criteria, allowed paths,
-Tasks, dependency IDs, implementation plans, or readiness claims. Feature Intake
-keeps source_route as new-source, reloads repository context, and derives its
-own Feature and Task fields.
+execution units, dependency IDs, implementation plans, or readiness claims.
+Feature Intake keeps source_route as new-source, reloads repository context, and
+derives its own Feature Plan fields.
 
 ## Safety and independence
 

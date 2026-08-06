@@ -1,8 +1,8 @@
 # SE2 Plugin Maintenance
 
 plugins/se2/ is an experimental graph-first workflow package. Learn, Idea,
-Feature, Implement, and Audit expose distinct workflow graphs; Feature
-additionally owns the Feature/Task graph. SE2 is independent from plugins/se/;
+Feature, Implement, and Audit expose distinct workflow graphs; Feature owns the
+repository-scoped textual Feature Plan graph. SE2 is independent from plugins/se/;
 do not silently merge its graph contract into the existing SE plugin.
 
 ## Ownership map
@@ -19,7 +19,7 @@ do not silently merge its graph contract into the existing SE plugin.
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
   registry rules, terminal meanings, authority boundaries, and validation
-  expectations. It does not own Idea hosted metadata or Feature/Task semantics.
+  expectations. It does not own Idea hosted metadata or Feature Plan semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before any SE2 workflow uses a required G-owned GitHub workflow.
 - references/hosted-content-safety.md owns the final portable-content projection
@@ -32,10 +32,10 @@ do not silently merge its graph contract into the existing SE plugin.
   pointer reconciliation, and AGENTS.md compaction proposals and its workflow
   registry; its references own branch-specific detail.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
-  registry, Feature/Task invariants, terminal-operation branches, and terminal
-  states.
-- skills/feature/references/task-profile.md owns the principal Feature planner
-  role and its model, reasoning, and topology selection.
+  registry, Feature Plan contract, question-batch rules, optional analysis
+  roles, publication adapter, and terminal states.
+- skills/feature/references/task-profile.md owns the required Feature planner,
+  optional analyst roles, model/reasoning profiles, and topology selection.
 - skills/feature/steps/ owns the Markdown node contracts. Every step file
   keeps the standard front matter and its declared transitions synchronized.
 - skills/feature/templates/ owns reusable authoring templates and is not a
@@ -62,18 +62,18 @@ do not silently merge its graph contract into the existing SE plugin.
 
 ## Maintenance contract
 
-- Keep Feature planning free of implementation authority. Implement accepts
-  one or more complete authoritative GitHub Features, never an isolated Task
-  or local draft, and returns a verified standalone or stacked PR topology.
-  Contract Repair must re-enter Feature maintenance instead of silently
-  rewriting the Feature graph or inheriting its planner profile.
-- Keep acceptance criteria as ordinary list items with stable bracketed
-  `F-AC-NN` and `T-AC-NN` identities, never Markdown checkbox state. Feature
-  owns identity assignment, monotonic retirement high-water marks, and durable
-  hosted coverage; workers own Task criterion proof at the exact candidate
-  HEAD; the orchestrator aggregates Feature proof without rewriting issue
-  bodies or adding criterion state to the ledger. The uppercase bracketed IDs
-  are an explicit rendered-contract syntax exception to lower-kebab values.
+- Keep Feature planning free of implementation authority. Feature publishes
+  one or more complete textual Feature Plans; Implement consumes those plans,
+  derives execution units internally, and returns a verified standalone or
+  stacked PR topology. Implement must not create an automatic plan-repair
+  planner for ordinary technical interpretation.
+- Keep Feature acceptance criteria as ordinary list items with stable bracketed
+  `F-AC-NN` identities, never Markdown checkbox state. Feature owns criterion
+  identity, monotonic retirement high-water marks, source and question
+  provenance, and the durable plan projection. Implement owns execution-unit
+  decomposition and exact-head implementation evidence. The uppercase
+  bracketed IDs are an explicit rendered-contract syntax exception to
+  lower-kebab values.
 - Keep Implement execution waves separate from PR delivery topology.
   Serialization, capacity, and path overlap do not create a stack. Stack only a
   true same-repository code dependency from one green exact-HEAD parent; keep
@@ -86,15 +86,16 @@ do not silently merge its graph contract into the existing SE plugin.
   SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
   message logs, findings, and routine worker state. The orchestrator is its only
   runtime client; workers supply evidence but never access the ledger.
-- Keep Task dependency edges executable: a downstream candidate must contain
-  every exact prerequisite HEAD through verified merged, stacked, or
-  worker-composed ancestry. PR readiness alone never satisfies a dependency.
+- Keep derived execution-unit dependency edges executable: a downstream
+  candidate must contain every exact prerequisite HEAD through verified merged,
+  stacked, or worker-composed ancestry. PR readiness alone never satisfies a
+  dependency.
 - Keep deterministic task-title initialization shared by every task-managed
   SE2 skill. After stable identity readback, require one bounded reconciliation
   outcome before monitoring: exact verification or an explicit
   `title-unverified`/`title-drift` warning. Never use a title as identity,
   repeat an adjustment, or create a replacement task for title failure.
-- Keep Idea capture independent from Feature/Task and Implement semantics while
+- Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
   durable; Idea must not write project memory or create application tasks.
@@ -107,20 +108,22 @@ do not silently merge its graph contract into the existing SE plugin.
   including worker/tool-originated content, and fail closed when portable
   identity cannot be established.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
-  hosted rehydration through the shared G dependency gate before hosted reads,
-  and route the default Feature publication through its terminal preflight and
-  G-owned issue workflow before any hosted mutation. Preview is opt-in and must
-  never be selected implicitly when publish authority or G is unavailable.
-- Keep Implement GitHub-backed end to end. It has no local-only or preview
-  execution mode: authoritative hosted Features and Tasks are mandatory input,
-  and a verified hosted PR topology is mandatory output.
+  hosted plan rehydration through the shared G dependency gate before hosted
+  reads, and route default plan publication through the single publication
+  adapter and G-owned issue workflow before any hosted mutation. Preview is
+  opt-in and must never be selected implicitly when publish authority or G is
+  unavailable.
+- Keep Implement GitHub-backed end to end. It accepts authoritative published
+  Feature Plans, derives its execution units in the Implement control plane,
+  and returns a verified hosted PR topology. It has no local-only or preview
+  implementation mode.
 - Keep Audit strictly observational. Attribute SE2 use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.
 - Keep repository context discovery rooted at AGENTS.md hierarchy and generic:
-  do not add a global context-document taxonomy or encode context discovery as
-  graph nodes. Keep future tracker capabilities separate from the initial
-  Feature, Task, relation, and dependency contract.
+  do not add a global context-document taxonomy. Feature records normative
+  context separately from the critic analyst's independent first pass and
+  reports conflicts rather than silently overriding repository instructions.
 - Keep node IDs lower-kebab-case, unique, and consistent across front matter,
   each skill registry, Mermaid node names, and transition targets.
 - Treat the node header and registry as the structural contract. Mermaid is a
@@ -140,25 +143,25 @@ do not silently merge its graph contract into the existing SE plugin.
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
   read-first routing, evolution-rule projection, and no-dangling-pointer rule.
-- Validate Feature terminal-operation preview/publish reachability, the
-  preflight-before-hosted-access boundary, reconciliation to `complete` or
-  `blocked`, and the absence of side effects or outgoing edges on terminal
-  nodes.
+- Validate Feature Plan graph reachability, the question-batch wait boundary,
+  optional delegation fallback, publication-before-hosted-access, reconciliation
+  to `complete` or `blocked`, and the absence of side effects or outgoing
+  edges on terminal nodes.
 - Validate Idea default-publish/explicit-preview routing, Learn's local-only
   boundary, and Implement's mandatory hosted-source and PR-output path.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery-gate and stack-reconcile paths.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
-  Implement, their write-owning references, and Contract Repair route through
-  the one canonical hosted-content owner without duplicate Idea doctrine.
+  Implement, and their write-owning references route through the one canonical
+  hosted-content owner without duplicate Idea doctrine.
 - Validate that Feature and Implement both route every created task through the
   shared title-reconciliation outcome before normal monitoring or update relay,
   and that resume paths cannot repeat an uncertain adjustment.
-- Validate the canonical bracketed acceptance syntax, Feature-local and
-  bundle-wide uniqueness, monotonic high-water marks, hosted coverage
-  publication/readback, malformed and legacy-checkbox rejection, and
-  worker-task-report acceptance recovery bound to the current candidate SHA.
+- Validate the canonical bracketed Feature acceptance syntax, monotonic
+  high-water marks, plan publication/readback, malformed and legacy-checkbox
+  rejection, question-batch completeness, and Implement evidence bound to the
+  current candidate SHA.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, exact transition-condition coverage, the
   intentional refresh loop, terminal reachability, evidence classifications,

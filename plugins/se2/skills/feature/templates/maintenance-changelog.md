@@ -1,23 +1,24 @@
-## Feature Maintenance Changelog
+# Feature Plan Maintenance Changelog
 
-Reason for maintenance: <external indication and rationale>
+Apply [hosted-content-safety.md](../../../references/hosted-content-safety.md)
+before projecting this changelog into hosted plan content.
 
-Feature definition changes:
+## Change
 
-- <Changed requirement, acceptance criterion, scope, or validation policy.>
-- <Acceptance IDs retained, assigned, or retired and the resulting monotonic
-  Feature and Task high-water marks.>
+- plan_issue: <Feature Plan issue reference>
+- source_indication: <explicit maintenance indication>
+- plan_revision: <revision or timestamp>
 
-Affected Tasks:
+## Evidence
 
-- <Task reference and change: retained, updated, created, or removed.>
+- retained identity:
+- changed outcome or scope:
+- changed acceptance criteria:
+- changed assumptions or risks:
+- changed question decisions:
+- changed repository context:
 
-Task dependency changes:
+## Handoff
 
-- <Dependency edge added, retained, updated, or removed, with the reason.>
-
-This is a separate comment on the Feature issue for a significant maintenance
-change. Render it through the shared
-[hosted-content-safety.md](../../../references/hosted-content-safety.md)
-contract immediately before publication. It is publication evidence, not a
-graph node or terminal state.
+<Explain what the next se2:implement run must reconsider. Do not include
+implementation-unit IDs, dependency edges, or worker state.>

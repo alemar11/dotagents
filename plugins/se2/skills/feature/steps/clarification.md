@@ -1,26 +1,25 @@
 ---
 node_id: clarification
 kind: decision
-purpose: resolve-material-unknowns-without-expanding-scope
+purpose: resolve-one-consolidated-batch-of-material-user-questions
 entry_conditions:
-  - intake-reports-material-unknowns
+  - analysis-produced-material-question-candidates
 inputs:
-  - normalized-intent
-  - feature-boundary-analysis
-  - planning-blockers
+  - question-candidates
+  - analysis-provenance
+  - affected-repositories
 outputs:
-  - resolved-intent
-  - resolved-feature-boundary
+  - answered-question-batch
   - accepted-assumptions
+  - rejected-assumptions
 transitions:
-  - to: feature
-    when: every-material-blocker-is-resolved
+  - to: convergence
+    when: one-complete-question-batch-has-been-answered
   - to: blocked
-    when: a-required-decision-remains-unresolved
+    when: a-required-decision-is-declined-or-remains-unresolved
 stop_if:
-  - clarification-would-create-a-second-feature
-  - caller-requires-overlapping-feature-identities
-  - evidence-is-contradictory
+  - user-answer-would-change-the-authorized-repository-set
+  - evidence-remains-contradictory-after-the-batch
 side_effects:
   - none
 terminal_states: []
@@ -28,16 +27,23 @@ terminal_states: []
 
 # Clarification
 
-Resolve only the smallest material unknown that prevents a coherent Feature
-definition. Keep accepted assumptions explicit and separate from confirmed
-evidence.
+Present every material question discovered by the analysis in one consolidated
+batch. Do not ask one question per worker or create a graph node for each
+question. Each item must include a stable question ID, the requested decision,
+why it matters, affected outcome or scope, available options, recommendation,
+blocking status, and originating evidence.
 
-When candidate Feature boundaries lack independent residual outcomes, resolve
-whether to consolidate them into one Feature with multiple vertical Tasks or
-to provide the missing observable outcome and separate-delivery reason. Never
-preserve a requested Feature count by inventing acceptance criteria, path
-boundaries, or release semantics.
+The task may remain in awaiting-user-input while the batch is shown. This is a
+wait state, not a terminal blocked result and not a reason to mark the run's
+goal blocked. Resume the same planning task and preserve the original question
+IDs when the user replies.
 
-Do not broaden the feature, invent repository facts, or silently convert an
-unresolved question into a requirement. Continue to Feature only when the
-remaining intent is internally consistent.
+A question is blocking when it changes the product outcome, repository
+ownership, plan boundary, scope, acceptance criteria, or an essential safety
+constraint. Non-blocking questions become explicit assumptions and retain
+their impact. Technical implementation choices are not Feature clarification
+questions; Implement owns them.
+
+After the complete user response is reconciled, carry accepted decisions and
+assumptions to Convergence. If the user declines a required decision or
+changes the authorized repository set, stop with the smallest recovery input.

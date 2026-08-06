@@ -1,7 +1,7 @@
 interface:
   display_name: "🛠️ Implement Features"
-  short_description: "Implement each Feature with one Feature Worker and PR."
+  short_description: "Implement Feature Plans with one Feature Worker and PR."
   brand_color: "#BE185D"
-  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Features, create one isolated Feature Worker and one PR per implementation-eligible Feature, execute each Feature's Task DAG serially in that worktree, require exact-HEAD acceptance and review evidence, derive Feature-level standalone or stacked delivery separately from Task order, route zero-delta or defective contracts through Contract Repair without artificial changes, and return verified topology or a fail-closed blocker."
+  default_prompt: "Use $se2:implement only for an explicit request to implement or resume complete authoritative GitHub Feature Plans, derive transient execution units from each plan, create one isolated Feature Worker and one PR per implementation-eligible plan member, require exact-HEAD Feature acceptance and review evidence, derive standalone or stacked delivery separately from execution order, surface product-level contradictions to the user, and return verified topology or a fail-closed blocker."
 policy:
   allow_implicit_invocation: false
