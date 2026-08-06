@@ -2,7 +2,7 @@
 
 Use this playbook when explicitly asked to check whether Codex changed how
 subagents are spawned or Codex App tasks are created and managed. This task
-keeps `$se:implement` current.
+keeps `$se2:implement` current.
 
 ## Scope
 
@@ -13,7 +13,7 @@ Review only Codex worker and thread orchestration surfaces:
 - Codex App project discovery, task creation, project/worktree targets, task
   read/write/wait, title, archive, handoff status, fork, pin, and listing
   behavior;
-   - SE Implement App task requirements and managed-worktree behavior.
+   - SE2 Implement task requirements and managed-worktree behavior.
 
 Do not use this task to redesign generic orchestration behavior, add new
 workers to a live task, or update unrelated skills.
@@ -31,12 +31,11 @@ workers to a live task, or update unrelated skills.
    - note whether each surface is a subagent surface, visible Codex App task
      surface, or unavailable in the current runtime.
 2. Compare the discovered surface against:
-   - `plugins/se/skills/implement/SKILL.md`;
-   - `plugins/se/skills/implement/references/root-bootstrap.md`;
-   - `plugins/se/skills/implement/references/worker-execution.md`;
-   - `plugins/se/skills/implement/references/codex-task-orchestration.md`;
-   - `plugins/se/skills/implement/references/run-state.md`;
-   - `plugins/se/skills/implement/references/final-verification.md` only when tool
+   - `plugins/se2/skills/implement/SKILL.md`;
+   - `plugins/se2/skills/implement/references/orchestration.md`;
+   - `plugins/se2/skills/implement/references/task-profile.md`;
+   - `plugins/se2/skills/implement/references/run-state.md`;
+   - `plugins/se2/skills/implement/references/review-delivery.md` only when tool
      changes affect authorization, proof, or closeout behavior.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?

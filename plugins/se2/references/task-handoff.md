@@ -40,7 +40,7 @@ records it only after independent observation.
 ## Canonical title metadata
 
 Every task created by SE2 receives a deterministic display-title request using
-the established `se:implement` grammar:
+the established SE2 Implement grammar:
 
 ```text
 <emoji> <role or workflow> · <scope or outcome>

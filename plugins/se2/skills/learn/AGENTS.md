@@ -36,8 +36,9 @@ references.
 - Durable capture and compaction are proposal-first unless the caller supplies
   explicit scoped authority. Preserve unrelated content and verify links,
   indexes, targets, and the final diff.
-- Keep this package independent from plugins/se/skills/learn/. Do not add an
-  import, alias, compatibility wrapper, or automatic synchronization path.
+- Keep this package independent from the other SE2 workflow packages. Do not
+  add an import, alias, compatibility wrapper, or automatic synchronization
+  path.
 - Do not add model selection, task profiles, application-task delegation, or
   GitHub transport to this runtime skill.
 
@@ -47,6 +48,6 @@ references.
   the package-local ownership map.
 - Validate the invocation preflight, canonical AGENTS.md pointer shape,
   read-first routing, evolution-rule projection, and no-dangling-pointer rule.
-- Scan for stale legacy SE Learn invocations, imports or aliases to the SE package,
-  direct provider/tracker behavior, task profiles, and unowned links.
+- Scan for stale legacy Learn invocations, imports or aliases to retired
+  packages, direct provider/tracker behavior, task profiles, and unowned links.
 - Preserve unrelated plugin docs and run git diff --check.

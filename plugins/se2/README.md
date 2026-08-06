@@ -44,7 +44,7 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se2:audit`.
-- task-handoff.md applies the established `se:implement` emoji-title grammar
+- task-handoff.md applies the established SE2 Implement emoji-title grammar
   to planner, orchestrator, and Feature Worker tasks, with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
   metadata.
@@ -113,5 +113,4 @@ Its skills are deliberately separated by responsibility:
   hosted artifacts and apply one shared portable-content gate immediately
   before each hosted write, including content returned by workers and tools.
 
-SE2 is a parallel design surface and does not replace or mutate the existing
-se plugin.
+SE2 is the active repository-local design surface for these workflows.

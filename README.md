@@ -39,19 +39,8 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 
-SE is the repo-local project-lifecycle plugin. It keeps durable project knowledge, architecture discovery, Idea capture, Feature convergence, Implement orchestration, and active-session auditing as separate skills. The feature workflow shares one internal clarification protocol and metadata contract, while GitHub transport remains delegated to G:
-
-| Skill | Purpose |
-| --- | --- |
-| `se:learn` | Maintain durable Project Context, ADRs, localization memory, confirmed corrections, and Code Review Rules. |
-| `se:improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor. |
-| `se:idea` | Capture durable GitHub Ideas with lightweight clarification when needed. |
-| `se:feature` | Clarify material unknowns and converge Feature Specs plus agent-ready implementation issue graphs. |
-| `se:implement` | Create one visible Sol/medium root controller and coordinate isolated workers through validation, review, and PR-ready delivery. |
-| `se:audit` | Monitor active sessions using SE skills and return a prioritized read-only report. |
-
-SE2 is an experimental parallel plugin for issue-first, graph-first Learn, Idea,
-Feature, Implement, and live Audit workflows. It does not replace SE:
+SE2 is the repository's issue-first, graph-first workflow plugin for Learn,
+Idea, Feature, Implement, and live Audit workflows:
 
 | Skill | Purpose |
 | --- | --- |
@@ -113,11 +102,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   not the default.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- `se:improve-codebase-architecture` prepares a Project Context handoff after its internal pressure-test and invokes `$se:learn` only when accepted durable knowledge, named targets, evidence, and explicit scoped capture authority are present.
-- `se:idea` loads the plugin workflow contract and uses `$g:github-issues` for exact GitHub preflight reads and Idea mutations.
-- `se:feature` uses the plugin's internal clarification protocol for context-backed questions and `$se:learn` for context or ADR routing plus implementation-closeout handoff. Feature owns Feature Spec writing and internal issue hardening, loads the plugin workflow contract for feature metadata, and uses `$g:github-issues` for exact paginated GitHub Idea and Feature-bundle convergence reads in both run modes plus published tracker mutations.
-- `se:implement` keeps discovery GitHub-only and side-effect free. Explicit execution first creates or resumes one visible `gpt-5.6-sol`/`medium` root controller in the invoking session's exact local project; the parent relays coarse milestones and the final root report. The root then reads the SE workflow contract, requires `ready-for-agent` on every final implementation issue before claims or workers, preflights exact saved Git projects, creates isolated visible workers, and ends with independently verified reviewed GitHub PRs without merging. The normal six-stage flow and exception routing live in `plugins/se/skills/implement/SKILL.md`; detailed state and recovery contracts remain in its references.
-- The G-dependent SE skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
+- The G-dependent SE2 skills run a read-only Codex plugin preflight before their first `$g:github-issues` handoff and fail closed when G is unavailable; they never install G automatically.
 - `se2:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
 - `se2:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `se2:implement` accepts only complete authoritative GitHub Feature Plan Sets with verified sibling Feature and same-parent Macro Task projections and stable Feature acceptance IDs, then returns a verified standalone or stacked PR topology per Feature. GitHub interaction is mandatory end to end; it has no local-only or preview execution mode. A Sol/medium orchestrator verifies the set registry, Feature-level dependencies, parent/child Macro Task registries, interprets each textual Feature and macro context, derives technical execution units and delivery dependencies separately from runtime waves, and creates isolated Feature Workers. Each Worker may use bounded delegated support for code analysis, execution-unit assistance, validation, or critique when delegation and capacity are observed; unavailable or unknown delegation falls back to serial parent execution and never blocks the required Worker. Functional order and cross-repository dependencies remain standalone; only a true same-repository code dependency may justify a stack from a green, exact-HEAD-verified parent PR. Workers own implementation semantics, validation, and local Feature/Macro Task evidence bound to the exact candidate HEAD; the orchestrator aggregates plan evidence without rewriting the plan. Each PR closes only its parent Feature plus every associated local Macro Task, regardless of internal technical realization. Product-level contradictions are surfaced to the user rather than causing an automatic Feature-planning relaunch. Final provider readiness is supplied by `g:github-delivery-status`, whose `ready` and `ready-with-manual-action` dispositions do not grant Implement merge, auto-merge, bypass, or queue authority. Idea, Feature, and Implement apply one shared portable-content gate immediately before each hosted write; G owns transport and readback rather than semantic cleanup. Parent drift invalidates descendant evidence for bottom-to-top worker reconciliation. A minimal SQLite WAL ledger prevents concurrent orchestrators on the same Feature Plan Set and stores durable checkpoints and idempotent side effects only; schema changes use explicit drop-and-recreate, never migrations.
@@ -143,7 +128,6 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add g@alemar11
-codex plugin add se@alemar11
 codex plugin add se2@alemar11
 ```
 
@@ -151,7 +135,6 @@ If the `alemar11` marketplace is already registered, install G directly:
 
 ```sh
 codex plugin add g@alemar11
-codex plugin add se@alemar11
 codex plugin add se2@alemar11
 ```
 
@@ -161,17 +144,15 @@ of the GitHub source, then install the same plugin:
 ```sh
 codex plugin marketplace add /path/to/dotagents
 codex plugin add g@alemar11
-codex plugin add se@alemar11
 codex plugin add se2@alemar11
 ```
 
 During local development, validate the changed plugin and reinstall each
-versioned plugin from the repository source. G has a dedicated helper;
-SE and SE2 are reinstalled directly:
+versioned plugins from the repository source. G has a dedicated helper; SE2 is
+reinstalled directly:
 
 ```sh
 plugins/g/projects/g/scripts/reinstall-local
-codex plugin add se@alemar11 --json
 codex plugin add se2@alemar11 --json
 ```
 
@@ -181,18 +162,16 @@ For a Git-backed marketplace checkout, refresh the marketplace before reinstalli
 codex plugin marketplace upgrade alemar11
 codex plugin remove g@alemar11
 codex plugin add g@alemar11
-codex plugin remove se@alemar11
-codex plugin add se@alemar11
 codex plugin remove se2@alemar11
 codex plugin add se2@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old
-installation before installing SE:
+installation before installing SE2:
 
 ```sh
 codex plugin remove feature-flow@alemar11
-codex plugin add se@alemar11
+codex plugin add se2@alemar11
 ```
 
 Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.

@@ -34,7 +34,7 @@ mode.
 Use the smallest requested memory_slice. Load
 references/options.md before resolving a branch and reject noncanonical
 structured fields or values. This is an independently maintained SE2 skill: it
-does not import, alias, synchronize with, or depend on the existing SE learn
+does not import, alias, synchronize with, or depend on a retired workflow
 package.
 
 ## Invocation preflight
@@ -227,8 +227,8 @@ material as flat topic files, and apply only after approval.
 This skill runs in the invoking task and owns no task profile, model selection,
 worker delegation, GitHub transport, or external publication. It may write
 consumer-repository context only when the current request authorizes the
-selected surface. It must remain independent from the existing SE learn
-implementation and must report unavailable evidence or ambiguous authority
+selected surface. It must remain independent from the other workflow
+implementations and must report unavailable evidence or ambiguous authority
 instead of guessing.
 
 ## Reference responsibilities

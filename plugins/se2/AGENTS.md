@@ -1,9 +1,10 @@
 # SE2 Plugin Maintenance
 
-plugins/se2/ is an experimental graph-first workflow package. Learn, Idea,
+plugins/se2/ is the repository's graph-first workflow package. Learn, Idea,
 Feature, Implement, and Audit expose distinct workflow graphs; Feature owns the
-repository-scoped textual Feature Plan Set graph. SE2 is independent from plugins/se/;
-do not silently merge its graph contract into the existing SE plugin.
+repository-scoped textual Feature Plan Set graph. Keep SE2 as the sole active
+owner of these workflow contracts; do not reintroduce a retired compatibility
+surface.
 
 ## Ownership map
 
@@ -202,7 +203,7 @@ do not silently merge its graph contract into the existing SE plugin.
   standard-library tests against temporary databases.
 - Check that the marketplace path and plugin metadata point to this package.
 - Validate Learn front matter, UI metadata, routed references, explicit-only
-  invocation, and independence from the existing SE Learn package.
+  invocation, and the absence of retired compatibility surfaces.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
 - Scan Learn sources for direct provider or tracker access, task/profile
