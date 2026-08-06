@@ -21,7 +21,8 @@ review:
   precedence from `options.md`, not a stored key or option)
 - root/scoped context routing
 - translation memory decision
-- `AGENTS.md` setup block state
+- `AGENTS.md` setup block state, including its owner, read-first pointer,
+  evolution guidance, and duplicate/over-copy status
 - Code Review Rules section state when that slice is selected
 
 Use `Unknown` only when a value is absent or ambiguous. If the user only asked
@@ -57,8 +58,9 @@ For each selected setup section, show the current value first, then
   update root `CONTEXT.md` at every memory-owning root selected by the setup
   scope. Do not present or persist a domain-layout enum.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
-- `agents-pointers`: create missing pointer block, refresh stale pointer block,
-  or minimize copied setup detail into project-context pointers.
+- `agents-pointers`: create a missing canonical pointer block, refresh stale or
+  over-copied evolution guidance, or remove duplicate managed pointer blocks
+  while preserving unrelated instructions.
 - `code-review-rules`: inspect, propose, or update the exact Code Review Rules
   section in the closest applicable `AGENTS.md`.
 - `durable-capture`: show the candidate, scope, exact destination, and wording;
@@ -77,6 +79,41 @@ repo evidence and the defaults below cannot resolve. Do not force the user
 through unrelated editable sections. If ambiguity remains, load
 [setup-questions.md](setup-questions.md) and use its applicable first-time-user
 prompt.
+
+## Invocation Preflight
+
+Run this local preflight for every explicit Learn invocation, before the
+selected branch. It is derived run state, not a second `memory_slice`:
+
+1. Resolve the actual root-to-target `AGENTS.md` chain. The repository-root
+   `AGENTS.md` is the canonical owner for the root `CONTEXT.md` pointer unless
+   repository evidence explicitly assigns that pointer to another applicable
+   file. Do not copy the same managed block into every file in the chain.
+2. Read the root `CONTEXT.md` first when it exists, then follow its scoped
+   routes and indexes as required by the selected operation. If it does not
+   exist, distinguish an authorized setup that will create it from a missing
+   surface that must be reported.
+3. Inspect the canonical `## Agent skills` / `### Domain memory` block and
+   classify it as `current`, `missing`, `stale`, `duplicated`, or
+   `not-applicable`. `stale` includes a missing read-first instruction, a
+   missing evolution rule, stale paths, or copied conditional detail.
+4. When `CONTEXT.md` exists, or authorized setup will create it, draft the
+   canonical block below. If the block is missing or stale and the current run
+   already authorizes the relevant local context write, reconcile it as a
+   companion change. Otherwise report the exact target and before/after block.
+5. If the root context is absent and no authorized setup creates it, do not add
+   a dangling pointer merely because `AGENTS.md` was inspected.
+
+The preflight must also compare accepted project evolution against the context
+surface. In an authorized context-bearing run, when the change affects shared
+purpose, vocabulary, durable project rules, boundaries, stable routing, known
+state, or explicit unknowns, update the root or matched scoped `CONTEXT.md`
+surface and relevant indexes in the same run. For an unrelated selected slice,
+report the candidate for `domain-memory` instead of widening the run.
+Conditional detail belongs in an indexed topic file, accepted load-bearing
+decisions belong in an indexed ADR, and agent operating rules remain in
+`AGENTS.md`. Do not infer a context update from file churn alone; require
+repository evidence or an accepted decision.
 
 ## Decision Defaults
 
@@ -119,8 +156,10 @@ Before writing, show only applicable items from this list:
 For an explicit setup or update request:
 
 - Update only files needed for the selected memory surfaces.
-- Create or update `AGENTS.md` pointer block and apply only authorized
-  minimization.
+- Create or update the canonical `AGENTS.md` pointer block when the root
+  context exists or is being created, and apply only authorized minimization of
+  managed duplicate/copying. Include this companion target in the draft and
+  completion report.
 - When `code-review-rules` is selected, update the closest applicable
   `AGENTS.md` with the exact `## Code Review Rules` section. Keep the persisted
   block limited to accepted invariant, consequence, and safe path; preserve
@@ -144,27 +183,36 @@ For an explicit setup or update request:
 
 ## AGENTS.md Pointer Block
 
-Use this shape as a menu. Include only sections whose target surface exists,
-is derived at runtime, or is authorized in the selected slice. Omit
-`Localization` unless `TRANSLATION.md` exists or is authorized; never create a
-broken pointer:
+Use this shape as the managed block. Include only sections whose target
+surface exists, is derived at runtime, or is authorized in the selected slice;
+preserve unrelated custom prose outside the block. Omit `Localization` unless
+`TRANSLATION.md` exists or is authorized; never create a broken pointer:
 
 ```markdown
 ## Agent skills
 
 ### Domain memory
 
-[one-line summary of shared context and any scoped routing]. Read `CONTEXT.md` first, then follow its `Scoped Contexts` table when relevant.
+`CONTEXT.md` is the shared-context entry point. Read it first, then follow its
+`Scoped Contexts` table when relevant. When the project evolves, update only
+evidence-backed shared purpose, vocabulary, durable project rules, boundaries,
+known state, explicit unknowns, scope routing, and topic/ADR indexes; route
+conditional detail to indexed `project-context/` topics and accepted
+load-bearing decisions to indexed ADRs. Keep always-active agent rules in
+`AGENTS.md`; exclude tentative plans, secrets, and raw logs.
 
 ### Localization
 
 [one-line summary of supported localization memory]. See `<path-to-TRANSLATION.md>`.
 ```
 
-Keep this block concise. Do not paste domain vocabulary, workflow procedures,
-implementation policy, localization rules, worker-dispatch rules, or context
-seed material into `AGENTS.md`. `the invoking implementation workflow` owns its session worker
-questions, checkpoint, dispatch, and ledger progress record.
+Keep this block concise and manage only the `Domain memory` entry. Do not paste
+project vocabulary, workflow procedures, implementation policy, localization
+rules, worker-dispatch rules, context seed material, or conditional topic
+content into `AGENTS.md`. The block is a compact pointer/evolution projection;
+the full capture contract remains in the routed Learn references. The invoking
+implementation workflow owns its session worker questions, checkpoint,
+dispatch, and ledger progress record.
 
 The `## Code Review Rules` section is a separate exact review contract, not a
 project-context pointer. Manage it only when the `code-review-rules` slice is
@@ -183,6 +231,8 @@ Summarize only the applicable fields:
 - root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
+- `AGENTS.md` Project Context pointer owner and state, including whether the
+  evolution rule was current, updated, or deferred;
 - Code Review Rules target, rule count, evaluation state, history coverage, and
   result when selected;
 - session-history window and whether it was used;

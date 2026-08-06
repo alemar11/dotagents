@@ -55,7 +55,7 @@ Feature, Implement, and live Audit workflows. It does not replace SE:
 
 | Skill | Purpose |
 | --- | --- |
-| `se2:learn` | Traverse a graph-first local-repository context workflow for Project Context, ADRs, localization memory, Code Review Rules, and proposal-first AGENTS.md compaction. |
+| `se2:learn` | Preflight and, when authorized, organize the applicable AGENTS.md pointer to CONTEXT.md, then maintain Project Context, ADRs, localization memory, Code Review Rules, and proposal-first AGENTS.md compaction. |
 | `se2:feature` | Traverse the graph-first Feature workflow, then converge linked Feature issues with stable acceptance-criterion IDs and vertical Task graphs in the invoking local project without creating a worktree; publish is the default and preview is explicit opt-in. |
 | `se2:idea` | Traverse a graph-first session-capture workflow and publish to GitHub by default; an explicitly requested preview stays local, with a transient idea-source handoff for later Feature planning. |
 | `se2:implement` | Execute authoritative GitHub Features through a mandatory GitHub-backed graph-first orchestrator, criterion-level exact-HEAD acceptance evidence, isolated workers, Contract Repair, and verified standalone or stacked PR delivery. |

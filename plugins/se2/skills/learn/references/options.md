@@ -26,6 +26,11 @@ There is no persisted Project Context configuration or generic run-mode field.
 Write authority is derived from the current request or an explicit caller
 handoff and is reported as result data.
 
+The `AGENTS.md` Project Context pointer/evolution check is a derived preflight
+fact for every explicit Learn invocation. It is not a selectable
+`memory_slice`, does not create durable configuration, and does not grant
+write authority.
+
 `durable-capture` is always proposal-first for a direct invocation. It selects
 the former correction/preference workflow but does not imply a write.
 

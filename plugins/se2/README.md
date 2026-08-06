@@ -29,6 +29,9 @@ Its skills are deliberately separated by responsibility:
   dependency between the skills.
 - skills/learn/ is the explicit repository-knowledge entry point and owns a
   workflow registry for scope, evidence, confirmation, apply, and verification.
+  Every invocation locally preflights the applicable AGENTS.md chain and
+  CONTEXT.md routing; when authorized, it reconciles one concise pointer that
+  tells future agents what shared context to maintain as the project evolves.
   It performs only authorized local-repository context changes and maintains
   evidence-backed Project Context, ADRs, localization memory, Code Review
   Rules, and proposal-first AGENTS.md compaction without external preflight,

@@ -37,6 +37,30 @@ structured fields or values. This is an independently maintained SE2 skill: it
 does not import, alias, synchronize with, or depend on the existing SE learn
 package.
 
+## Invocation preflight
+
+After loading `references/options.md` and before executing any selected branch,
+run a local Project Context routing preflight. Resolve the actual
+root-to-target `AGENTS.md` chain, read the root `CONTEXT.md` first when it
+exists, and inspect the canonical Project Context pointer in the applicable
+`AGENTS.md`. The pointer must direct agents to `CONTEXT.md` and carry the
+compact evolution rule defined in `references/setup-workflow.md`.
+
+Treat a missing, stale, duplicated, or over-copied pointer as an
+`agents-pointers` finding even when another `memory_slice` was requested. For
+an authorized context setup, update, closeout, or confirmed capture, reconcile
+that pointer as a companion local change. In review, proposal, or otherwise
+read-only work, report the exact pointer change without writing it. This
+preflight derives run facts; it never grants write authority or changes the
+selected memory slice.
+
+When an authorized context-bearing run carries accepted landed changes that
+alter shared purpose, vocabulary, durable project rules, boundaries, stable
+routing, known state, or explicit unknowns, update the smallest applicable
+`CONTEXT.md` surface and its topic/ADR indexes in the same run. For an
+unrelated selected slice, report the candidate for `domain-memory` instead of
+silently widening the run. File churn alone is not durable context evidence.
+
 ## Workflow graph
 
 Read the shared [workflow-graph.md](../../references/workflow-graph.md) before
@@ -98,7 +122,7 @@ every task.
 | domain-memory | Root/scoped context routing, topic setup, ADR setup, inline update, implementation closeout, or periodic review. |
 | durable-capture | Manual capture of a confirmed correction, preference, rule, localization convention, or accepted decision. |
 | translation-memory | Localization memory only. |
-| agents-pointers | Missing or stale context pointers in AGENTS.md. |
+| agents-pointers | Preflight and maintain the concise Project Context pointer and evolution rule in the applicable AGENTS.md; detect missing, stale, duplicated, or over-copied routing. |
 | agents-compaction | Measurement, classification, proposal, and authorized compaction of an applicable AGENTS.md chain. |
 | code-review-rules | Evidence-backed rules in the exact ## Code Review Rules section of the closest applicable AGENTS.md. |
 | full-setup | All applicable context slices, only when explicitly requested. |
@@ -126,6 +150,10 @@ Never infer durable capture from ordinary conversation, tentative ideas, raw
 session text, secrets, or generic advice. Preserve unrelated custom prose,
 comments, overrides, context files, ADRs, and localization data.
 
+The invocation preflight only detects a companion `AGENTS.md` pointer change.
+It may apply that change when the current run already authorizes the relevant
+local context write; otherwise it remains a reported proposal.
+
 ## Non-negotiable rules
 
 - Resolve the current Git repository as the default scope. Cross-repository work
@@ -147,7 +175,8 @@ comments, overrides, context files, ADRs, and localization data.
 
 ## Reference loading matrix
 
-Load only the selected branch:
+Load `options.md` and `setup-workflow.md` for the invocation preflight, then
+load only the selected branch:
 
 | Work | Required references |
 | --- | --- |

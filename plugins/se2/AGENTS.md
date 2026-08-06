@@ -28,9 +28,9 @@ do not silently merge its graph contract into the existing SE plugin.
 - scripts/validate-hosted-content-safety owns the static owner-routing,
   duplicate-doctrine, and hosted-template path checks for that contract.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
-  capture, localization, Code Review Rules, and AGENTS.md compaction
-  proposals and its workflow registry; its references own branch-specific
-  detail.
+  capture, localization, Code Review Rules, concise AGENTS.md Project Context
+  pointer reconciliation, and AGENTS.md compaction proposals and its workflow
+  registry; its references own branch-specific detail.
 - skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
   registry, Feature/Task invariants, terminal-operation branches, and terminal
   states.
@@ -138,6 +138,8 @@ do not silently merge its graph contract into the existing SE plugin.
   a registered node, and every step has the standard front matter.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
+- Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
+  read-first routing, evolution-rule projection, and no-dangling-pointer rule.
 - Validate Feature terminal-operation preview/publish reachability, the
   preflight-before-hosted-access boundary, reconciliation to `complete` or
   `blocked`, and the absence of side effects or outgoing edges on terminal
