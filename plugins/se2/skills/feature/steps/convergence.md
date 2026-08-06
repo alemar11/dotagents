@@ -1,7 +1,7 @@
 ---
 node_id: convergence
 kind: action
-purpose: converge-source-issues-into-repository-owned-plan-members
+purpose: converge-source-issues-into-a-feature-plan-set
 entry_conditions:
   - analysis-evidence-is-available
   - material-question-batch-is-answered-or-empty
@@ -9,25 +9,36 @@ inputs:
   - normalized-source-issue-set
   - intent-analysis
   - boundary-analysis
+  - feature-boundary-evidence
+  - feature-dependency-evidence
+  - macro-boundary-evidence
+  - macro-dependency-evidence
   - critic-analysis
   - answered-question-batch
   - accepted-assumptions
   - repository-context-evidence
 outputs:
-  - plan-members
+  - feature-members
+  - feature-plan-set-boundaries
+  - feature-dependency-relations
   - source-consolidation-decision
   - outcome-boundaries
+  - macro-task-boundaries
+  - macro-dependency-relations
   - repository-plan-links
   - plan-input-evidence
 transitions:
   - to: plan
-    when: every-plan-member-has-one-coherent-owned-outcome
+    when: every-feature-member-has-one-coherent-owned-outcome-and-local-macro-boundary
   - to: blocked
     when: independent-boundaries-or-repository-ownership-cannot-be-resolved
 stop_if:
-  - plan-member-has-no-observable-outcome
+  - feature-member-has-no-observable-outcome
   - caller-requested-split-has-no-independent-residual
+  - feature-boundary-has-no-independent-landing-state-ownership-or-delivery-reason
+  - macro-boundary-cannot-cover-the-feature-member
   - multi-repository-linkage-is-ambiguous
+  - feature-dependency-is-missing-cross-set-or-cyclic
 side_effects:
   - none
 terminal_states: []
@@ -36,17 +47,32 @@ terminal_states: []
 # Convergence
 
 Use the residual-outcome test to decide whether source issues belong to one
-plan member or separate members. Consolidate sources that share one
-independently deliverable outcome. Keep separate members when an exclusive
-observable outcome, acceptance obligation, usable landing state, or
-delivery reason remains.
+Feature member or separate sibling Features. Consolidate sources that share
+one independently deliverable outcome. Keep separate members only when an
+exclusive observable outcome, acceptance obligation, usable landing state,
+ownership boundary, or delivery reason remains. A shared integration
+narrative never creates a container Feature.
 
-For multiple repositories, produce one linked plan member per repository and
-keep each member's context local. Cross-repository links describe the
-relationship; they do not create an integration issue or an implementation
-dependency graph.
+For multiple repositories, produce one or more Feature members per repository
+and keep each member's context local. Cross-repository Feature-level
+dependencies may describe functional sequencing, but they do not create an
+integration issue or an automatic stack.
 
 Record every consolidation, separation, retained out-of-scope source, and
 critic challenge that affected the boundary. Do not preserve an issue count
-by inventing outcomes or acceptance criteria. Do not derive implementation
-execution units, dependency IDs, waves, or path claims.
+by inventing outcomes or acceptance criteria. If a criterion spans distinct
+Features, keep it in one Feature or decompose it into Feature-local criteria;
+never create an integration Feature to hold the span.
+
+Once each Feature member has one coherent outcome, define its closed Macro
+Task set. Each Macro Task is a vertical macro view of that outcome, must map
+to one or more Feature acceptance criteria, and may cross technical layers.
+Do not create separate Macro Tasks only for backend, frontend, tests,
+documentation, or other technical layers.
+
+Record Feature-level `blocked_by` relations only between Feature IDs in the
+same Plan Set. Record Macro Task `blocked_by` relations only between Macro
+Task IDs with the same `parent_feature_id`. Reject missing refs, duplicates,
+self-edges, cross-parent edges, and cycles at the appropriate level. Both
+levels are planning context; do not derive technical execution units, allowed
+paths, execution waves, worker schedules, or technical dependency IDs.

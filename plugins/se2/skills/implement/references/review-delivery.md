@@ -6,26 +6,53 @@ provider review monitoring, and final exact-HEAD evidence.
 ## Candidate boundary
 
 The Feature Worker operates only in its application-managed worktree. After it
-implements every derived execution unit for one Feature Plan member, validates
+implements every derived execution unit for one Feature member, validates
 the complete outcome, and commits, freeze one candidate with exact repository,
 base branch, base SHA, head branch, and full head SHA. The worktree must be
 clean and pinned to that candidate before review. Do not create a reviewer task
 or a second review worktree.
 
-Execution-unit criteria are transient Implement evidence. The authoritative
-requirements remain the current published plan and its stable F-AC-NN criteria;
-no hosted Task issue set or T-AC-NN registry is required.
+The authoritative requirements remain the current published Feature Plan Set,
+the selected Feature member, and its stable F-AC-NN criteria. The hosted local
+Macro Task registry and child Task issues are durable macro-planning
+projections of that same Feature outcome;
+they are not technical execution units, T-AC-NN records, worker assignments,
+or PR boundaries.
 
 For a dependency-bearing assignment, also freeze the exact prerequisite HEAD
 vector and prove every member is an ancestor of the candidate. The candidate's
 integration base and intended PR base must preserve that ancestry; a
 prerequisite PR being ready is not sufficient proof.
 
+A Feature-level `blocked_by` relation is not stack authority. The delivery
+record must independently classify the relation as a real same-repository
+code dependency before using a stacked base. Functional order and every
+cross-repository dependency remain standalone.
+
 Freeze one transient delivery record before review. A standalone candidate uses
 the verified default branch. A stacked candidate names exactly one immediate
 parent assignment and PR, the parent head branch, the exact parent candidate
 SHA used as base_sha, and its bottom-to-top position. Do not infer a parent from
 branch naming, plan order, display metadata, or operational serialization.
+
+## Delivery lifecycle boundary
+
+The canonical lifecycle is:
+
+`candidate` → `PR published` → `bounded review/CI/delivery-status monitoring` →
+`PR verified ready or ready-with-manual-action` → `complete`
+
+Implement terminates with a PR published and verified on its exact HEAD. The PR
+may remain open; merge, the effective closure of the Feature and its Macro
+Tasks, and every post-merge activity are outside this workflow. The
+`closing_issue_refs` values are closure intent derived from the verified local
+registry: the parent Feature plus every associated Macro Task. They become
+effective only when GitHub merges the PR.
+
+Preserve exact readback of the current PR HEAD, PR body and closing references,
+stack link, and delivery-status evidence. A `ready` or
+`ready-with-manual-action` disposition verifies delivery readiness; it does not
+authorize merge or imply that the Feature or Macro Tasks are already closed.
 
 ## Git and GitHub operation ownership
 
@@ -49,7 +76,7 @@ portable marker and full SHA still passes the same final gate.
 | --- | --- | --- |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; Feature Worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Feature-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; Feature Worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
-| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository, plan-member publication scope, and optional closing_issue_refs; read back repository, base, branch, full PR HEAD, URL, body, closingIssuesReferences, and draft state. |
+| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and Feature publication scope; derive `closing_issue_refs` from that Feature's verified local registry, then read back repository, base, branch, full PR HEAD, URL, body, closingIssuesReferences, and draft state. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | $g:github-delivery-status | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
@@ -81,34 +108,44 @@ against the new exact SHA.
 Publish only after native review is clean and the exact publication scope is
 resolved from the explicit Implement request.
 
-The default closing_issue_refs set for a Feature Plan implementation is empty.
-The published Feature Plan remains open as the durable product record; the PR
-body may identify it as the plan source without implicitly closing it. If the
-explicit Implement request authorizes issue closure, derive one exact set from
-that request and the current plan-member evidence:
+For every implementation-eligible Feature, derive
+`closing_issue_refs` deterministically from that Feature's verified local
+hosted registry:
 
-- every requested ref must be a real, repository-unambiguous plan or source
-  issue in the declared publication scope;
-- reject a missing, extra, duplicate, or ambiguous ref instead of silently
-  changing closure semantics;
-- never invent hosted Task refs, T-AC-NN identifiers, or closure obligations
-  from narrative plan text;
-- never close an Idea or unrelated source issue unless the explicit request
-  names that exact mutation.
+```text
+closing_issue_refs =
+  [this parent Feature issue] + [every Macro Task child issue owned by this Feature]
+```
+This parent Feature and every associated local Macro Task are one closed
+planning set. There is no per-Task opt-out, no Worker-supplied closure list,
+and no one-to-one requirement between Macro Tasks and technical execution
+units. Sibling Features and their Tasks are never included. Implement may
+combine, distribute, or otherwise realize local Macro Tasks through its
+internal execution graph, but the final candidate must cover every local Macro
+Task outcome and every criterion for this Feature.
+
+Require every local registry entry to resolve to one real,
+repository-unambiguous child issue under this exact parent Feature. Reject a
+missing, extra, duplicate, cross-parent, cross-Feature, or ambiguous registry
+ref instead of silently changing the closing set. Never invent closure refs
+from narrative text, include a sibling Feature, or close an Idea or unrelated
+source issue.
 
 Pass the verified set unchanged to the G-owned single-PR publication workflow.
-G renders the canonical closing lines, if any, and reads back the exact body
-and closingIssuesReferences set. An empty set is a valid default and must
-remain empty on readback. The delivery mode, not Send, determines the intended
-base: a standalone candidate uses the verified default branch, while a stacked
-child uses the verified parent branch.
+G renders the canonical closing lines and reads back the exact body and
+`closingIssuesReferences` set. Require the read-back set to equal
+`closing_issue_refs` exactly. The PR declares closure intent; GitHub closes
+this Feature and its local Macro Tasks only when the PR is merged. Implement
+does not merge or perform post-merge closure. The delivery mode, not Send, determines
+the intended base: a standalone candidate uses the verified default branch,
+while a stacked child uses the verified parent branch.
 
 Apply the shared hosted-content safety gate to the exact final PR title and
 body immediately before publication. Use the G-owned single-PR publication
 workflow to push the committed candidate and create or reuse a draft PR.
 Independently read back repository, base, branch, full PR HEAD, URL, body,
 draft state, and GitHub closingIssuesReferences. Require the read-back closing
-issue set to equal closing_issue_refs exactly. The PR HEAD must equal the
+issue set to equal `closing_issue_refs` exactly. The PR HEAD must equal the
 reviewed candidate HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
@@ -212,8 +249,13 @@ without post-merge work.
 
 The orchestrator performs read-only final verification. Require:
 
-- exact Feature Plan refs, repository members, current plan revision, and
-  complete hosted readback;
+- exact Feature Plan Set ref/revision, selected Feature ID, repository, and
+  complete hosted sibling readback;
+- exact Feature-level registry/dependency readback plus the local Macro Task
+  registry, one-to-one child Task readback, parent/child relations, issue
+  types, and same-parent-only macro dependency readback;
+- Feature-level scheduling evidence and the independent technical dependency
+  classification that justifies standalone or stacked delivery;
 - exact current F-AC-NN set with no missing, duplicate, malformed, or
   ambiguous IDs;
 - authoritative hosted plan coverage and monotonic Feature acceptance
@@ -222,10 +264,13 @@ The orchestrator performs read-only final verification. Require:
 - clean implementation worktree and exact current HEAD;
 - a complete acceptance matrix for every F-AC-NN whose evidence is bound to
   the same exact current candidate HEAD;
+- complete Macro Task coverage evidence bound to the same exact current
+  candidate HEAD;
 - current-head validation and native review evidence;
 - PR publication readback and exact PR HEAD equality;
-- the exact optional closing_issue_refs set and equal GitHub
-  closingIssuesReferences set, with no unrequested source closure;
+- the exact Feature-local registry-derived `closing_issue_refs` set containing
+  this parent Feature and every associated local Macro Task, equal to GitHub
+  `closingIssuesReferences`, with no sibling or unrequested source closure;
 - standalone default-base evidence, or stacked parent identity, unchanged
   parent HEAD, exact child base, stack order, and verified link receipt;
 - ready-transition receipt plus a clean current-head automatic-review
@@ -236,16 +281,22 @@ The orchestrator performs read-only final verification. Require:
   disposition is `ready` or `ready-with-manual-action`, plus zero unresolved
   actionable review threads.
 
-Aggregate every current F-AC-NN through the Feature Worker evidence map and
-retain the exact candidate SHA. Any uncovered, unverified, blocked, stale, or
-ambiguous criterion prevents delivery readiness. This acceptance verification
-is evidence-only and never edits the Feature Plan.
+Aggregate every current F-AC-NN and every local Macro Task through the Feature
+Worker evidence map and retain the exact candidate SHA. Any uncovered,
+unverified, stale, or ambiguous criterion or local Macro Task outcome prevents
+delivery readiness. A planning-only local Macro Task status of `blocked`
+caused by another local Macro Task does not block delivery by itself once the
+final candidate covers this Feature outcome. A Feature-level `blocked_by`
+relation may affect scheduling, but it does not add a sibling to this PR's
+closing set. This acceptance verification is evidence-only and never edits
+the Feature Plan Set or any registry.
 
 On recovery, use the assignment's stored worker_task_id and candidate_sha to
 reread the Feature Worker's final acceptance matrix. Accept it only when its
-Feature Plan ref, complete F-AC-NN set, plan revision, and candidate SHA
-exactly match current authoritative state. Plan drift or worker-report
-invisibility invalidates the matrix.
+Feature Plan Set ref, Feature ID, complete local Macro Task registry, complete
+F-AC-NN set, set/plan revision, and candidate SHA exactly match current
+authoritative state. Feature membership or local Macro Task registry drift, or
+worker-report invisibility, invalidates the matrix.
 
 Return repairable evidence mismatches to the Feature Worker without diagnosis.
 The Feature Worker owns repair and replacement evidence. Final verification

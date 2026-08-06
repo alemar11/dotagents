@@ -1,53 +1,71 @@
 ---
 name: implement
-description: "Implement one or more authoritative GitHub Feature Plans by interpreting their textual outcomes into internal execution units, creating one isolated Feature Worker and one pull request per plan member, and returning verified exact-HEAD delivery; use only for explicit implementation or resume requests."
+description: "Implement one or more authoritative GitHub Feature Plan Sets and their verified sibling/Macro projections by interpreting each Feature outcome into technical execution units, creating one isolated Feature Worker and one pull request per Feature, optionally using bounded delegated support assignments, and returning verified exact-HEAD delivery; use only for explicit implementation or resume requests."
 ---
 
-# Implement Feature Plans
+# Implement Feature Plan Sets
 
 ## Input and output invariant
 
 Use this skill only for an explicit request to implement or resume one or more
-published SE2 Feature Plans from GitHub. Every selected plan must resolve to
-one authoritative Feature issue or linked repository-owned Feature Plan
-member with:
+published SE2 Feature Plan Sets from GitHub. Every selected set must resolve to
+one complete, authoritative sibling Feature registry, and every selected
+Feature member must have:
 
-- repository identity and complete hosted readback;
+- `feature_plan_set_id`, revision, stable `feature_id`, repository identity,
+  and complete hosted readback;
+- one authoritative parent Feature issue of type Feature;
 - an observable outcome, scope, and non-goals;
+- a usable landing state, ownership boundary, and delivery reason;
 - stable Feature acceptance criteria using F-AC-NN identities;
 - monotonic Feature acceptance high-water evidence;
 - resolved material questions, explicit assumptions, risks, and validation
   intent;
+- a complete Macro Task registry with one verified child Task issue per stable
+  `(parent_feature_id, macro_task_id)` pair;
+- Feature-level `blocked_by` readback to Feature IDs in the same set;
+- macro-local `blocked_by` readback to Macro Task IDs with the same
+  `parent_feature_id` only;
+- authoritative parent/child, issue-type, registry, set-membership, and
+  dependency readback;
 - a complete textual handoff that is ready for technical interpretation;
 - publication and readiness evidence.
 
-An authoritative hosted Task issue set, Task dependency graph, T-AC identifiers,
-or automatic plan-repair result is not required input. Implement derives
-internal execution units, implementation dependencies, safe path envelopes,
-and runtime waves from the plan during Prepare Run. Those units belong to the
-Implement control plane and are not silently sent back to Feature for ordinary
-technical clarification.
+The hosted Feature Plan Set and every local Macro Task projection are required
+input, but they are planning projections rather than a technical execution
+graph. Feature-level `blocked_by` relations provide scheduling context and
+may cross repositories. Macro `blocked_by` relations are local to one
+`parent_feature_id`. An authoritative technical Task dependency graph,
+T-AC identifiers, or automatic plan-repair result is not required input.
+Implement derives internal execution units, implementation dependencies, safe
+path envelopes, and runtime waves from the set and each Feature registry
+during Prepare Run. Those units belong to the Implement control plane and are
+not silently sent back to Feature for ordinary technical clarification.
 
-Do not start from an isolated Task, local draft, Idea, unbounded request, or
-preview-only plan. If the plan has a product-level contradiction or an
+Do not start from an isolated Macro Task, an isolated technical Task, local
+draft, Idea, unbounded request, or preview-only plan. If the plan has a
+product-level contradiction or an
 unresolved material question, pause the affected assignment for one explicit
 user decision and report the exact question. Do not create a hidden planner
 task or automatically invoke se2:feature.
 
 The expected terminal output is one verified pull-request delivery topology
-with exactly one PR output per implementation-eligible selected plan member.
-Return a complete mapping from each plan member and its derived execution
-units to its repository, Feature branch, exact HEAD, PR reference, and
-standalone or stacked relationship. Bind every Feature acceptance criterion
-to evidence on the same final candidate HEAD. Any execution-unit acceptance
-identities are Implement-owned evidence and never rewrite the hosted plan.
+with exactly one PR output per implementation-eligible selected Feature.
+Return a complete mapping from each Feature ID, its local Macro Tasks, and its
+derived execution units to its repository, Feature branch, exact HEAD, PR
+reference, and standalone or stacked relationship. Bind every Feature
+acceptance criterion and every local Macro Task outcome to evidence on the
+same final candidate HEAD. Any technical execution-unit acceptance identities
+are Implement-owned evidence and never rewrite the hosted Plan Set or Macro
+Task registries.
 
-Complete means every implementation-eligible plan member has a verified
+Complete means every implementation-eligible Feature has a verified
 standalone-ready or stack-ready PR output backed by a current
 $g:github-delivery-status disposition of `ready` or
 `ready-with-manual-action`,
-all required Feature criteria are verified against that exact HEAD, and every
-authorized closing reference is read back. A plan member with no exclusive
+all required Feature criteria and local Macro Task coverage are verified
+against that exact HEAD, and that Feature's registry-derived closing set is
+read back. A Feature with no exclusive
 implementation delta must not receive an empty commit, empty PR, cosmetic
 change, or artificial proof; report the zero-delta product question to the
 user and stop that assignment.
@@ -56,6 +74,12 @@ This skill never merges, deploys, releases, or performs post-merge closure.
 GitHub interaction is mandatory end to end. Local worktrees and local Git
 transport are execution surfaces inside the implementation flow, never an
 alternative terminal result.
+
+The delivery lifecycle ends at a published PR verified on its exact HEAD.
+The PR may remain open; merge, effective Feature/Macro Task closure, and all
+post-merge activity remain outside the workflow. The canonical lifecycle and
+the registry-derived closure intent are defined in
+[review-delivery.md](references/review-delivery.md).
 
 ## Shared contracts and dependencies
 
@@ -83,6 +107,14 @@ Implement task profile, shared task preflight, and shared task handoff. The
 orchestrator and every Feature Worker are required roles. Title
 reconciliation is required before normal monitoring or update relay.
 
+The Feature Worker may use the task profile's optional delegated support role
+for bounded code analysis, execution-unit assistance, validation, or critique.
+Before the first optional support effect, inspect delegation once and record
+delegation as available, unavailable, or unknown separately from observed
+worker capacity. Delegation is not a required topology gate: when it is
+unavailable, unknown, or has no usable capacity, the Feature Worker performs
+the same work serially and the run continues.
+
 Load orchestration when interpreting plans, deriving execution units,
 scheduling workers, resolving plan questions, or calculating delivery
 topology. Load review-delivery at candidate review and publication. Load
@@ -105,14 +137,14 @@ workflow transitions.
 
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |
-| intake | action | explicit implementation or resume request with one or more published Feature Plan refs | source-preflight, blocked | none | none |
-| source-preflight | validation | complete Feature Plans are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
+| intake | action | explicit implementation or resume request with one or more published Feature Plan Set refs | source-preflight, blocked | none | none |
+| source-preflight | validation | complete Feature Plan Sets and selected Features are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
 | runtime-preflight | validation | plans and target repositories are known | prepare-run, blocked | read | none |
 | prepare-run | action | required roles, destinations, and plan interpretation are ready | schedule, blocked | durable | none |
-| schedule | decision | run is ready for another plan-member wave or aggregate reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |
-| delivery-gate | decision | unfinished plan-member assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
-| worker-bootstrap | action | one or more plan-member assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | Feature Worker identity, worktree, derived execution units, and plan criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
+| schedule | decision | run is ready for another Feature wave or aggregate reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |
+| delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
+| worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
+| implement-validate | action | Feature Worker identity, worktree, verified sibling/Macro coverage, derived execution units, and plan criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
 | plan-question | decision | a product-level plan contradiction or decision is explicit | schedule, assignment-deferred, blocked | none | none |
 | candidate | validation | Feature Worker reports a committed candidate HEAD with plan criteria evidence | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
@@ -121,11 +153,11 @@ workflow transitions.
 | stack-reconcile | validation | a stacked PR was published or its parent/base/link/exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
 | ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
 | final-verify | validation | current PR, topology, CI, review, checkout, HEAD, and acceptance evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read | none |
-| assignment-blocked | action | one plan-member assignment cannot progress but independent work remains | schedule | durable | none |
-| assignment-deferred | action | one plan-member assignment awaits bounded user authority | schedule | durable | none |
+| assignment-blocked | action | one Feature assignment cannot progress but independent work remains | schedule | durable | none |
+| assignment-deferred | action | one Feature assignment awaits bounded user authority | schedule | durable | none |
 | release-claims | action | every assignment is delivery-ready or explicitly resolved and no assignment remains active | complete, blocked | durable | none |
 | deferred | terminal | all remaining work awaits user authority | none | none | deferred |
-| complete | terminal | every eligible plan member maps to one verified PR-ready output | none | none | complete |
+| complete | terminal | every eligible Feature maps to one verified PR-ready output | none | none | complete |
 | blocked | terminal | required evidence, capability, identity, authority, or reconciliation is unavailable | none | none | blocked |
 
 ~~~mermaid
@@ -192,60 +224,115 @@ flowchart TD
 The orchestrator control plane and Feature Worker lifecycle are one
 hierarchical graph. They are not independent runs. A Feature Worker is an
 application task plus its isolated worktree lifecycle; native-review is a
-phase inside that lifecycle, not a second worker.
+phase inside that lifecycle, not a second worker. Optional support
+assignments are subordinate execution envelopes, not Feature Workers, graph
+nodes, Feature members, or ledger assignments.
 
 ## Plan interpretation and orchestration
 
-Source-preflight reads the authoritative Feature Plan body and verifies
-repository identity, Feature criteria, publication readback, resolved
-questions, and plan status. Runtime-preflight independently verifies every
-selected repository, project, current checkout, required application roles,
-and the G-owned workflows needed for the run.
+Source-preflight reads the authoritative Feature Plan Set manifest and every
+hosted sibling Feature with its local Macro Task children. It verifies set
+identity/revision, distinct Feature membership, repository identity, Feature
+criteria, Feature-level `blocked_by`, each local Macro Task registry,
+one-to-one parent/child issue mapping, parent/child relations, issue types,
+same-parent-only macro dependencies, publication readback, resolved
+questions, and plan status. A missing, extra, duplicate, cross-set,
+cross-parent, cyclic, or mismatched identity blocks before worker creation.
+Runtime-preflight independently verifies every selected repository, project,
+current checkout, required application roles, and the G-owned workflows
+needed for the run.
 
-Prepare Run translates each textual plan into a transient set of
-implementation units. An implementation unit has an observable technical
-outcome, repository scope, allowed-path proposal, validation intent,
-dependencies that are real implementation prerequisites, and evidence linking
-it back to one or more Feature criteria. These units are not copied into the
+Prepare Run uses the Feature Plan Set and each local Macro Task registry as
+the complete macro planning context, then translates each Feature into a
+transient set of technical implementation units. A unit has an observable
+technical outcome, repository scope, allowed-path proposal, validation
+intent, dependencies that are real implementation prerequisites, and evidence
+linking it back to one Feature criterion and one or more local Macro Tasks.
+Feature-level `blocked_by` relations may order Feature scheduling but do not
+by themselves create execution dependency edges, worker gates, PR boundaries,
+or stacks. Macro `blocked_by` relations are advisory and same-parent-only;
+they do not become technical edges. These units are not copied into the
 hosted plan by default and are not a reason to rerun Feature.
 
-Schedule independent plan members across safe waves. Within one plan member,
-the Feature Worker owns the derived units in deterministic prerequisite order
-and never creates child workers. Path overlap, capacity, and preferred order
-do not create a PR stack. A stack requires a true same-repository code
-dependency and a verified parent exact HEAD.
+Schedule independent Features across safe waves, respecting Feature-level
+`blocked_by` context. Within one Feature, the Feature Worker owns the derived
+units in deterministic prerequisite order and does not create child Feature
+Workers or planner tasks. It may use
+bounded support assignments when the optional delegation capability and
+usable worker capacity are observed; otherwise it performs the work itself.
+Path overlap, capacity, preferred order, functional Feature order, and
+cross-repository dependencies do not create a PR stack. A stack requires
+independent evidence of a true same-repository code dependency and a verified
+parent exact HEAD. A same-repository Feature-level `blocked_by` edge can
+justify scheduling order without justifying a stack.
 
 When implementation reveals a missing product decision, enter plan-question
 and present the bounded question to the user. Preserve the worker, worktree,
 branch, and useful evidence when safe. If the user explicitly decides that the
 published plan must change, stop the affected assignment and report a new
 se2:feature request as the recovery action; do not create that planner task
-automatically and do not let independent plan members wait.
+automatically and do not let independent Features wait.
 
 ## Feature Worker and review boundary
 
-Each Feature Worker owns one authoritative plan member, one verified
-implementation worktree, one branch, and one eventual PR. It owns technical
-design, code, tests, validation, candidate evidence, exact-HEAD native
-review, and fixes. It binds every Feature acceptance criterion to evidence on
-the same candidate SHA. Internal execution-unit criteria may be used for
-worker control, but they are not durable Feature requirements unless the user
-explicitly publishes a revised plan.
+Each Feature Worker owns one authoritative Feature member, its complete local
+Macro Task set, one verified implementation worktree, one branch, and one
+eventual PR. It owns technical design, code, tests, validation, candidate
+evidence, exact-HEAD native review, and fixes. It binds every Feature
+acceptance criterion and every local Macro Task outcome to evidence on the
+same candidate SHA. It never owns a sibling Feature or its Tasks.
+Macro Tasks are not worker or PR boundaries. Internal execution-unit criteria
+may be used for worker control, but they are not durable Feature or Macro Task
+requirements unless the user explicitly publishes a revised plan.
 
 Any HEAD change invalidates prior acceptance, validation, and review evidence.
 The worker repeats the required checks and review at the new exact HEAD. The
 orchestrator receives evidence and coordinates delivery; it never edits,
 rebases, or judges worker code.
 
+### Optional Feature Worker support
+
+The Feature Worker remains the sole owner of the Feature member, worktree,
+integration branch, candidate commit, acceptance matrix, native review, and
+eventual PR. When delegation is available and useful, it may dispatch bounded
+support assignments with one of these responsibilities:
+
+- `code-analyst`: read-only repository, impact, and dependency analysis;
+- `execution-assistant`: implementation of one explicitly bounded execution
+  unit in an exclusive path envelope or isolated helper context;
+- `validation-assistant`: focused tests, checks, and validation evidence;
+- `critic-reviewer`: independent challenge of design, risks, regressions, and
+  current-candidate evidence.
+
+Every support assignment receives the current Feature ID, Plan Set revision,
+local Macro Task context, execution-unit scope, path envelope, and validation
+intent. It returns bounded
+evidence or a scoped change proposal to the Feature Worker. Support
+assignments never edit or publish the Feature Plan, never access the SQLite
+ledger, never publish or mutate GitHub, never create Feature Workers or
+planner tasks, and never become the source of final delivery evidence. The
+parent integrates any useful change, reruns the complete validation and review
+cycle, and owns the final candidate HEAD.
+
+Never run concurrent writes against overlapping worktree paths. A helper may
+edit only an exclusive declared envelope or an isolated helper context, and
+the parent must reconcile its result before continuing. A delegated helper is
+reported as started only after its task and result have been independently
+observed. `delegated-support`, `serial-fallback`, `unavailable`, and `unknown`
+are distinct runtime modes; configured delegation or capacity is not proof
+that a helper ran.
+
 ## Delivery topology
 
 Keep implementation waves separate from PR delivery topology. Run independent
-plan members concurrently when repositories, paths, dependencies, and live
-capacity permit. Serialize real cross-member code dependencies and unsafe
-overlap. A stacked child requires one same-repository immediate parent with a
-green exact-HEAD candidate, accepted hosted readiness, clean review, and the
-verified parent branch and SHA as its integration base. Parallel, unrelated,
-cross-repository, and capacity-only ordering remains standalone.
+Features concurrently when repositories, paths, dependencies, and live
+capacity permit. Serialize Feature-level `blocked_by` context and real
+cross-Feature code dependencies as appropriate, without treating every
+ordering relation as a stack. A stacked child requires one same-repository
+immediate parent with a green exact-HEAD candidate, accepted hosted
+readiness, clean review, and the verified parent branch and SHA as its
+integration base. Functional order, cross-repository relations, unrelated
+work, and capacity-only ordering remain standalone.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
 review, delivery disposition, and stack capability. Parent drift invalidates
@@ -256,7 +343,7 @@ never performs a stack-wide rebase.
 ## Ledger boundary
 
 The SQLite WAL ledger remains a minimal checkpoint and recovery index, not a
-second workflow engine. It stores exclusive plan-member claims, assignment
+second workflow engine. It stores exclusive Feature claims, assignment
 identity, durable checkpoints, and idempotent side-effect reservations. It
 does not store plans, prompts, messages, worker logs, internal execution-unit
 details, findings, or routine technical state.
@@ -270,22 +357,27 @@ and hosted delivery state before another side effect.
 
 Return one aggregate report with:
 
-- every authoritative Feature Plan and repository member;
-- every derived execution unit and its Feature-criterion mapping;
+- the authoritative Feature Plan Set and every Feature/repository member;
+- every verified local Macro Task registry and parent/child Task identity;
+- every Feature-level dependency and its scheduling/technical interpretation;
+- every derived execution unit and its Feature-criterion/Macro mapping;
+- local Macro Task coverage and its mapping to final Feature evidence;
 - every Feature Worker identity and verified destination;
 - execution waves, path-overlap evidence, and deferred or blocked assignments;
 - candidate, review, publication, delivery-status, stack, and exact-HEAD
   evidence;
 - Feature acceptance evidence bound to each final candidate SHA;
-- authorized closing references and their readback;
+- one registry-derived `closing_issue_refs` set per Feature containing only
+  that Feature and every associated local Macro Task, plus exact PR readback;
 - aggregate outcome complete, deferred, or blocked.
 
-Never claim completion while an eligible plan member lacks a verified PR,
-current exact-HEAD evidence, or verified Feature acceptance coverage.
+Never claim completion while an eligible Feature lacks a verified PR,
+current exact-HEAD evidence, verified Feature acceptance coverage, or verified
+Macro Task coverage.
 
 ## Terminal meanings
 
-- complete: every eligible plan member has verified PR delivery and the
+- complete: every eligible Feature has verified PR delivery and the
   aggregate evidence is reconciled;
 - deferred: all remaining work awaits explicit user authority;
 - blocked: a required contract, capability, identity, authority, or

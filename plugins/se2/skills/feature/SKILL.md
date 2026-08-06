@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Analyze one or more related feature inputs, converge their repository-owned outcomes, surface one consolidated batch of user questions, and produce a structured textual Feature Plan that se2:implement can execute; use optional read-only analyst workers when available, publish the plan to GitHub by default, and never implement code."
+description: "Analyze one or more related feature inputs, converge their repository-owned outcomes into a Feature Plan Set, surface one consolidated batch of user questions, split each Feature into durable macro-vertical Task projections, and produce a structured plan that se2:implement can execute; use optional read-only analyst workers when available, publish by default, and never implement code."
 ---
 
 # Feature Planning
@@ -11,26 +11,36 @@ Use this skill only for an explicit SE2 Feature-planning request. Accept a
 new request, a set of related source issues, or an explicit plan-maintenance
 request for an existing published plan.
 
-The result is a Feature Plan, not an implementation graph. For every
-repository-owned plan member, converge:
+The result is a Feature Plan Set with one or more repository-owned Feature
+members and a durable macro-planning projection, not a technical
+implementation graph. For every Feature member, converge:
 
 - the bounded product or capability outcome;
 - the source-issue relationship and multi-issue consolidation rationale;
 - the problem analysis, scope, non-goals, and repository context;
 - stable Feature acceptance criteria;
+- an observable usable landing state, ownership boundary, and delivery reason;
+- a closed set of macro-vertical Task areas that collectively cover the
+  Feature outcome and its acceptance criteria;
+- macro planning dependencies or `blocked_by` relations between those areas;
+- Feature-level `blocked_by` relations to other Feature members when one
+  distinct functionality depends on another;
 - constraints, assumptions, risks, and validation intent;
 - one complete batch of material questions for the user when decisions remain;
 - a narrative plan that is clear enough for se2:implement to derive execution
   work without invoking se2:feature for technical decomposition.
 
-For a multi-repository request, produce one linked plan member per affected
-repository. Keep repository context and source evidence separate per member.
-Do not create an artificial integration issue.
+For a multi-repository request, produce one or more linked Feature members per
+affected repository. Keep repository context and source evidence separate per
+member. Do not create an artificial Feature container or integration issue.
 
-This skill never writes repository code, derives implementation execution units
-or an execution graph, schedules implementation workers, creates worktrees, chooses code
-design, merges changes, or decides delivery completion. Its terminal product is
-the plan and its optional GitHub projection.
+This skill never writes repository code, derives technical implementation
+execution units or an execution graph, schedules implementation workers,
+creates worktrees, chooses code design, merges changes, or decides delivery
+completion. It does create the Feature-owned macro Task projections and their
+non-operational planning relations. Its terminal product is the complete Plan
+Set, one closed Macro Task registry per Feature, and their optional GitHub
+projections.
 
 ## Application task, delegation, and goal
 
@@ -121,18 +131,47 @@ without fresh evidence.
 
 Treat issue titles, headings, requested counts, and proposed splits as
 candidate evidence. Consolidate sources when they describe one independently
-deliverable outcome. Keep separate plan members when an exclusive outcome,
+deliverable outcome. Keep separate Feature members when an exclusive outcome,
 acceptance obligation, usable landing state, or delivery reason remains.
 
-Multiple source issues may map to one plan member. Independently deliverable
-outcomes become separate plan members in the same plan set or separate
-explicit planning runs. Multi-repository work produces one linked plan member
-per repository. Source mapping and the consolidation decision remain visible
-in the final plan.
+Multiple source issues may map to one Feature member. Independently
+deliverable outcomes become separate sibling Feature members in the same Plan
+Set or separate explicit planning runs. Multi-repository work may produce one
+or more Feature members per repository. Source mapping and the consolidation
+or separation decision remain visible in the final plan.
 
-Do not create implementation units, dependency IDs, execution waves,
-allowed-path claims, or tracker-specific execution relations in Feature planning.
-se2:implement derives those from the complete plan.
+Create separate Feature members only when the user outcome, acceptance
+criteria, usable landing state, ownership, or delivery reason is genuinely
+independent. A shared integration narrative is not a reason to create a
+Feature container. If an acceptance criterion inherently spans distinct
+Features, keep the outcome in one Feature or decompose the criterion into
+Feature-local criteria; never invent a cross-Feature integration Feature.
+
+After each Feature member has one coherent outcome, split that outcome into a
+closed set of Macro Tasks. Each Macro Task is a vertical macro view of the
+same Feature outcome, not an optional deliverable or a technical execution
+unit. Macro Tasks may cross repository layers when those layers serve one
+coherent outcome. Do not split only into backend, frontend, tests, or other
+technical layers. The complete set must cover the Feature acceptance criteria
+and must not introduce scope outside the Feature.
+
+Feature-level `blocked_by` relations connect distinct Feature IDs in the same
+Plan Set and express functional sequencing or dependency context. They are
+not automatically technical execution edges or stack instructions. A Macro
+Task `blocked_by` relation is narrower: it may reference only a Macro Task
+whose `parent_feature_id` is exactly the current Feature ID. Cross-Feature
+Task-to-Task edges are invalid, including when the Features share a
+repository.
+
+Macro Task `blocked_by` relations are planning structure and sequencing
+context. They are not Implement execution edges, worker gates, PR boundaries,
+or stack instructions. Implement re-evaluates real technical prerequisites in
+its own control plane.
+
+Do not create technical implementation units, allowed-path claims, execution
+waves, worker assignments, or technical dependency IDs in Feature planning.
+se2:implement derives those from the complete Feature Plan Set and each
+Feature's Macro Task registry.
 
 ## Question batch
 
@@ -156,18 +195,32 @@ questions belong to se2:implement and do not restart Feature planning.
 
 ## Feature Plan contract
 
-The Feature Plan is the canonical semantic content. When published, a GitHub
-issue of type Feature is its hosted projection and authoritative durable copy;
-the type is metadata and does not carry the semantics.
+The Feature Plan Set is the canonical semantic content. When published, each
+Feature member becomes one GitHub issue of type Feature. There is no hosted
+container issue. Each parent Feature carries the common Plan Set identity and
+revision, the set-membership manifest, its own Feature identity, and its own
+closed Macro Task registry. The type is metadata and does not carry the
+semantics.
 
 The plan must contain:
 
-- plan identity and source-issue mapping;
-- shared outcome, problem statement, and analysis;
+- Feature Plan Set identity, revision, and source-issue mapping;
+- one Feature identity, outcome, problem statement, and analysis per member;
 - explicit scope and non-goals;
-- affected repository members and links;
-- repository-context sources and relevant facts;
-- stable Feature acceptance criteria rendered as F-AC-NN list items;
+- affected Feature members, repositories, and parent-issue identities;
+- repository-context sources and relevant facts per Feature member;
+- stable Feature acceptance criteria rendered as F-AC-NN list items per
+  Feature member;
+- a Feature Plan Set registry that maps every Feature identity to its parent
+  Feature issue, Feature-level `blocked_by` refs, and local Macro Task
+  registry;
+- one hosted child Task projection for every Macro Task, linked to its own
+  parent Feature issue;
+- Macro `blocked_by` relations that reference only Macro Tasks with the same
+  `parent_feature_id` and remain planning-only;
+- the per-Feature closure policy that each parent Feature and only its own
+  associated Macro Tasks belong to that Feature's final implementation
+  closing set;
 - constraints, assumptions, risks, and validation intent;
 - the critic-analyst findings and accepted or rejected challenges;
 - the resolved question batch, or the current awaiting-user-input batch;
@@ -175,11 +228,40 @@ The plan must contain:
 - the handoff statement for se2:implement;
 - selected operation and publication evidence.
 
-Feature criteria use stable F-AC-NN identities and a monotonic
-feature_acceptance_high_water. They are contract identity, not Markdown
-checkbox state. This workflow does not assign T-AC-NN identities or an
-execution-unit acceptance high-water; those belong to the execution plan derived by
-se2:implement.
+Feature identities use stable lower-kebab `feature_id` values within the
+`feature_plan_set_id`. Feature criteria use stable F-AC-NN identities and a
+monotonic feature_acceptance_high_water per Feature member. They are contract
+identity, not Markdown checkbox state. Macro Tasks use stable lower-kebab
+`macro_task_id` values scoped by `parent_feature_id` and map to one or more
+F-AC-NN identities. This workflow does not assign T-AC-NN identities or an
+execution-unit acceptance high-water; those belong to the technical
+execution evidence derived by se2:implement.
+
+The canonical Feature Plan Set registry contains one entry per Feature:
+
+- `feature_plan_set_id`: stable identity for the sibling Feature set;
+- `feature_plan_set_revision`: monotonic set revision;
+- `feature_id`: stable lower-kebab identity within the set;
+- `repository_identity`: the repository owned by this Feature;
+- `parent_issue_ref`: the authoritative hosted Feature issue after publication;
+- `blocked_by`: zero or more Feature IDs in the same set;
+- `macro_tasks`: the complete local Macro Task registry for this Feature.
+
+Each Macro Task entry contains:
+
+- `parent_feature_id`: the Feature identity that owns the Macro Task;
+- `macro_task_id`: stable lower-kebab identity within that Feature;
+- `macro_outcome`, `scope`, and `feature_acceptance_refs`;
+- `blocked_by`: zero or more Macro Task IDs whose `parent_feature_id` is the
+  same value;
+- `macro_status` and `child_issue_ref` after publication.
+
+The set registry is closed. Every Feature identity has exactly one parent
+issue and every Macro Task has exactly one parent Feature and one child Task.
+The registry is projected into every parent Feature issue with the same set
+identity and revision; authoritative readback must reconcile those
+projections. No child issue, title, or narrative text can add a sibling,
+Feature dependency, or Macro Task to the registry.
 
 ## Workflow graph
 
@@ -188,7 +270,7 @@ publication node loads the shared G dependency and hosted-content contracts
 internally; transport and read-after-write safeguards remain mandatory but do
 not become planning nodes.
 
-Before the first hosted operation in plan-publication, load the shared
+Before every hosted write in plan-publication, load the shared
 [hosted-content-safety.md](../../references/hosted-content-safety.md) contract
 for the exact projected content.
 
@@ -203,7 +285,7 @@ flowchart TD
     analysis -->|missing context or failed analysis| blocked
     clarification -->|answer batch received| convergence
     clarification -->|unresolved or declined decision| blocked
-    convergence -->|bounded plan members| plan
+    convergence -->|bounded Feature members| plan
     convergence -->|independent scope cannot be resolved| blocked
     plan -->|draft complete| plan-validation
     plan -->|missing required content| blocked
@@ -222,15 +304,17 @@ Only the following files are graph nodes:
 | analysis | steps/analysis.md | action | normalized source set and repository targets | clarification, convergence, blocked |
 | clarification | steps/clarification.md | decision | consolidated material question batch | convergence, blocked |
 | convergence | steps/convergence.md | action | evidence and answered questions are available | plan, blocked |
-| plan | steps/plan.md | action | bounded plan members are resolved | plan-validation, blocked |
+| plan | steps/plan.md | action | bounded Feature members are resolved | plan-validation, blocked |
 | plan-validation | steps/plan-validation.md | validation | textual plan draft is complete | plan-publication, blocked |
 | plan-publication | steps/plan-publication.md | action | plan is ready and operation mode is resolved | complete, blocked |
 | complete | steps/complete.md | terminal | preview is frozen or publication is verified | none |
 | blocked | steps/blocked.md | terminal | a required planning or publication contract cannot be satisfied | none |
 
 The application task and optional analysis workers are execution envelopes,
-not graph nodes. A question batch is a user-facing wait state inside
-clarification, not a separate node for each question.
+not workflow graph nodes. The durable Feature Plan Set registry and its
+Feature/Macro Task relations are planning projections, not workflow nodes or
+the Implement runtime graph. A question batch is a user-facing wait state
+inside clarification, not a separate node for each question.
 
 ## Workflow rules
 
@@ -238,9 +322,10 @@ clarification, not a separate node for each question.
 
 Normalize the explicit source issue set, preserve the original intent, and
 resolve repository identities without inventing scope. Maintenance rehydrates
-the existing plan projection and carries only the explicit semantic change
-into the same analysis and convergence flow. It never creates a second plan
-identity and it never starts an implementation worker.
+the existing Feature Plan Set, including every Feature identity, parent issue,
+Feature dependency, Macro Task identity, and child issue. It carries only the
+explicit semantic change into the same analysis and convergence flow. It
+never creates a second set identity or starts an implementation worker.
 
 ### Analysis
 
@@ -251,64 +336,99 @@ critic challenges, assumptions, and the complete question candidate set.
 
 ### Convergence
 
-Resolve one or more repository-owned plan members from the evidence. Preserve
-source provenance and explain every consolidation or separation. Do not
-manufacture distinctions merely to preserve issue counts. A plan is ready for
-composition only when each member has a coherent outcome and a clear
-ownership boundary.
+Resolve one or more repository-owned Feature members from the evidence.
+Preserve source provenance and explain every consolidation or separation. Do
+not manufacture distinctions merely to preserve issue counts. A Plan Set is
+ready for composition only when each Feature has a coherent outcome, a clear
+ownership boundary, and any Feature-level dependency is explicit and
+acyclic.
 
 ### Plan composition and validation
 
 Write the narrative plan from confirmed evidence, accepted assumptions, and
-answered questions. Keep implementation considerations useful to Implement
-without turning them into an execution graph or prescribing code design.
+answered questions. First compose the Feature Plan Set and its distinct
+Feature members; then compose one closed Macro Task registry per Feature.
+Keep each Macro Task useful to Implement without turning it into a technical
+execution unit or prescribing code design.
 
-Validate only the plan contract: outcome, scope, non-goals, repository
+Validate only the Plan Set and macro-planning contract: set identity and
+revision, distinct Feature boundaries, outcome, scope, non-goals, repository
 identity, acceptance criteria, source mapping, context evidence, assumptions,
-risks, validation intent, question status, critic reconciliation, and
-Implement handoff clarity. Do not validate execution graphs, worker scheduling,
-current Git HEADs, or implementation readiness here.
+risks, validation intent, question status, critic reconciliation, Feature
+dependency coverage, Macro Task coverage, Macro Task identity, local macro
+dependency validity, and Implement handoff clarity. Do not validate technical
+execution graphs, worker scheduling, current Git HEADs, or implementation
+readiness here.
 
 ### Plan publication
 
 Resolve run_mode once after plan validation. Omitted run_mode means publish;
 preview is accepted only when explicitly requested. Preview retains the
-complete plan as local report data and performs no hosted reads for a new
-source. Publish loads the G dependency preflight and hosted-content-safety
-contract immediately before the first hosted operation, publishes one Feature
-plan issue per repository member through the G-owned workflow, and verifies
-every result with authoritative read-after-write evidence. A hosted failure
-does not silently fall back to preview; retain the calculated plan and report
-the blocker.
+complete Feature Plan Set, Feature registry, local Macro Task registries, and
+proposed parent/child projections as local report data and performs no hosted
+reads for a new source.
 
-When one exact hosted Idea was the source and the Feature Plan publishes
-successfully, close that source Idea as completed only after the plan
-publication and its readback are verified. Preview and ambiguous source
-identity never close an Idea.
+Publish loads the G dependency preflight and hosted-content-safety contract
+immediately before every hosted write. For each Feature member, publish one
+parent Feature issue through the G-owned hosted issue workflow. Do not create
+a Feature Plan Set container or integration issue. Then publish one child
+Task issue per Macro Task, link each child to its own parent Feature issue,
+and project Feature-level and Macro-level planning `blocked_by` values into
+the set manifest, parent Feature bodies, and child Task bodies. Do not invent
+a provider-native blocker relation. Update every parent Feature projection
+with the final set membership, authoritative parent issue refs, local child
+issue refs, and registry after all parent and child identities are known.
+
+The set registry remains the canonical mapping from `feature_id` to parent
+Feature issue and from `(parent_feature_id, macro_task_id)` to child Task
+issue. The hosted projections must all report the same set identity and
+revision. A Feature-level edge may cross repositories; a Macro Task edge may
+not cross parent Features even in one repository. Publication is complete
+only when every parent registry, child issue, parent/child relation, issue
+type, and registry `blocked_by` value passes authoritative read-after-write
+verification.
+
+Each parent Feature plus every associated Macro Task issue forms one closed
+implementation issue set. A Feature's set never includes a sibling Feature or
+the sibling's Macro Tasks. A hosted failure does not silently fall back to
+preview; retain the calculated Plan Set and report the blocker.
+
+When one exact hosted Idea was the source and the complete Feature Plan Set,
+every sibling Feature, every child Task, all relations, and their
+authoritative readbacks publish successfully, close that source Idea as
+completed. Preview and ambiguous source identity never close an Idea.
 
 ### Implement handoff
 
-Only a complete published plan is an implementation input. Implement reads
-the authoritative plan, derives execution units and their dependencies,
-path envelopes, and runtime waves in its own control plane, then creates its
-orchestrator and Feature Workers. Technical interpretation remains in
-Implement. A product-level contradiction is reported to the user as a
-bounded plan question; Implement must not create an automatic plan-repair
+Only a complete published Feature Plan Set and its verified sibling/Macro
+projections are implementation input. Implement reads the authoritative set,
+uses Feature-level `blocked_by` for scheduling context, re-evaluates real
+technical prerequisites, and derives technical execution units, path
+envelopes, and runtime waves in its own control plane. It creates one Feature
+Worker and one PR per implementation-eligible Feature member. A
+same-repository code dependency may justify a stack; functional order and
+every cross-repository dependency remain standalone. Technical interpretation
+remains in Implement. A product-level contradiction is reported to the user
+as a bounded plan question; Implement must not create an automatic plan-repair
 planner for ordinary implementation detail.
 
 ## Transient state and terminal report
 
 Keep current_node_id, entry_route, source_route, run_mode, source issue
-identities, repository plan members, analysis evidence, worker provenance,
-question batch, assumptions, artifacts, publication evidence, blockers, and
-terminal state explicit and transient. Do not store runtime state in Markdown.
+identities, Feature Plan Set and Feature members, analysis evidence, worker
+provenance, question batch, assumptions, artifacts, publication evidence,
+blockers, and terminal state explicit and transient. Do not store runtime
+state in Markdown.
 
 A complete report contains:
 
-- every plan member and repository identity;
+- the Feature Plan Set identity and every Feature member/repository identity;
 - source issues, consolidation and separation rationale;
 - problem analysis, outcome, scope, non-goals, and context sources;
 - Feature acceptance criteria and high-water evidence;
+- the complete Feature registry, Feature-level dependency relations, every
+  local Macro Task registry, and projected parent/child issue identities when
+  published;
 - assumptions, risks, validation intent, and critic findings;
 - the full question batch and the user's resolutions;
 - the complete textual plan and Implement handoff;

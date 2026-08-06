@@ -2,7 +2,7 @@
 
 plugins/se2/ is an experimental graph-first workflow package. Learn, Idea,
 Feature, Implement, and Audit expose distinct workflow graphs; Feature owns the
-repository-scoped textual Feature Plan graph. SE2 is independent from plugins/se/;
+repository-scoped textual Feature Plan Set graph. SE2 is independent from plugins/se/;
 do not silently merge its graph contract into the existing SE plugin.
 
 ## Ownership map
@@ -31,8 +31,9 @@ do not silently merge its graph contract into the existing SE plugin.
   capture, localization, Code Review Rules, concise AGENTS.md Project Context
   pointer reconciliation, and AGENTS.md compaction proposals and its workflow
   registry; its references own branch-specific detail.
-- skills/feature/SKILL.md owns the graph manifest, Mermaid overview, node
-  registry, Feature Plan contract, question-batch rules, optional analysis
+- skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
+  node registry, Feature Plan Set, Feature identity, Feature-level dependency,
+  and local Macro Task contracts, question-batch rules, optional analysis
   roles, publication adapter, and terminal states.
 - skills/feature/references/task-profile.md owns the required Feature planner,
   optional analyst roles, model/reasoning profiles, and topology selection.
@@ -42,9 +43,10 @@ do not silently merge its graph contract into the existing SE plugin.
   node namespace.
 - skills/implement/SKILL.md owns the GitHub-Feature-to-PR workflow registry and
   Mermaid projection. Its references own multi-Feature orchestration,
-  execution and delivery topology, orchestrator/worker profiles, Contract
-  Repair, worker-session review, standalone and stacked delivery, stack
-  reconciliation, and the SQLite WAL run-state contract.
+  execution and delivery topology, orchestrator/worker profiles, optional
+  Feature Worker support delegation, worker-session review, standalone and
+  stacked delivery, stack reconciliation, and the SQLite WAL run-state
+  contract.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
@@ -62,16 +64,24 @@ do not silently merge its graph contract into the existing SE plugin.
 
 ## Maintenance contract
 
-- Keep Feature planning free of implementation authority. Feature publishes
-  one or more complete textual Feature Plans; Implement consumes those plans,
-  derives execution units internally, and returns a verified standalone or
-  stacked PR topology. Implement must not create an automatic plan-repair
-  planner for ordinary technical interpretation.
+- Keep Feature planning free of technical implementation authority. Feature
+  publishes one complete Feature Plan Set containing only genuinely distinct
+  sibling Features, each with a closed set of durable macro-vertical Task
+  projections. Feature-level and macro-local `blocked_by` relations remain
+  planning-only. Implement consumes the verified set, derives technical
+  execution units internally, and returns a verified standalone or stacked
+  PR topology. Implement must not create an automatic plan-repair planner for
+  ordinary technical interpretation.
 - Keep Feature acceptance criteria as ordinary list items with stable bracketed
-  `F-AC-NN` identities, never Markdown checkbox state. Feature owns criterion
-  identity, monotonic retirement high-water marks, source and question
-  provenance, and the durable plan projection. Implement owns execution-unit
-  decomposition and exact-head implementation evidence. The uppercase
+  `F-AC-NN` identities, never Markdown checkbox state. Feature owns Plan Set
+  identity, stable Feature identities, criterion identity, monotonic retirement
+  high-water marks, source and question provenance, Feature-level dependency
+  relations, each closed Macro Task registry, macro-local planning relations,
+  and the durable parent/child projection. Implement owns technical
+  execution-unit decomposition, exact-head implementation evidence, and one
+  registry-derived closing set per Feature. Macro Tasks are planning views of
+  the same Feature outcome and are always included with that parent Feature;
+  sibling Features and their Tasks are never included. The uppercase
   bracketed IDs are an explicit rendered-contract syntax exception to
   lower-kebab values.
 - Keep Implement execution waves separate from PR delivery topology.
@@ -81,15 +91,27 @@ do not silently merge its graph contract into the existing SE plugin.
   blocked until it has one valid integration base. G owns publication and
   pairwise stack linking. Parent drift invalidates descendant evidence, and
   each worker owns its own bottom-to-top rebase and review cycle.
+- Keep Feature Worker support delegation subordinate to the parent Worker.
+  Delegation is optional and must fall back to serial parent execution when
+  unavailable, unknown, or capacityless. Support assignments may return
+  bounded evidence or scoped changes, but never own a Feature member, final
+  candidate, PR, Feature Plan Set, GitHub mutation, or ledger state. Do not run
+  overlapping writes in one worktree.
 - Keep the Implement ledger a minimal recovery index, not a second workflow
   engine. Preserve five tables, including exclusive active Feature claims,
   SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
   message logs, findings, and routine worker state. The orchestrator is its only
   runtime client; workers supply evidence but never access the ledger.
-- Keep derived execution-unit dependency edges executable: a downstream
-  candidate must contain every exact prerequisite HEAD through verified merged,
-  stacked, or worker-composed ancestry. PR readiness alone never satisfies a
-  dependency.
+- Keep Feature-level scheduling and derived execution-unit dependency edges
+  separate. A Feature `blocked_by` edge may order work and may cross
+  repositories, but it never automatically creates a stack. Only independent
+  evidence of a true same-repository code dependency can justify a stack;
+  functional order and cross-repository dependencies remain standalone. A
+  downstream candidate must contain every exact technical prerequisite HEAD
+  through verified merged, stacked, or worker-composed ancestry. PR readiness
+  alone never satisfies a dependency. Macro Task `blocked_by` relations are
+  planning context only and never become executable edges without independent
+  Implement evidence.
 - Keep deterministic task-title initialization shared by every task-managed
   SE2 skill. After stable identity readback, require one bounded reconciliation
   outcome before monitoring: exact verification or an explicit
@@ -108,15 +130,19 @@ do not silently merge its graph contract into the existing SE plugin.
   including worker/tool-originated content, and fail closed when portable
   identity cannot be established.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
-  hosted plan rehydration through the shared G dependency gate before hosted
-  reads, and route default plan publication through the single publication
-  adapter and G-owned issue workflow before any hosted mutation. Preview is
-  opt-in and must never be selected implicitly when publish authority or G is
-  unavailable.
+  hosted Plan Set rehydration through the shared G dependency gate before
+  hosted reads, and route default publication through the single publication
+  adapter and G-owned issue workflow before any hosted mutation. Publication
+  creates every sibling parent Feature, every local child Macro Task, their
+  planning relations, and the final set registry readback without a container
+  issue. Preview is opt-in and must never be selected implicitly when publish
+  authority or G is unavailable.
 - Keep Implement GitHub-backed end to end. It accepts authoritative published
-  Feature Plans, derives its execution units in the Implement control plane,
-  and returns a verified hosted PR topology. It has no local-only or preview
-  implementation mode.
+  Feature Plan Sets with verified sibling/Macro projections, derives its
+  technical execution units in the Implement control plane, and returns one
+  verified hosted PR topology per Feature whose `closing_issue_refs` contains
+  only that Feature's parent and every associated local Macro Task. It has no
+  local-only or preview implementation mode.
 - Keep Audit strictly observational. Attribute SE2 use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.
@@ -143,15 +169,21 @@ do not silently merge its graph contract into the existing SE plugin.
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
   read-first routing, evolution-rule projection, and no-dangling-pointer rule.
-- Validate Feature Plan graph reachability, the question-batch wait boundary,
-  optional delegation fallback, publication-before-hosted-access, reconciliation
-  to `complete` or `blocked`, and the absence of side effects or outgoing
-  edges on terminal nodes.
+- Validate Feature Plan Set graph reachability, genuinely distinct sibling
+  Feature boundaries, Feature registry coverage, Feature-level acyclic
+  planning relations, each local Macro Task registry, same-parent-only macro
+  relations, the question-batch wait boundary, optional delegation fallback,
+  publication-before-hosted-access, parent/child publication and readback,
+  reconciliation to `complete` or `blocked`, and the absence of side effects
+  or outgoing edges on terminal nodes.
 - Validate Idea default-publish/explicit-preview routing, Learn's local-only
   boundary, and Implement's mandatory hosted-source and PR-output path.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
-  the delivery-gate and stack-reconcile paths.
+  the delivery gate, Feature-level scheduling, optional Feature Worker
+  delegation fallback, exact sibling/Macro Task readback, per-Feature
+  registry-derived closing sets, same-repository stack qualification, and
+  stack-reconcile paths.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
   Implement, and their write-owning references route through the one canonical
   hosted-content owner without duplicate Idea doctrine.

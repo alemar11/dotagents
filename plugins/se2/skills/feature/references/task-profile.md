@@ -24,12 +24,13 @@ it does not select or rewrite these values.
         reasoning: medium
         topology: independent-first-principles-analysis
     topology: planner-with-optional-analysis-workers
-    title_template: "📚 Plan Feature · <Feature outcome>"
+    title_template: "📚 Plan Feature Set · <set outcome>"
 
-The planner owns the application task, the Feature graph, the question batch,
-the reduction of worker evidence, the canonical textual plan, and the final
-publication report. The application task is an execution envelope, not a
-Feature graph node.
+The planner owns the application task, the Feature workflow graph, the
+Feature Plan Set registry, each Feature's local Macro Task registry, the
+question batch, the reduction of worker evidence, the canonical textual plan,
+and the final publication report. The application task is an execution
+envelope, not a Feature or Macro Task graph node.
 
 Optional roles are capability-conditioned. When delegation is available, the
 planner may run bounded analysis-worker assignments with distinct analytical

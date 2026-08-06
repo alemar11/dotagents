@@ -13,6 +13,10 @@ outputs:
   - repository-context-evidence
   - intent-analysis
   - boundary-analysis
+  - feature-boundary-evidence
+  - feature-dependency-evidence
+  - macro-boundary-evidence
+  - macro-dependency-evidence
   - question-candidates
   - critic-analysis
   - assumptions
@@ -70,5 +74,13 @@ duplicate questions, and separates:
 - material questions for the user;
 - non-blocking risks and follow-up suggestions.
 
-Do not derive execution units, dependency IDs, execution waves, path claims, or worker
-schedules in this node. Those belong to Implement.
+Identify candidate Feature boundaries and evidence for whether each outcome
+has a separate usable landing state, ownership, acceptance obligation, or
+delivery reason. Record candidate Feature-level `blocked_by` relations and
+their evidence for later Plan Set composition. Identify candidate Macro Task
+areas and evidence-backed local macro `blocked_by` relationships. Keep both
+levels vertical at the product/capability level and do not split by technical
+layer. Do not create Feature containers or cross-Feature Macro Task edges.
+Do not derive technical execution units, allowed paths, execution waves,
+worker schedules, or technical dependency IDs in this node. Those belong to
+Implement.

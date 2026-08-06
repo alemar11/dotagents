@@ -6,22 +6,38 @@ every skill into an implementation graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 hosted shape. This reference owns workflow structure only.
-Feature owns Feature Plan semantics; Implement owns the derived implementation
-units and delivery graph. Learn, Idea, and Audit own their skill-specific
-registries and branch details.
+Feature owns Feature Plan Set semantics, Feature identities, Feature-level
+planning dependencies, and the durable local Macro Task projections;
+Implement owns the derived technical execution units, scheduling
+interpretation, and delivery graph.
+Learn, Idea, and Audit own their skill-specific registries and branch details.
 
 ## Graph model
 
 A workflow graph describes control state and authority boundaries for one skill
-run. It is distinct from the Feature Plan and Implement execution graph:
+run. It is distinct from the durable Feature Plan Set graph and the Implement
+execution graph:
 
 - a workflow node describes what phase the skill is in;
-- an execution-unit node describes an independently valuable implementation
-  outcome;
+- a Feature node describes one genuinely distinct sibling outcome in a Plan
+  Set;
+- a Macro Task node describes a vertical macro planning view of one owning
+  Feature outcome;
+- an execution-unit node describes an independently valuable technical
+  implementation outcome;
 - a workflow graph may contain decisions, validations, actions, and terminal
   outcomes;
+- Feature-level relations describe planning structure between Feature IDs and
+  may include `blocked_by` context;
+- Macro Task relations describe planning structure only within one
+  `parent_feature_id` and may include local `blocked_by` context;
 - Implement execution edges may contain only real implementation prerequisites;
-  Feature planning does not publish those edges.
+  Feature planning does not publish those technical edges. Feature-level
+  order or cross-repository dependency never automatically becomes a stack.
+
+Feature IDs, Macro Task IDs, parent/child identities, and both dependency
+scopes are owned by the Feature Plan Set contract, not by the workflow-node
+registry below.
 
 Each graph registry declares the following fields:
 

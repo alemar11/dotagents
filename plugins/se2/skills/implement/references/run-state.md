@@ -67,8 +67,9 @@ Keep only five tables:
 - `runs`: one multi-Feature run, orchestrator identity, coarse checkpoint,
   aggregate status, and revision;
 - `feature_claims`: exclusive active ownership from one authoritative GitHub
-  Feature Plan to one Implement run, with revision and explicit release state;
-- `assignments`: one immutable Feature Plan ref, Feature Worker identity and
+  Feature Plan/Feature ID to one Implement run, with revision and explicit
+  release state;
+- `assignments`: one immutable Feature ref, Feature Worker identity and
   worktree, branches, SHAs, PR ref, plan-question identity, checkpoint, status,
   and revision;
 - `operations`: one idempotency reservation for a side effect, its subject,
@@ -79,7 +80,7 @@ JSON, model/reasoning profiles, code state, or Feature Worker technical state.
 
 Path claims are transient control-plane reservations, not a sixth ledger table.
 The orchestrator must normalize the union of the derived execution-unit path
-envelopes in a plan-member assignment, atomically claim the resulting envelope
+envelopes in a Feature assignment, atomically claim the resulting envelope
 before Feature Worker bootstrap, and release or reconcile it at the assignment
 boundary. Never infer path ownership from an active plan claim, a theoretical
 wave, or a stale assignment checkpoint. On resume, independently reread the
@@ -117,11 +118,11 @@ transaction. It never releases one Feature independently. Preserve claims for
 resumable blocked or deferred runs. Never infer release from plan or PR state
 without terminal reconciliation.
 
-Exactly one assignment may exist per claimed Feature Plan member in a run. An assignment
+Exactly one assignment may exist per claimed Feature in a run. An assignment
 may be created or moved only while its `feature_ref` has an
 active claim owned by the same run. A released, missing, or foreign claim
 blocks the checkpoint; assignment state never establishes Feature ownership.
-Feature Plan and repository identity are immutable after creation. The current
+Feature/Plan Set identity and repository identity are immutable after creation. The current
 plan revision is recovered from the authoritative hosted plan and is never
 copied into the ledger assignment.
 

@@ -1,6 +1,6 @@
 # Implement Orchestration
 
-This reference owns multi-Plan scheduling, textual-plan interpretation,
+This reference owns Feature Plan Set scheduling, textual-plan interpretation,
 Feature Worker dialogue, user plan questions, and delivery-topology routing.
 
 Before any hosted publication or user-facing hosted relay, apply the shared
@@ -10,30 +10,53 @@ contract to the exact final content. G owns transport and readback.
 ## Control plane
 
 The orchestrator coordinates one run containing one or more authoritative
-GitHub Feature Plans. Each plan member retains its repository binding, one
-Feature assignment, one Feature Worker, and one PR output. The orchestrator
-derives execution units from the plan before scheduling; the Feature Plan
-does not contain the runtime execution graph.
+GitHub Feature Plan Sets and their verified sibling/Macro projections. Each
+Feature member retains its Feature ID, repository binding, one Feature
+assignment, one complete local Macro Task set, one Feature Worker, and one PR
+output. The orchestrator derives technical execution units from the Feature
+and its local Macro Task registry before scheduling; the Plan Set does not
+contain the runtime execution graph.
 
 Provider delivery readiness is observed through
 $g:github-delivery-status against the current exact PR HEAD; the orchestrator
 does not reinterpret raw provider states.
 
-Run independent plan members concurrently when their repositories, derived
-path envelopes, real cross-member code dependencies, and observed runtime
-capacity are safe. Serialize real dependencies and unsafe overlap. Do not
-create synthetic dependencies, impose a fixed worker cap, or stop independent
-plan members because one assignment is blocked or deferred.
+Run independent Features concurrently when their repositories, derived path
+envelopes, real cross-Feature code dependencies, Feature-level `blocked_by`
+context, and observed runtime capacity are safe. Serialize real dependencies
+and unsafe overlap. Do not create synthetic dependencies, impose a fixed
+worker cap, or stop independent Features because one assignment is blocked or
+deferred.
 
-Before any Feature Worker starts, claim the complete sorted plan-member set in
-one ledger transaction. A conflicting active claim blocks startup without
-partial claims or a competing orchestrator. Release all claims atomically
-after terminal reconciliation.
+Before any Feature Worker starts, claim the complete sorted Feature set in one
+ledger transaction. A conflicting active claim blocks startup without partial
+claims or a competing orchestrator. Release all claims atomically after
+terminal reconciliation.
 
-## Plan interpretation and execution units
+## Macro plan interpretation and execution units
 
-The orchestrator reads the authoritative Feature Plan and derives a transient
-execution unit set. Each unit must have:
+The orchestrator reads the authoritative Feature Plan Set manifest and every
+hosted sibling Feature with its local Macro Task children before deriving a
+transient technical execution unit set. It verifies set identity/revision,
+Feature membership, Feature-level `blocked_by`, each local parent registry,
+one-to-one child issue mapping, parent/child relations, issue types, and
+same-parent-only macro dependencies. A missing, extra, duplicate,
+cross-parent, cyclic, or mismatched identity blocks the assignment before a
+worker starts.
+
+Feature-level `blocked_by` relations are scheduling context and may cross
+repositories. Macro `blocked_by` relations are planning context within one
+parent Feature. Neither relation creates technical execution edges, worker
+gates, PR boundaries, or stacks by itself. The orchestrator re-evaluates real
+technical prerequisites independently; only a real same-repository code
+dependency can justify a stack. If an upstream Feature named by
+`blocked_by` is missing, unverified, or outside the selected implementation
+scope, keep the dependent assignment blocked or deferred; never silently
+implement it as if the Feature-level dependency were absent. Once the
+upstream outcome is verified but no code ancestry is required, schedule the
+dependent Feature in order while keeping its PR standalone.
+
+Each derived unit must have:
 
 - one observable technical outcome;
 - repository and path scope;
@@ -42,19 +65,20 @@ execution unit set. Each unit must have:
 - real implementation prerequisites;
 - evidence needed from the Feature Worker.
 
-Use the smallest useful vertical units. Keep implementation and validation
+Use the smallest useful technical vertical units. Keep implementation and validation
 layers together when they serve one outcome. Do not split a unit merely by
 database, API, UI, test, documentation, or tracker layer unless that layer is
 independently valuable.
 
 Dependency edges mean real implementation prerequisites. Path overlap,
-capacity, and preferred order are separate scheduling facts. Cross-repository
-prerequisites remain plan-member context and never become a shared execution
-edge.
+capacity, preferred order, Feature-level functional order, and
+cross-repository prerequisites are separate scheduling facts and never become
+a shared execution edge automatically.
 
 The orchestrator owns this translation and may ask the Feature Worker to
-refine technical units during implementation. It must not rewrite or publish
-the Feature Plan.
+refine technical units during implementation. It must preserve coverage of
+every Macro Task and must not rewrite or publish the Feature Plan or its Macro
+Task registry.
 
 ## User plan questions
 
@@ -62,20 +86,22 @@ When a Feature Worker finds a product-level contradiction, missing outcome,
 ownership conflict, or material acceptance gap, create one plan-question
 record for the affected assignment. Present the bounded decision to the user
 with its evidence and impact. Keep the assignment deferred while independent
-plan members continue.
+Features continue.
 
 Do not create a separate Feature planner task automatically. If the user's
-answer requires changing the published Feature Plan, report an explicit
+answer requires changing the published Feature Plan Set, report an explicit
 se2:feature maintenance request as the recovery action and preserve the
 worker's useful implementation evidence where safe. Technical implementation
 ambiguity remains inside Implement and never becomes a Feature question.
 
 ## Execution and delivery topology
 
-For every plan member, bootstrap exactly one Feature Worker. The worker
+For every Feature member, bootstrap exactly one Feature Worker. The worker
 executes its derived units in deterministic prerequisite order inside one
-isolated worktree. Parallelism is only between plan members whose paths,
-repositories, dependencies, and live capacity are safe.
+isolated worktree. It may use optional bounded support assignments when live
+delegation and usable worker capacity are observed; otherwise it continues
+serially. Parallelism is only between Features whose paths, repositories,
+dependencies, Feature-level scheduling context, and live capacity are safe.
 
 Derive standalone or stacked delivery separately from execution order:
 
@@ -83,8 +109,9 @@ Derive standalone or stacked delivery separately from execution order:
 - stacked: one same-repository immediate parent is the intended integration
   base and its exact verified branch and HEAD are available.
 
-Serialization caused only by path overlap, capacity, or preferred order
-remains standalone. A fan-in requires one Feature Worker-owned integration
+Serialization caused only by path overlap, capacity, Feature-level functional
+order, or preferred order remains standalone. A fan-in requires one Feature
+Worker-owned integration
 candidate containing every prerequisite HEAD or an authoritative merged base.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
@@ -96,6 +123,40 @@ If a parent changes after a child starts, invalidate the descendant's
 integration, review, CI, and readiness evidence. Return the parent to its
 worker, then rebase and revalidate descendants bottom to top. The
 orchestrator coordinates this sequence but never edits or rebases worker code.
+
+## Optional Feature Worker support
+
+The Feature Worker is the parent owner of one Feature member, its complete
+local Macro Task set, worktree, integration branch, candidate HEAD,
+acceptance matrix, native review, and PR. Macro Tasks are planning
+projections, not worker or PR boundaries.
+Optional support assignments are subordinate to that lifecycle and are not
+additional Feature assignments. The parent may select these bounded
+responsibilities:
+
+- `code-analyst` for read-only repository, impact, and dependency analysis;
+- `execution-assistant` for one explicitly bounded execution unit;
+- `validation-assistant` for focused checks and validation evidence;
+- `critic-reviewer` for independent design, regression, and current-candidate
+  challenges.
+
+The parent supplies each helper with the current Feature ID, Plan Set revision,
+local Macro Task context, execution-unit scope, exclusive path envelope, and
+validation intent. Helpers
+return evidence or a scoped change proposal; they never edit or publish the
+Feature Plan, never access the SQLite ledger, never mutate GitHub, never create
+Feature Workers or planner tasks, and never own final delivery evidence. An
+execution assistant may write only within an exclusive envelope or isolated
+helper context. The
+Feature Worker integrates the result, reruns complete validation and native
+review, and owns the final candidate commit.
+
+Do not run overlapping writes in the same worktree. Record delegation as
+`delegated-support` only after a helper task and result are independently
+observed. If delegation is unavailable, unknown, or capacity is zero, use
+`serial-fallback`; these conditions do not block the Feature Worker. The
+orchestrator reports the effective mode but does not treat configured
+delegation or capacity as proof that a helper started.
 
 ## Feature Worker dialogue
 
@@ -111,8 +172,11 @@ It must not prescribe code, files, commands, tests, review fixes, or design.
 The Feature Worker owns implementation semantics, conflict resolution,
 validation, candidate evidence, exact-HEAD review, and fixes.
 
-The orchestrator is the only task creator for implementation. A Feature
-Worker never creates another worker or planner task.
+The orchestrator is the only creator of implementation assignments and
+Feature Worker tasks. A Feature Worker never creates another Feature Worker or
+planner task. It may create subordinate support assignments only when the
+optional delegation preflight is available; those assignments remain outside
+the implementation ledger and never replace the parent Feature Worker.
 
 ## Ledger boundary
 

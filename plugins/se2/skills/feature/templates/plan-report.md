@@ -8,18 +8,36 @@
 - plan_status: <planning-awaiting-user-input-plan-ready-published-or-blocked>
 - goal_status: <active-complete-or-not-available>
 
-## Plan members
+## Feature Plan Set
 
-| repository | Feature Plan issue | outcome | status |
-| --- | --- | --- | --- |
-| <repository> | <issue reference or local preview> | <outcome> | <status> |
+- feature_plan_set_id: <set identity>
+- feature_plan_set_revision: <revision>
+- set_status: <preview-published-or-blocked>
+
+| feature_id | repository | parent Feature issue | Feature blocked_by | status |
+| --- | --- | --- | --- | --- |
+| <feature-id> | <repository> | <issue reference or local preview> | <Feature ID or none> | <status> |
+
+### Feature members
+
+| feature_id | repository | Feature Plan issue | outcome | status |
+| --- | --- | --- | --- | --- |
+| <feature-id> | <repository> | <issue reference or local preview> | <outcome> | <status> |
+
+### Macro Tasks
+
+| Feature ID | Feature issue | parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <feature-id> | <Feature issue> | <feature-id> | <macro-01> | <issue reference or local preview> | <F-AC-01> | <local macro ID or none> | <status> |
 
 ## Source and boundary evidence
 
 - source issues:
 - consolidation decision:
 - separate or out-of-scope sources:
-- linked repository plan members:
+- linked Feature members and repositories:
+- Feature Plan Set identity and revision:
+- Feature-level dependency graph:
 
 ## Analysis
 
@@ -42,7 +60,9 @@
 - desired outcome:
 - scope:
 - non-goals:
-- acceptance criteria:
+- Feature acceptance criteria by Feature:
+- Feature registry and parent issue mapping:
+- local Macro Task registries and macro dependencies:
 - validation intent:
 - Implement handoff:
 
@@ -51,5 +71,8 @@
 - plan-validation:
 - publication:
 - read-after-write:
+- parent Feature publication and set readback:
+- Macro Task child publication and local registry readback:
+- Feature-level dependency readback:
 - source-Idea lifecycle:
 - blockers:
