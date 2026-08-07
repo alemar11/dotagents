@@ -38,6 +38,10 @@ Read the shared
 SE graph. For each selected session, read the exact active contract for every
 confirmed SE skill before assessing it.
 
+Read [states.md](references/states.md) for the human-readable meaning of every
+Audit node and for the separate report, evidence, finding, and observed-runtime
+state registries. That reference also defines the runtime-checkpoint boundary.
+
 ## Workflow graph
 
 The registry is the structural source of truth. Mermaid is its maintained

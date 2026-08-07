@@ -64,9 +64,11 @@ silently widening the run. File churn alone is not durable context evidence.
 ## Workflow graph
 
 Read the shared [workflow-graph.md](../../references/workflow-graph.md) before
-using this registry. Learn owns the registry below; its routed references own
-operation-specific detail. The registry is the structural source of truth and
-Mermaid is its projection.
+using this registry. Read [references/states.md](references/states.md) for the
+human-readable distinction between workflow nodes, selectable fields, derived
+facts, result values, and persisted domain state. Learn owns the registry
+below; its routed references own operation-specific detail. The registry is the
+structural source of truth and Mermaid is its projection.
 
 | node_id | kind | entry condition | transitions | terminal state |
 | --- | --- | --- | --- | --- |
@@ -233,6 +235,7 @@ instead of guessing.
 
 ## Reference responsibilities
 
+- states.md: workflow-node and field-qualified state inventory.
 - options.md: canonical fields and values.
 - domain.md: repository-root and scoped-context discovery, layout, and ADR
   ownership.

@@ -3,6 +3,9 @@
 This reference owns the minimal SQLite WAL checkpoint and recovery ledger for
 `se:implement`. The ledger is not the workflow engine and never replaces
 authoritative application, GitHub, Git, or filesystem readback.
+Use [states.md](states.md) as the canonical human-readable registry for run and
+assignment status/checkpoint values, valid pairs, Feature-claim states,
+operation results, and their recovery meaning.
 
 The orchestrator is the sole runtime ledger client. Feature Workers communicate
 bounded evidence to the orchestrator and never invoke, inspect, or reconcile
@@ -16,8 +19,8 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.0.0` |
-| Runtime contract | `3.0.0` |
+| CLI | `3.1.0` |
+| Runtime contract | `3.1.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
 
@@ -46,6 +49,11 @@ different from the metadata singleton. `state prepare` may repair permissions,
 WAL, and runtime identity for the current schema; it never rewrites an
 incompatible schema or follows a symlink.
 
+Normal commands and `doctor` also reject any persisted run or assignment pair,
+Feature-claim status, or operation result outside the registry exposed by
+`capabilities`. An incompatible runtime contract requires the explicit reset
+path; there is no state-value migration or compatibility alias.
+
 The `runtime_metadata` singleton row is the schema source of truth. Require the
 current schema identity plus the exact table definitions, types, nullability,
 primary and unique keys, checks, foreign keys, and explicit index definitions.
@@ -70,8 +78,7 @@ Keep only five tables:
   Feature Plan/Feature ID to one Implement run, with revision and explicit
   release state;
 - `assignments`: one immutable Feature ref, Feature Worker identity and
-  worktree, branches, SHAs, PR ref, plan-question identity, checkpoint, status,
-  and revision;
+  worktree, branches, SHAs, PR ref, checkpoint, status, and revision;
 - `operations`: one idempotency reservation for a side effect, its subject,
   status, receipt ref, and readback ref.
 
@@ -82,11 +89,15 @@ Path claims are transient control-plane reservations, not a sixth ledger table.
 The orchestrator must normalize the union of the derived execution-unit path
 envelopes in a Feature assignment, atomically claim the resulting envelope
 before Feature Worker bootstrap, and release or reconcile it at the assignment
-boundary. Never infer path ownership from an active plan claim, a theoretical
-wave, or a stale assignment checkpoint. On resume, independently reread the
-authoritative plan and current repository/base/HEAD evidence, then reacquire
-the path claim before execution. The five-table ledger remains a recovery
-index; it does not prove a live path claim.
+or inactive-Worker boundary. After verified `candidate-published`, release the
+active path claim while the Worker is resumable and the assignment is
+`delivery-pending`. Before any repair or rebase resumption, reacquire the exact
+envelope; if it is unavailable, leave the repair pending and do not permit
+overlapping writes. Never infer path ownership from an active plan claim, a
+theoretical wave, or a stale assignment checkpoint. On resume, independently
+reread the authoritative plan and current repository/base/HEAD evidence, then
+reacquire the path claim before execution. The five-table ledger remains a
+recovery index; it does not prove a live path claim.
 
 ## Command families
 
@@ -112,7 +123,7 @@ set or changes nothing; an active claim from another run returns
 `owner/repository#number` identity before lookup or storage, including an
 equivalent GitHub issue URL. `feature release` accepts the complete active claim
 set and expected revision for every member, verifies the run is at
-`release-claims`, every assignment is delivery-ready at `final-verify`, and no
+`release-claims`, every assignment is `delivery-ready @ final-verify`, and no
 operation remains pending or unknown, then releases the whole set in one
 transaction. It never releases one Feature independently. Preserve claims for
 resumable blocked or deferred runs. Never infer release from plan or PR state
@@ -133,11 +144,21 @@ require its Feature-criterion matrix to match the current authoritative plan
 and candidate SHA; never add the matrix, plan body, or an opaque evidence field
 to the ledger.
 
+After publication readback and any required stack-link reconciliation, record
+the coarse boundary as `status=delivery-pending` and
+`checkpoint=candidate-published`. This stores only the exact candidate/PR
+recovery key; it does not prove that the Worker is inactive, the PR remains
+current, monitoring continues, or a child base is still valid. A later Worker
+repair replaces the candidate through the ordinary assignment checkpoint and
+must return through `candidate-published` again.
+
 `run checkpoint` and `assignment checkpoint` accept only documented,
-allowlisted fields and one expected revision. They record durable boundaries,
-not every graph transition. A run can become `complete` only after at least one
+allowlisted fields and one expected revision. The CLI rejects every status and
+checkpoint pair outside the canonical registry defined in
+[states.md](states.md) and exposed by `capabilities`. Checkpoints record durable
+boundaries, not every graph transition. A run can become `complete` only after at least one
 Feature claim has been released, at least one assignment exists, every
-assignment is delivery-ready at `final-verify`, and all operations are resolved.
+assignment is `delivery-ready @ final-verify`, and all operations are resolved.
 An empty run can never complete. `operation begin` is idempotent for one
 `run_id, action, subject_id`; duplicate calls return the original operation.
 Beginning a side effect requires an active run and the assignment's active
@@ -146,7 +167,11 @@ Feature claim; a released or reclaimed claim makes the old run ineligible.
 or `blocked` evidence. Every result requires authoritative readback;
 `applied` and `unknown` also require the originating receipt. A recorded
 `unknown` may be refined to one definitive result after reconciliation, while
-a definitive result is immutable.
+a definitive result is immutable. Use `blocked` only when the effect is
+definitively inapplicable for the exact action and subject, authoritative
+readback proves non-application, and the reservation must not be retried. A
+temporary prerequisite, authority wait, path-claim conflict, or provider delay
+leaves the operation `pending` for later reconciliation.
 
 Treat a bounded application-task title adjustment as an application side
 effect. Before applying it, reserve an operation with
@@ -162,12 +187,13 @@ operations contract and requires no schema, runtime-contract, envelope, or
 CLI-version change.
 
 Delivery topology does not add a table or assignment field. Reconstruct it from
-real Feature-level code dependencies and assignment `base_branch`, `base_sha`,
-`head_branch`, `candidate_sha`, live PR state, and operation evidence. Before a
-stacked child publication, reserve the normal publication effect and a separate
-child-bound operation with `action=stack-link`. Use a stable subject derived
-from repository identity, verified parent PR, child branch, and candidate SHA
-so the reservation exists before the G-owned workflow attempts the link.
+same-repository Feature-level stack intent and assignment `base_branch`,
+`base_sha`, `head_branch`, `candidate_sha`, live PR state, and operation
+evidence. Before a stacked child publication, reserve the normal publication
+effect and a separate child-bound operation with `action=stack-link`. Use a
+stable subject derived from repository identity, verified parent PR, child
+branch, and candidate SHA so the reservation exists before the G-owned
+workflow attempts the link.
 
 After the Feature Worker returns, finish the publication and stack-link operations
 independently. Store the G receipt by reference and require an authoritative
@@ -176,6 +202,12 @@ publication as `applied` and stack-link as `unknown`; it never replays PR
 creation or linking without reconciliation. This usage requires no schema,
 runtime-contract, envelope, or CLI-version change.
 
+The `delivery-pending @ candidate-published` pair uses the existing assignment
+status/checkpoint fields and requires no schema or JSON-envelope change. The
+explicit state registry and capability readback are runtime-contract and CLI
+version `3.1.0`. The orchestrator remains the only ledger client and the only
+owner of delivery monitoring, Worker resumption, and aggregate completion.
+
 ## Recovery boundary
 
 On resume, read the last ledger checkpoint, then independently observe current
@@ -183,6 +215,11 @@ application tasks, worktrees, repositories, Feature Plan issues, PRs, and
 reviews. For stacked assignments, also re-read parent/child bases, full heads,
 stack order, and link state. Reconcile differences before another side effect.
 Ledger text never proves external state.
+
+For an assignment recovered at `candidate-published`, verify the PR exact HEAD,
+publication and stack-link readback, Worker resumability, released path claim,
+and every immediate child base before resuming central delivery monitoring or
+bootstrapping a dependent Worker.
 
 For title recovery, the current display title can verify a match but cannot
 prove whether a missing or different title was never adjusted. When the

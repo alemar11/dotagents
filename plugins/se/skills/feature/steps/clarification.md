@@ -31,7 +31,7 @@ Present every material question discovered by the analysis in one consolidated
 batch. Do not ask one question per worker or create a graph node for each
 question. Each item must include a stable question ID, the requested decision,
 why it matters, affected outcome or scope, available options, recommendation,
-blocking status, and originating evidence.
+`question_blocking` value, and originating evidence.
 
 The task may remain in awaiting-user-input while the batch is shown. This is a
 wait state, not a terminal blocked result and not a reason to mark the run's

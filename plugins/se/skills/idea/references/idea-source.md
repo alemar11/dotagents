@@ -22,7 +22,7 @@ The artifact may contain only these fields:
 | open_questions | Material or unresolved questions. |
 | source_evidence | Portable evidence supporting the proposal. |
 | idea_ref | Proposed or verified Idea reference. |
-| idea_ref_state | proposed-non-durable or verified hosted state. |
+| idea_ref_state | One of proposed-non-durable or verified-hosted. |
 
 ## Excluded fields
 

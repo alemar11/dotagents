@@ -40,6 +40,13 @@ when the package is intended for Codex.
 - Keep selection metadata, trigger rules, load-bearing workflow order,
   mutation boundaries, and output contracts in `SKILL.md`. Keep branch-specific
   detail in directly routed lowercase `references/*.md` files.
+- Every skill that defines or observes workflow nodes, statuses, checkpoints,
+  modes, dispositions, or other behavior-affecting states must own a canonical
+  `references/states.md` and route to it from `SKILL.md`. That reference must
+  list every state in its owning namespace with a plain-language description,
+  distinguish persisted state from transient or external state, and be updated
+  in the same change whenever a state is added, renamed, removed, or changes
+  meaning.
 - Use a package's `SKILL.md` to decide when the runtime skill is applicable;
   use its nearest `AGENTS.md`, when present, for maintenance rules while
   improving, editing, updating, or removing that package. Do not copy either

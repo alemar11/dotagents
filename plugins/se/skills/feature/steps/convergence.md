@@ -55,8 +55,8 @@ narrative never creates a container Feature.
 
 For multiple repositories, produce one or more Feature members per repository
 and keep each member's context local. Cross-repository Feature-level
-dependencies may describe functional sequencing, but they do not create an
-integration issue or an automatic stack.
+dependencies may describe hard outcome sequencing, but they do not create an
+integration issue or a stack because Git ancestry cannot cross repositories.
 
 Record every consolidation, separation, retained out-of-scope source, and
 critic challenge that affected the boundary. Do not preserve an issue count
@@ -73,6 +73,10 @@ documentation, or other technical layers.
 Record Feature-level `blocked_by` relations only between Feature IDs in the
 same Plan Set. Record Macro Task `blocked_by` relations only between Macro
 Task IDs with the same `parent_feature_id`. Reject missing refs, duplicates,
-self-edges, cross-parent edges, and cycles at the appropriate level. Both
-levels are planning context; do not derive technical execution units, allowed
-paths, execution waves, worker schedules, or technical dependency IDs.
+self-edges, cross-parent edges, and cycles at the appropriate level. Require
+every Feature-level edge to represent a hard outcome dependency and preserve
+repository identity so Implement can project same-repository edges as stack
+intent and cross-repository edges as scheduling-only. Macro-level edges remain
+planning-only and may be internalized by Implement. Do not derive technical
+execution units, allowed paths, execution waves, worker schedules, or
+technical dependency IDs.

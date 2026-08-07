@@ -12,6 +12,12 @@ Implement owns the derived technical execution units, scheduling
 interpretation, and delivery graph.
 Learn, Idea, and Audit own their skill-specific registries and branch details.
 
+Every SE skill routes to `references/states.md`. The skill registry remains the
+structural source of truth for nodes and edges; the state reference explains
+every node in plain language and separates workflow position from
+field-qualified domain, persisted, result, and external states. Same-named
+values from different fields remain distinct.
+
 ## Graph model
 
 A workflow graph describes control state and authority boundaries for one skill
@@ -28,12 +34,16 @@ execution graph:
 - a workflow graph may contain decisions, validations, actions, and terminal
   outcomes;
 - Feature-level relations describe planning structure between Feature IDs and
-  may include `blocked_by` context;
+  may include `blocked_by` context. Implement deterministically projects a
+  same-repository edge as mandatory stack intent and a cross-repository edge as
+  scheduling-only context;
 - Macro Task relations describe planning structure only within one
   `parent_feature_id` and may include local `blocked_by` context;
 - Implement execution edges may contain only real implementation prerequisites;
   Feature planning does not publish those technical edges. Feature-level
-  order or cross-repository dependency never automatically becomes a stack.
+  same-repository `blocked_by` still controls delivery topology rather than the
+  technical unit graph, while cross-repository dependency never becomes a
+  stack.
 
 Feature IDs, Macro Task IDs, parent/child identities, and both dependency
 scopes are owned by the Feature Plan Set contract, not by the workflow-node

@@ -2,6 +2,9 @@
 
 This reference owns Feature Plan Set scheduling, textual-plan interpretation,
 Feature Worker dialogue, user plan questions, and delivery-topology routing.
+Use [states.md](states.md) for the canonical meaning of workflow nodes,
+persisted status/checkpoint pairs, runtime-only modes, and terminal invocation
+outcomes.
 
 Before any hosted publication or user-facing hosted relay, apply the shared
 [hosted-content-safety.md](../../../references/hosted-content-safety.md)
@@ -19,14 +22,19 @@ contain the runtime execution graph.
 
 Provider delivery readiness is observed through
 $g:github-delivery-status against the current exact PR HEAD; the orchestrator
-does not reinterpret raw provider states.
+does not reinterpret raw provider states. It is the sole delivery-monitoring
+and aggregate lifecycle owner. Feature Workers never poll their own PRs while
+inactive.
 
 Run independent Features concurrently when their repositories, derived path
 envelopes, real cross-Feature code dependencies, Feature-level `blocked_by`
-context, and observed runtime capacity are safe. Serialize real dependencies
-and unsafe overlap. Do not create synthetic dependencies, impose a fixed
-worker cap, or stop independent Features because one assignment is blocked or
-deferred.
+context, and observed runtime capacity are safe. A same-repository dependent
+may enter a later execution wave as soon as its immediate parent is
+`candidate-published`; parent delivery readiness is not a worker-bootstrap
+gate. Serialize unsafe overlap and cross-repository outcome dependencies. Do
+not create synthetic dependencies, impose a fixed worker cap, or stop
+independent Features because one assignment is blocked, deferred, or
+delivery-pending.
 
 Before any Feature Worker starts, claim the complete sorted Feature set in one
 ledger transaction. A conflicting active claim blocks startup without partial
@@ -44,17 +52,23 @@ same-parent-only macro dependencies. A missing, extra, duplicate,
 cross-parent, cyclic, or mismatched identity blocks the assignment before a
 worker starts.
 
-Feature-level `blocked_by` relations are scheduling context and may cross
-repositories. Macro `blocked_by` relations are planning context within one
-parent Feature. Neither relation creates technical execution edges, worker
-gates, PR boundaries, or stacks by itself. The orchestrator re-evaluates real
-technical prerequisites independently; only a real same-repository code
-dependency can justify a stack. If an upstream Feature named by
-`blocked_by` is missing, unverified, or outside the selected implementation
-scope, keep the dependent assignment blocked or deferred; never silently
-implement it as if the Feature-level dependency were absent. Once the
-upstream outcome is verified but no code ancestry is required, schedule the
-dependent Feature in order while keeping its PR standalone.
+Feature-level `blocked_by` relations are planning-owned hard outcome
+dependencies and may cross repositories. Repository identity controls their
+deterministic delivery projection: every same-repository edge is mandatory
+stack intent and every cross-repository edge is scheduling-only. Neither form
+creates technical execution-unit edges; the orchestrator still derives real
+implementation prerequisites independently. Macro `blocked_by` relations are
+planning context within one parent Feature and never create worker or PR
+boundaries. The orchestrator may combine, reorder, or internalize them while
+preserving every Macro Task outcome and Feature criterion.
+
+If an upstream Feature named by `blocked_by` is missing, unverified, or outside
+the selected implementation scope, keep the dependent assignment blocked or
+deferred; never silently implement it as if the relation were absent. A
+same-repository dependent becomes worker-runnable only from a verified
+`candidate-published` parent branch and exact HEAD. A cross-repository
+dependent remains ordered by the verified upstream outcome and keeps a
+standalone PR.
 
 Each derived unit must have:
 
@@ -71,9 +85,9 @@ database, API, UI, test, documentation, or tracker layer unless that layer is
 independently valuable.
 
 Dependency edges mean real implementation prerequisites. Path overlap,
-capacity, preferred order, Feature-level functional order, and
-cross-repository prerequisites are separate scheduling facts and never become
-a shared execution edge automatically.
+capacity, preferred order, Feature-level delivery projection, and
+cross-repository prerequisites remain separate scheduling or topology facts
+and never become technical execution-unit edges automatically.
 
 The orchestrator owns this translation and may ask the Feature Worker to
 refine technical units during implementation. It must preserve coverage of
@@ -83,10 +97,11 @@ Task registry.
 ## User plan questions
 
 When a Feature Worker finds a product-level contradiction, missing outcome,
-ownership conflict, or material acceptance gap, create one plan-question
-record for the affected assignment. Present the bounded decision to the user
-with its evidence and impact. Keep the assignment deferred while independent
-Features continue.
+ownership conflict, or material acceptance gap, enter `plan-question` for the
+affected assignment. Present the bounded decision to the user with its
+evidence and impact. Persist `deferred @ plan-question` without claiming that
+the ledger stores the question body or a separate plan-question identity. Keep
+independent Features moving.
 
 Do not create a separate Feature planner task automatically. If the user's
 answer requires changing the published Feature Plan Set, report an explicit
@@ -105,24 +120,50 @@ dependencies, Feature-level scheduling context, and live capacity are safe.
 
 Derive standalone or stacked delivery separately from execution order:
 
-- standalone: no concrete same-repository parent branch is required;
-- stacked: one same-repository immediate parent is the intended integration
-  base and its exact verified branch and HEAD are available.
+- standalone: no same-repository Feature-level `blocked_by` parent exists;
+- stacked: one same-repository immediate parent is selected from the hosted
+  relation set and its verified `candidate-published` branch and exact HEAD are
+  the integration base.
 
-Serialization caused only by path overlap, capacity, Feature-level functional
-order, or preferred order remains standalone. A fan-in requires one Feature
-Worker-owned integration
-candidate containing every prerequisite HEAD or an authoritative merged base.
+Serialization caused only by path overlap, capacity, or preferred order
+remains standalone. For same-repository fan-in, select one immediate parent
+only when its candidate already contains every other required same-repository
+prerequisite HEAD. Otherwise block the dependent assignment for explicit Plan
+Set reconciliation; never invent an ordering edge or silently choose a base.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
-review, delivery disposition, and stack capability. A stale or ambiguous
-parent keeps only that child out of the runnable wave. Never silently degrade
-to standalone.
+`candidate-published` checkpoint, publication readback, and stack capability.
+The parent may remain `delivery-pending`; a stale or ambiguous candidate keeps
+only that child out of the runnable wave. Never silently degrade to standalone.
 
 If a parent changes after a child starts, invalidate the descendant's
 integration, review, CI, and readiness evidence. Return the parent to its
 worker, then rebase and revalidate descendants bottom to top. The
 orchestrator coordinates this sequence but never edits or rebases worker code.
+
+## Candidate publication and central delivery monitoring
+
+After native review and publication, the orchestrator verifies repository, PR,
+branch, full candidate HEAD, draft state, closing references, and any required
+stack link. Only that complete readback establishes `candidate-published`.
+Checkpoint the assignment as `status=delivery-pending` and
+`checkpoint=candidate-published`, release its transient active path claim, and
+mark the Feature Worker inactive but resumable. This checkpoint is the only
+same-repository child-development trigger; it is not delivery completion.
+
+Return to `schedule` after every candidate publication. The scheduler may
+bootstrap newly unblocked Features and interleave bounded observations of all
+delivery-pending PRs. The orchestrator owns those observations and combines
+G-normalized review, CI, delivery status, exact-head, and parent/base evidence.
+It does not ask inactive Workers to poll. A still-pending observation returns
+to `schedule`; a clean ready observation enters final verification.
+
+For an actionable finding, evidence mismatch, or parent drift, preserve the
+exact PR, head, provider artifact, and observation fingerprint. Reacquire the
+Worker's path envelope before resumption, then contact the same Worker with
+only that bounded evidence. If the path claim is unavailable, keep the repair
+pending without permitting overlapping writes. A new candidate repeats native
+review, publication readback, `candidate-published`, and central monitoring.
 
 ## Optional Feature Worker support
 
@@ -165,6 +206,7 @@ The orchestrator may exchange only bounded control-plane messages:
 - verified bootstrap and plan revision;
 - execution-unit or coarse milestone request;
 - evidence-only mismatch or reconciliation request;
+- actionable hosted-review or parent-drift resumption request;
 - plan-question decision request;
 - terminal-state request.
 
@@ -186,6 +228,12 @@ Store only durable claims, assignment identity, checkpoints, exact candidate
 heads, user-authority waits, and idempotent side-effect reservations. Do not
 store plans, prompts, messages, execution-unit bodies, findings, or routine
 worker state.
+
+`delivery-pending @ candidate-published` is one coarse status/checkpoint pair,
+not two sequential states or a second delivery engine. The ledger never proves
+that a Worker is inactive, that a PR remains current, or that a path envelope
+is free; recover each fact from the application, repository, provider, and
+transient control plane.
 
 On resume, reread the authoritative plan, repository/project destination,
 current base and full HEAD, worker identity, and hosted delivery state before

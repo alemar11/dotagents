@@ -15,6 +15,9 @@ Its skills are deliberately separated by responsibility:
   Feature Plan Set, sibling Feature registry, and local Macro Task graphs;
   Implement derives its technical execution units and runtime graph from that
   durable set.
+- Every bundled skill owns `references/states.md`, a compact human-readable
+  table that distinguishes workflow nodes from domain values, persisted
+  statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs.
 - references/workflow-contract.md owns the Idea hosted shape, while
@@ -58,7 +61,12 @@ Its skills are deliberately separated by responsibility:
   critique when delegation and capacity are observed; otherwise the parent
   Worker continues serially. The Worker performs exact-HEAD in-session review
   and the workflow handles stack reconciliation and final exact-HEAD evidence.
-  A stack represents a true same-repository code dependency, never serialization alone;
+  Every same-repository Feature dependency is mandatory stack intent, while a
+  cross-repository dependency remains scheduling-only and standalone. A
+  stacked child may begin from its parent's verified `candidate-published`
+  exact HEAD before that parent is delivery-ready. The orchestrator centrally
+  monitors hosted review, CI, delivery status, and stack drift while published
+  Feature Workers remain inactive but resumable.
   G owns PR publication and pairwise stack linking, while Send remains agnostic
   about whether an explicit PR base participates in a stack. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
@@ -96,11 +104,13 @@ Its skills are deliberately separated by responsibility:
   textual Feature Plan Set with genuinely distinct sibling Features. Each
   Feature has ordinary list-item acceptance criteria with stable `F-AC-NN`
   identities, its own closed macro-vertical Task registry, and optional
-  Feature-level planning dependencies. Feature publishes every parent
-  Feature, every local child Task, planning-only relations, and the final set
-  registry through one publication adapter by default; it never creates a
-  container issue. Explicit preview remains local and non-durable. Hosted
-  publication requires G preflight and read-after-write verification.
+  hard-outcome Feature dependencies. Same-repository Feature dependencies
+  project to stack intent; cross-repository dependencies project to scheduling
+  only. Feature publishes every parent Feature, every local child Task, these
+  relations, and the final set registry through one publication adapter by
+  default; it never creates a container issue. Explicit preview remains local
+  and non-durable. Hosted publication requires G preflight and read-after-write
+  verification.
 - Feature maintenance is an alternate entry into the same Plan Set graph:
   it rehydrates the existing sibling Features, reconciles an explicit
   indication, and republishes the revised projections when requested. It does

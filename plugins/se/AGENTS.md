@@ -68,11 +68,21 @@ surface.
 - Keep Feature planning free of technical implementation authority. Feature
   publishes one complete Feature Plan Set containing only genuinely distinct
   sibling Features, each with a closed set of durable macro-vertical Task
-  projections. Feature-level and macro-local `blocked_by` relations remain
-  planning-only. Implement consumes the verified set, derives technical
-  execution units internally, and returns a verified standalone or stacked
-  PR topology. Implement must not create an automatic plan-repair planner for
-  ordinary technical interpretation.
+  projections. Feature-level `blocked_by` remains a planning-owned relation,
+  but repository identity gives it a deterministic Implement projection: a
+  same-repository edge is mandatory stack intent and a cross-repository edge
+  is scheduling-only. Macro-local `blocked_by` remains planning-only and may be
+  internalized by Implement while preserving every Macro Task outcome.
+  Implement consumes the verified set, derives technical execution units
+  internally, and returns a verified standalone or stacked PR topology.
+  Implement must not create an automatic plan-repair planner for ordinary
+  technical interpretation.
+- Keep one human-readable `references/states.md` in every bundled SE skill.
+  Each file is that skill's canonical state glossary: it must include every
+  workflow node, separate workflow nodes from field-qualified domain or
+  persisted states, and say explicitly when the skill owns no checkpoint or
+  ledger. Do not present same-named values from different state domains as one
+  shared state machine.
 - Keep Feature acceptance criteria as ordinary list items with stable bracketed
   `F-AC-NN` identities, never Markdown checkbox state. Feature owns Plan Set
   identity, stable Feature identities, criterion identity, monotonic retirement
@@ -86,12 +96,16 @@ surface.
   bracketed IDs are an explicit rendered-contract syntax exception to
   lower-kebab values.
 - Keep Implement execution waves separate from PR delivery topology.
-  Serialization, capacity, and path overlap do not create a stack. Stack only a
-  true same-repository code dependency from one green exact-HEAD parent; keep
-  parallel, unrelated, cross-repository, and multi-parent work standalone or
-  blocked until it has one valid integration base. G owns publication and
-  pairwise stack linking. Parent drift invalidates descendant evidence, and
-  each worker owns its own bottom-to-top rebase and review cycle.
+  Serialization, capacity, and path overlap do not create a stack. Every
+  same-repository Feature `blocked_by` edge does create mandatory stack intent,
+  independently of whether implementation otherwise runs serially or in
+  parallel. Cross-repository edges remain scheduling-only. A stacked child may
+  start from a verified `candidate-published` parent branch and exact HEAD
+  before that parent is delivery-ready; multi-parent work remains blocked until
+  one immediate parent candidate contains every required same-repository
+  prerequisite HEAD. G owns publication and pairwise stack linking. Parent
+  drift invalidates descendant evidence, and each worker owns its own
+  bottom-to-top rebase and review cycle.
 - Keep Feature Worker support delegation subordinate to the parent Worker.
   Delegation is optional and must fall back to serial parent execution when
   unavailable, unknown, or capacityless. Support assignments may return
@@ -104,15 +118,22 @@ surface.
   message logs, findings, and routine worker state. The orchestrator is its only
   runtime client; workers supply evidence but never access the ledger.
 - Keep Feature-level scheduling and derived execution-unit dependency edges
-  separate. A Feature `blocked_by` edge may order work and may cross
-  repositories, but it never automatically creates a stack. Only independent
-  evidence of a true same-repository code dependency can justify a stack;
-  functional order and cross-repository dependencies remain standalone. A
-  downstream candidate must contain every exact technical prerequisite HEAD
-  through verified merged, stacked, or worker-composed ancestry. PR readiness
-  alone never satisfies a dependency. Macro Task `blocked_by` relations are
-  planning context only and never become executable edges without independent
-  Implement evidence.
+  separate. A Feature `blocked_by` edge may cross repositories. Implement maps
+  every same-repository edge to mandatory stack intent and every
+  cross-repository edge to scheduling-only context; it never treats capacity,
+  path overlap, or preferred order as stack authority. A downstream stacked
+  candidate must contain every exact same-repository prerequisite HEAD through
+  one verified immediate-parent ancestry chain. `candidate-published`, not PR
+  readiness, is the development-unblock boundary. Macro Task `blocked_by`
+  relations remain planning context: Implement may combine, reorder, or
+  internalize them only while preserving every Macro Task outcome and Feature
+  acceptance criterion.
+- Keep PR observation centralized in the Implement orchestrator. After
+  `candidate-published`, the Feature Worker becomes inactive but resumable and
+  the assignment remains `delivery-pending`; the orchestrator monitors exact
+  PR heads, hosted review, CI, delivery status, and parent drift. It contacts
+  the same Worker only for actionable fixes, evidence repair, or rebase, and
+  retains sole ledger and aggregate-completion authority.
 - Keep deterministic task-title initialization shared by every task-managed
   SE skill. After stable identity readback, require one bounded reconciliation
   outcome before monitoring: exact verification or an explicit
@@ -183,8 +204,12 @@ surface.
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery gate, Feature-level scheduling, optional Feature Worker
   delegation fallback, exact sibling/Macro Task readback, per-Feature
-  registry-derived closing sets, same-repository stack qualification, and
-  stack-reconcile paths.
+  registry-derived closing sets, deterministic same-repository stack intent,
+  `candidate-published` child unblocking, orchestrator-owned delivery
+  monitoring, resumable Worker repair, and stack-reconcile paths.
+- Validate that every bundled skill routes to `references/states.md`, every
+  graph node appears in its skill's state table, and Implement's documented
+  persisted values exactly match the run-state capability registry.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
   Implement, and their write-owning references route through the one canonical
   hosted-content owner without duplicate Idea doctrine.

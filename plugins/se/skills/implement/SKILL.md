@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement or resume published Feature Plans. Deliver each Feature through its own worker and pull request, verify the final code and GitHub state, and leave merge and post-merge closure to the user."
+description: "Implement or resume published Feature Plans. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
 ---
 
 # Implement Feature Plan Sets
@@ -33,10 +33,13 @@ Feature member must have:
 
 The hosted Feature Plan Set and every local Macro Task projection are required
 input, but they are planning projections rather than a technical execution
-graph. Feature-level `blocked_by` relations provide scheduling context and
-may cross repositories. Macro `blocked_by` relations are local to one
-`parent_feature_id`. An authoritative technical Task dependency graph,
-T-AC identifiers, or automatic plan-repair result is not required input.
+graph. Feature-level `blocked_by` relations express hard outcome dependencies
+and may cross repositories. Implement projects every same-repository edge as
+mandatory stack intent and every cross-repository edge as scheduling-only.
+Macro `blocked_by` relations are local to one `parent_feature_id` and remain
+eligible for technical internalization. An authoritative technical Task
+dependency graph, T-AC identifiers, or automatic plan-repair result is not
+required input.
 Implement derives internal execution units, implementation dependencies, safe
 path envelopes, and runtime waves from the set and each Feature registry
 during Prepare Run. Those units belong to the Implement control plane and are
@@ -85,6 +88,9 @@ the registry-derived closure intent are defined in
 
 Read the shared workflow-graph contract before using this registry. The
 registry is the structural source of truth and Mermaid is its projection.
+Read the canonical human-readable [state model](references/states.md) before
+interpreting a workflow node, persisted status/checkpoint pair, operation
+result, provider disposition, runtime-only mode, or output label.
 
 Before the mandatory first GitHub Feature Plan, issue, PR, review, label, or
 relation read or write, load the shared G dependency preflight. All GitHub
@@ -107,6 +113,13 @@ Implement task profile, shared task preflight, and shared task handoff. The
 orchestrator and every Feature Worker are required roles. Title
 reconciliation is required before normal monitoring or update relay.
 
+The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
+After a PR reaches `candidate-published`, its Feature Worker becomes inactive
+but resumable while the assignment remains `delivery-pending`. The
+orchestrator observes exact-head hosted review, CI, delivery status, and stack
+drift through G-owned workflows; it contacts the same Worker only for an
+actionable fix, evidence repair, or rebase.
+
 The Feature Worker may use the task profile's optional delegated support role
 for bounded code analysis, execution-unit assistance, validation, or critique.
 Before the first optional support effect, inspect delegation once and record
@@ -119,6 +132,8 @@ Load orchestration when interpreting plans, deriving execution units,
 scheduling workers, resolving plan questions, or calculating delivery
 topology. Load review-delivery at candidate review and publication. Load
 run-state before preparing, resuming, checkpointing, or resetting the ledger.
+Use [states.md](references/states.md) as the canonical human-readable meaning
+of every state namespace and persisted pair.
 
 ## Transition-condition ownership
 
@@ -126,7 +141,7 @@ run-state before preparing, resuming, checkpointing, or resetting the ledger.
 | --- | --- |
 | intake, source-preflight, runtime-preflight, prepare-run | This skill's input invariant and shared contracts |
 | schedule, delivery-gate, worker-bootstrap, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
-| candidate, native-review, review-decision, publish-pr, stack-reconcile, ready-monitor, final-verify | review-delivery.md |
+| candidate, native-review, review-decision, publish-pr, stack-reconcile, candidate-published, delivery-monitor, final-verify | review-delivery.md |
 | deferred, complete, blocked | This skill's terminal definitions |
 
 Each owner defines every declared outgoing condition and must not add an
@@ -141,7 +156,7 @@ workflow transitions.
 | source-preflight | validation | complete Feature Plan Sets and selected Features are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
 | runtime-preflight | validation | plans and target repositories are known | prepare-run, blocked | read | none |
 | prepare-run | action | required roles, destinations, and plan interpretation are ready | schedule, blocked | durable | none |
-| schedule | decision | run is ready for another Feature wave or aggregate reconciliation | delivery-gate, release-claims, deferred, blocked | none | none |
+| schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
 | implement-validate | action | Feature Worker identity, worktree, verified sibling/Macro coverage, derived execution units, and plan criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
@@ -149,13 +164,14 @@ workflow transitions.
 | candidate | validation | Feature Worker reports a committed candidate HEAD with plan criteria evidence | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to the current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
-| publish-pr | action | review is clean and publication scope is resolved | stack-reconcile, ready-monitor, assignment-blocked, blocked | hosted, durable | none |
-| stack-reconcile | validation | a stacked PR was published or its parent/base/link/exact-HEAD evidence drifted | ready-monitor, implement-validate, assignment-blocked, blocked | read, durable | none |
-| ready-monitor | action | PR identity and exact published HEAD are verified | implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
+| publish-pr | action | review is clean and publication scope is resolved | stack-reconcile, candidate-published, assignment-blocked, blocked | hosted, durable | none |
+| stack-reconcile | validation | a stacked PR was published or its parent/base/link/exact-HEAD evidence drifted | candidate-published, implement-validate, assignment-blocked, blocked | read, durable | none |
+| candidate-published | validation | PR identity, branch, exact candidate HEAD, closing set, and any required stack link are verified | schedule, assignment-blocked, blocked | read, durable | none |
+| delivery-monitor | action | one or more published assignments are delivery-pending on a verified exact PR HEAD | schedule, implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
 | final-verify | validation | current PR, topology, CI, review, checkout, HEAD, and acceptance evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read | none |
 | assignment-blocked | action | one Feature assignment cannot progress but independent work remains | schedule | durable | none |
 | assignment-deferred | action | one Feature assignment awaits bounded user authority | schedule | durable | none |
-| release-claims | action | every assignment is delivery-ready or explicitly resolved and no assignment remains active | complete, blocked | durable | none |
+| release-claims | action | every assignment is `delivery-ready @ final-verify` and every operation is resolved | complete, blocked | durable | none |
 | deferred | terminal | all remaining work awaits user authority | none | none | deferred |
 | complete | terminal | every eligible Feature maps to one verified PR-ready output | none | none | complete |
 | blocked | terminal | required evidence, capability, identity, authority, or reconciliation is unavailable | none | none | blocked |
@@ -171,6 +187,7 @@ flowchart TD
     prepare-run --> schedule
     prepare-run --> blocked
     schedule --> delivery-gate
+    schedule --> delivery-monitor
     schedule --> release-claims
     schedule --> deferred
     schedule --> blocked
@@ -198,19 +215,23 @@ flowchart TD
     review-decision --> publish-pr
     review-decision --> assignment-blocked
     review-decision --> blocked
-    publish-pr -->|standalone| ready-monitor
+    publish-pr -->|standalone| candidate-published
     publish-pr -->|stacked| stack-reconcile
     publish-pr --> assignment-blocked
     publish-pr --> blocked
-    stack-reconcile --> ready-monitor
+    stack-reconcile --> candidate-published
     stack-reconcile --> implement-validate
     stack-reconcile --> assignment-blocked
     stack-reconcile --> blocked
-    ready-monitor --> implement-validate
-    ready-monitor --> stack-reconcile
-    ready-monitor --> final-verify
-    ready-monitor --> assignment-blocked
-    ready-monitor --> blocked
+    candidate-published --> schedule
+    candidate-published --> assignment-blocked
+    candidate-published --> blocked
+    delivery-monitor --> schedule
+    delivery-monitor --> implement-validate
+    delivery-monitor --> stack-reconcile
+    delivery-monitor --> final-verify
+    delivery-monitor --> assignment-blocked
+    delivery-monitor --> blocked
     final-verify --> schedule
     final-verify --> stack-reconcile
     final-verify --> assignment-blocked
@@ -248,23 +269,31 @@ transient set of technical implementation units. A unit has an observable
 technical outcome, repository scope, allowed-path proposal, validation
 intent, dependencies that are real implementation prerequisites, and evidence
 linking it back to one Feature criterion and one or more local Macro Tasks.
-Feature-level `blocked_by` relations may order Feature scheduling but do not
-by themselves create execution dependency edges, worker gates, PR boundaries,
-or stacks. Macro `blocked_by` relations are advisory and same-parent-only;
-they do not become technical edges. These units are not copied into the
-hosted plan by default and are not a reason to rerun Feature.
+Feature-level `blocked_by` relations do not become technical execution-unit
+edges, but repository identity controls their delivery projection. Every
+same-repository edge is mandatory stack intent and every cross-repository edge
+is scheduling-only. Macro `blocked_by` relations are advisory and
+same-parent-only; the orchestrator may combine, reorder, or internalize them
+while preserving every Macro Task outcome and Feature criterion. These units
+are not copied into the hosted plan by default and are not a reason to rerun
+Feature.
 
 Schedule independent Features across safe waves, respecting Feature-level
-`blocked_by` context. Within one Feature, the Feature Worker owns the derived
-units in deterministic prerequisite order and does not create child Feature
-Workers or planner tasks. It may use
+`blocked_by` context. A same-repository dependent becomes worker-runnable when
+one immediate parent has verified `candidate-published` evidence and its exact
+branch and full SHA form the child's frozen integration base; parent delivery
+readiness is not a development gate. If several same-repository parents exist,
+select one immediate parent only when its candidate contains every other
+required prerequisite HEAD, otherwise block for explicit plan reconciliation.
+Within one Feature, the Feature Worker owns the derived units in deterministic
+prerequisite order and does not create child Feature Workers or planner tasks. It may use
 bounded support assignments when the optional delegation capability and
 usable worker capacity are observed; otherwise it performs the work itself.
-Path overlap, capacity, preferred order, functional Feature order, and
-cross-repository dependencies do not create a PR stack. A stack requires
-independent evidence of a true same-repository code dependency and a verified
-parent exact HEAD. A same-repository Feature-level `blocked_by` edge can
-justify scheduling order without justifying a stack.
+Path overlap, capacity, preferred order, and cross-repository dependencies do
+not create a PR stack. Same-repository Feature-level `blocked_by` is the only
+Plan Set relation that creates mandatory stack intent; Implement still derives
+technical execution edges independently and must verify the exact parent
+ancestry before child publication.
 
 When implementation reveals a missing product decision, enter plan-question
 and present the bounded question to the user. Preserve the worker, worktree,
@@ -289,6 +318,14 @@ Any HEAD change invalidates prior acceptance, validation, and review evidence.
 The worker repeats the required checks and review at the new exact HEAD. The
 orchestrator receives evidence and coordinates delivery; it never edits,
 rebases, or judges worker code.
+
+After the orchestrator verifies `delivery-pending @ candidate-published`, the
+Worker returns a bounded exact-HEAD handoff and becomes inactive but resumable.
+This is not assignment completion: the orchestrator releases the transient
+active path claim and monitors the PR centrally. Before returning the Worker
+for a finding, evidence mismatch, or parent drift, the orchestrator reacquires
+its path envelope and sends only the exact actionable evidence. A Worker never
+polls its own PR while inactive.
 
 ### Optional Feature Worker support
 
@@ -326,16 +363,16 @@ that a helper ran.
 
 Keep implementation waves separate from PR delivery topology. Run independent
 Features concurrently when repositories, paths, dependencies, and live
-capacity permit. Serialize Feature-level `blocked_by` context and real
-cross-Feature code dependencies as appropriate, without treating every
-ordering relation as a stack. A stacked child requires one same-repository
-immediate parent with a green exact-HEAD candidate, accepted hosted
-readiness, clean review, and the verified parent branch and SHA as its
-integration base. Functional order, cross-repository relations, unrelated
-work, and capacity-only ordering remain standalone.
+capacity permit. Every same-repository Feature-level `blocked_by` relation is
+mandatory stack intent independently of otherwise serial or parallel
+execution. A stacked child requires one immediate parent with verified
+`candidate-published` evidence and the parent branch and exact SHA as its
+integration base; it does not wait for parent delivery readiness to begin
+development. Cross-repository relations, unrelated work, and capacity-only
+ordering remain standalone.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
-review, delivery disposition, and stack capability. Parent drift invalidates
+candidate-published checkpoint, and stack capability. Parent drift invalidates
 descendant base, review, CI, and readiness evidence. The owning workers
 rebase and revalidate their own branches bottom to top; the orchestrator
 never performs a stack-wide rebase.
@@ -364,8 +401,8 @@ Return one aggregate report with:
 - local Macro Task coverage and its mapping to final Feature evidence;
 - every Feature Worker identity and verified destination;
 - execution waves, path-overlap evidence, and deferred or blocked assignments;
-- candidate, review, publication, delivery-status, stack, and exact-HEAD
-  evidence;
+- candidate, `delivery-pending @ candidate-published`, Worker resumption,
+  review, publication, delivery-status, stack, and exact-HEAD evidence;
 - Feature acceptance evidence bound to each final candidate SHA;
 - one registry-derived `closing_issue_refs` set per Feature containing only
   that Feature and every associated local Macro Task, plus exact PR readback;

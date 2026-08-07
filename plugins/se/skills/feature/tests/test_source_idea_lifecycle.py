@@ -55,6 +55,8 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         normalized_convergence = " ".join(convergence.split())
         normalized_validation = " ".join(validation.split())
         normalized_publication = " ".join(publication.split())
+        normalized_plan = " ".join(plan.split())
+        normalized_macro_task = " ".join(macro_task.split())
 
         for required in (
             "Feature Plan Set",
@@ -71,7 +73,18 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         self.assertIn("same `parent_feature_id`", normalized_validation)
         self.assertIn("cross-parent", normalized_validation)
         self.assertIn("Feature-level `blocked_by` relations only between Feature IDs", normalized_convergence)
+        self.assertIn("hard outcome dependency", normalized_convergence)
+        self.assertIn("same-repository edges as stack intent", normalized_convergence)
+        self.assertIn("cross-repository edges as scheduling-only", normalized_convergence)
+        self.assertIn("same-repository means mandatory stack intent", normalized_validation)
+        self.assertIn("cross-repository means scheduling-only", normalized_validation)
+        self.assertIn("same-repository Feature `blocked_by` is mandatory stack intent", normalized_skill)
+        self.assertIn("cross-repository `blocked_by` is scheduling-only", normalized_skill)
+        self.assertIn("Macro-level edges remain planning-only", normalized_convergence)
+        self.assertIn("may combine, reorder, or internalize", normalized_macro_task)
         self.assertIn("feature_plan_set_id", plan)
+        self.assertIn("mandatory stack intent", normalized_plan)
+        self.assertIn("scheduling-only", normalized_plan)
         self.assertIn("parent_feature_id", macro_task)
         self.assertIn("Cross-Feature Macro Task references are invalid", macro_task)
 

@@ -55,7 +55,10 @@ For the Feature Plan Set registry, require one stable lower-kebab `feature_id`
 per Feature, one parent Feature identity per Feature, one repository identity,
 one or more local Macro Tasks, and no artificial container. Require every
 Feature-level `blocked_by` to name an existing Feature in the same set, with
-no self-edge, duplicate, or cycle.
+no self-edge, duplicate, or cycle. Require evidence that each edge is a hard
+outcome dependency rather than preferred order, and verify that repository
+identity makes its Implement projection unambiguous: same-repository means
+mandatory stack intent and cross-repository means scheduling-only.
 
 For each local Macro Task registry, require stable unique lower-kebab IDs,
 explicit matching `parent_feature_id`, one or more F-AC-NN references per
@@ -63,7 +66,9 @@ entry, coverage of every local F-AC-NN, no scope outside the parent Feature,
 and no technical execution details. Require every Macro Task `blocked_by` to
 name an existing Macro Task with the same `parent_feature_id`, with no
 missing, duplicate, cross-parent, self, or cyclic reference. Mark both
-relation levels as planning-only; they are not technical Implement gates.
+relation levels as planning-owned rather than technical execution edges.
+Macro-local relations are not Implement gates and may be internalized while
+preserving every Macro Task outcome.
 
 Confirm that the plan explains what must be true without pretending to decide
 how code will be written. Reject missing or duplicate F-AC-NN identities,

@@ -26,7 +26,7 @@ worker assignment, or a separate PR boundary.
 ## Macro dependency
 
 - blocked_by: <Macro Task IDs owned by the same parent Feature or none>
-- dependency_semantics: planning-only; Implement re-evaluates technical prerequisites
+- dependency_semantics: planning-only; Implement may combine, reorder, or internalize the relation while preserving this outcome and its Feature criteria
 
 Cross-Feature Macro Task references are invalid, even when the parent Features
 share a repository. Feature-level dependencies belong in the Feature Plan Set

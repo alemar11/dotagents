@@ -29,8 +29,10 @@ implicitly.
 Read the shared [workflow-graph.md](../../references/workflow-graph.md) for the
 common graph vocabulary. Read
 [workflow-contract.md](../../references/workflow-contract.md) for the Idea
-hosted shape. The registry below is the structural source of truth for Idea;
-Mermaid is its projection.
+hosted shape. Read [references/states.md](references/states.md) for the
+human-readable distinction between workflow nodes, run fields, result values,
+typed handoff state, and hosted domain state. The registry below is the
+structural source of truth for Idea; Mermaid is its projection.
 
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |

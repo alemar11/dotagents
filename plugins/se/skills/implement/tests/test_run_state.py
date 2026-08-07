@@ -35,7 +35,7 @@ class RunStateTests(unittest.TestCase):
         version = subprocess.run(
             [str(SCRIPT), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "3.0.0")
+        self.assertEqual(version.stdout.strip(), "3.1.0")
         db = self.root / "nested/run-state.sqlite3"
         result = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertEqual(result["database_state"], "absent")
@@ -104,7 +104,7 @@ class RunStateTests(unittest.TestCase):
         self.assertTrue(created["result"]["created"])
 
         source.write_text(json.dumps({
-            "status": "reviewing", "checkpoint": "native-review",
+            "status": "active", "checkpoint": "native-review",
             "candidate_sha": "a" * 40,
         }), encoding="utf-8")
         updated = self.payload(self.invoke(
@@ -113,6 +113,22 @@ class RunStateTests(unittest.TestCase):
             "--input", str(source),
         ))
         self.assertEqual(updated["result"]["assignment"]["revision"], 1)
+
+        source.write_text(json.dumps({
+            "status": "delivery-pending", "checkpoint": "candidate-published",
+        }), encoding="utf-8")
+        published = self.payload(self.invoke(
+            db, "assignment", "checkpoint", "--run-id", "run-1",
+            "--assignment-id", "assignment-1", "--expected-revision", "1",
+            "--input", str(source),
+        ))
+        self.assertEqual(published["result"]["assignment"]["revision"], 2)
+        self.assertEqual(
+            published["result"]["assignment"]["status"], "delivery-pending"
+        )
+        self.assertEqual(
+            published["result"]["assignment"]["checkpoint"], "candidate-published"
+        )
 
         begun = self.payload(self.invoke(
             db, "operation", "begin", "--run-id", "run-1",
@@ -160,6 +176,75 @@ class RunStateTests(unittest.TestCase):
         missing = self.invoke(db, "run", "show", "--run-id", "run-1", check=False)
         self.assertEqual(self.payload(missing)["error"]["code"], "run-not-found")
 
+    def test_capabilities_publish_the_complete_state_registry(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        registry = self.payload(self.invoke(db, "capabilities"))["result"][
+            "state_registry"
+        ]
+        self.assertEqual(
+            registry["run_pairs"],
+            [
+                {"status": "active", "checkpoint": "prepare-run"},
+                {"status": "active", "checkpoint": "release-claims"},
+                {"status": "active", "checkpoint": "schedule"},
+                {"status": "blocked", "checkpoint": "blocked"},
+                {"status": "complete", "checkpoint": "complete"},
+                {"status": "deferred", "checkpoint": "deferred"},
+            ],
+        )
+        self.assertEqual(
+            registry["feature_claim_statuses"], ["active", "released"]
+        )
+        self.assertEqual(
+            registry["operation_statuses"],
+            ["applied", "blocked", "not-applied", "pending", "unknown"],
+        )
+        self.assertIn(
+            {"status": "delivery-pending", "checkpoint": "candidate-published"},
+            registry["assignment_pairs"],
+        )
+        self.assertIn(
+            {"status": "delivery-ready", "checkpoint": "final-verify"},
+            registry["assignment_pairs"],
+        )
+
+    def test_rejects_undocumented_run_and_assignment_state_pairs(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        self.invoke(
+            db, "run", "start", "--run-id", "run-1",
+            "--orchestrator-task-id", "task-root",
+        )
+        invalid_run = self.invoke(
+            db, "run", "checkpoint", "--run-id", "run-1",
+            "--expected-revision", "0", "--status", "reviewing",
+            "--checkpoint", "native-review", check=False,
+        )
+        self.assertEqual(self.payload(invalid_run)["error"]["code"], "invalid-input")
+
+        features = self.root / "features.json"
+        features.write_text(
+            json.dumps({"feature_refs": ["owner/repo#10"]}), encoding="utf-8"
+        )
+        self.invoke(
+            db, "feature", "claim", "--run-id", "run-1", "--input", str(features)
+        )
+        assignment = self.root / "assignment.json"
+        assignment.write_text(json.dumps({
+            "feature_ref": "owner/repo#10",
+            "repository_identity": "github:owner/repo",
+            "status": "reviewing",
+            "checkpoint": "native-review",
+        }), encoding="utf-8")
+        invalid_assignment = self.invoke(
+            db, "assignment", "checkpoint", "--run-id", "run-1",
+            "--assignment-id", "assignment-1", "--expected-revision", "0",
+            "--input", str(assignment), check=False,
+        )
+        self.assertEqual(
+            self.payload(invalid_assignment)["error"]["code"], "invalid-input"
+        )
+
     def test_plan_question_assignment_cannot_release_claims(self) -> None:
         db = self.root / "run-state.sqlite3"
         self.invoke(db, "state", "prepare")
@@ -175,7 +260,7 @@ class RunStateTests(unittest.TestCase):
         assignment.write_text(json.dumps({
             "feature_ref": "owner/repo#10",
             "repository_identity": "github:owner/repo",
-            "status": "plan-question", "checkpoint": "plan-question",
+            "status": "deferred", "checkpoint": "plan-question",
             "worker_task_id": "feature-worker-1",
         }), encoding="utf-8")
         self.invoke(db, "assignment", "checkpoint", "--run-id", "run-1",
@@ -274,6 +359,23 @@ class RunStateTests(unittest.TestCase):
             )
         doctor = self.invoke(db, "doctor", check=False)
         self.assertEqual(self.payload(doctor)["error"]["code"], "invalid-state-schema")
+
+    def test_doctor_rejects_undocumented_persisted_state(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        self.invoke(
+            db, "run", "start", "--run-id", "run-1",
+            "--orchestrator-task-id", "task-root",
+        )
+        with sqlite3.connect(db) as connection:
+            connection.execute(
+                "UPDATE runs SET status='reviewing', checkpoint='native-review' "
+                "WHERE run_id='run-1'"
+            )
+        doctor = self.invoke(db, "doctor", check=False)
+        self.assertEqual(
+            self.payload(doctor)["error"]["code"], "invalid-state-data"
+        )
 
     def test_doctor_rejects_permission_and_artifact_drift(self) -> None:
         db = self.root / "run-state.sqlite3"

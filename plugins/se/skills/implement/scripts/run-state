@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "3.0.0"
-CONTRACT_VERSION = "3.0.0"
+CLI_VERSION = "3.1.0"
+CONTRACT_VERSION = "3.1.0"
 SCHEMA_VERSION = 3
 ENVELOPE = "se-implement/ledger-envelope"
 ENVELOPE_VERSION = "3.0.0"
@@ -36,7 +36,30 @@ GITHUB_ISSUE_URL = re.compile(
     re.IGNORECASE,
 )
 FULL_SHA = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
-FINAL_OPERATION_STATES = {"applied", "not-applied", "unknown", "blocked"}
+RUN_STATE_PAIRS = {
+    ("active", "prepare-run"),
+    ("active", "schedule"),
+    ("active", "release-claims"),
+    ("deferred", "deferred"),
+    ("blocked", "blocked"),
+    ("complete", "complete"),
+}
+ASSIGNMENT_DURABLE_CHECKPOINTS = {
+    "worker-bootstrap", "native-review", "plan-question",
+    "candidate-published", "final-verify",
+}
+ASSIGNMENT_STATE_PAIRS = {
+    ("active", "worker-bootstrap"),
+    ("active", "native-review"),
+    ("active", "candidate-published"),
+    ("deferred", "plan-question"),
+    ("delivery-pending", "candidate-published"),
+    ("delivery-ready", "final-verify"),
+    *{("blocked", checkpoint) for checkpoint in ASSIGNMENT_DURABLE_CHECKPOINTS},
+}
+FEATURE_CLAIM_STATES = {"active", "released"}
+OPERATION_STATES = {"pending", "applied", "not-applied", "unknown", "blocked"}
+FINAL_OPERATION_STATES = OPERATION_STATES - {"pending"}
 ASSIGNMENT_FIELDS = {
     "feature_ref", "repository_identity", "status", "checkpoint",
     "worker_task_id", "worker_project_id", "implementation_worktree",
@@ -282,12 +305,45 @@ def verify_schema(db: sqlite3.Connection) -> dict[str, Any]:
     return metadata
 
 
+def validate_state_pair(status: str, checkpoint: str,
+                        allowed: set[tuple[str, str]], domain: str,
+                        error_code: str = "invalid-input") -> None:
+    if (status, checkpoint) not in allowed:
+        raise LedgerError(
+            error_code,
+            f"invalid {domain} state pair: status={status}, checkpoint={checkpoint}",
+        )
+
+
+def validate_persisted_states(db: sqlite3.Connection) -> None:
+    for row in db.execute("SELECT status,checkpoint FROM runs"):
+        validate_state_pair(
+            row["status"], row["checkpoint"], RUN_STATE_PAIRS, "run",
+            "invalid-state-data",
+        )
+    for row in db.execute("SELECT status,checkpoint FROM assignments"):
+        validate_state_pair(
+            row["status"], row["checkpoint"], ASSIGNMENT_STATE_PAIRS, "assignment",
+            "invalid-state-data",
+        )
+    if db.execute(
+        "SELECT 1 FROM feature_claims WHERE status NOT IN ('active','released') LIMIT 1"
+    ).fetchone():
+        raise LedgerError("invalid-state-data", "invalid Feature claim state")
+    if db.execute(
+        "SELECT 1 FROM operations "
+        "WHERE status NOT IN ('pending','applied','not-applied','unknown','blocked') LIMIT 1"
+    ).fetchone():
+        raise LedgerError("invalid-state-data", "invalid operation state")
+
+
 def require_db(path: Path) -> sqlite3.Connection:
     if not path.is_file():
         raise LedgerError("state-not-prepared", "run state prepare explicitly")
     verify_permissions(path)
     db = connect(path)
     metadata = verify_schema(db)
+    validate_persisted_states(db)
     if (
         metadata["runtime_cli_version"] != CLI_VERSION
         or metadata["runtime_artifact_sha256"] != artifact_hash()
@@ -330,6 +386,7 @@ def prepare(path: Path) -> dict[str, Any]:
         else:
             db.execute("BEGIN IMMEDIATE")
             verify_schema(db)
+            validate_persisted_states(db)
             db.execute(
                 "UPDATE runtime_metadata SET runtime_cli_version=?, "
                 "runtime_artifact_sha256=? WHERE singleton=1",
@@ -360,6 +417,7 @@ def doctor(path: Path) -> dict[str, Any]:
     db = connect(path, readonly=True)
     try:
         metadata = verify_schema(db)
+        validate_persisted_states(db)
         sidecars_exist = Path(f"{path}-wal").exists()
         journal = (
             db.execute("PRAGMA journal_mode").fetchone()[0]
@@ -460,6 +518,7 @@ def run_show(path: Path, run_id: str) -> dict[str, Any]:
 def run_checkpoint(path: Path, run_id: str, revision: int, status: str,
                    checkpoint: str) -> dict[str, Any]:
     kebab(status, "status"); kebab(checkpoint, "checkpoint")
+    validate_state_pair(status, checkpoint, RUN_STATE_PAIRS, "run")
     db = require_db(path)
     try:
         db.execute("BEGIN IMMEDIATE")
@@ -730,6 +789,16 @@ def assignment_checkpoint(path: Path, run_id: str, assignment_id: str,
             "SELECT * FROM assignments WHERE run_id=? AND assignment_id=?",
             (run_id, assignment_id),
         ).fetchone()
+        next_status = payload.get("status") or (
+            current["status"] if current is not None else None
+        )
+        next_checkpoint = payload.get("checkpoint") or (
+            current["checkpoint"] if current is not None else None
+        )
+        if next_status is not None and next_checkpoint is not None:
+            validate_state_pair(
+                next_status, next_checkpoint, ASSIGNMENT_STATE_PAIRS, "assignment"
+            )
         feature_ref = payload.get("feature_ref") or (
             current["feature_ref"] if current is not None else None
         )
@@ -916,6 +985,18 @@ def capabilities() -> dict[str, Any]:
         "journal_mode": "wal", "busy_timeout_ms": TIMEOUT_MS, "migrations": False,
         "reset_confirmation": RESET_TOKEN, "tables": sorted(TABLE_COLUMNS),
         "command_families": ["state", "run", "feature", "assignment", "operation"],
+        "state_registry": {
+            "run_pairs": [
+                {"status": status, "checkpoint": checkpoint}
+                for status, checkpoint in sorted(RUN_STATE_PAIRS)
+            ],
+            "assignment_pairs": [
+                {"status": status, "checkpoint": checkpoint}
+                for status, checkpoint in sorted(ASSIGNMENT_STATE_PAIRS)
+            ],
+            "feature_claim_statuses": sorted(FEATURE_CLAIM_STATES),
+            "operation_statuses": sorted(OPERATION_STATES),
+        },
     }
 
 

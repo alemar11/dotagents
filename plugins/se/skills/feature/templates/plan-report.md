@@ -2,33 +2,33 @@
 
 ## Run
 
-- entry_route: <create-or-maintenance>
-- source_route: <new-source-or-existing-source>
-- run_mode: <publish-or-preview>
-- plan_status: <planning-awaiting-user-input-plan-ready-published-or-blocked>
-- goal_status: <active-complete-or-not-available>
+- entry_route: <create or maintenance>
+- source_route: <new-source or existing-source>
+- run_mode: <preview or publish>
+- plan_status: <planning, awaiting-user-input, plan-ready, published, or blocked>
+- goal_status: <active, complete, or not-available>
 
 ## Feature Plan Set
 
 - feature_plan_set_id: <set identity>
 - feature_plan_set_revision: <revision>
-- set_status: <preview-published-or-blocked>
+- set_status: <preview, published, or blocked>
 
-| feature_id | repository | parent Feature issue | Feature blocked_by | status |
+| feature_id | repository | parent Feature issue | Feature blocked_by | feature_status |
 | --- | --- | --- | --- | --- |
-| <feature-id> | <repository> | <issue reference or local preview> | <Feature ID or none> | <status> |
+| <feature-id> | <repository> | <issue reference or local preview> | <Feature ID or none> | <ready or blocked> |
 
 ### Feature members
 
-| feature_id | repository | Feature Plan issue | outcome | status |
+| feature_id | repository | Feature Plan issue | outcome | feature_status |
 | --- | --- | --- | --- | --- |
-| <feature-id> | <repository> | <issue reference or local preview> | <outcome> | <status> |
+| <feature-id> | <repository> | <issue reference or local preview> | <outcome> | <ready or blocked> |
 
 ### Macro Tasks
 
-| Feature ID | Feature issue | parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | status |
+| Feature ID | Feature issue | parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | macro_status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <feature-id> | <Feature issue> | <feature-id> | <macro-01> | <issue reference or local preview> | <F-AC-01> | <local macro ID or none> | <status> |
+| <feature-id> | <Feature issue> | <feature-id> | <macro-01> | <issue reference or local preview> | <F-AC-01> | <local macro ID or none> | <ready or blocked> |
 
 ## Source and boundary evidence
 
@@ -50,9 +50,9 @@
 
 ## Question batch
 
-| id | question | blocking | answer or status | evidence |
-| --- | --- | --- | --- | --- |
-| Q-01 | <decision> | <yes-or-no> | <answer-or-open> | <source> |
+| id | question | question_blocking | question_status | answer | evidence |
+| --- | --- | --- | --- | --- | --- |
+| Q-01 | <decision> | <yes or no> | <open or resolved> | <answer or none> | <source> |
 
 ## Plan content
 

@@ -89,6 +89,8 @@ class ReviewDeliveryContractTests(unittest.TestCase):
 
         self.assertIn("separate G-owned pairwise stack-link workflow", normalized)
         self.assertIn("Before bootstrapping a stacked child", orchestration_normalized)
+        self.assertIn("`candidate-published` parent branch and exact HEAD", orchestration_normalized)
+        self.assertIn("The parent may remain `delivery-pending`", orchestration_normalized)
         self.assertNotIn("Task-only", normalized)
         self.assertIn("this parent Feature and every associated local Macro Task", normalized)
 
@@ -106,14 +108,16 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             "Feature-level `blocked_by`",
             "same-parent-only",
             "exactly one PR output per implementation-eligible selected Feature",
-            "true same-repository code dependency",
+            "same-repository edge is mandatory stack intent",
+            "cross-repository edge as scheduling-only",
         ):
             self.assertIn(required, normalized_skill)
 
         for required in (
             "Feature Plan Sets",
-            "Feature-level `blocked_by` relations are scheduling context",
-            "only a real same-repository code dependency can justify a stack",
+            "hard outcome dependencies",
+            "every same-repository edge is mandatory stack intent",
+            "every cross-repository edge is scheduling-only",
             "Sibling Features and their Tasks are never included",
         ):
             self.assertIn(required, normalized_orchestration + normalized_reference)
@@ -149,8 +153,8 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         normalized = " ".join(reference.split())
         lifecycle = (
-            "`candidate` → `PR published` → `bounded review/CI/delivery-status monitoring` "
-            "→ `PR verified ready or ready-with-manual-action` → `complete`"
+            "active @ worker-bootstrap -> active @ native-review -> "
+            "delivery-pending @ candidate-published -> delivery-ready @ final-verify"
         )
 
         self.assertIn(lifecycle, normalized)
@@ -165,6 +169,33 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             "The delivery lifecycle ends at a published PR verified on its exact HEAD",
             " ".join(skill.split()),
         )
+
+    def test_candidate_publication_hands_monitoring_to_the_orchestrator(self) -> None:
+        reference = REFERENCE.read_text(encoding="utf-8")
+        orchestration = ORCHESTRATION.read_text(encoding="utf-8")
+        skill = SKILL.read_text(encoding="utf-8")
+        profile = TASK_PROFILE.read_text(encoding="utf-8")
+        run_state = RUN_STATE.read_text(encoding="utf-8")
+
+        normalized_reference = " ".join(reference.split())
+        normalized_orchestration = " ".join(orchestration.split())
+        normalized_skill = " ".join(skill.split())
+        normalized_profile = " ".join(profile.split())
+        normalized_run_state = " ".join(run_state.split())
+
+        self.assertIn("The orchestrator is the sole delivery monitor", normalized_skill)
+        self.assertIn("becomes inactive but resumable", normalized_skill)
+        self.assertIn("It does not monitor its own PR", normalized_profile)
+        self.assertIn("actionable fix, evidence repair, or rebase", normalized_profile)
+        self.assertIn("status=delivery-pending", normalized_reference)
+        self.assertIn("checkpoint=candidate-published", normalized_reference)
+        self.assertIn("releases the transient active path claim", normalized_reference)
+        self.assertIn("Before any repair or rebase resumption, reacquire", normalized_run_state)
+        self.assertIn("parent delivery readiness is not a worker-bootstrap gate", normalized_orchestration)
+        self.assertIn("Do not wait for hosted review, CI, or provider readiness", normalized_reference)
+        self.assertIn("candidate-published --> schedule", skill)
+        self.assertIn("delivery-monitor --> implement-validate", skill)
+        self.assertNotIn("ready-monitor", skill)
 
     def test_provider_automation_is_informational_and_implement_never_merges(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")

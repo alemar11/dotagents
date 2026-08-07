@@ -23,8 +23,9 @@ implementation graph. For every Feature member, converge:
 - a closed set of macro-vertical Task areas that collectively cover the
   Feature outcome and its acceptance criteria;
 - macro planning dependencies or `blocked_by` relations between those areas;
-- Feature-level `blocked_by` relations to other Feature members when one
-  distinct functionality depends on another;
+- Feature-level `blocked_by` relations to other Feature members only for hard
+  outcome dependencies, with repository identity preserved for Implement's
+  deterministic stack-or-scheduling projection;
 - constraints, assumptions, risks, and validation intent;
 - one complete batch of material questions for the user when decisions remain;
 - a narrative plan that is clear enough for se:implement to derive execution
@@ -156,17 +157,24 @@ technical layers. The complete set must cover the Feature acceptance criteria
 and must not introduce scope outside the Feature.
 
 Feature-level `blocked_by` relations connect distinct Feature IDs in the same
-Plan Set and express functional sequencing or dependency context. They are
-not automatically technical execution edges or stack instructions. A Macro
-Task `blocked_by` relation is narrower: it may reference only a Macro Task
-whose `parent_feature_id` is exactly the current Feature ID. Cross-Feature
-Task-to-Task edges are invalid, including when the Features share a
-repository.
+Plan Set and express a hard outcome dependency, never preferred order alone.
+Repository identity gives the relation a deterministic Implement projection:
+a same-repository edge is mandatory stack intent, while a cross-repository
+edge remains scheduling-only because no Git ancestry can span repositories.
+This projection does not make Feature the owner of branches, exact heads,
+technical execution edges, or worker scheduling. Record non-blocking preferred
+order as prose instead of `blocked_by`.
+
+A Macro Task `blocked_by` relation is narrower: it may reference only a Macro
+Task whose `parent_feature_id` is exactly the current Feature ID.
+Cross-Feature Task-to-Task edges are invalid, including when the Features
+share a repository.
 
 Macro Task `blocked_by` relations are planning structure and sequencing
 context. They are not Implement execution edges, worker gates, PR boundaries,
-or stack instructions. Implement re-evaluates real technical prerequisites in
-its own control plane.
+or stack instructions. Implement may combine, reorder, or internalize them in
+its technical execution graph, but it must preserve every Macro Task outcome
+and Feature acceptance criterion.
 
 Do not create technical implementation units, allowed-path claims, execution
 waves, worker assignments, or technical dependency IDs in Feature planning.
@@ -214,6 +222,9 @@ The plan must contain:
 - a Feature Plan Set registry that maps every Feature identity to its parent
   Feature issue, Feature-level `blocked_by` refs, and local Macro Task
   registry;
+- the repository-sensitive projection rule that same-repository Feature
+  `blocked_by` is mandatory stack intent and cross-repository `blocked_by` is
+  scheduling-only;
 - one hosted child Task projection for every Macro Task, linked to its own
   parent Feature issue;
 - Macro `blocked_by` relations that reference only Macro Tasks with the same
@@ -269,6 +280,10 @@ The graph contains planning milestones and one publication adapter. Its
 publication node loads the shared G dependency and hosted-content contracts
 internally; transport and read-after-write safeguards remain mandatory but do
 not become planning nodes.
+
+Read [states.md](references/states.md) for the human-readable meaning of every
+workflow node and for the separate plan, report, domain, and external state
+registries. That reference also defines the runtime-checkpoint boundary.
 
 Before every hosted write in plan-publication, load the shared
 [hosted-content-safety.md](../../references/hosted-content-safety.md) contract
@@ -402,15 +417,18 @@ completed. Preview and ambiguous source identity never close an Idea.
 
 Only a complete published Feature Plan Set and its verified sibling/Macro
 projections are implementation input. Implement reads the authoritative set,
-uses Feature-level `blocked_by` for scheduling context, re-evaluates real
+projects same-repository Feature `blocked_by` as mandatory stack intent and
+cross-repository Feature `blocked_by` as scheduling-only, re-evaluates real
 technical prerequisites, and derives technical execution units, path
-envelopes, and runtime waves in its own control plane. It creates one Feature
-Worker and one PR per implementation-eligible Feature member. A
-same-repository code dependency may justify a stack; functional order and
-every cross-repository dependency remain standalone. Technical interpretation
-remains in Implement. A product-level contradiction is reported to the user
-as a bounded plan question; Implement must not create an automatic plan-repair
-planner for ordinary implementation detail.
+envelopes, and runtime waves in its own control plane. It may combine, reorder,
+or internalize Macro Task dependencies while preserving every Macro outcome
+and Feature criterion. It creates one Feature Worker and one PR per
+implementation-eligible Feature member. A same-repository child may start from
+its parent's verified `candidate-published` exact HEAD before that parent is
+delivery-ready. Technical interpretation remains in Implement. A product-level
+contradiction is reported to the user as a bounded plan question; Implement
+must not create an automatic plan-repair planner for ordinary implementation
+detail.
 
 ## Transient state and terminal report
 

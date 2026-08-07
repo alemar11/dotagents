@@ -17,14 +17,15 @@ publishes a container or integration issue. Each Feature entry has its own
 outcome, acceptance criteria, parent Feature issue, and closed Macro Task
 registry.
 
-| feature_id | repository_identity | parent_issue_ref | blocked_by Feature IDs | status |
+| feature_id | repository_identity | parent_issue_ref | blocked_by Feature IDs | feature_status |
 | --- | --- | --- | --- | --- |
 | feature-a | <repository> | <assigned after publication> | <Feature ID or none> | <ready or blocked> |
 
 `feature_id` is stable lower-kebab identity within the
 `feature_plan_set_id`. Feature-level `blocked_by` may reference only another
-Feature ID in this table. A dependency can cross repositories, but does not
-automatically create a stack.
+Feature ID in this table and represents a hard outcome dependency, not
+preferred order. se:implement projects a same-repository edge as mandatory
+stack intent and a cross-repository edge as scheduling-only.
 
 ## Plan Set context
 
@@ -148,17 +149,18 @@ in this Feature and must not add scope outside it.
   options:
     - <option>
   recommendation: <recommended option>
-  status: resolved
+  question_status: resolved
   answer: <user answer or accepted assumption>
 
 ## Implementation handoff
 
 <Explain what se:implement must achieve and what evidence it should preserve.
-Use Feature-level `blocked_by` for scheduling context, re-evaluate actual code
-dependencies independently, and cover every local Macro Task in this
-Feature's final evidence. Keep this implementation-neutral: do not prescribe
-code design, technical execution-unit IDs, allowed paths, execution waves, or
-worker scheduling.>
+Project every same-repository Feature-level `blocked_by` edge as mandatory
+stack intent and every cross-repository edge as scheduling-only. Derive the
+technical execution units independently, and cover every local Macro Task in
+this Feature's final evidence. Keep this implementation-neutral: do not
+prescribe code design, technical execution-unit IDs, allowed paths, execution
+waves, or worker scheduling.>
 
 ### Likely affected surfaces
 

@@ -1,7 +1,11 @@
 # Implement Review And Delivery
 
 This reference owns exact-HEAD Feature Worker-session review, PR publication,
-provider review monitoring, and final exact-HEAD evidence.
+the `candidate-published` handoff, orchestrator-owned provider monitoring, and
+final exact-HEAD evidence.
+Use [states.md](states.md) for the canonical distinction between workflow
+nodes, assignment statuses, checkpoints, provider dispositions, runtime-only
+modes, and output labels.
 
 ## Candidate boundary
 
@@ -24,10 +28,12 @@ vector and prove every member is an ancestor of the candidate. The candidate's
 integration base and intended PR base must preserve that ancestry; a
 prerequisite PR being ready is not sufficient proof.
 
-A Feature-level `blocked_by` relation is not stack authority. The delivery
-record must independently classify the relation as a real same-repository
-code dependency before using a stacked base. Functional order and every
-cross-repository dependency remain standalone.
+A Feature-level `blocked_by` relation has a deterministic repository-sensitive
+delivery projection. Every same-repository edge is mandatory stack intent;
+every cross-repository edge remains scheduling-only and standalone. The
+delivery record still proves the exact parent branch, full HEAD, and ancestry;
+the relation never substitutes for Git evidence or creates technical
+execution-unit edges.
 
 Freeze one transient delivery record before review. A standalone candidate uses
 the verified default branch. A stacked candidate names exactly one immediate
@@ -37,10 +43,22 @@ branch naming, plan order, display metadata, or operational serialization.
 
 ## Delivery lifecycle boundary
 
-The canonical lifecycle is:
+The canonical persisted assignment lifecycle is:
 
-`candidate` → `PR published` → `bounded review/CI/delivery-status monitoring` →
-`PR verified ready or ready-with-manual-action` → `complete`
+```text
+active @ worker-bootstrap
+  -> active @ native-review
+  -> delivery-pending @ candidate-published
+  -> delivery-ready @ final-verify
+```
+
+The workflow nodes `candidate`, `publish-pr`, `stack-reconcile`,
+`candidate-published`, `delivery-monitor`, and `final-verify` perform the work
+between those durable pairs. After every assignment reaches
+`delivery-ready @ final-verify`, the run enters `active @ release-claims` and
+then `complete @ complete`. Provider dispositions such as `ready` and
+`ready-with-manual-action` are exact-HEAD evidence used by final verification,
+not assignment statuses.
 
 Implement terminates with a PR published and verified on its exact HEAD. The PR
 may remain open; merge, the effective closure of the Feature and its Macro
@@ -80,7 +98,7 @@ portable marker and full SHA still passes the same final gate.
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | Provider delivery readiness, CI, mergeability, rulesets, queue, and automation observation | $g:github-delivery-status | Require the current full PR HEAD and preserve the typed disposition, attribution, blockers, pending evidence, warnings, automation facts, and completeness. |
-| Hosted Codex review and actionable review-thread observation | G-owned review workflow | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. |
+| Hosted Codex review and actionable review-thread observation | G-owned review workflow, centrally coordinated by the Implement orchestrator | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. Feature Workers do not poll while inactive. |
 | Merge, deploy, release, or post-merge closure | No Implement owner; outside this skill | Never perform these operations as part of Implement completion. |
 
 The Feature Worker may decide that evidence is insufficient and return to
@@ -157,9 +175,10 @@ operation. Do not use a stack-wide publication, push, sync, rebase, or merge
 operation from normal publication, and never install a missing stack dependency
 implicitly.
 
-When validation, body, and required CI are stable, mark the PR ready through
-the G-owned workflow and independently observe the transition. A draft review
-is consultative and never satisfies the ready cycle.
+Do not wait for hosted review, CI, or provider readiness before establishing
+`candidate-published`. The draft PR and exact publication readback are the
+handoff boundary; a draft review is consultative and never satisfies the ready
+cycle.
 
 ## Stack reconciliation
 
@@ -177,7 +196,33 @@ repush the child merely because stack readback failed. A proven stale base or
 parent HEAD returns the same child Feature Worker to implementation; an
 unreconciled link blocks only that assignment while independent work continues.
 
+## Candidate-published handoff
+
+For a standalone PR, complete publication readback establishes
+`candidate-published`. For a stacked PR, require both publication readback and
+successful stack reconciliation first. Record the exact repository, PR, base
+and head branches, candidate full SHA, closing references, and any parent PR,
+parent full SHA, stack position, and link receipt.
+
+The orchestrator then checkpoints `status=delivery-pending` and
+`checkpoint=candidate-published`, releases the transient active path claim,
+and returns to scheduling. The Feature Worker emits one bounded exact-HEAD
+handoff and becomes inactive but resumable. This checkpoint unlocks a
+same-repository dependent Feature whose frozen base is this exact branch and
+SHA; it does not assert hosted review, CI, provider readiness, mergeability, or
+Feature completion.
+
 ## Hosted review monitoring
+
+The orchestrator owns the monitoring loop for every delivery-pending PR. It
+uses bounded G-owned observations and never asks an inactive Feature Worker to
+poll provider state. A pending observation returns to scheduling so newly
+unblocked Feature Workers and other PR observations can progress.
+
+After `candidate-published`, when local validation and the published body are
+stable, mark the PR ready through the G-owned workflow and independently
+observe the transition. Hosted CI and provider review may remain pending and
+are reconciled by this monitoring loop.
 
 The first hosted Codex review and every later re-review have different trigger
 lineages. Keep them separate:
@@ -204,19 +249,20 @@ published full HEAD. Pending, timed-out, stale, ambiguous, draft-only,
 missing-ready-receipt, request-correlation, or incomplete provider evidence is
 not terminal. One bounded wait may return a pending state at its caller-owned
 deadline; when continued monitoring remains authorized, the orchestrator
-resumes through later bounded waits without posting a duplicate request or
-resetting the existing lineage.
+returns to schedule and resumes through later bounded waits without posting a
+duplicate request or resetting the existing lineage.
 
 For a stacked child, also monitor the immediate parent PR and base relationship.
-Any parent HEAD or readiness change invalidates the child's ancestry, review,
-CI, and readiness evidence even when the child head itself did not move. Wait
-for the parent to pass final verification, then require the child Feature Worker
-to rebase onto the new parent HEAD and repeat its complete candidate cycle.
+A parent HEAD, base, or link change invalidates the child's ancestry, review,
+CI, and readiness evidence even when the child head itself did not move; return
+the same child Feature Worker for rebase and its complete candidate cycle. A
+parent readiness change without topology or HEAD drift affects bottom-to-top
+finalization only and does not invalidate child implementation evidence.
 
 If hosted review produces an actionable finding, preserve its exact provider,
-PR, head, artifact, and observation fingerprint when returning it to the same
-Feature Worker. Never force-push, merge, enqueue, deploy, release, or perform
-post-merge closure.
+PR, head, artifact, and observation fingerprint. Reacquire the Worker's path
+envelope, then return that evidence to the same Feature Worker. Never
+force-push, merge, enqueue, deploy, release, or perform post-merge closure.
 
 ## Provider delivery status
 
@@ -254,8 +300,8 @@ The orchestrator performs read-only final verification. Require:
 - exact Feature-level registry/dependency readback plus the local Macro Task
   registry, one-to-one child Task readback, parent/child relations, issue
   types, and same-parent-only macro dependency readback;
-- Feature-level scheduling evidence and the independent technical dependency
-  classification that justifies standalone or stacked delivery;
+- Feature-level scheduling evidence and the repository-sensitive projection
+  that justifies standalone or stacked delivery;
 - exact current F-AC-NN set with no missing, duplicate, malformed, or
   ambiguous IDs;
 - authoritative hosted plan coverage and monotonic Feature acceptance
@@ -267,6 +313,9 @@ The orchestrator performs read-only final verification. Require:
 - complete Macro Task coverage evidence bound to the same exact current
   candidate HEAD;
 - current-head validation and native review evidence;
+- evidence that final verification started from
+  `delivery-pending @ candidate-published`, plus the exact Worker handoff and
+  any later resumption lineage;
 - PR publication readback and exact PR HEAD equality;
 - the exact Feature-local registry-derived `closing_issue_refs` set containing
   this parent Feature and every associated local Macro Task, equal to GitHub
@@ -281,15 +330,20 @@ The orchestrator performs read-only final verification. Require:
   disposition is `ready` or `ready-with-manual-action`, plus zero unresolved
   actionable review threads.
 
+When every requirement passes for the same exact HEAD, persist
+`delivery-ready @ final-verify`. Until then, preserve
+`delivery-pending @ candidate-published` unless a repair, rebase, plan question,
+or blocker changes assignment ownership.
+
 Aggregate every current F-AC-NN and every local Macro Task through the Feature
 Worker evidence map and retain the exact candidate SHA. Any uncovered,
 unverified, stale, or ambiguous criterion or local Macro Task outcome prevents
 delivery readiness. A planning-only local Macro Task status of `blocked`
 caused by another local Macro Task does not block delivery by itself once the
 final candidate covers this Feature outcome. A Feature-level `blocked_by`
-relation may affect scheduling, but it does not add a sibling to this PR's
-closing set. This acceptance verification is evidence-only and never edits
-the Feature Plan Set or any registry.
+relation controls stack intent or cross-repository scheduling, but it does not
+add a sibling to this PR's closing set. This acceptance verification is
+evidence-only and never edits the Feature Plan Set or any registry.
 
 On recovery, use the assignment's stored worker_task_id and candidate_sha to
 reread the Feature Worker's final acceptance matrix. Accept it only when its
