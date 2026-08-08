@@ -27,8 +27,9 @@ execution graph:
 - a workflow node describes what phase the skill is in;
 - a Feature node describes one genuinely distinct sibling outcome in a Plan
   Set;
-- a Macro Task node describes a vertical macro planning view of one owning
-  Feature outcome;
+- a Macro Task node describes one coherent macro planning view of an owning
+  Feature outcome; when the outcome admits clean slices, the view should be
+  vertical rather than a technical-layer split;
 - an execution-unit node describes an independently valuable technical
   implementation outcome;
 - a workflow graph may contain decisions, validations, actions, and terminal

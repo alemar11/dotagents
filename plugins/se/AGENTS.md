@@ -67,8 +67,10 @@ surface.
 
 - Keep Feature planning free of technical implementation authority. Feature
   publishes one complete Feature Plan Set containing only genuinely distinct
-  sibling Features, each with a closed set of durable macro-vertical Task
-  projections. Feature-level `blocked_by` remains a planning-owned relation,
+  sibling Features, each with a closed set of durable Macro Task projections.
+  Use vertical slices when a Feature outcome admits coherent slices; never
+  manufacture them by splitting technical layers. Feature-level `blocked_by`
+  remains a planning-owned relation,
   but repository identity gives it a deterministic Implement projection: a
   same-repository edge is mandatory stack intent and a cross-repository edge
   is scheduling-only. Macro-local `blocked_by` remains planning-only and may be

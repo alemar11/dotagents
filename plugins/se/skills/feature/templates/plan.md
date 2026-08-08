@@ -42,11 +42,13 @@ Repeat the following member sections for every `feature_id` in the registry.
 
 ##### Problem statement
 
-<Explain the user or product problem and the evidence that establishes it.>
+<Explain who or what experiences the user or product problem, the evidence
+that establishes it, and any material uncertainty.>
 
 ##### Desired outcome
 
-<Describe the observable outcome in user and system terms.>
+<Describe the observable outcome in user and system terms, including the usable
+landing state and ownership boundary.>
 
 ##### Scope
 
@@ -93,9 +95,10 @@ this Feature member and must be covered by its local Macro Task registry.
 
 This is the closed set for the current Feature member, not the entire Plan
 Set. Macro Tasks are not optional scope, technical execution units, worker
-assignments, or separate PR boundaries. Every entry is included in this
-Feature's final implementation closing set, and sibling Feature issues are
-excluded.
+assignments, or separate PR boundaries. Use vertical rows when the Feature
+outcome admits clean slices; otherwise keep fewer coherent rows and explain
+the boundary. Every entry is included in this Feature's final implementation
+closing set, and sibling Feature issues are excluded.
 
 - macro_task_registry_revision: 1
 - parent_feature_id: `<feature_id>`
@@ -103,7 +106,7 @@ excluded.
 
 | parent_feature_id | macro_task_id | macro outcome | scope | F-AC refs | blocked_by | macro status | child issue ref |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `<feature_id>` | macro-01 | <vertical macro outcome> | <macro boundary> | <F-AC-01> | <none or local macro ID> | <ready or blocked> | <assigned after publication> |
+| `<feature_id>` | macro-01 | <vertical slice when the outcome admits one; otherwise coherent macro outcome> | <macro boundary> | <F-AC-01> | <none or local macro ID> | <ready or blocked> | <assigned after publication> |
 
 Each `(parent_feature_id, macro_task_id)` pair is stable. Macro `blocked_by`
 may reference only another Macro Task with the same `parent_feature_id` and

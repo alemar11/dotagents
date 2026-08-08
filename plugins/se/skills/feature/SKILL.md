@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Turn one or more related requests into a clear Feature Plan Set. Define each Feature's outcome and acceptance criteria, split it into practical Macro Tasks, publish the plan by default, and never implement code."
+description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish the plan by default, and never implement code."
 ---
 
 # Feature Planning
@@ -15,13 +15,15 @@ The result is a Feature Plan Set with one or more repository-owned Feature
 members and a durable macro-planning projection, not a technical
 implementation graph. For every Feature member, converge:
 
-- the bounded product or capability outcome;
+- an evidence-backed description of the problem, affected users, actors, or
+  systems, and bounded product or capability outcome;
 - the source-issue relationship and multi-issue consolidation rationale;
 - the problem analysis, scope, non-goals, and repository context;
 - stable Feature acceptance criteria;
 - an observable usable landing state, ownership boundary, and delivery reason;
-- a closed set of macro-vertical Task areas that collectively cover the
-  Feature outcome and its acceptance criteria;
+- a closed set of Macro Task areas that collectively cover the Feature outcome
+  and its acceptance criteria, using vertical slices when the outcome supports
+  them;
 - macro planning dependencies or `blocked_by` relations between those areas;
 - Feature-level `blocked_by` relations to other Feature members only for hard
   outcome dependencies, with repository identity preserved for Implement's
@@ -151,10 +153,13 @@ Feature container. If an acceptance criterion inherently spans distinct
 Features, keep the outcome in one Feature or decompose the criterion into
 Feature-local criteria; never invent a cross-Feature integration Feature.
 
-After each Feature member has one coherent outcome, split that outcome into a
-closed set of Macro Tasks. Each Macro Task is a vertical macro view of the
-same Feature outcome, not an optional deliverable or a technical execution
-unit. Macro Tasks may cross repository layers when those layers serve one
+After each Feature member has one coherent outcome, define its closed set of
+Macro Tasks and decide whether that outcome admits clean vertical slicing. When
+it does, make each Macro Task a
+bounded vertical view of one slice of the same Feature outcome, not an optional
+deliverable or a technical execution unit. When it does not, keep fewer
+coherent Macro Tasks and explain the boundary rather than forcing a vertical
+split. Macro Tasks may cross repository layers when those layers serve one
 coherent outcome. Do not split only into backend, frontend, tests, or other
 technical layers. The complete set must cover the Feature acceptance criteria
 and must not introduce scope outside the Feature.
@@ -216,7 +221,8 @@ semantics.
 The plan must contain:
 
 - Feature Plan Set identity, revision, and source-issue mapping;
-- one Feature identity, outcome, problem statement, and analysis per member;
+- one Feature identity, evidence-backed problem statement, affected users,
+  actors, or systems, desired outcome, and analysis per member;
 - explicit scope and non-goals;
 - affected Feature members, repositories, and parent-issue identities;
 - repository-context sources and relevant facts per Feature member;

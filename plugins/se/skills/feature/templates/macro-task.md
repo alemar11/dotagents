@@ -1,9 +1,10 @@
 # Macro Task
 
 The semantic contract is owned by [Feature Planning](../SKILL.md). This issue
-is a durable macro-vertical planning projection of one parent Feature
-outcome. It is not an optional scope item, a technical execution unit, a
-worker assignment, or a separate PR boundary.
+is a durable macro planning projection of one parent Feature outcome. When the
+outcome admits a clean vertical slice, this projection should describe that
+slice. It is not an optional scope item, a technical execution unit, a worker
+assignment, or a separate PR boundary.
 
 ## Identity
 
@@ -16,7 +17,8 @@ worker assignment, or a separate PR boundary.
 
 ## Macro outcome
 
-<Describe the coherent vertical capability area this Macro Task represents.>
+<Describe the coherent outcome or vertical slice this Macro Task represents;
+use a vertical slice when the Feature outcome supports one.>
 
 ## Scope and criteria
 

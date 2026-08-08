@@ -58,13 +58,21 @@ critic findings, consolidation rationale, and the handoff to Implement.
 Clearly distinguish confirmed evidence, accepted assumptions, and unresolved
 questions.
 
+Write each Feature member's description from the confirmed evidence: explain
+who or what is affected, what outcome is desired, what is in and out of scope,
+and how success will be observed. If evidence is incomplete, record the
+assumption or question instead of inventing product detail.
+
 Keep implementation considerations useful but generic. The plan may identify
 affected surfaces, architectural constraints, likely validation areas, and
 integration concerns. Macro Tasks are planning projections of the Feature
 outcome, not technical execution units. The plan must not prescribe code
 design, allowed paths, worker assignments, or runtime scheduling claims.
 
-Feature criteria use ordinary list items with stable F-AC-NN identities. They
+Use vertical Macro Tasks when the Feature outcome admits clean, coherent
+slices. If it does not, keep fewer coherent Macro Tasks and explain the
+boundary; do not force a backend/frontend/test split. Feature criteria use
+ordinary list items with stable F-AC-NN identities. They
 describe observable product outcomes and are not execution checkboxes. Every
 F-AC-NN belongs to exactly one Feature member and every Feature's criteria are
 covered by at least one local Macro Task. Every Macro Task carries its

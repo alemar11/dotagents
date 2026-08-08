@@ -64,11 +64,13 @@ by inventing outcomes or acceptance criteria. If a criterion spans distinct
 Features, keep it in one Feature or decompose it into Feature-local criteria;
 never create an integration Feature to hold the span.
 
-Once each Feature member has one coherent outcome, define its closed Macro
-Task set. Each Macro Task is a vertical macro view of that outcome, must map
-to one or more Feature acceptance criteria, and may cross technical layers.
-Do not create separate Macro Tasks only for backend, frontend, tests,
-documentation, or other technical layers.
+Once each Feature member has one coherent outcome, decide whether it admits
+clean vertical slices. When it does, define one Macro Task for each bounded
+vertical view that maps to one or more Feature acceptance criteria and may
+cross technical layers. When it does not, keep fewer coherent Macro Tasks and
+record why a vertical split would be artificial. Do not create separate Macro
+Tasks only for backend, frontend, tests, documentation, or other technical
+layers.
 
 Record Feature-level `blocked_by` relations only between Feature IDs in the
 same Plan Set. Record Macro Task `blocked_by` relations only between Macro

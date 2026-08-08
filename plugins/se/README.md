@@ -103,10 +103,11 @@ Its skills are deliberately separated by responsibility:
 - Feature analyzes one or more source issues, runs optional bounded
   read-only analysts and an independent critic when delegation is available,
   presents one consolidated batch of material questions, and returns one
-  textual Feature Plan Set with genuinely distinct sibling Features. Each
-  Feature has ordinary list-item acceptance criteria with stable `F-AC-NN`
-  identities, its own closed macro-vertical Task registry, and optional
-  hard-outcome Feature dependencies. Same-repository Feature dependencies
+  evidence-backed textual Feature Plan Set with genuinely distinct sibling
+  Features. Each Feature has ordinary list-item acceptance criteria with stable
+  `F-AC-NN` identities, its own closed Macro Task registry, and optional
+  hard-outcome Feature dependencies; use vertical Macro Tasks when an outcome
+  admits coherent slices. Same-repository Feature dependencies
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by
