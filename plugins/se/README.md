@@ -121,11 +121,14 @@ Its skills are deliberately separated by responsibility:
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by
-  default; it never creates a container issue. Native GitHub Issue Types are
-  optional publication metadata: Feature applies `Feature` and `Task` when the
-  repository supports them, while absent or unavailable types never block the
-  semantic publication. Explicit preview remains local and non-durable. Hosted
-  publication requires G preflight and read-after-write verification.
+  default; it never creates a container issue. After exact issue publication,
+  Feature delegates optional label and native type classification to
+  `g:github-tagger` for each issue. The tagger chooses the smallest relevant
+  existing label set, including none, and zero or one available native type;
+  Feature never presets `Feature`, `Task`, or any other metadata value. An
+  empty assignment is valid and does not block semantic publication. Explicit
+  preview remains local and non-durable. Hosted publication requires G
+  preflight and read-after-write verification.
 - Feature maintenance is an alternate entry into the same Plan Set graph:
   it rehydrates the existing sibling Features, reconciles an explicit
   indication, and republishes the revised projections when requested. It does

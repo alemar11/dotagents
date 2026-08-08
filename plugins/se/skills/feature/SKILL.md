@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish the plan by default, and never implement code."
+description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish the plan by default, delegate optional issue label and type classification, and never implement code."
 ---
 
 # Feature Planning
@@ -215,10 +215,13 @@ The Feature Plan Set is the canonical semantic content. When published, each
 Feature member becomes one GitHub parent issue. There is no hosted container
 issue. Each parent Feature carries the common Plan Set identity and revision,
 the set-membership manifest, its own Feature identity, and its own closed Macro
-Task registry. Native GitHub Issue Types are optional metadata and do not carry
-the semantics: request `Feature` for parent issues and `Task` for child issues
-when those types are available, but absence or provider unavailability never
-blocks publication.
+Task registry. Repository labels and native GitHub Issue Types are optional
+metadata and do not carry these semantics. Feature never preselects their
+values. After each final hosted issue projection and exact identity are
+verified, delegate classification and authorized application to
+`$g:github-tagger`. Instruct it to choose the smallest relevant set of existing
+labels, including none, and zero or one available native issue type for that
+exact issue.
 
 The plan must contain:
 
@@ -412,9 +415,14 @@ revision. A Feature-level edge may cross repositories; a Macro Task edge may
 not cross parent Features even in one repository. Publication is complete
 only when every parent registry, child issue, parent/child relation, and
 registry `blocked_by` value passes authoritative read-after-write verification.
-Read back native Issue Type metadata when the provider exposes it, but treat
-missing or unavailable types as non-blocking publication evidence rather than
-semantic plan failure.
+Then invoke `$g:github-tagger` once for every exact parent and child issue with
+`mutation_mode=apply` and both classification dimensions. Do not supply label
+names or type values. Record its reconciled result, including the final
+read-back assignments when a mutation was attempted. Zero selected labels,
+zero selected types, unchanged values, unavailable catalogs, no confident
+match, or a reconciled partial or failed optional metadata write do not turn
+into semantic plan failure. An absent result or indeterminate mutation remains
+a publication blocker because final provider state has not been reconciled.
 
 Each parent Feature plus every associated Macro Task issue forms one closed
 implementation issue set. A Feature's set never includes a sibling Feature or
@@ -423,8 +431,9 @@ preview; retain the calculated Plan Set and report the blocker.
 
 When one exact hosted Idea was the source and the complete Feature Plan Set,
 every sibling Feature, every child Task, all relations, and their
-authoritative readbacks publish successfully, close that source Idea as
-completed. Preview and ambiguous source identity never close an Idea.
+authoritative readbacks and tagger results reconcile successfully, close that
+source Idea as completed. Preview and ambiguous source identity never close an
+Idea.
 
 ### Implement handoff
 
@@ -463,7 +472,8 @@ A complete report contains:
 - assumptions, risks, validation intent, and critic findings;
 - the full question batch and the user's resolutions;
 - the complete textual plan and Implement handoff;
-- preview or publication operation evidence;
+- preview or publication operation evidence, including each reconciled tagger
+  result when published;
 - source-Idea lifecycle evidence when applicable;
 - retained identities, no-op operations, and unresolved blockers when
   applicable.

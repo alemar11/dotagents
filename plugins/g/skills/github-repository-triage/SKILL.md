@@ -1,6 +1,6 @@
 ---
 name: github-repository-triage
-description: Triage GitHub repositories read-only. Use for detailed issue and pull request queues in one repository or explicit multi-repository summaries of blockers, CI, releases, and next actions; route mutations to $g:github-issues.
+description: Triage GitHub repositories read-only. Use for detailed issue and pull request queues in one repository or explicit multi-repository summaries of blockers, CI, releases, and next actions; route content-based metadata selection or taxonomy proposals to $g:github-tagger and exact mutations to $g:github-issues.
 ---
 
 # GitHub Repository Triage
@@ -32,9 +32,12 @@ repositories, produce a comparative summary of queue size, CI, release state,
 blockers, and next actions. Keep both report shapes URL-first, concise,
 read-only, and action-oriented.
 
-Use `$g:github-stars` for star and list operations. Use
-`$g:github-issues` for issue creation, issue type changes, comments,
-labels, parent/sub-issue relationships, and closure.
+Use `$g:github-stars` for star and list operations. Use `$g:github-tagger`
+when one exact issue must be read to select existing labels or a native issue
+type, or when the user explicitly requests repository and issue-corpus analysis
+to propose missing taxonomy. Use `$g:github-issues` when the exact issue
+creation, metadata change, comment, relationship, or closure operation is
+already decided.
 
 ## Multi-Repository Script
 
@@ -68,15 +71,20 @@ per-repository failures, and writes no implicit config.
    `<plugin-root>/scripts/g portfolio scan` and summarize queue size,
    blocking CI, release gaps, and next actions per repository. Preserve
    per-repository failures instead of hiding the rest of the scan.
-4. Do not edit labels, milestones, assignees, titles, comments, releases, or
-   workflows from this
-   skill; route authorized GitHub issue lifecycle mutations to
-   `$g:github-issues` only after normalizing the handoff to
+4. When queue work identifies one exact issue that needs content-based label or
+   type selection, route it to `$g:github-tagger`; do not choose metadata from a
+   queue summary.
+   When the user instead requests a taxonomy proposal, route the exact
+   repository and corpus context to that skill; do not invent new labels from
+   the triage summary alone.
+5. Do not edit labels, milestones, assignees, titles, comments, releases, or
+   workflows from this skill; route predetermined authorized GitHub issue
+   lifecycle mutations to `$g:github-issues` only after normalizing the handoff to
    `mutation_mode=apply`, the exact repository and issue target, and one
    canonical `issue_operation`. Route an explicit mutation preview with
    `mutation_mode=dry-run` and the same exact target and operation. Pure queue
    reads omit both fields.
-5. Route evidence-backed issue disposition questions, including whether an
+6. Route evidence-backed issue disposition questions, including whether an
    issue should close or partial work satisfies its acceptance criteria, to
    `$g:github-investigation`. Route any authorized resulting lifecycle
    mutation to `$g:github-issues`.

@@ -74,6 +74,6 @@
 - parent Feature publication and set readback:
 - Macro Task child publication and local registry readback:
 - Feature-level dependency readback:
-- optional native Issue Type readback:
+- delegated tagger result per issue, including final labels and type:
 - source-Idea lifecycle:
 - blockers:

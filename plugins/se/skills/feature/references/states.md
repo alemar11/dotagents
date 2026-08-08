@@ -53,7 +53,8 @@ represented by the transition from `plan-validation` and by `plan_status`.
 | planner task wait | `awaiting-user-input` | application runtime | A resumable wait while the question batch is with the user. It remains nonterminal. |
 | `goal_status` | `active`, `complete`, `not-available` | goal runtime and report | Reports the optional goal lifecycle. Goal `complete` is not the Feature workflow node `complete`. |
 | delegation outcome | `parallel-analysis`, `serial-fallback`, `unavailable`, `unknown` | planner report | Reports how optional analysis roles were handled; it does not change the planning contract. |
-| source Idea close reason | `completed` | hosted issue provider | Used only after the complete Plan Set and all projections have verified publication. |
+| tagger result | values defined by `$g:github-tagger` | `$g:github-tagger` | Records the reconciled classification and application result for each published issue. It may contain zero selected labels and zero selected types and is not Feature or Macro Task semantic state. |
+| source Idea close reason | `completed` | hosted issue provider | Used only after the complete Plan Set, all projections, and every tagger handoff have reconciled. |
 
 ## Persistence boundary
 

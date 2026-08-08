@@ -39,6 +39,15 @@ Do not infer availability from a display name, an installed cache directory,
 historical task output, or an unrelated GitHub connector. Do not require source
 and installed versions to match as part of this gate.
 
+For Idea, the required workflow set contains `$g:github-issues`. For every
+Feature publication, including a maintenance publication, it contains both
+`$g:github-issues` for exact issue lifecycle operations and `$g:github-tagger`
+for repository-owned label and native type classification. A maintenance or
+existing-source route that only rehydrates hosted state requires
+`$g:github-issues` until publication is selected. The Feature preview route for
+a new local source requires neither workflow because it performs no hosted
+access.
+
 For Implement, the required workflow set includes the G owners needed by the
 selected publication, review, CI, issue, local Git, and stack paths. Branch
 protection and ruleset inspection are not required by this workflow. A generic

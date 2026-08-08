@@ -17,6 +17,11 @@ package and its shared artifact.
   handling.
 - `skills/audit/` owns explicit, read-only Codex App monitoring of active tasks
   that use G skills; it does not own Git/GitHub transport.
+- `skills/github-tagger/` owns evidence-backed selection from current
+  repository-owned labels and enabled native issue types, plus explicitly
+  requested read-only proposals for missing labels and organization issue
+  types. It delegates exact issue mutations to `skills/github-issues/` and
+  never mutates taxonomy from proposal mode.
 - `skills/<name>/` owns only its narrow provider-primitive contract and local
   adapters or reference summaries.
 
@@ -43,7 +48,9 @@ unversioned, or belongs to another repository.
   `skills/audit/` is the explicit read-only App-monitoring exception and must
   not add Git/GitHub transport. Caller-owned planning, orchestration, project
   context, queue state, issue-body, and label policy must remain in composing
-  skills.
+  skills or provider-owned metadata. GitHub Tagger may interpret the current
+  provider-owned taxonomy or propose a minimal evidence-backed extension when
+  explicitly requested, but proposal mode must remain read-only.
 - Do not add a second Git/GitHub transport or move publication policy into the
   shared helper. Preserve explicit authority for every GitHub mutation.
 - Treat plugin caches as verification surfaces, never editable sources.
@@ -54,3 +61,6 @@ unversioned, or belongs to another repository.
   maintenance source as the normal runtime.
 - For bundled-skill changes, validate the narrow workflow contract and use
   shared artifact checks when the provider transport is affected.
+- For GitHub Tagger changes, validate the explicit mode boundary, canonical
+  states, minimal-proposal rules, repository-versus-organization scope, and the
+  prohibition on taxonomy writes from proposal mode.

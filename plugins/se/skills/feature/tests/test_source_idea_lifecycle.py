@@ -38,13 +38,23 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         self.assertIn("one hosted child Task projection for every Macro Task", normalized_skill)
         self.assertIn("one child issue per Macro Task", normalized_publication)
         self.assertIn(
-            "Native GitHub Issue Types are optional publication metadata",
+            "invoke `$g:github-tagger` separately for each exact issue",
             normalized_publication,
         )
         self.assertIn(
-            "missing or unavailable Issue Type metadata alone never blocks completion",
+            "smallest relevant set of existing labels, with zero labels valid",
             normalized_publication,
         )
+        self.assertIn("zero or one available native issue type", normalized_publication)
+        self.assertIn(
+            "Feature must not choose, suggest, or preset label names",
+            normalized_publication,
+        )
+        self.assertIn(
+            "empty optional metadata assignment alone never blocks completion",
+            normalized_publication,
+        )
+        self.assertNotIn("Request `Feature`", normalized_publication)
         self.assertIn("final set registry", normalized_publication)
         self.assertIn("one or more local Macro Tasks", normalized_validation)
         self.assertIn("cyclic reference", normalized_validation)

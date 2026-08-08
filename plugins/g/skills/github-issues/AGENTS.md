@@ -11,6 +11,10 @@ canonical option ownership in the plugin-level references.
   verification. Do not create a second issue transport here.
 - Preserve the separation between issue lifecycle mechanics and repository-wide
   triage, investigation, review, Actions, release, or submission workflows.
+- Keep content-based selection of existing labels and native issue types, plus
+  read-only proposals for missing taxonomy, in `../github-tagger/`; this
+  package receives exact metadata operations and owns their provider mutation
+  and readback only.
 - Keep free-form provider text file-backed and secret-safe; direct `gh` paths
   must remain explicit, dry-run capable, and independently verified.
 - Validate shared CLI changes through `projects/g/AGENTS.md`; validate

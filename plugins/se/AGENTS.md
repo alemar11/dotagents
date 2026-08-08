@@ -166,7 +166,11 @@ surface.
   adapter and G-owned issue workflow before any hosted mutation. Publication
   creates every sibling parent Feature, every local child Macro Task, their
   planning relations, and the final set registry readback without a container
-  issue. Preview is opt-in and must never be selected implicitly when publish
+  issue. After each exact issue projection is final, delegate optional label
+  and native type selection to `g:github-tagger`; Feature must not preselect
+  metadata values. Preserve the tagger's smallest-set policy: zero or more
+  relevant labels and zero or one relevant type, with empty selections valid.
+  Preview is opt-in and must never be selected implicitly when publish
   authority or G is unavailable.
 - Keep Implement GitHub-backed end to end. It accepts authoritative published
   Feature Plan Sets with verified sibling/Macro projections, derives its
@@ -232,6 +236,9 @@ surface.
   high-water marks, plan publication/readback, malformed and legacy-checkbox
   rejection, question-batch completeness, and Implement evidence bound to the
   current candidate SHA.
+- Validate that Feature publication delegates label and native type selection
+  only after exact issue readback, never presets metadata values, and preserves
+  the tagger cardinalities of zero or more labels and zero or one type.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, exact transition-condition coverage, the
   intentional refresh loop, terminal reachability, evidence classifications,

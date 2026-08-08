@@ -54,12 +54,23 @@ not invent a provider-native blocker relation. Update every parent Feature
 projection with the final set membership, exact parent issue refs, local child
 issue refs, and registry after all parent and child identities are known.
 
-Native GitHub Issue Types are optional publication metadata. Request `Feature`
-for each parent and `Task` for each child when the target repository exposes
-those types. If Issue Types or either requested value are unavailable, publish
-and verify the issues without them. Record the observed metadata result in the
-publication evidence, but never use type availability or absence as Feature,
-Macro Task, relation, or completion authority.
+After every final parent and child projection, relation, and exact identity are
+verified, invoke `$g:github-tagger` separately for each exact issue with
+`mutation_mode=apply` and both labels and native type requested. Feature must
+not choose, suggest, or preset label names or type values, including `Feature`
+or `Task`. Instruct the tagger to select the smallest relevant set of existing
+labels, with zero labels valid when none is pertinent, and zero or one
+available native issue type, with zero valid when none is pertinent. Record
+each tagger result in the publication evidence.
+
+Labels and native issue types remain optional publication metadata. A readable
+catalog with no confident match, an empty catalog, unavailable metadata, zero
+selected values, unchanged values, or a reconciled partial or failed metadata
+write does not block semantic publication. The handoff itself must still
+return one terminal, reconciled result per issue. A missing result or an
+indeterminate mutation blocks completion because final provider state is not
+known. Never use labels, type, or their availability as Feature, Macro Task,
+relation, or completion authority.
 
 The set registry maps `feature_id` to exactly one parent Feature issue and
 `(parent_feature_id, macro_task_id)` to exactly one child Task issue. Every
@@ -80,12 +91,13 @@ planning projections and are not one-to-one execution units.
 Verify every parent Feature issue, every child Task, every parent/child
 relation, every Feature identity, every parent issue ref, every registry
 `blocked_by` value, shared set identity/revision, and the final set registry
-with authoritative read-after-write evidence. When native Issue Type metadata
-is available, read it back as optional publication evidence. Publication is
-not complete while a Feature or Macro Task lacks its exact hosted identity, a
-Feature-level edge points outside the set, a Macro edge crosses a parent
-Feature, or sibling projections disagree; missing or unavailable Issue Type
-metadata alone never blocks completion.
+with authoritative read-after-write evidence. Verify every tagger handoff has
+a reconciled result and retain its independently read-back final labels and
+type when it attempted a mutation. Publication is not complete while a Feature
+or Macro Task lacks its exact hosted identity, a Feature-level edge points
+outside the set, a Macro edge crosses a parent Feature, sibling projections
+disagree, or a tagger result remains unresolved; an empty optional metadata
+assignment alone never blocks completion.
 
 Verify every hosted operation with authoritative read-after-write evidence.
 Retain the calculated plan when publication fails and report the smallest
@@ -93,5 +105,6 @@ recovery input. Do not silently downgrade a default publish to preview.
 
 When one exact hosted Idea is the source, close that Idea with reason
 completed only after the complete Feature Plan Set, every sibling Feature,
-every Macro Task projection, the final registry, and all authoritative
-readbacks succeed. Preview and ambiguous source identity never close an Idea.
+every Macro Task projection, the final registry, all authoritative readbacks,
+and every required tagger handoff reconcile. Preview and ambiguous source
+identity never close an Idea.

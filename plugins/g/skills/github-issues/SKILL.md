@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Manage individual GitHub issues and their lifecycle. Use to create, inspect, edit, label, type, comment on, close, relate, or preview changes to specific issues; use $g:github-repository-triage for repository-wide issue and pull request queues.
+description: Manage individual GitHub issues and their lifecycle. Use when the exact content, label, type, comment, state, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
 ---
 
 # GitHub Issues
@@ -24,12 +24,14 @@ CLI gate.
 ## Role
 
 Own GitHub issue lifecycle mechanics. Use this skill when another workflow has
-already decided what issue content, type, state, or relationship is needed and
-needs the GitHub operation performed or drafted.
+already decided what issue content, label, type, state, or relationship is
+needed and needs the GitHub operation performed or drafted.
 
-Keep product planning, issue splitting, triage classification, CI, review
-threads, releases, stars, commits, and PR publishing in their focused skills.
-This skill only handles GitHub Issues.
+Keep product planning, issue splitting, metadata classification and taxonomy
+proposals, queue triage, CI, review threads, releases, stars, commits, and PR
+publishing in their focused skills. `$g:github-tagger` owns evidence-backed
+label and type selection and read-only taxonomy proposals; this skill only
+handles GitHub Issues lifecycle mechanics.
 
 ## Core Rules
 
@@ -104,6 +106,9 @@ This skill only handles GitHub Issues.
 
 ## Routing
 
+- Use `$g:github-tagger` when the issue must be read to choose among available
+  labels or native issue types, or when an explicit request asks for
+  repository-backed proposals for missing labels or organization issue types.
 - Use `$g:github-repository-triage` for current-repository queue snapshots, stale/blocker
   grouping, and PR triage.
 - Use `$g:github-investigation` when the question needs root cause, provenance, or

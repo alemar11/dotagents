@@ -54,6 +54,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | Send local work as a branch and draft PR | `$g:send` |
 | Stacked PR branch/stack lifecycle | `$g:github-stack` |
 | Issue and PR queue triage for one or more repositories | `$g:github-repository-triage` |
+| Content-based issue classification or explicit read-only taxonomy proposals | `$g:github-tagger` |
 | GitHub issue lifecycle and relationships | `$g:github-issues` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$g:github-investigation` |
 | Actions inspection or explicit CI repair | `$g:github-actions` |
