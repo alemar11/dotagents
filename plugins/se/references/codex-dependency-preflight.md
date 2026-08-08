@@ -39,10 +39,11 @@ Do not infer availability from a display name, an installed cache directory,
 historical task output, or an unrelated GitHub connector. Do not require source
 and installed versions to match as part of this gate.
 
-For Implement, the required workflow set includes
-`$g:github-delivery-status` in addition to the G owners needed by the selected
-publication, review, issue, local Git, and stack paths. A generic GitHub read or
-raw provider call is not a substitute for its typed exact-head disposition.
+For Implement, the required workflow set includes the G owners needed by the
+selected publication, review, CI, issue, local Git, and stack paths. Branch
+protection and ruleset inspection are not required by this workflow. A generic
+GitHub read or raw provider call is not a substitute for the focused typed
+workflow that owns the evidence being collected.
 
 ## Blocking outcomes
 

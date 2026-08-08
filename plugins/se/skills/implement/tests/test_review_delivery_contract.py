@@ -74,11 +74,22 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             "no Worker-supplied closure list",
             "The PR declares closure intent",
             "GitHub closes this Feature and its local Macro Tasks only when the PR is merged",
-            "`closingIssuesReferences` set",
+            "`closingIssuesReferences` field is not a stable pre-merge contract for stacked PRs",
         ):
             self.assertIn(required, normalized)
 
-        self.assertIn("Require the read-back set to equal `closing_issue_refs` exactly", normalized)
+        self.assertIn(
+            "never require it to equal `closing_issue_refs`",
+            normalized,
+        )
+        self.assertIn(
+            "Verify the PR body carries the exact registry-derived closure intent",
+            normalized,
+        )
+        self.assertNotIn(
+            "Require the " + "read-back set",
+            normalized,
+        )
         self.assertIn("Macro Task coverage evidence", normalized)
 
     def test_stacked_children_link_separately(self) -> None:
@@ -128,25 +139,29 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         )
         self.assertIn("cross-parent", normalized_reference)
 
-    def test_delivery_status_is_exact_head_and_has_two_accepted_dispositions(self) -> None:
+    def test_provider_policy_is_not_an_implement_completion_gate(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")
         skill = SKILL.read_text(encoding="utf-8")
         preflight = PREFLIGHT.read_text(encoding="utf-8")
 
-        for document in (reference, orchestration, skill, preflight):
-            self.assertIn("$g:github-delivery-status", document)
+        normalized_reference = " ".join(reference.split())
+        normalized_skill = " ".join(skill.split())
+        normalized_orchestration = " ".join(orchestration.split())
 
-        for disposition in ("`ready`", "`ready-with-manual-action`"):
-            self.assertIn(disposition, reference)
-            self.assertIn(disposition, skill)
-
-        for rejected in ("`pending`", "`blocked`", "`conflicting`", "`unknown`"):
-            self.assertIn(rejected, reference)
-
-        self.assertIn("merge_boundary=none", reference)
-        self.assertIn("merge_boundary=manual", reference)
-        self.assertIn("exact published full HEAD", " ".join(reference.split()))
+        self.assertIn("Do not require or invoke $g:github-delivery-status", normalized_skill)
+        self.assertIn("Branch protection and rulesets are outside this workflow", normalized_skill)
+        self.assertIn("optional provider diagnostics", normalized_skill)
+        self.assertIn("Optional provider diagnostics", normalized_reference)
+        self.assertIn("cannot block completion", normalized_reference)
+        self.assertNotIn("Require $g:github-delivery-status", normalized_skill)
+        self.assertNotIn(
+            "a complete current-head $g:github-delivery-status certificate",
+            normalized_reference,
+        )
+        self.assertNotIn("$g:github-delivery-status", preflight)
+        self.assertNotIn("delivery status", normalized_orchestration)
+        self.assertIn("exact published full HEAD", normalized_reference)
 
     def test_delivery_lifecycle_stops_before_merge(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
@@ -164,7 +179,10 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         )
         self.assertIn("The PR may remain open", normalized)
         self.assertIn("They become effective only when GitHub merges the PR", normalized)
-        self.assertIn("current PR HEAD, PR body and closing references", normalized)
+        self.assertIn(
+            "current PR HEAD, the PR body carrying registry-derived closure intent",
+            normalized,
+        )
         self.assertIn(
             "The delivery lifecycle ends at a published PR verified on its exact HEAD",
             " ".join(skill.split()),
@@ -203,12 +221,12 @@ class ReviewDeliveryContractTests(unittest.TestCase):
 
         normalized = " ".join(reference.split())
         for phrase in (
-            "They neither block delivery readiness nor grant authority",
-            "must not enable, disable, enqueue, dequeue, bypass, or merge",
+            "diagnostic only",
+            "must still never enable, disable, enqueue, dequeue, bypass, or merge",
         ):
             self.assertIn(phrase, normalized)
 
-        self.assertIn("are not blockers by themselves", skill)
+        self.assertIn("optional provider diagnostics", " ".join(skill.split()))
         self.assertIn(
             "never merges, bypasses protections, enables or disables auto-merge, or enqueues or dequeues a PR",
             " ".join(skill.split()),

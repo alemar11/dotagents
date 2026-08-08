@@ -20,11 +20,11 @@ output. The orchestrator derives technical execution units from the Feature
 and its local Macro Task registry before scheduling; the Plan Set does not
 contain the runtime execution graph.
 
-Provider delivery readiness is observed through
-$g:github-delivery-status against the current exact PR HEAD; the orchestrator
-does not reinterpret raw provider states. It is the sole delivery-monitoring
-and aggregate lifecycle owner. Feature Workers never poll their own PRs while
-inactive.
+PR delivery readiness is established from exact PR publication, current CI,
+hosted review feedback, and stack evidence. The orchestrator is the sole
+delivery-monitoring and aggregate lifecycle owner. Feature Workers never poll
+their own PRs while inactive. Branch protection and rulesets are outside the
+Implement completion contract.
 
 Run independent Features concurrently when their repositories, derived path
 envelopes, real cross-Feature code dependencies, Feature-level `blocked_by`
@@ -144,8 +144,11 @@ orchestrator coordinates this sequence but never edits or rebases worker code.
 ## Candidate publication and central delivery monitoring
 
 After native review and publication, the orchestrator verifies repository, PR,
-branch, full candidate HEAD, draft state, closing references, and any required
-stack link. Only that complete readback establishes `candidate-published`.
+branch, full candidate HEAD, draft state, registry-derived closure intent in
+the PR body, and any required stack link. If available, it records GitHub's
+`closingIssuesReferences` as optional provider diagnostics; that field never
+blocks publication. Only the remaining exact-head and topology readback
+establishes `candidate-published`.
 Checkpoint the assignment as `status=delivery-pending` and
 `checkpoint=candidate-published`, release its transient active path claim, and
 mark the Feature Worker inactive but resumable. This checkpoint is the only
@@ -154,9 +157,9 @@ same-repository child-development trigger; it is not delivery completion.
 Return to `schedule` after every candidate publication. The scheduler may
 bootstrap newly unblocked Features and interleave bounded observations of all
 delivery-pending PRs. The orchestrator owns those observations and combines
-G-normalized review, CI, delivery status, exact-head, and parent/base evidence.
-It does not ask inactive Workers to poll. A still-pending observation returns
-to `schedule`; a clean ready observation enters final verification.
+G-normalized review, CI, exact-head, and parent/base evidence. It does not ask
+inactive Workers to poll. A still-pending observation returns to `schedule`; a
+clean review and CI observation enters final verification.
 
 For an actionable finding, evidence mismatch, or parent drift, preserve the
 exact PR, head, provider artifact, and observation fingerprint. Reacquire the

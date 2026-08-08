@@ -81,8 +81,8 @@ the whole run, one assignment, or the current invocation.
 | `publish-pr` | Assignment | Push the exact candidate and create or update its draft pull request. |
 | `stack-reconcile` | Assignment | Verify the immediate parent, base, ancestry, stack order, and link for a stacked PR. |
 | `candidate-published` | Assignment | Verify that PR publication and any required stack link match the exact candidate HEAD. |
-| `delivery-monitor` | Run | Observe ready transition, hosted review, CI, provider disposition, and stack drift for published assignments. |
-| `final-verify` | Assignment | Verify all exact-HEAD acceptance, review, CI, topology, closing-reference, and provider evidence. |
+| `delivery-monitor` | Run | Observe ready transition, hosted review, CI, and stack drift for published assignments. |
+| `final-verify` | Assignment | Verify all exact-HEAD acceptance, review, CI, topology, and registry-derived closure-intent evidence. |
 | `assignment-blocked` | Assignment | Record a non-authority blocker while independent assignments continue. |
 | `assignment-deferred` | Assignment | Record a user-authority wait while independent assignments continue. |
 | `release-claims` | Run | Atomically release all Feature claims after every assignment is delivery-ready and operations are resolved. |
@@ -144,7 +144,7 @@ outcomes for the current invocation but remain resumable run statuses.
 | `native-review` | A committed candidate exists and exact-HEAD native review is the last durable recovery boundary. |
 | `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
 | `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |
-| `final-verify` | Acceptance, review, CI, topology, closing references, and provider disposition passed for the exact final HEAD. |
+| `final-verify` | Acceptance, review, CI, topology, and registry-derived closure intent in the PR body passed for the exact final HEAD; `closingIssuesReferences` is diagnostic only. |
 
 ### Canonical assignment pairs
 
@@ -190,18 +190,18 @@ operation `pending` and resume the same reservation after the condition changes.
 
 ## Provider dispositions
 
-Provider dispositions are exact-HEAD observations returned by
+Provider dispositions are optional exact-HEAD observations returned by
 `$g:github-delivery-status`. They are never run statuses, assignment statuses,
-or operation results.
+or operation results, and Implement never requires them for completion.
 
 | Disposition | Description | Implement interpretation |
 | --- | --- | --- |
-| `ready` | Required hosted gates are observed satisfied for the exact PR HEAD. | Eligible for `delivery-ready @ final-verify`; `merge_boundary=none`. |
-| `ready-with-manual-action` | Required evidence is satisfied, but G attributes the remaining boundary to a restricted manual branch action. | Eligible for `delivery-ready @ final-verify`; `merge_boundary=manual`. |
-| `pending` | Known hosted work or evidence is incomplete. | Continue bounded orchestrator monitoring. |
-| `blocked` | Hosted policy, review, or checks currently prevent readiness. | Monitor or report the attributed blocker; do not confuse it with an assignment or operation state. |
-| `conflicting` | The PR cannot currently merge cleanly. | Resume the owning Worker only when implementation evidence must change. |
-| `unknown` | Hosted evidence is missing, stale, ambiguous, or incomplete. | Reconcile; never infer readiness. |
+| `ready` | Optional provider policy gates are observed satisfied for the exact PR HEAD. | Informational only; never a completion gate. |
+| `ready-with-manual-action` | Optional provider evidence is satisfied except for a manual branch action. | Informational only; never a completion gate. |
+| `pending` | Optional hosted policy evidence is incomplete. | Report diagnostically; do not block an otherwise verified PR. |
+| `blocked` | Optional hosted policy currently prevents provider readiness. | Report diagnostically; do not confuse it with an Implement blocker. |
+| `conflicting` | Optional provider observation reports a merge conflict. | Reconcile only when implementation or stack evidence must change. |
+| `unknown` | Optional provider evidence is missing, stale, ambiguous, or incomplete. | Report diagnostically; never infer merge readiness. |
 
 ## Runtime-only modes
 
@@ -228,8 +228,6 @@ statuses and never imply merge or post-merge closure.
 | --- | --- |
 | `standalone-ready` | A standalone PR is `delivery-ready @ final-verify` on its exact HEAD. |
 | `stack-ready` | A stacked PR is `delivery-ready @ final-verify`, and every lower parent in its selected chain is current and delivery-ready. |
-| `merge_boundary=none` | The accepted provider disposition is `ready`. |
-| `merge_boundary=manual` | The accepted provider disposition is `ready-with-manual-action`; the remaining manual action stays outside Implement authority. |
 | `complete` | Every eligible Feature has one verified PR-ready output and aggregate reconciliation succeeded. |
 | `deferred` | All remaining work awaits explicit user authority. |
 | `blocked` | Required evidence, capability, identity, authority, or reconciliation remains unavailable. |
@@ -238,7 +236,8 @@ statuses and never imply merge or post-merge closure.
 
 - Treat ledger state as a recovery index, never as proof of live external state.
 - Re-read the authoritative plan, Worker, worktree, repository, PR, exact HEAD,
-  review, checks, provider disposition, and stack relationship on resume.
+  review, checks, and stack relationship on resume. Optional provider
+  diagnostics may be retained but never replace these required observations.
 - Reacquire the exact path envelope before resuming Worker writes.
 - Preserve `delivery-pending @ candidate-published` while monitoring remains
   clean and the exact publication evidence is current.

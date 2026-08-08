@@ -63,12 +63,15 @@ are Implement-owned evidence and never rewrite the hosted Plan Set or Macro
 Task registries.
 
 Complete means every implementation-eligible Feature has a verified
-standalone-ready or stack-ready PR output backed by a current
-$g:github-delivery-status disposition of `ready` or
-`ready-with-manual-action`,
-all required Feature criteria and local Macro Task coverage are verified
-against that exact HEAD, and that Feature's registry-derived closing set is
-read back. A Feature with no exclusive
+standalone-ready or stack-ready PR output on its current exact HEAD, all
+required Feature criteria and local Macro Task coverage are verified against
+that HEAD, the PR/base/stack topology is read back, and current CI and hosted
+review evidence contain no unresolved actionable feedback. Branch protection,
+rulesets, mergeability policy, merge queues, and auto-merge are outside the
+Implement completion contract and may only be reported as optional provider
+diagnostics. The Feature's registry-derived closing set is still read back as
+PR-body publication intent; GitHub's `closingIssuesReferences` field is an
+optional provider diagnostic and never a completion gate. A Feature with no exclusive
 implementation delta must not receive an empty commit, empty PR, cosmetic
 change, or artificial proof; report the zero-delta product question to the
 user and stop that assignment.
@@ -98,9 +101,13 @@ transport, hosted mutation safety, publication, and read-after-write
 verification belong to G-owned workflows. The explicit Implement request
 implicitly authorizes only the exact selected plan and delivery writes.
 
-Require $g:github-delivery-status for exact-HEAD provider readiness. Provider
-automation facts are not blockers by themselves; auto-merge, bypass, and queue
-observations never authorize Implement to merge or change hosted policy.
+Do not require or invoke $g:github-delivery-status as an Implement completion
+gate. Use the focused G-owned PR publication, CI, review, and stack workflows
+for the exact-head evidence this skill owns. Branch protection and rulesets
+are outside this workflow; if an outer coordinator supplies provider-policy
+observations, preserve them as optional diagnostics and never block completion
+on their availability or disposition. Automation observations never authorize
+Implement to merge or change hosted policy.
 Implement never merges, bypasses protections, enables or disables auto-merge, or
 enqueues or dequeues a PR.
 
@@ -117,9 +124,9 @@ update relay.
 The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
 After a PR reaches `candidate-published`, its Feature Worker becomes inactive
 but resumable while the assignment remains `delivery-pending`. The
-orchestrator observes exact-head hosted review, CI, delivery status, and stack
-drift through G-owned workflows; it contacts the same Worker only for an
-actionable fix, evidence repair, or rebase.
+orchestrator observes exact-head hosted review, CI, and stack drift through
+G-owned workflows; it contacts the same Worker only for an actionable fix,
+evidence repair, or rebase.
 
 The Feature Worker may use the task profile's optional delegated support role
 for bounded code analysis, execution-unit assistance, validation, or critique.
@@ -403,10 +410,12 @@ Return one aggregate report with:
 - every Feature Worker identity and verified destination;
 - execution waves, path-overlap evidence, and deferred or blocked assignments;
 - candidate, `delivery-pending @ candidate-published`, Worker resumption,
-  review, publication, delivery-status, stack, and exact-HEAD evidence;
+  review, publication, CI, stack, and exact-HEAD evidence;
 - Feature acceptance evidence bound to each final candidate SHA;
 - one registry-derived `closing_issue_refs` set per Feature containing only
-  that Feature and every associated local Macro Task, plus exact PR readback;
+  that Feature and every associated local Macro Task, plus exact PR-body
+  closure-intent readback; any GitHub `closingIssuesReferences` observation is
+  optional diagnostic evidence and never a gate;
 - aggregate outcome complete, deferred, or blocked.
 
 Never claim completion while an eligible Feature lacks a verified PR,

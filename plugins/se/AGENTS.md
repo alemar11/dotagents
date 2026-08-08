@@ -131,7 +131,7 @@ surface.
 - Keep PR observation centralized in the Implement orchestrator. After
   `candidate-published`, the Feature Worker becomes inactive but resumable and
   the assignment remains `delivery-pending`; the orchestrator monitors exact
-  PR heads, hosted review, CI, delivery status, and parent drift. It contacts
+  PR heads, hosted review, CI, and parent drift. It contacts
   the same Worker only for actionable fixes, evidence repair, or rebase, and
   retains sole ledger and aggregate-completion authority.
 - Keep deterministic task-title initialization shared by every task-managed
@@ -170,8 +170,10 @@ surface.
   Feature Plan Sets with verified sibling/Macro projections, derives its
   technical execution units in the Implement control plane, and returns one
   verified hosted PR topology per Feature whose `closing_issue_refs` contains
-  only that Feature's parent and every associated local Macro Task. It has no
-  local-only or preview implementation mode.
+  only that Feature's parent and every associated local Macro Task, with that
+  intent carried by the PR body. GitHub `closingIssuesReferences` is optional
+  diagnostic provider data and never a gate. It has no local-only or preview
+  implementation mode.
 - Keep Audit strictly observational. Attribute SE use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.

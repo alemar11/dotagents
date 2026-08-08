@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Turn ideas into clear Feature plans, deliver them through reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Plan Features, deliver reviewed pull requests, and maintain project knowledge.",
-    "longDescription": "SE supports a complete software-delivery workflow. Learn maintains durable project knowledge and decisions. Idea captures proposals for later planning. Feature turns one or more source issues into a clear Feature Plan Set, with separate Feature issues, practical Macro Tasks, and repository-sensitive dependency intent. Implement delivers each Feature through a dedicated resumable worker, starts stacked children from verified candidate-published parents, centrally monitors pull requests, verifies the final exact-head state, and leaves merge and post-merge closure to the user. Audit observes active SE work and reports problems or workflow improvements without making changes.",
+    "longDescription": "SE supports a complete software-delivery workflow. Learn maintains durable project knowledge and decisions. Idea captures proposals for later planning. Feature turns one or more source issues into a clear Feature Plan Set, with separate Feature issues, practical Macro Tasks, and repository-sensitive dependency intent. Implement delivers each Feature through a dedicated resumable worker, starts stacked children from verified candidate-published parents, centrally monitors pull requests, CI, review feedback, and exact-head stack state, and leaves merge and post-merge closure to the user. Audit observes active SE work and reports problems or workflow improvements without making changes.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
