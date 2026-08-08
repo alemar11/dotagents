@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 DEFAULT_INITIAL_VERSION = (0, 1, 0)
 TAG_APPLICATION_POLICY = "explicit-confirmation-required"
 TAG_APPLICATION_BLOCKED = "blocked-noncanonical"
@@ -131,6 +131,15 @@ def latest_tag(tags: Iterable[ParsedTag]) -> ParsedTag:
     return max(tags, key=lambda tag: (tag.version.precedence_key(), tag.canonical, tag.raw))
 
 
+def latest_stable_tag(tags: Iterable[ParsedTag]) -> ParsedTag | None:
+    stable_tags = [tag for tag in tags if tag.version.stable]
+    return max(
+        stable_tags,
+        key=lambda tag: (tag.version.precedence_key(), tag.canonical, tag.raw),
+        default=None,
+    )
+
+
 def tags_for_base(tags: Iterable[ParsedTag], base: tuple[int, int, int]) -> list[ParsedTag]:
     return [tag for tag in tags if tag.version.base == base]
 
@@ -222,6 +231,8 @@ def main_suggestions(
             "mode": "main",
             "latest_tag": None,
             "latest_version": None,
+            "stable_baseline_tag": None,
+            "stable_baseline_version": None,
             "initial_version": version.tag,
             "initial_version_source": "explicit" if initial_version else "default",
             "ignored_tag_count": ignored,
@@ -238,7 +249,33 @@ def main_suggestions(
         }
 
     latest = latest_tag(tags)
-    major, minor, patch = latest.version.base
+    baseline = latest_stable_tag(tags)
+    if baseline is None:
+        suggestions = []
+        for base in sorted({tag.version.base for tag in tags}):
+            existing = tags_for_base(tags, base)
+            suggestions.append(
+                {
+                    "kind": "candidate",
+                    "status": "release-in-progress",
+                    "tag": base_tag(base, next_rc_for_base(tags, base)),
+                    "release_branch": f"release/{base_tag(base)}",
+                    "existing_tags": sorted(tag.version.tag for tag in existing),
+                }
+            )
+        return {
+            "format": "vX.Y.Z-rc.N",
+            "mode": "main",
+            "latest_tag": canonical_tag(tags, latest.version),
+            "latest_version": latest.version.tag,
+            "stable_baseline_tag": None,
+            "stable_baseline_version": None,
+            "ignored_tag_count": ignored,
+            "tag_application": TAG_APPLICATION_POLICY,
+            "suggestions": suggestions,
+        }
+
+    major, minor, patch = baseline.version.base
     candidate_bases = {
         "patch": (major, minor, patch + 1),
         "minor": (major, minor + 1, 0),
@@ -284,6 +321,8 @@ def main_suggestions(
         "mode": "main",
         "latest_tag": canonical_tag(tags, latest.version),
         "latest_version": latest.version.tag,
+        "stable_baseline_tag": canonical_tag(tags, baseline.version),
+        "stable_baseline_version": baseline.version.tag,
         "ignored_tag_count": ignored,
         "tag_application": TAG_APPLICATION_POLICY,
         "suggestions": suggestions,

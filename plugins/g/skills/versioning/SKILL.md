@@ -6,7 +6,9 @@ description: Apply the shared SemVer tag and release-line convention, calculate 
 # Versioning
 
 Use this skill when a project needs a release version, a Git tag, a release
-branch, or the next candidate suggestions for a release workflow.
+branch, the next candidate suggestions for a release workflow, or the guarded
+GitHub Actions that implement this convention without touching application
+code.
 
 This skill owns the convention, read-only calculation, and explicit migration
 of stable legacy tags. It never moves or deletes a tag. The helper only creates
@@ -102,17 +104,21 @@ sources; they are never valid targets for a new tag application.
 The bundled `scripts/version-suggestions` helper reads local Git tags by
 default and emits either human-readable suggestions or stable JSON.
 
-For `main`, it resolves the highest SemVer tag (stable or RC) and proposes the
-next release lines:
+For `main`, it resolves the highest stable SemVer tag as the increment baseline
+and proposes the next release lines:
 
 - `patch`: `vX.Y.(Z+1)-rc.1`;
 - `minor`: `vX.(Y+1).0-rc.1`;
 - `major`: `v(X+1).0.0-rc.1`.
 
-If a proposed line already has RC tags, the helper reports the next candidate
-number and marks the line `release-in-progress`; the main flow must use that
-release branch rather than creating a parallel tag from `main`. If the line is
-already final, it is marked `finalized` and is not available for a new RC.
+Unrelated RC lines do not change the stable baseline or block other lines. If a
+proposed line already has RC tags, the helper reports the next candidate number
+and marks only that line `release-in-progress`; the main flow must use its
+release branch rather than creating another tag for the same line from `main`.
+If no stable baseline exists but RC tags do, the helper reports those lines as
+`release-in-progress` and does not derive patch, minor, or major lines from an
+unstable version. If the proposed line is already final, it is marked
+`finalized` and is not available for a new RC.
 
 For `release/vX.Y.Z`, it proposes:
 
@@ -189,11 +195,14 @@ ask which release line or migration the user wants.
    stale. The helper does not fetch or write remote state implicitly.
 2. If the release flow will be implemented in GitHub Actions, run the
    read-only Actions permissions preflight from
-   `../github-actions/references/configuration.md` before creating the
-   workflow. The workflow-authoring instructions are not currently present. If
-   the preflight is blocked, warn that the generated Action will not complete
-   its PR operation until the repository setting is enabled; continue writing
-   the explicitly requested workflow and keep its status pending configuration.
+   `../github-actions/references/configuration.md`, then read
+   `references/github-actions.md` before creating or upgrading the workflow.
+   That reference owns the complete workflow templates, universal versus
+   repository-specific rules, resolver-version comparison, installation,
+   validation, and recovery contract. If the preflight is blocked, warn that
+   the generated Action will not complete its PR operation until the repository
+   setting is enabled; continue writing the explicitly requested workflow and
+   keep its status pending configuration.
 3. Run the helper in the correct mode and inspect its resolved `latest_tag`,
    `suggestions`, `migrations`, and status values.
 4. Validate the exact tag selected for application. A
@@ -205,6 +214,22 @@ ask which release line or migration the user wants.
    before the authorized operation.
 7. Preserve exact tag and branch SHAs; reject an existing tag or a finalized
    release line.
+
+## GitHub Actions authoring boundary
+
+When the user asks to create or upgrade the release Actions, install the
+portable topology from `references/github-actions.md` and copy
+`assets/resolve_release_version.py` to
+`.github/scripts/resolve_release_version.py`. The bundled resolver reports its
+independent version through `--version`; compare it with any project copy
+before writing. Never downgrade a newer project resolver, silently overwrite
+an unversioned resolver, or replace same-version divergent bytes.
+
+The Actions may read only provider-owned repository metadata, tags, branches,
+commits, and pull requests. They must not read package manifests, inspect or
+edit application code, run project build/test commands, create commits, or
+merge the final pull request. Preserve the exact canonical tag gate and the
+separate dry-run/application confirmation boundary.
 
 Examples from the skill directory:
 
@@ -230,4 +255,5 @@ application tag violates the canonical format.
 
 - [SemVer and tag format](references/semver.md)
 - [Suggestion states](references/states.md)
+- [GitHub Actions release workflow authoring](references/github-actions.md)
 - [GitHub Actions configuration preflight](../github-actions/references/configuration.md)

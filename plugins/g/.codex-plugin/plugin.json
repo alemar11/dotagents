@@ -1,6 +1,6 @@
 {
   "name": "g",
-  "version": "2.8.1",
+  "version": "2.9.0",
   "description": "Manage Git and GitHub work from commits, evidence-backed issue classification, and read-only taxonomy proposals through delivery status, reviewed pull-request delivery, active-session audits, and consistent SemVer versioning.",
   "author": {
     "name": "alemar11",
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "G",
     "shortDescription": "Manage Git and GitHub work from issues to reviewed pull requests.",
-    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle and exact native blocked-by dependencies, evidence-backed selection of existing issue labels and native types, explicit read-only proposals for missing repository labels and organization issue types, repository triage, investigations, Actions failures and permissions preflights, exact-head delivery-status inspection, review threads, releases, stars, stacked pull requests, draft pull-request delivery, consistent SemVer versioning suggestions, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
+    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle and exact native blocked-by dependencies, evidence-backed selection of existing issue labels and native types, explicit read-only proposals for missing repository labels and organization issue types, repository triage, investigations, Actions failures and permissions preflights, exact-head delivery-status inspection, review threads, releases, stars, stacked pull requests, draft pull-request delivery, consistent SemVer versioning suggestions, guarded project-agnostic release Action authoring, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -26,7 +26,7 @@
       "Analyze this repository and its issues to propose only the missing labels and organization issue types without changing GitHub.",
       "Diagnose and fix the failing GitHub Actions checks.",
       "Publish these local changes as a safe draft pull request.",
-      "Preview context-aware SemVer release and candidate tags, including bootstrap and legacy-tag migration cases.",
+      "Preview context-aware SemVer tags or install guarded release Actions with a versioned resolver, including bootstrap and legacy-tag migration cases.",
       "Audit active Codex tasks using G skills and prioritize feedback, bugs, and improvements."
     ],
     "brandColor": "#DE4C36",

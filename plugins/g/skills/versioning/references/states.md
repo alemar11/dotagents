@@ -26,3 +26,17 @@ reports `tag_application=explicit-confirmation-required`; a suggestion is not
 authorization to create or push a tag. A validation failure instead reports
 `tag_application=blocked-noncanonical` and exits nonzero so automation fails
 closed.
+
+## GitHub Actions resolver states
+
+These states are derived while creating or upgrading the repository-local
+release Actions. They are not persisted workflow state.
+
+| State | Kind | Meaning |
+| --- | --- | --- |
+| `resolver-absent` | Derived | The project has no `.github/scripts/resolve_release_version.py`; install the bundled asset with both workflows. |
+| `resolver-current` | Derived | Project and bundled resolver versions and bytes match. |
+| `resolver-upgrade-available` | Derived | The project resolver has a lower SemVer than the bundled asset; review and update the resolver, tests, and workflows together. |
+| `resolver-project-newer` | Derived | The project resolver has a higher SemVer than the bundled asset; never downgrade it. |
+| `resolver-unversioned` | Derived | The project resolver cannot report a valid SemVer through `--version`; treat it as a legacy local implementation and do not overwrite it silently. |
+| `resolver-version-conflict` | Mutation gate | Project and asset report the same version but have different bytes; treat the project as a local fork and require explicit resolution before replacement. |

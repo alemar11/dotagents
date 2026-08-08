@@ -18,7 +18,7 @@ class VersionSuggestionsTests(unittest.TestCase):
 
     def test_version_is_reported(self) -> None:
         completed = subprocess.run([str(SCRIPT), "--version"], check=True, capture_output=True, text=True)
-        self.assertEqual(completed.stdout.strip(), "1.1.0")
+        self.assertEqual(completed.stdout.strip(), "1.2.0")
 
     def test_validate_accepts_only_canonical_stable_and_candidate_tags(self) -> None:
         stable = self.run_cli(
@@ -74,19 +74,45 @@ class VersionSuggestionsTests(unittest.TestCase):
                 self.assertEqual(result["status"], "blocked-noncanonical")
                 self.assertEqual(result["tag_application"], "blocked-noncanonical")
 
-    def test_main_suggests_patch_minor_and_major_from_rc(self) -> None:
+    def test_main_uses_stable_baseline_and_scopes_in_progress_lines(self) -> None:
         result = self.run_cli(
             "--mode",
             "main",
             "--tag",
-            "v2.3.1-rc.2",
+            "v1.0.0",
+            "--tag",
+            "v2.0.0-rc.2",
         )
-        self.assertEqual(result["latest_tag"], "v2.3.1-rc.2")
+        self.assertEqual(result["latest_tag"], "v2.0.0-rc.2")
+        self.assertEqual(result["stable_baseline_tag"], "v1.0.0")
         self.assertEqual(
             [suggestion["tag"] for suggestion in result["suggestions"]],
-            ["v2.3.2-rc.1", "v2.4.0-rc.1", "v3.0.0-rc.1"],
+            ["v1.0.1-rc.1", "v1.1.0-rc.1", "v2.0.0-rc.3"],
+        )
+        self.assertEqual(
+            [suggestion["status"] for suggestion in result["suggestions"]],
+            ["available", "available", "release-in-progress"],
         )
         self.assertEqual(result["tag_application"], "explicit-confirmation-required")
+
+    def test_main_with_only_candidates_routes_to_release_lines(self) -> None:
+        result = self.run_cli(
+            "--mode",
+            "main",
+            "--tag",
+            "v0.1.0-rc.1",
+            "--tag",
+            "v0.1.0-rc.3",
+        )
+
+        self.assertIsNone(result["stable_baseline_tag"])
+        self.assertEqual(len(result["suggestions"]), 1)
+        self.assertEqual(result["suggestions"][0]["status"], "release-in-progress")
+        self.assertEqual(result["suggestions"][0]["tag"], "v0.1.0-rc.4")
+        self.assertEqual(
+            result["suggestions"][0]["release_branch"],
+            "release/v0.1.0",
+        )
 
     def test_main_bootstraps_when_no_tags_exist(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
