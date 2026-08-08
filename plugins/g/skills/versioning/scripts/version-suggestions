@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+"""Calculate SemVer release-tag suggestions from local Git tags."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+
+__version__ = "1.0.0"
+DEFAULT_INITIAL_VERSION = (0, 1, 0)
+TAG_APPLICATION_POLICY = "explicit-confirmation-required"
+
+TAG_PATTERN = re.compile(
+    r"^(?P<prefix>v?)(?P<major>0|[1-9][0-9]*)\."
+    r"(?P<minor>0|[1-9][0-9]*)\."
+    r"(?P<patch>0|[1-9][0-9]*)"
+    r"(?:-rc\.(?P<rc>[1-9][0-9]*))?$"
+)
+RELEASE_LINE_PATTERN = re.compile(r"^release/(v[0-9]+\.[0-9]+\.[0-9]+)$")
+
+
+@dataclass(frozen=True)
+class Version:
+    major: int
+    minor: int
+    patch: int
+    rc: int | None = None
+
+    @property
+    def base(self) -> tuple[int, int, int]:
+        return self.major, self.minor, self.patch
+
+    @property
+    def stable(self) -> bool:
+        return self.rc is None
+
+    @property
+    def tag(self) -> str:
+        base = f"v{self.major}.{self.minor}.{self.patch}"
+        return base if self.rc is None else f"{base}-rc.{self.rc}"
+
+    def precedence_key(self) -> tuple[int, int, int, int, int]:
+        # A stable version has higher precedence than every pre-release of the
+        # same base version. Numeric RC identifiers compare numerically.
+        return (*self.base, 1 if self.stable else 0, self.rc or 0)
+
+
+@dataclass(frozen=True)
+class ParsedTag:
+    raw: str
+    version: Version
+    canonical: bool
+
+
+def parse_tag(raw: str) -> ParsedTag | None:
+    value = raw.strip()
+    if value.startswith("refs/tags/"):
+        value = value.removeprefix("refs/tags/")
+    match = TAG_PATTERN.fullmatch(value)
+    if match is None:
+        return None
+    version = Version(
+        major=int(match.group("major")),
+        minor=int(match.group("minor")),
+        patch=int(match.group("patch")),
+        rc=int(match.group("rc")) if match.group("rc") else None,
+    )
+    return ParsedTag(raw=value, version=version, canonical=value.startswith("v"))
+
+
+def canonical_tag(tags: Iterable[ParsedTag], version: Version) -> str:
+    matching = [tag for tag in tags if tag.version == version]
+    if not matching:
+        return version.tag
+    selected = max(matching, key=lambda tag: (tag.canonical, tag.raw))
+    return selected.version.tag if selected.canonical else selected.raw
+
+
+def load_raw_tags(args: argparse.Namespace) -> list[str]:
+    if args.tags:
+        return args.tags
+    if args.tags_file:
+        return [
+            line.strip()
+            for line in Path(args.tags_file).read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(args.repo)), "tag", "--list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise ValueError("git is required when --tag or --tags-file is not provided") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.strip() or "unknown git error"
+        raise ValueError(f"unable to read Git tags: {detail}") from exc
+    return [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+
+
+def parse_tags(raw_tags: Iterable[str]) -> tuple[list[ParsedTag], int]:
+    parsed: list[ParsedTag] = []
+    ignored = 0
+    for raw in raw_tags:
+        tag = parse_tag(raw)
+        if tag is None:
+            ignored += 1
+        else:
+            parsed.append(tag)
+    return parsed, ignored
+
+
+def latest_tag(tags: Iterable[ParsedTag]) -> ParsedTag:
+    return max(tags, key=lambda tag: (tag.version.precedence_key(), tag.canonical, tag.raw))
+
+
+def tags_for_base(tags: Iterable[ParsedTag], base: tuple[int, int, int]) -> list[ParsedTag]:
+    return [tag for tag in tags if tag.version.base == base]
+
+
+def final_for_base(tags: Iterable[ParsedTag], base: tuple[int, int, int]) -> ParsedTag | None:
+    finals = [tag for tag in tags_for_base(tags, base) if tag.version.stable]
+    return max(finals, key=lambda tag: (tag.canonical, tag.raw), default=None)
+
+
+def next_rc_for_base(tags: Iterable[ParsedTag], base: tuple[int, int, int]) -> int:
+    rc_numbers = [
+        tag.version.rc
+        for tag in tags_for_base(tags, base)
+        if tag.version.rc is not None
+    ]
+    return max(rc_numbers, default=0) + 1
+
+
+def base_tag(base: tuple[int, int, int], rc: int | None = None) -> str:
+    version = Version(*base, rc=rc)
+    return version.tag
+
+
+def resolve_commit(repo: str, tag: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(repo)), "rev-parse", "--verify", f"{tag}^{{commit}}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    commit = completed.stdout.strip()
+    return commit or None
+
+
+def parse_initial_version(value: str) -> Version:
+    parsed = parse_tag(value)
+    if parsed is None or not parsed.version.stable:
+        raise ValueError("initial version must be a stable X.Y.Z or vX.Y.Z value")
+    return parsed.version
+
+
+def main_suggestions(
+    tags: list[ParsedTag],
+    ignored: int,
+    initial_version: Version | None,
+) -> dict[str, object]:
+    if not tags:
+        version = initial_version or Version(*DEFAULT_INITIAL_VERSION)
+        return {
+            "format": "vX.Y.Z-rc.N",
+            "mode": "main",
+            "latest_tag": None,
+            "latest_version": None,
+            "initial_version": version.tag,
+            "initial_version_source": "explicit" if initial_version else "default",
+            "ignored_tag_count": ignored,
+            "tag_application": TAG_APPLICATION_POLICY,
+            "suggestions": [
+                {
+                    "kind": "initial",
+                    "status": "bootstrap-required",
+                    "tag": base_tag(version.base, 1),
+                    "release_branch": f"release/{base_tag(version.base)}",
+                    "reason": "no SemVer tags found; confirm the initial version before creating a tag",
+                }
+            ],
+        }
+
+    latest = latest_tag(tags)
+    major, minor, patch = latest.version.base
+    candidate_bases = {
+        "patch": (major, minor, patch + 1),
+        "minor": (major, minor + 1, 0),
+        "major": (major + 1, 0, 0),
+    }
+    suggestions: list[dict[str, object]] = []
+    for kind, base in candidate_bases.items():
+        existing = tags_for_base(tags, base)
+        final = final_for_base(tags, base)
+        next_rc = next_rc_for_base(tags, base)
+        release_branch = f"release/{base_tag(base)}"
+        if final is not None:
+            suggestions.append(
+                {
+                    "kind": kind,
+                    "status": "finalized",
+                    "tag": None,
+                    "release_branch": release_branch,
+                    "existing_final": final.version.tag,
+                }
+            )
+        elif existing:
+            suggestions.append(
+                {
+                    "kind": kind,
+                    "status": "release-in-progress",
+                    "tag": base_tag(base, next_rc),
+                    "release_branch": release_branch,
+                    "existing_tags": sorted(tag.version.tag for tag in existing),
+                }
+            )
+        else:
+            suggestions.append(
+                {
+                    "kind": kind,
+                    "status": "available",
+                    "tag": base_tag(base, 1),
+                    "release_branch": release_branch,
+                }
+            )
+    return {
+        "format": "vX.Y.Z-rc.N",
+        "mode": "main",
+        "latest_tag": canonical_tag(tags, latest.version),
+        "latest_version": latest.version.tag,
+        "ignored_tag_count": ignored,
+        "tag_application": TAG_APPLICATION_POLICY,
+        "suggestions": suggestions,
+    }
+
+
+def parse_release_line(value: str) -> Version:
+    normalized = value.strip()
+    match = RELEASE_LINE_PATTERN.fullmatch(normalized)
+    if match:
+        normalized = match.group(1)
+    parsed = parse_tag(normalized)
+    if parsed is None or not parsed.canonical or not parsed.version.stable:
+        raise ValueError("release line must be release/vX.Y.Z or vX.Y.Z")
+    return parsed.version
+
+
+def release_suggestions(tags: list[ParsedTag], ignored: int, line: Version) -> dict[str, object]:
+    matching = tags_for_base(tags, line.base)
+    final = final_for_base(tags, line.base)
+    branch = f"release/{line.tag}"
+    if final is not None:
+        suggestions = [
+            {
+                "kind": "candidate",
+                "status": "blocked-finalized",
+                "tag": None,
+                "reason": f"{final.version.tag} already exists",
+            },
+            {
+                "kind": "final",
+                "status": "blocked-finalized",
+                "tag": None,
+                "reason": f"{final.version.tag} already exists",
+            },
+        ]
+        return {
+            "format": "vX.Y.Z-rc.N",
+            "mode": "release",
+            "release_line": line.tag,
+            "release_branch": branch,
+            "finalized": True,
+            "ignored_tag_count": ignored,
+            "tag_application": TAG_APPLICATION_POLICY,
+            "suggestions": suggestions,
+        }
+
+    candidate = base_tag(line.base, next_rc_for_base(tags, line.base))
+    return {
+        "format": "vX.Y.Z-rc.N",
+        "mode": "release",
+        "release_line": line.tag,
+        "release_branch": branch,
+        "finalized": False,
+        "ignored_tag_count": ignored,
+        "tag_application": TAG_APPLICATION_POLICY,
+        "suggestions": [
+            {"kind": "candidate", "status": "available", "tag": candidate},
+            {"kind": "final", "status": "available", "tag": line.tag},
+        ],
+        "existing_line_tags": sorted(tag.version.tag for tag in matching),
+    }
+
+
+def migration_suggestions(tags: list[ParsedTag], ignored: int, repo: str) -> dict[str, object]:
+    canonical_versions = {tag.version for tag in tags if tag.canonical and tag.version.stable}
+    migrations: list[dict[str, object]] = []
+    for source in sorted(
+        (tag for tag in tags if not tag.canonical and tag.version.stable),
+        key=lambda tag: (tag.version.precedence_key(), tag.raw),
+    ):
+        target = source.version.tag
+        source_commit = resolve_commit(repo, source.raw)
+        if source_commit is None:
+            migrations.append(
+                {
+                    "source_tag": source.raw,
+                    "target_tag": target,
+                    "status": "source-missing",
+                    "source_commit": None,
+                    "target_commit": None,
+                }
+            )
+            continue
+
+        if source.version in canonical_versions:
+            target_commit = resolve_commit(repo, target)
+            migrations.append(
+                {
+                    "source_tag": source.raw,
+                    "target_tag": target,
+                    "status": "already-present" if target_commit == source_commit else "target-conflict",
+                    "source_commit": source_commit,
+                    "target_commit": target_commit,
+                }
+            )
+            continue
+
+        migrations.append(
+            {
+                "source_tag": source.raw,
+                "target_tag": target,
+                "status": "migration-available",
+                "source_commit": source_commit,
+                "target_commit": None,
+            }
+        )
+
+    return {
+        "format": "vX.Y.Z-rc.N",
+        "mode": "migration",
+        "repo": str(Path(repo).resolve()),
+        "ignored_tag_count": ignored,
+        "tag_application": TAG_APPLICATION_POLICY,
+        "status": "nothing-to-migrate" if not migrations else "review-required",
+        "migrations": migrations,
+    }
+
+
+def human_output(result: dict[str, object]) -> str:
+    lines = [
+        f"Mode: {result['mode']}",
+        f"Tag application: {result['tag_application']}",
+    ]
+    if result["mode"] == "main":
+        lines.append(f"Latest tag: {result['latest_tag'] or 'none (bootstrap)'}")
+        for suggestion in result["suggestions"]:
+            tag = suggestion["tag"] or "blocked"
+            branch = suggestion.get("release_branch")
+            detail = suggestion["status"]
+            suffix = f"; {branch}" if branch else ""
+            lines.append(f"{suggestion['kind']}: {tag} ({detail}{suffix})")
+    elif result["mode"] == "release":
+        lines.append(f"Release line: {result['release_line']}")
+        lines.append(f"Release branch: {result['release_branch']}")
+        for suggestion in result["suggestions"]:
+            tag = suggestion["tag"] or "blocked"
+            detail = suggestion["status"]
+            lines.append(f"{suggestion['kind']}: {tag} ({detail})")
+    else:
+        if not result["migrations"]:
+            lines.append("No legacy stable tags require migration.")
+        for migration in result["migrations"]:
+            source = migration["source_tag"]
+            target = migration["target_tag"]
+            commit = migration["source_commit"] or "unresolved"
+            lines.append(f"{source} -> {target} ({migration['status']}; {commit})")
+    return "\n".join(lines)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Calculate canonical SemVer release-tag suggestions from Git tags."
+    )
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--mode", choices=("main", "release", "migration"), required=True)
+    parser.add_argument(
+        "--line",
+        help="Release line for release mode: release/vX.Y.Z or vX.Y.Z",
+    )
+    parser.add_argument(
+        "--initial-version",
+        help="Stable version to use for a tag-less main branch (defaults to v0.1.0)",
+    )
+    parser.add_argument("--repo", default=".", help="Repository path when reading local tags")
+    parser.add_argument(
+        "--tag",
+        dest="tags",
+        action="append",
+        help="Version tag input; repeat for multiple tags instead of reading Git",
+    )
+    parser.add_argument("--tags-file", help="File containing one version tag per line")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    return parser
+
+
+def run(args: argparse.Namespace) -> dict[str, object]:
+    if args.mode == "release" and not args.line:
+        raise ValueError("--line is required when --mode release is selected")
+    if args.mode == "migration" and (args.tags or args.tags_file):
+        raise ValueError("migration mode requires a repository so source commit SHAs can be resolved")
+    if args.mode != "main" and args.initial_version:
+        raise ValueError("--initial-version is only valid with --mode main")
+    raw_tags = load_raw_tags(args)
+    tags, ignored = parse_tags(raw_tags)
+    if not tags and ignored:
+        raise ValueError("no SemVer tags found; expected vX.Y.Z or vX.Y.Z-rc.N")
+    if args.mode == "main":
+        initial_version = parse_initial_version(args.initial_version) if args.initial_version else None
+        return main_suggestions(tags, ignored, initial_version)
+    if args.mode == "release":
+        return release_suggestions(tags, ignored, parse_release_line(args.line))
+    return migration_suggestions(tags, ignored, args.repo)
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        result = run(args)
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(human_output(result))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,7 +1,7 @@
 {
   "name": "g",
-  "version": "2.3.0",
-  "description": "Manage Git and GitHub work from commits and issue triage through read-only delivery status and reviewed pull-request delivery, with active-session audits.",
+  "version": "2.5.0",
+  "description": "Manage Git and GitHub work from commits and issue triage through read-only delivery status, reviewed pull-request delivery, active-session audits, and consistent SemVer versioning.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,13 +9,13 @@
   "homepage": "https://github.com/alemar11/dotagents",
   "repository": "https://github.com/alemar11/dotagents",
   "license": "MIT",
-  "keywords": ["git", "github", "workflow", "codex"],
+  "keywords": ["git", "github", "workflow", "codex", "semver", "versioning"],
   "skills": "./skills/",
   "apps": "./.app.json",
   "interface": {
     "displayName": "G",
     "shortDescription": "Manage Git and GitHub work from issues to reviewed pull requests.",
-    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle, repository triage, investigations, Actions failures, exact-head delivery-status inspection, review threads, releases, stars, stacked pull requests, draft pull-request delivery, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
+    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle, repository triage, investigations, Actions failures and permissions preflights, exact-head delivery-status inspection, review threads, releases, stars, stacked pull requests, draft pull-request delivery, consistent SemVer versioning suggestions, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -24,6 +24,7 @@
       "Triage this repository's open issues and pull requests.",
       "Diagnose and fix the failing GitHub Actions checks.",
       "Publish these local changes as a safe draft pull request.",
+      "Preview context-aware SemVer release and candidate tags, including bootstrap and legacy-tag migration cases.",
       "Audit active Codex tasks using G skills and prioritize feedback, bugs, and improvements."
     ],
     "brandColor": "#DE4C36",

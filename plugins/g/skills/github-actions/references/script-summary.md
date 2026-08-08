@@ -1,4 +1,4 @@
-# G CI Inspect Contract
+# G CI and Actions Permissions Contract
 
 ## Commands
 
@@ -8,6 +8,7 @@
 <plugin-root>/scripts/g doctor
 <plugin-root>/scripts/g --json doctor
 <plugin-root>/scripts/g ci inspect --repo <owner/repo> --pr <number>
+<plugin-root>/scripts/g ci permissions --repo <owner/repo> --allow-non-project
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
@@ -19,7 +20,7 @@ Success payloads include:
 
 - `ok`
 - `version`
-- check or inspection data
+- check, inspection, or Actions-permissions data
 
 Errors include a message and non-zero exit code. The script does not write
 configuration files.

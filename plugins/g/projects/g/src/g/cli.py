@@ -43,7 +43,10 @@ def parser() -> Parser:
     pr_delivery.add_argument("--repo", required=True)
     pr_delivery.add_argument("--pr", required=True, type=int)
     pr_delivery.add_argument("--expected-head")
-    ci_parser = commands.add_parser("ci", help="Inspect failing GitHub Actions checks.")
+    ci_parser = commands.add_parser(
+        "ci",
+        help="Inspect GitHub Actions checks or repository permissions preflight.",
+    )
     ci_parser.add_argument("args", nargs=argparse.REMAINDER)
     portfolio_parser = commands.add_parser("portfolio", help="Scan multiple repositories read-only.")
     portfolio_parser.add_argument("args", nargs=argparse.REMAINDER)

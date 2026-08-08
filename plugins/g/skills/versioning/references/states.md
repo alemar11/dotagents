@@ -1,0 +1,24 @@
+# Suggestion states
+
+This skill does not persist workflow state. The helper returns derived state
+from the selected mode, the current tags, and the requested release line.
+
+| State | Kind | Meaning |
+| --- | --- | --- |
+| `available` | Derived | The suggested tag is unused and may be considered by a later authorized workflow. |
+| `bootstrap-required` | Derived | The repository has no SemVer tags; confirm the initial version before creating the first candidate. |
+| `release-in-progress` | Derived | The suggested version line already has RC tags; use its `release/vX.Y.Z` branch. |
+| `finalized` | Derived | The stable `vX.Y.Z` tag already exists. The line cannot receive another RC or final tag. |
+| `blocked-finalized` | Derived | A release-mode candidate or final operation is blocked because the line is finalized. |
+| `migration-available` | Derived | A stable legacy `X.Y.Z` tag has a resolvable commit and the canonical `vX.Y.Z` target is absent. |
+| `already-present` | Derived | The canonical migration target exists and resolves to the same commit as its legacy source. |
+| `target-conflict` | Derived | The canonical target exists but resolves to a different commit; migration must stop. |
+| `source-missing` | Derived | The legacy source tag is listed but its commit object cannot be resolved locally. |
+| `nothing-to-migrate` | Derived | No stable legacy tags exist, so migration has no work. |
+| `confirmation-required` | Mutation gate | Any tag application needs explicit confirmation of the exact tag, operation, and commit. |
+| `invalid-input` | Transient error | The requested mode, line, or tag does not match the canonical contract. |
+
+`main` and `release` are selectable calculation modes, not persisted release
+states. The helper remains read-only in every state. Every JSON preview also
+reports `tag_application=explicit-confirmation-required`; a suggestion is not
+authorization to create or push a tag.

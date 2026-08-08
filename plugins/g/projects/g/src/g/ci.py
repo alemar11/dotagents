@@ -48,6 +48,8 @@ FAILURE_MARKERS = (
 
 DEFAULT_MAX_LINES = 160
 DEFAULT_CONTEXT_LINES = 30
+ACTIONS_API_VERSION = "2022-11-28"
+CI_COMMANDS = ("inspect", "permissions")
 PENDING_LOG_MARKERS = (
     "still in progress",
     "log will be available when it is complete",
@@ -132,10 +134,17 @@ def run_git_command(args: Sequence[str], cwd: Path | None) -> GhResult:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Inspect failing GitHub PR checks, fetch GitHub Actions logs, and extract a "
-            "failure snippet."
+            "Inspect failing GitHub PR checks or read the repository GitHub Actions "
+            "permissions preflight."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=CI_COMMANDS,
+        default="inspect",
+        help="inspect failing checks or permissions for creating pull requests",
     )
     parser.add_argument(
         "--repo",
@@ -196,6 +205,26 @@ def emit_error(exc: InspectionError, command: list[str]) -> None:
     )
 
 
+def render_permissions(payload: dict[str, Any]) -> str:
+    actions = "enabled" if payload["actions_enabled"] else "disabled"
+    approval = "enabled" if payload["can_approve_pull_request_reviews"] else "disabled"
+    pull_requests = payload["pull_requests_write"]
+    lines = [
+        f"Repository: {payload['repository']}",
+        f"GitHub Actions: {actions}",
+        f"Workflow default permissions: {payload['default_workflow_permissions']}",
+        f"PR create/approve repository setting: {approval}",
+        "Required workflow permissions: contents: read, pull-requests: write",
+        f"pull-requests: write repository gate: {pull_requests['repository_gate']}",
+        "contents: write is required when the workflow creates branches or tags.",
+        "The effective token permission must still be verified from the workflow and its run.",
+    ]
+    warning = payload["workflow_authoring"]["warning"]
+    if warning:
+        lines.append(f"Warning: {warning}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     if raw_argv == ["--version"]:
@@ -212,6 +241,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.repo,
             allow_non_project=args.allow_non_project,
         )
+        if args.command == "permissions":
+            payload = inspect_actions_permissions(repo=repo, repo_root=repo_root)
+            if args.json:
+                emit_success(payload, ["permissions"])
+            else:
+                print(render_permissions(payload), end="")
+            return 0
         payload, exit_code = inspect_pr_failures(
             repo=repo,
             repo_root=repo_root,
@@ -221,7 +257,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     except InspectionError as exc:
         if args.json:
-            emit_error(exc, ["inspect"])
+            emit_error(exc, [args.command])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -238,6 +274,83 @@ def find_git_root(start: Path | None = None) -> Path | None:
     if result.returncode != 0:
         return None
     return Path(result.stdout.strip())
+
+
+def fetch_actions_endpoint(endpoint: str, repo_root: Path | None) -> dict[str, Any]:
+    result = run_gh_command(
+        [
+            "api",
+            endpoint,
+            "--method",
+            "GET",
+            "--header",
+            "Accept: application/vnd.github+json",
+            "--header",
+            f"X-GitHub-Api-Version: {ACTIONS_API_VERSION}",
+        ],
+        cwd=repo_root,
+    )
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "").strip()
+        raise InspectionError(message or f"gh api failed for {endpoint}.", 1)
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        raise InspectionError(f"Unable to parse GitHub Actions permissions JSON: {exc}", 1) from exc
+    if not isinstance(data, dict):
+        raise InspectionError("GitHub Actions permissions endpoint returned an unexpected JSON shape.", 1)
+    return data
+
+
+def inspect_actions_permissions(*, repo: str, repo_root: Path | None) -> dict[str, Any]:
+    ensure_gh_available(repo_root)
+    actions = fetch_actions_endpoint(f"repos/{repo}/actions/permissions", repo_root)
+    workflow = fetch_actions_endpoint(f"repos/{repo}/actions/permissions/workflow", repo_root)
+
+    actions_enabled = actions.get("enabled")
+    default_workflow_permissions = workflow.get("default_workflow_permissions")
+    can_approve = workflow.get("can_approve_pull_request_reviews")
+    if not isinstance(actions_enabled, bool):
+        raise InspectionError("GitHub Actions permissions response omitted the enabled flag.", 1)
+    if default_workflow_permissions not in {"read", "write"}:
+        raise InspectionError("GitHub Actions permissions response has an invalid default permission value.", 1)
+    if not isinstance(can_approve, bool):
+        raise InspectionError("GitHub Actions workflow permissions response omitted the PR approval flag.", 1)
+
+    if not actions_enabled:
+        repository_gate = "blocked"
+        warning = "The workflow may be written, but GitHub Actions is disabled and cannot run until it is enabled."
+    elif not can_approve:
+        repository_gate = "blocked"
+        warning = "The workflow may be written, but its pull-request operation will not work until the repository setting is enabled."
+    else:
+        repository_gate = "enabled"
+        warning = None
+
+    return {
+        "repository": repo,
+        "actions_enabled": actions_enabled,
+        "default_workflow_permissions": default_workflow_permissions,
+        "can_approve_pull_request_reviews": can_approve,
+        "pull_requests_write": {
+            "repository_gate": repository_gate,
+            "workflow_declaration": {
+                "contents": "read",
+                "pull-requests": "write",
+            },
+            "effective": "not-verifiable-before-workflow-run",
+        },
+        "workflow_authoring": {
+            "status": "allowed-with-warning" if warning else "ready",
+            "warning": warning,
+        },
+        "contents_write_required_for": ["branch", "tag"],
+        "limitations": [
+            "The repository API exposes the Actions setting and workflow defaults, not the effective token permissions of a future workflow.",
+            "The workflow must declare pull-requests: write explicitly; use contents: write when it creates branches or tags.",
+            "A missing or forbidden API response can reflect token scope, plan, account, organization, or enterprise policy.",
+        ],
+    }
 
 
 def ensure_gh_available(cwd: Path | None) -> None:

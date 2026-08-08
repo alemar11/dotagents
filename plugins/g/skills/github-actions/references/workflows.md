@@ -1,5 +1,17 @@
 # GitHub CI Workflows
 
+For release workflows that create pull requests, branches, or tags, run the
+configuration preflight in
+[`configuration.md`](configuration.md) before editing workflow files. Detailed
+workflow-authoring instructions are not currently present. A blocked or
+unavailable preflight is an advisory warning: when the user requested the
+workflow, write it with the required `permissions` block and report that its PR
+operation will remain non-functional until the repository setting is enabled.
+
+```bash
+<plugin-root>/scripts/g --json ci permissions --repo <owner/repo> --allow-non-project
+```
+
 ## PR Checks
 
 ```bash
