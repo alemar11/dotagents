@@ -173,7 +173,8 @@ Before creating, resuming, or monitoring application tasks, load the
 Implement task profile, shared task preflight, and shared task handoff. The
 orchestrator and every Feature Worker are required roles. Authoritative role
 observation and title reconciliation are required before normal monitoring or
-update relay.
+update relay. Actively request each role's complete resolved model and
+reasoning profile; never omit either value or rely on ambient inheritance.
 
 The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
 After a PR reaches `candidate-published`, its Feature Worker becomes inactive

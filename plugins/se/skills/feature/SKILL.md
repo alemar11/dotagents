@@ -75,10 +75,11 @@ the same objective in the task report and continue.
 The shared task preflight must verify required task creation, effective planner
 profile readback, observation, monitoring, and relay capabilities. After task
 identity readback, the shared handoff must bind the exact requested and
-effective planner model and reasoning before normal monitoring. It records
-delegation and goal capabilities as optional runtime facts. A missing optional
-capability selects the documented fallback; it does not authorize a
-replacement planner task.
+effective planner model and reasoning before normal monitoring. The planner's
+complete resolved profile must be actively requested rather than obtained
+through ambient inheritance. It records delegation and goal capabilities as
+optional runtime facts. A missing optional capability selects the documented
+fallback; it does not authorize a replacement planner task.
 
 ## Analysis worker contract
 

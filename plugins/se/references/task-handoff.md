@@ -11,6 +11,7 @@ authorization decisions.
 - [Handoff boundary](#handoff-boundary)
 - [Canonical title metadata](#canonical-title-metadata)
 - [Title reconciliation](#title-reconciliation)
+- [Role-profile request](#role-profile-request)
 - [Role-profile observation](#role-profile-observation)
 - [Observation record](#observation-record)
 - [Update relay](#update-relay)
@@ -31,6 +32,8 @@ The handoff must contain, or link to:
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
 - the exact requested model and reasoning resolved for this assignment;
+- evidence that the complete resolved profile will be actively requested and
+  ambient inheritance is forbidden;
 - expected partial-update and final-report behavior;
 - validation and terminal-readiness expectations;
 - the preflight record, including its separate authorization decisions.
@@ -123,13 +126,41 @@ again. If retained evidence cannot prove that no prior attempt occurred, do
 not adjust: preserve the task and finalize `verified` when authoritative
 readback already matches, otherwise record `title-unverified` or `title-drift`.
 
+## Role-profile request
+
+Treat the skill-owned model and reasoning as required task-effect inputs, not
+preferences or defaults. The explicit Feature or Implement invocation selects
+the profile declared for every required role and for any optional role
+instantiated as its own application task. Before creation or resume, actively
+request both resolved values and freeze semantic request evidence in the
+handoff. Never omit either value to inherit the invoking session, application,
+project, host, or provider default.
+
+Use this interface-independent record shape for the request evidence:
+
+```yaml
+profile_request:
+  requested_model: "<assignment-resolved model>"
+  requested_reasoning: "<assignment-resolved reasoning>"
+  request_mode: explicit
+  ambient_inheritance: forbidden
+```
+
+These are handoff evidence fields, not application-operation parameter names.
+If the live runtime cannot actively request both resolved values, stop before
+the task effect. A task created through ambient inheritance is not a valid
+profile request even when its later effective readback happens to match.
+Authoritative post-effect observation remains independently mandatory.
+
 ## Role-profile observation
 
 Every application task created or resumed under a skill-owned profile must
 carry a typed role observation. Resolve the exact requested model and reasoning
 before the task effect. When a profile selects reasoning per assignment, such
 as one Implement Feature Worker per Feature, freeze that resolved value in the
-handoff before startup.
+handoff before startup. Bind the observation to the handoff's explicit
+`profile_request`; effective-profile readback never substitutes for that
+pre-effect request evidence.
 
 After stable task identity is independently observed, read the effective model
 and reasoning from the authoritative runtime view. A request payload, creation
@@ -165,6 +196,7 @@ task_observation:
   task_profile_ref: "<skill-owned profile>"
   role: "<profile role>"
   assignment_ref: "<planner, orchestration, Feature, or other stable scope>"
+  profile_request_ref: "<explicit profile-request evidence>"
   role_observation:
     requested_model: "<assignment-resolved model>"
     requested_reasoning: "<assignment-resolved reasoning>"
@@ -186,7 +218,9 @@ task_observation:
 ```
 
 The observation must be compared with the preflight target and the resolved
-skill-owned profile. A mismatch in effective model, effective reasoning, task
+skill-owned profile, and its `profile_request_ref` must prove the complete
+resolved profile was actively requested. A missing explicit request, ambient
+inheritance, or a mismatch in effective model, effective reasoning, task
 identity, project, host, repository, or state is a blocker until reconciled.
 The task identity and authoritative role readback are execution evidence;
 titles and other display metadata are not.
@@ -244,6 +278,8 @@ the authoritative evidence that remains available.
 The final relay must preserve the exact task identity and include:
 
 - the final independently observed task, project, host, repository, and state;
+- the explicit profile-request evidence and prohibition on ambient
+  inheritance;
 - the final typed role observation and authoritative effective-profile
   evidence;
 - the final title-reconciliation status and any display-metadata warning;

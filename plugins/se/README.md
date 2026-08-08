@@ -20,6 +20,7 @@ Its skills are deliberately separated by responsibility:
   statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs. They require an
+  explicit, complete role-profile request with no ambient inheritance plus an
   authoritative, assignment-specific comparison between requested and
   effective model/reasoning before normal task monitoring.
 - references/workflow-contract.md owns the Idea hosted shape, while

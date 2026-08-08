@@ -164,9 +164,11 @@ surface.
   skill. The invoking skill owns requested role, model, reasoning, and topology;
   the shared preflight owns authoritative-readback capability; and the shared
   handoff owns one typed assignment-specific comparison bound to the observed
-  task identity. Reuse existing workflow outcomes, never persist this evidence
-  in the Implement ledger, and never create a replacement after a mismatch or
-  unobservable required profile.
+  task identity. Required profiles must be actively requested in full; ambient
+  or configured-default inheritance is prohibited even when it happens to
+  produce matching effective values. Reuse existing workflow outcomes, never
+  persist this evidence in the Implement ledger, and never create a replacement
+  after a mismatch or unobservable required profile.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is

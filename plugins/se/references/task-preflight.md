@@ -37,6 +37,16 @@ resume. This contract owns the live capability gate for reading those values
 back authoritatively; [Task Handoff](task-handoff.md) owns the typed
 per-task observation and comparison evidence.
 
+An explicit invocation of a task-managed Feature or Implement workflow also
+selects the exact required role profiles declared by that workflow. For every
+required role, and for every optional role instantiated as its own application
+task, the task controller must actively request the resolved model and
+reasoning on creation and resume. Omitting either value and relying on an
+ambient, inherited, configured, or provider-default profile is prohibited,
+even when the resulting effective values happen to match. This selection
+authorizes only the profiles declared by the invoked skill; it does not permit
+an undeclared model or reasoning substitution.
+
 The invoking skill must pass a reference to its complete task profile and the
 roles required by the selected topology. The preflight verifies the live
 runtime for every supplied role; it does not select, rewrite, downgrade, or
@@ -70,14 +80,19 @@ not evidence that a live capability is available. If creation, observation, or
 monitoring cannot be verified, fail closed before creating or retrying a task.
 
 Before recording a required role as verified, establish that the current
-runtime can both accept the resolved requested profile and expose an
-authoritative post-effect readback of the effective model and reasoning. A
+runtime can both accept an active request for the complete resolved profile
+and expose an authoritative post-effect readback of the effective model and reasoning. A
 request payload, configured default, creation receipt, conversation text, or
 locally inferred value is not effective-profile evidence. `roles_verified:
 true` means every required role is supported and has this readback capability;
 it does not claim that a task has already been created or that its effective
 profile has matched. The handoff supplies that proof after stable task identity
 observation.
+
+If the runtime can create a task only by inheriting one or both required
+profile values, the fixed-profile capability gate has not passed. Stop before
+the task effect instead of creating a task and checking which defaults it
+received afterward.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or its effective profile
@@ -139,6 +154,10 @@ monitoring or update relay. Preserve and reconcile the observed task identity;
 do not create a replacement. For an optional role, use only the invoking
 skill's declared parent or serial fallback and do not claim delegated work.
 
+A matching effective readback does not repair a missing explicit profile
+request. Require both the pre-effect request evidence owned by the handoff and
+the post-effect effective-profile observation for the same task.
+
 The same observation boundary applies after a resume, a host change, a
 monitoring gap, or a final update. Do not report a task as running or complete
 from an unverified receipt.
@@ -171,6 +190,11 @@ forbids renaming. Record that authority separately because correction is a
 distinct application effect. It never authorizes arbitrary or later lifecycle
 renames.
 
+The same explicit invocation authorizes the task controller to request the
+exact model and reasoning declared by the skill-owned profile. This is part of
+the bounded task-creation or resume authority, not permission to select a
+different profile or rely on ambient inheritance.
+
 ### 6. Reconciliation before retry
 
 An error, timeout, disconnected monitor, or incomplete receipt is an
@@ -199,6 +223,8 @@ preflight:
     explicit: true
   profile:
     reference: "<skill-owned task profile>"
+    request_mode: explicit
+    ambient_inheritance: forbidden
     roles_verified: true
   capabilities:
     create_task: available
@@ -239,6 +265,11 @@ effective required-role readback, or monitoring/relay path is unavailable, the
 outcome is `blocked`. The skill must return the smallest recovery input and
 stop before the affected task effect. It must not claim that a task exists, is
 being monitored, or completed until the required live evidence is available.
+
+The same fail-closed rule applies when the exact resolved model and reasoning
+cannot be actively requested. Never omit a required profile value to obtain a
+task receipt and never treat a coincidentally matching inherited profile as a
+valid task initialization.
 
 A missing title-request or title-adjustment capability alone is not a topology
 blocker because a title is display metadata. Continue only after recording the

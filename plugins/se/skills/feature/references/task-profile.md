@@ -26,6 +26,13 @@ it does not select or rewrite these values.
     topology: planner-with-optional-analysis-workers
     title_template: "📚 Plan Feature Set · <set outcome>"
 
+The explicit se:feature invocation selects these role profiles as required
+runtime inputs. Actively request both the resolved model and reasoning for the
+planner and for any optional role instantiated as its own application task.
+Never omit either value or rely on the invoking session, application, project,
+host, or provider default. The required planner is always requested as
+`gpt-5.6-sol` with `medium` reasoning.
+
 The planner owns the application task, the Feature workflow graph, the
 Feature Plan Set registry, each Feature's local Macro Task registry, the
 question batch, the reduction of worker evidence, the canonical textual plan,
@@ -55,14 +62,17 @@ metadata, never task identity or recovery evidence.
 The planner role is required exactly as declared. Do not substitute another
 model or reasoning level. Optional workers may fall back to the parent, but
 the planner has no automatic model or destination fallback. If the live
-runtime cannot verify the planner profile, stop with unsupported-runtime.
+runtime cannot actively request and verify the planner profile, stop with
+unsupported-runtime.
 
-Resolve the planner's requested model and reasoning from this profile before
-creation or resume. After stable task identity readback, require the shared
-task handoff's typed `role_observation` to contain authoritative effective
-values that exactly match them. A request or creation receipt is not proof. A
-missing, unobservable, or mismatched effective value is
-`unsupported-runtime`; preserve the observed task and do not create a
+Resolve and actively request the planner's model and reasoning from this
+profile before creation or resume. Require the shared handoff's explicit
+profile-request evidence; a matching value obtained through ambient
+inheritance does not satisfy this invariant. After stable task identity
+readback, require the shared task handoff's typed `role_observation` to contain
+authoritative effective values that exactly match the request. A request or
+creation receipt is not proof. A missing, unobservable, or mismatched effective
+value is `unsupported-runtime`; preserve the observed task and do not create a
 replacement. Apply the same rule to an optional role only when it is
 instantiated as its own application task; otherwise the delegation evidence
 below remains authoritative.

@@ -7,11 +7,39 @@ ORCHESTRATION = Path(__file__).resolve().parents[1] / "references/orchestration.
 SKILL = Path(__file__).resolve().parents[1] / "SKILL.md"
 PREFLIGHT = Path(__file__).resolve().parents[3] / "references/codex-dependency-preflight.md"
 TASK_PROFILE = Path(__file__).resolve().parents[1] / "references/task-profile.md"
+TASK_HANDOFF = Path(__file__).resolve().parents[3] / "references/task-handoff.md"
 RUN_STATE = Path(__file__).resolve().parents[1] / "references/run-state.md"
 STATES = Path(__file__).resolve().parents[1] / "references/states.md"
 
 
 class ReviewDeliveryContractTests(unittest.TestCase):
+    def test_orchestrator_title_uses_selected_feature_count(self) -> None:
+        profile = TASK_PROFILE.read_text(encoding="utf-8")
+        handoff = " ".join(TASK_HANDOFF.read_text(encoding="utf-8").split())
+        templates = {}
+        for line in profile.splitlines():
+            key, separator, value = line.strip().partition(": ")
+            if separator and key in {"singular", "plural"}:
+                templates[key] = value.strip('"')
+
+        self.assertEqual(
+            templates,
+            {
+                "singular": "🤖 Orchestrator · 1 Feature",
+                "plural": "🤖 Orchestrator · <feature_count> Features",
+            },
+        )
+        self.assertEqual(templates["singular"], "🤖 Orchestrator · 1 Feature")
+        self.assertEqual(
+            templates["plural"].replace("<feature_count>", "6"),
+            "🤖 Orchestrator · 6 Features",
+        )
+        self.assertIn(
+            "use `1 Feature` for one selected Feature and `<feature_count> Features` for multiple selected Features",
+            handoff,
+        )
+        self.assertNotIn("<feature_set_count>", profile)
+
     def test_one_feature_worker_owns_each_feature_and_its_single_pr(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")
