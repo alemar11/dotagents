@@ -22,8 +22,8 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn('title_template: "🛠️ Feature Worker · <Feature outcome>"', profile)
         self.assertIn("For every Feature member, bootstrap exactly one Feature Worker", orchestration)
         self.assertIn("executes its derived units in deterministic prerequisite order", " ".join(orchestration.split()))
-        self.assertIn("The hosted Feature Plan Set and every local Macro Task projection reached from", " ".join(skill.split()))
-        self.assertIn("one verified child Task issue per stable", skill)
+        self.assertIn("selected parent Feature semantic contract are required input", " ".join(skill.split()))
+        self.assertIn("one observed Macro projection state", orchestration)
         self.assertIn("Exactly one assignment may exist per claimed Feature", run_state)
         self.assertIn(
             "must not receive an empty commit, empty PR, cosmetic change, or artificial proof",
@@ -80,13 +80,13 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         )
         self.assertIn("outside the implementation ledger", normalized_orchestration)
 
-    def test_pr_delivery_derives_the_closed_set_from_the_macro_registry(self) -> None:
+    def test_pr_delivery_derives_closure_from_verified_existing_projections(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         normalized = " ".join(reference.split())
 
         for required in (
-            "derive `closing_issue_refs` deterministically from that Feature's verified local hosted registry",
-            "[this parent Feature issue] + [every Macro Task child issue owned by this Feature]",
+            "derive `closing_issue_refs` deterministically from that parent Feature",
+            "[this parent Feature issue] + [every verified existing Macro Task child issue owned by this Feature]",
             "There is no per-Task opt-out",
             "no Worker-supplied closure list",
             "The PR declares closure intent",
@@ -100,14 +100,15 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             normalized,
         )
         self.assertIn(
-            "Verify the PR body carries the exact registry-derived closure intent",
+            "Verify the PR body carries the exact source-derived closure intent",
             normalized,
         )
         self.assertNotIn(
             "Require the " + "read-back set",
             normalized,
         )
-        self.assertIn("Macro Task coverage evidence", normalized)
+        self.assertIn("available Macro Task contextual coverage evidence", normalized)
+        self.assertIn("Never invent closure refs", normalized)
 
     def test_stacked_children_link_separately(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
@@ -120,7 +121,7 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("`candidate-published` parent branch and exact HEAD", orchestration_normalized)
         self.assertIn("The parent may remain `delivery-pending`", orchestration_normalized)
         self.assertNotIn("Task-only", normalized)
-        self.assertIn("this parent Feature and every associated local Macro Task", normalized)
+        self.assertIn("this parent Feature and every verified existing associated local Macro Task", normalized)
 
     def test_starting_branch_is_selectable_refreshed_and_frozen_before_bootstrap(self) -> None:
         skill = " ".join(SKILL.read_text(encoding="utf-8").split())
@@ -171,11 +172,39 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         ):
             self.assertIn(required, normalized_orchestration + normalized_reference)
 
-        self.assertIn(
-            "Require every local registry entry to resolve to one real",
-            normalized_reference,
-        )
+        self.assertIn("verified existing subset", normalized_reference)
         self.assertIn("cross-parent", normalized_reference)
+
+    def test_parent_feature_contract_allows_degraded_macro_projections(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        for projection_state in ("`complete`", "`partial`", "`absent`"):
+            self.assertIn(projection_state, skill)
+            self.assertIn(projection_state, orchestration)
+            self.assertIn(projection_state, reference)
+
+        self.assertIn("does not block implementation when the parent Feature semantic contract is sufficient", skill)
+        self.assertIn("Never invent, repair, or publish a Task issue automatically", skill)
+        self.assertIn("does not block PR publication when the parent Feature semantic contract is sufficient", reference)
+        self.assertIn("quarantine", orchestration.lower())
+
+    def test_t_ac_specializes_f_ac_and_semantic_conflicts_pause_only_the_assignment(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        self.assertIn("deterministic `T-AC-NN` technical criteria", skill)
+        self.assertIn("may only specialize", skill)
+        self.assertIn("must never replace, weaken, delete, or reinterpret an F-AC", skill)
+        self.assertIn("Every F-AC must have direct exact-HEAD evidence", skill)
+        self.assertIn("Implement resolves missing execution decomposition", orchestration)
+        self.assertIn("acceptance specificity autonomously", orchestration)
+        self.assertIn("F-AC contradict each other or the outcome", orchestration)
+        self.assertIn("blocked by an unselected or unfulfilled Feature", orchestration)
+        self.assertIn("Keep independent Features moving", orchestration)
+        self.assertIn("deterministic T-AC-NN criteria", reference)
 
     def test_provider_policy_is_not_an_implement_completion_gate(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
@@ -218,7 +247,7 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("The PR may remain open", normalized)
         self.assertIn("They become effective only when GitHub merges the PR", normalized)
         self.assertIn(
-            "current PR HEAD, the PR body carrying registry-derived closure intent",
+            "current PR HEAD, the PR body carrying source-derived closure intent",
             normalized,
         )
         self.assertIn(

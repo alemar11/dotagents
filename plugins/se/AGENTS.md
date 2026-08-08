@@ -74,9 +74,15 @@ surface.
   but repository identity gives it a deterministic Implement projection: a
   same-repository edge is mandatory stack intent and a cross-repository edge
   is scheduling-only. Macro-local `blocked_by` remains planning-only and may be
-  internalized by Implement while preserving every Macro Task outcome.
-  Implement consumes the verified set, derives technical execution units
-  internally, and returns a verified standalone or stacked PR topology.
+  internalized by Implement while preserving every available Macro Task
+  outcome. Implement consumes each selected parent Feature as the required
+  semantic contract, treats hosted Macro Tasks as `complete`, `partial`, or
+  `absent` planning projections, derives technical execution units and T-AC
+  criteria internally, and returns a verified standalone or stacked PR
+  topology. A degraded Macro projection is reported but does not block when
+  outcome, scope, F-AC, and Feature dependencies remain sufficient. Implement
+  may derive missing execution coverage from the parent contract but never
+  creates or repairs Task projections automatically.
   Implement must not create an automatic plan-repair planner for ordinary
   technical interpretation.
 - Keep one human-readable `references/states.md` in every bundled SE skill.
@@ -91,10 +97,13 @@ surface.
   high-water marks, source and question provenance, Feature-level dependency
   relations, each closed Macro Task registry, macro-local planning relations,
   and the durable parent/child projection. Implement owns technical
-  execution-unit decomposition, exact-head implementation evidence, and one
-  registry-derived closing set per Feature. Macro Tasks are planning views of
-  the same Feature outcome and are always included with that parent Feature;
-  sibling Features and their Tasks are never included. The uppercase
+  execution-unit decomposition, assignment-scoped T-AC criteria, exact-head
+  implementation evidence, and one source-derived closing set per Feature.
+  T-AC may specialize but never replace, weaken, or reinterpret F-AC. Macro
+  Tasks are planning views of the same Feature outcome; every verified existing
+  local child is included with that parent Feature, while missing or
+  quarantined projections are reported and never invented. Sibling Features
+  and their Tasks are never included. The uppercase
   bracketed IDs are an explicit rendered-contract syntax exception to
   lower-kebab values.
 - Keep Implement execution waves separate from PR delivery topology.
@@ -128,8 +137,8 @@ surface.
   one verified immediate-parent ancestry chain. `candidate-published`, not PR
   readiness, is the development-unblock boundary. Macro Task `blocked_by`
   relations remain planning context: Implement may combine, reorder, or
-  internalize them only while preserving every Macro Task outcome and Feature
-  acceptance criterion.
+  internalize them only while preserving every available Macro Task outcome
+  and every Feature acceptance criterion.
 - Keep PR observation centralized in the Implement orchestrator. After
   `candidate-published`, the Feature Worker becomes inactive but resumable and
   the assignment remains `delivery-pending`; the orchestrator monitors exact
@@ -173,11 +182,14 @@ surface.
   Preview is opt-in and must never be selected implicitly when publish
   authority or G is unavailable.
 - Keep Implement GitHub-backed end to end. It accepts authoritative published
-  Feature Plan Sets with verified sibling/Macro projections, derives its
-  technical execution units in the Implement control plane, and returns one
+  parent Feature semantic contracts with verified sibling context, tolerates
+  `complete`, `partial`, or `absent` Macro projections, derives technical
+  execution units and stable assignment-scoped T-AC criteria in the Implement
+  control plane, and returns one
   verified hosted PR topology per Feature whose `closing_issue_refs` contains
-  only that Feature's parent and every associated local Macro Task, with that
-  intent carried by the PR body. GitHub `closingIssuesReferences` is optional
+  only that Feature's parent and every verified existing associated local Macro
+  Task, with that intent carried by the PR body. GitHub
+  `closingIssuesReferences` is optional
   diagnostic provider data and never a gate. It has no local-only or preview
   implementation mode.
 - Keep Audit strictly observational. Attribute SE use only from task-visible
@@ -218,8 +230,9 @@ surface.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery gate, Feature-level scheduling, optional Feature Worker
-  delegation fallback, exact sibling/Macro Task readback, per-Feature
-  registry-derived closing sets, deterministic same-repository stack intent,
+  delegation fallback, exact sibling readback, degraded Macro projection
+  tolerance, per-Feature source-derived closing sets, deterministic
+  same-repository stack intent, F-AC-to-T-AC evidence mapping,
   `candidate-published` child unblocking, orchestrator-owned delivery
   monitoring, resumable Worker repair, and stack-reconcile paths.
 - Validate that every bundled skill routes to `references/states.md`, every

@@ -54,11 +54,13 @@ Its skills are deliberately separated by responsibility:
   SE Implement emoji-title grammar with authoritative readback and at most one
   bounded correction before monitoring; titles remain display metadata.
 - skills/implement/ accepts one or more explicit GitHub parent Feature issue
-  references, verifies their authoritative Feature Plan Set and local Macro
-  projections, and returns a
+  references, verifies their authoritative Feature semantic contracts and
+  sibling dependency context, records local Macro projections as complete,
+  partial, or absent, and returns a
   verified standalone or stacked PR topology. Its graph owns Feature-level
-  scheduling, derives technical execution units from each Feature and its
-  local Macro Tasks, creates one isolated Sol Feature Worker and one PR per
+  scheduling, derives technical execution units and assignment-scoped T-AC
+  criteria from each parent Feature plus available Macro context, creates one
+  isolated Sol Feature Worker and one PR per
   implementation-eligible Feature, and may use bounded delegated support
   assignments for code analysis, execution-unit assistance, validation, or
   critique when delegation and capacity are observed; otherwise the parent
@@ -87,14 +89,18 @@ Its skills are deliberately separated by responsibility:
   `ready-with-manual-action` are accepted without granting Implement any merge,
   auto-merge, bypass, or queue authority.
   Feature acceptance criteria use stable bracketed IDs rather than Markdown
-  checkbox state; Feature Workers bind every Feature criterion and every local
-  Macro Task to the same final candidate HEAD;
-  the orchestrator aggregates plan evidence without rewriting the plan. The
-  PR closing set is derived independently for each Feature as its parent
-  Feature plus every associated local Macro Task; sibling Features and their
-  Tasks are never included, regardless of internal technical decomposition.
-  Product-level plan contradictions are surfaced to the
-  user; ordinary technical interpretation does not relaunch Feature.
+  checkbox state; Feature Workers may derive T-AC criteria that specialize but
+  never replace or weaken F-AC, and bind both to the same final candidate HEAD.
+  Available Macro outcomes remain contextual evidence; missing Task
+  projections do not block when the parent semantic contract is sufficient.
+  The orchestrator aggregates evidence without rewriting the plan. The PR
+  closing set is derived independently for each Feature as its parent Feature
+  plus every verified existing associated local Macro Task; missing refs are
+  reported and never invented, while sibling Features and their Tasks are
+  never included. Semantic contradictions that require changing outcome,
+  scope, F-AC, or Feature dependencies are surfaced to the user; missing task
+  decomposition, acceptance specificity, and ordinary technical interpretation
+  remain Implement-owned.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.

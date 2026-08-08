@@ -106,6 +106,21 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         self.assertIn("parent_feature_id", macro_task)
         self.assertIn("Cross-Feature Macro Task references are invalid", macro_task)
 
+    def test_feature_publication_stays_strict_while_implement_tolerates_projection_degradation(self) -> None:
+        skill = " ".join((ROOT / "SKILL.md").read_text(encoding="utf-8").split())
+        publication = " ".join(
+            (ROOT / "steps/plan-publication.md").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("one child issue per Macro Task", publication)
+        self.assertIn("Feature must publish and reconcile the complete Feature Plan Set", skill)
+        self.assertIn("required semantic contract", skill)
+        self.assertIn("`complete`, `partial`, or `absent`", skill)
+        self.assertIn("derive missing execution coverage", skill)
+        self.assertIn("without creating or repairing Task issues", skill)
+        self.assertIn("A T-AC may specialize an F-AC but never replace, weaken, or change it", skill)
+        self.assertIn("acceptance specificity remain autonomous Implement work", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

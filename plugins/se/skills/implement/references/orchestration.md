@@ -16,10 +16,10 @@ The orchestrator coordinates one run containing one or more caller-supplied
 GitHub parent Feature issue refs and the authoritative Feature Plan Sets and
 Macro projections resolved from them. Each selected Feature member retains its
 Feature ID, repository binding, one Feature
-assignment, one complete local Macro Task set, one Feature Worker, and one PR
-output. The orchestrator derives technical execution units from the Feature
-and its local Macro Task registry before scheduling; the Plan Set does not
-contain the runtime execution graph.
+assignment, one observed Macro projection state, one Feature Worker, and one PR
+output. The orchestrator derives technical execution units and T-AC criteria
+from the Feature semantic contract plus any available verified Macro context
+before scheduling; the Plan Set does not contain the runtime execution graph.
 
 PR delivery readiness is established from exact PR publication, current CI,
 hosted review feedback, and stack evidence. The orchestrator is the sole
@@ -85,16 +85,20 @@ it does not change the selected landing branch at the root of the stack.
 
 The orchestrator resolves only the exact caller-supplied parent issue refs,
 then reads the authoritative Feature Plan Set manifest, hosted sibling
-registry, and each selected Feature's local Macro Task children before deriving
-a transient technical execution unit set. It verifies set identity/revision,
-Feature membership, Feature-level `blocked_by`, each selected local parent
-registry, one-to-one child issue mapping, parent/child relations, and
-same-parent-only macro dependencies. Sibling entries provide consistency and
-dependency evidence but never expand the selected implementation set. A
-missing, extra, duplicate, cross-parent, cyclic, or mismatched identity blocks
-the assignment before a worker starts. GitHub labels and native Issue Types
-are outside this workflow and must not be read, searched, inferred, validated,
-mutated, or used as gates.
+registry, each selected parent Feature semantic contract, and any reachable
+local Macro Task children before deriving a transient technical execution unit
+set. It verifies set identity/revision, Feature membership, outcome, scope,
+non-goals, F-AC identities and high-water evidence, and Feature-level
+`blocked_by`. Sibling entries provide consistency and dependency evidence but
+never expand the selected implementation set. Record Macro projection
+availability as `complete`, `partial`, or `absent`. Validate every reachable
+local child and quarantine missing, extra, duplicate, cross-parent, cyclic, or
+mismatched Task projections from execution and closure intent. Those defects
+do not block a worker when the parent Feature semantic contract is sufficient;
+they block only when they also make that contract or Feature-level dependency
+topology ambiguous. Never create or repair hosted Task projections. GitHub
+labels and native Issue Types are outside this workflow and must not be read,
+searched, inferred, validated, mutated, or used as gates.
 
 Feature-level `blocked_by` relations are planning-owned hard outcome
 dependencies and may cross repositories. Repository identity controls their
@@ -104,7 +108,14 @@ creates technical execution-unit edges; the orchestrator still derives real
 implementation prerequisites independently. Macro `blocked_by` relations are
 planning context within one parent Feature and never create worker or PR
 boundaries. The orchestrator may combine, reorder, or internalize them while
-preserving every Macro Task outcome and Feature criterion.
+preserving every available Macro Task outcome and Feature criterion.
+
+Derive deterministic `T-AC-NN` criteria for the assignment and preserve their
+identities across candidate revisions. Every T-AC must map to one or more
+current F-AC identities and may only make their technical proof more specific.
+It cannot replace, weaken, delete, or reinterpret an F-AC or change outcome,
+scope, non-goals, or Feature dependencies. Every F-AC needs direct exact-HEAD
+evidence or at least one mapped T-AC; every T-AC needs exact-HEAD evidence.
 
 If an upstream Feature named by `blocked_by` is missing, unverified, or outside
 the selected implementation scope, keep the dependent assignment blocked or
@@ -120,6 +131,7 @@ Each derived unit must have:
 - repository and path scope;
 - implementation and validation intent;
 - Feature-criterion mapping;
+- deterministic T-AC criteria and their F-AC mapping;
 - real implementation prerequisites;
 - evidence needed from the Feature Worker.
 
@@ -134,18 +146,23 @@ cross-repository prerequisites remain separate scheduling or topology facts
 and never become technical execution-unit edges automatically.
 
 The orchestrator owns this translation and may ask the Feature Worker to
-refine technical units during implementation. It must preserve coverage of
-every Macro Task and must not rewrite or publish the Feature Plan or its Macro
-Task registry.
+refine technical units and T-AC criteria during implementation. It must
+preserve every F-AC and every available Macro Task outcome, but it may derive
+missing execution coverage directly from the parent Feature contract. It must
+not rewrite or publish the Feature Plan or its Macro Task registry.
 
 ## User plan questions
 
-When a Feature Worker finds a product-level contradiction, missing outcome,
-ownership conflict, or material acceptance gap, enter `plan-question` for the
-affected assignment. Present the bounded decision to the user with its
-evidence and impact. Persist `deferred @ plan-question` without claiming that
-the ledger stores the question body or a separate plan-question identity. Keep
-independent Features moving.
+Implement resolves missing execution decomposition, ordinary technical
+ambiguity, and acceptance specificity autonomously. Enter `plan-question` for
+the affected assignment only when no semantic-preserving implementation is
+possible: F-AC contradict each other or the outcome, satisfying the contract
+requires changing outcome or scope, Feature dependencies are contradictory or
+cyclic, or a selected Feature is blocked by an unselected or unfulfilled
+Feature. Present the bounded conflict to the user with its evidence and impact.
+Persist `deferred @ plan-question` without claiming that the ledger stores the
+question body or a separate plan-question identity. Keep independent Features
+moving.
 
 Do not create a separate Feature planner task automatically. If the user's
 answer requires changing the published Feature Plan Set, report an explicit
@@ -214,8 +231,8 @@ review, publication readback, `candidate-published`, and central monitoring.
 
 ## Optional Feature Worker support
 
-The Feature Worker is the parent owner of one Feature member, its complete
-local Macro Task set, worktree, integration branch, candidate HEAD,
+The Feature Worker is the parent owner of one Feature member, its observed
+Macro projection state and available local Task context, worktree, integration branch, candidate HEAD,
 acceptance matrix, native review, and PR. Macro Tasks are planning
 projections, not worker or PR boundaries.
 Optional support assignments are subordinate to that lifecycle and are not
@@ -229,8 +246,8 @@ responsibilities:
   challenges.
 
 The parent supplies each helper with the current Feature ID, Plan Set revision,
-local Macro Task context, execution-unit scope, exclusive path envelope, and
-validation intent. Helpers
+available local Macro Task context, execution-unit scope, exclusive path
+envelope, and validation intent. Helpers
 return evidence or a scoped change proposal; they never edit or publish the
 Feature Plan, never access the SQLite ledger, never mutate GitHub, never create
 Feature Workers or planner tasks, and never own final delivery evidence. An

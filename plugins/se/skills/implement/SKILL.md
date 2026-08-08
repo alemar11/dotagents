@@ -17,7 +17,8 @@ Plan Set ID, sibling registry, title, search result, GitHub label, or native
 Issue Type.
 
 Each supplied parent issue must resolve to one complete, authoritative sibling
-Feature registry, and every selected Feature member must have:
+Feature registry. The selected parent Feature issue is the required semantic
+contract, and every selected Feature member must have:
 
 - `feature_plan_set_id`, revision, stable `feature_id`, repository identity,
   and complete hosted readback;
@@ -28,15 +29,22 @@ Feature registry, and every selected Feature member must have:
 - monotonic Feature acceptance high-water evidence;
 - resolved material questions, explicit assumptions, risks, and validation
   intent;
-- a complete Macro Task registry with one verified child Task issue per stable
-  `(parent_feature_id, macro_task_id)` pair;
 - Feature-level `blocked_by` readback to Feature IDs in the same set;
-- macro-local `blocked_by` readback to Macro Task IDs with the same
-  `parent_feature_id` only;
-- authoritative parent/child, registry, set-membership, and dependency
-  readback;
+- authoritative set-membership and Feature dependency readback;
 - a complete textual handoff that is ready for technical interpretation;
 - publication and readiness evidence.
+
+The local Macro Task registry and hosted child Task issues are optional
+planning projections for Implement. Classify their observed availability as
+`complete`, `partial`, or `absent`. Validate and use every unambiguous local
+projection that exists, but a missing registry entry, missing child issue, or
+unreadable child projection does not block implementation when the parent
+Feature semantic contract is sufficient. Quarantine an extra, duplicate,
+cross-set, cross-parent, cyclic, or mismatched Task projection from execution
+and closure intent, record the exact degradation, and continue from the parent
+Feature contract unless that defect also makes Feature outcome, scope, F-AC,
+or Feature-level dependencies ambiguous. Never invent, repair, or publish a
+Task issue automatically.
 
 The caller may provide one optional `starting_branch` selection per target
 repository. This is a selectable invocation input, not Feature Plan content or
@@ -47,48 +55,62 @@ repository's authoritative provider default branch. A supplied branch must
 exist in the declared target repository; never silently substitute the default
 branch, another local branch, or the current checkout.
 
-The hosted Feature Plan Set and every local Macro Task projection reached from
-each supplied parent issue are required input, but they are planning
-projections rather than a technical execution graph. Read sibling registry
+The hosted Feature Plan Set and selected parent Feature semantic contract are
+required input. Local Macro Task projections are useful planning context, not
+an implementation gate or a technical execution graph. Read sibling registry
 entries only to validate set consistency and dependency context; do not expand
 the implementation selection beyond the caller-supplied parent issue refs.
 Feature-level `blocked_by` relations express hard outcome dependencies and may
 cross repositories. Implement projects every same-repository edge as mandatory
 stack intent and every cross-repository edge as scheduling-only.
 Macro `blocked_by` relations are local to one `parent_feature_id` and remain
-eligible for technical internalization. An authoritative technical Task
-dependency graph, T-AC identifiers, or automatic plan-repair result is not
-required input.
+eligible for technical internalization when their projections are available.
+An authoritative technical Task dependency graph, published T-AC identifiers,
+or automatic plan-repair result is not required input.
 Implement derives internal execution units, implementation dependencies, safe
 path envelopes, and runtime waves from the set and each Feature registry
 during Prepare Run. Those units belong to the Implement control plane and are
 not silently sent back to Feature for ordinary technical clarification.
 
+Implement also derives deterministic `T-AC-NN` technical criteria for the
+assignment. Each T-AC maps to one or more current F-AC identities and may only
+specialize how those Feature criteria are demonstrated. A T-AC must never
+replace, weaken, delete, or reinterpret an F-AC, or change the Feature outcome,
+scope, non-goals, or dependency topology. Preserve T-AC identities across
+candidate revisions in the assignment and bind their evidence to the current
+exact HEAD. Every F-AC must have direct exact-HEAD evidence or coverage through
+one or more mapped T-AC criteria.
+
 Do not start from an isolated Macro Task, an isolated technical Task, local
-draft, Idea, unbounded request, or preview-only plan. If the plan has a
-product-level contradiction or an
-unresolved material question, pause the affected assignment for one explicit
-user decision and report the exact question. Do not create a hidden planner
-task or automatically invoke se:feature.
+draft, Idea, unbounded request, or preview-only plan. Implement resolves
+ordinary technical ambiguity, missing execution decomposition, and acceptance
+specificity autonomously. Pause the affected assignment at `plan-question` and
+report the exact conflict only when no semantic-preserving implementation is
+possible: F-AC contradict each other or the outcome, satisfying them requires
+changing outcome or scope, Feature dependencies are contradictory or cyclic,
+or a selected Feature is blocked by an unselected or unfulfilled Feature. Keep
+independent Features moving. Do not create a hidden planner task or
+automatically invoke se:feature.
 
 The expected terminal output is one verified pull-request delivery topology
 with exactly one PR output per implementation-eligible selected Feature.
-Return a complete mapping from each Feature ID, its local Macro Tasks, and its
-derived execution units to its repository, Feature branch, exact HEAD, PR
-reference, and standalone or stacked relationship. Bind every Feature
-acceptance criterion and every local Macro Task outcome to evidence on the
-same final candidate HEAD. Any technical execution-unit acceptance identities
-are Implement-owned evidence and never rewrite the hosted Plan Set or Macro
-Task registries.
+Return a complete mapping from each Feature ID, its available local Macro Task
+projections, and its derived execution units to its repository, Feature branch,
+exact HEAD, PR reference, and standalone or stacked relationship. Bind every
+Feature acceptance criterion and derived T-AC to evidence on the same final
+candidate HEAD. Map available Macro Task outcomes as planning context, but do
+not make missing projections an acceptance gate. T-AC identities are
+Implement-owned evidence and never rewrite the hosted Plan Set or Macro Task
+registries.
 
 Complete means every implementation-eligible Feature has a verified
 standalone-ready or stack-ready PR output on its current exact HEAD, all
-required Feature criteria and local Macro Task coverage are verified against
-that HEAD, the PR/base/stack topology is read back, and current CI and hosted
+required Feature criteria and derived T-AC coverage are verified against that
+HEAD, the PR/base/stack topology is read back, and current CI and hosted
 review evidence contain no unresolved actionable feedback. Branch protection,
 rulesets, mergeability policy, merge queues, and auto-merge are outside the
 Implement completion contract and may only be reported as optional provider
-diagnostics. The Feature's registry-derived closing set is still read back as
+diagnostics. The Feature's source-derived closing set is still read back as
 PR-body publication intent; GitHub's `closingIssuesReferences` field is an
 optional provider diagnostic and never a completion gate. A Feature with no exclusive
 implementation delta must not receive an empty commit, empty PR, cosmetic
@@ -186,14 +208,14 @@ workflow transitions.
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |
 | intake | action | explicit implementation or resume request with one or more exact parent Feature issue refs | source-preflight, blocked | none | none |
-| source-preflight | validation | every supplied parent issue and its complete Feature Plan Set projection are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
+| source-preflight | validation | every supplied parent Feature semantic contract and its dependency context are readable; Macro projection state is classified | runtime-preflight, blocked | hosted | none |
 | runtime-preflight | validation | plans, target repositories, and selected or default starting branches are known and refreshable | prepare-run, blocked | read | none |
 | prepare-run | action | required roles, destinations, refreshed base snapshots, and plan interpretation are ready | schedule, blocked | durable | none |
 | schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | Feature Worker identity, worktree, verified sibling/Macro coverage, derived execution units, and plan criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
-| plan-question | decision | a product-level plan contradiction or decision is explicit | schedule, assignment-deferred, blocked | none | none |
+| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
+| plan-question | decision | a semantic conflict requires user authority because no contract-preserving implementation exists | schedule, assignment-deferred, blocked | none | none |
 | candidate | validation | Feature Worker reports a committed candidate HEAD with plan criteria evidence | native-review, assignment-blocked, blocked | read, durable | none |
 | native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to the current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
@@ -286,16 +308,18 @@ nodes, Feature members, or ledger assignments.
 
 Source-preflight resolves only the exact caller-supplied parent issue refs,
 then reads each authoritative Feature Plan Set manifest, its hosted sibling
-registry, and the selected Feature's local Macro Task children. It verifies
-set identity/revision, distinct Feature membership, repository identity,
-Feature criteria, Feature-level `blocked_by`, each selected local Macro Task
-registry, one-to-one parent/child issue mapping, parent/child relations,
-same-parent-only macro dependencies, publication readback, resolved questions,
-and plan status. Sibling entries are consistency and dependency evidence only;
-they never enlarge the selected implementation set. A missing, extra,
-duplicate, cross-set, cross-parent, cyclic, or mismatched identity blocks
-before worker creation. GitHub labels and native Issue Types are never read or
-evaluated.
+registry, the selected parent Feature semantic contract, and any reachable
+local Macro Task children. It verifies set identity/revision, distinct Feature
+membership, repository identity, outcome, scope, non-goals, Feature criteria,
+Feature-level `blocked_by`, publication readback, resolved questions, and plan
+status. Sibling entries are consistency and dependency evidence only; they
+never enlarge the selected implementation set. Classify Macro projections as
+`complete`, `partial`, or `absent`; validate and use verified local children,
+quarantine malformed or foreign projections, and report the degradation
+without blocking when the parent semantic contract remains sufficient. A
+contradictory or cyclic Feature dependency topology, or an ambiguous parent
+semantic contract, blocks before worker creation. GitHub labels and native
+Issue Types are never read or evaluated.
 Runtime-preflight independently verifies every selected repository, project,
 current checkout, required application roles, and the G-owned workflows
 needed for the run. For each repository, it resolves the caller-selected
@@ -306,18 +330,21 @@ fetched local ref is never freshness evidence. The detailed refresh,
 drift, and worker-bootstrap rules are owned by
 [orchestration.md](references/orchestration.md).
 
-Prepare Run uses the Feature Plan Set and each local Macro Task registry as
-the complete macro planning context, then translates each Feature into a
+Prepare Run uses the Feature semantic contract and every available verified
+local Macro Task projection as planning context, then translates each Feature into a
 transient set of technical implementation units. A unit has an observable
 technical outcome, repository scope, allowed-path proposal, validation
 intent, dependencies that are real implementation prerequisites, and evidence
-linking it back to one Feature criterion and one or more local Macro Tasks.
+linking it back to one or more Feature criteria and, when applicable, available
+local Macro Tasks. Derive stable `T-AC-NN` criteria that specialize the F-AC
+evidence expected from those units.
 Feature-level `blocked_by` relations do not become technical execution-unit
 edges, but repository identity controls their delivery projection. Every
 same-repository edge is mandatory stack intent and every cross-repository edge
 is scheduling-only. Macro `blocked_by` relations are advisory and
 same-parent-only; the orchestrator may combine, reorder, or internalize them
-while preserving every Macro Task outcome and Feature criterion. These units
+while preserving every available Macro Task outcome and every Feature
+criterion. These units
 are not copied into the hosted plan by default and are not a reason to rerun
 Feature.
 
@@ -338,24 +365,29 @@ Plan Set relation that creates mandatory stack intent; Implement still derives
 technical execution edges independently and must verify the exact parent
 ancestry before child publication.
 
-When implementation reveals a missing product decision, enter plan-question
-and present the bounded question to the user. Preserve the worker, worktree,
-branch, and useful evidence when safe. If the user explicitly decides that the
-published plan must change, stop the affected assignment and report a new
-se:feature request as the recovery action; do not create that planner task
-automatically and do not let independent Features wait.
+When implementation reveals a semantic contradiction that cannot be resolved
+without changing outcome, scope, F-AC, or Feature dependencies, enter
+plan-question and present the bounded conflict to the user. Preserve the
+worker, worktree, branch, and useful evidence when safe. Do not escalate
+missing Macro decomposition, ordinary technical ambiguity, or the need for
+more specific technical acceptance criteria. If the user explicitly decides
+that the published semantic contract must change, stop the affected assignment
+and report a new se:feature request as the recovery action; do not create that
+planner task automatically and do not let independent Features wait.
 
 ## Feature Worker and review boundary
 
-Each Feature Worker owns one authoritative Feature member, its complete local
-Macro Task set, one verified implementation worktree, one branch, and one
+Each Feature Worker owns one authoritative Feature member, its observed Macro
+projection state and available local Task context, one verified implementation
+worktree, one branch, and one
 eventual PR. It owns technical design, code, tests, validation, candidate
 evidence, exact-HEAD native review, and fixes. It binds every Feature
-acceptance criterion and every local Macro Task outcome to evidence on the
-same candidate SHA. It never owns a sibling Feature or its Tasks.
-Macro Tasks are not worker or PR boundaries. Internal execution-unit criteria
-may be used for worker control, but they are not durable Feature or Macro Task
-requirements unless the user explicitly publishes a revised plan.
+acceptance criterion and every derived T-AC to evidence on the same candidate
+SHA, and maps available local Macro Task outcomes as contextual coverage. It
+never owns a sibling Feature or its Tasks.
+Macro Tasks are not worker or PR boundaries. Derived T-AC and execution-unit
+criteria are assignment-scoped worker evidence, not durable Feature or Macro
+Task requirements, and may only specialize the published F-AC contract.
 
 Any HEAD change invalidates prior acceptance, validation, and review evidence.
 The worker repeats the required checks and review at the new exact HEAD. The
@@ -439,10 +471,12 @@ Return one aggregate report with:
 
 - every caller-supplied parent issue ref and its authoritative Feature Plan Set
   and Feature/repository member;
-- every verified local Macro Task registry and parent/child Task identity;
+- the Macro projection state (`complete`, `partial`, or `absent`), every
+  verified local parent/child Task identity, and every quarantined defect;
 - every Feature-level dependency and its scheduling/technical interpretation;
-- every derived execution unit and its Feature-criterion/Macro mapping;
-- local Macro Task coverage and its mapping to final Feature evidence;
+- every derived execution unit and its F-AC/T-AC mapping plus any available
+  Macro context;
+- every T-AC and its mapping to final Feature evidence;
 - every Feature Worker identity and verified destination;
 - every repository's requested or default starting branch, refreshed full base
   SHA, and the worktree-bootstrap readback bound to that SHA;
@@ -450,15 +484,15 @@ Return one aggregate report with:
 - candidate, `delivery-pending @ candidate-published`, Worker resumption,
   review, publication, CI, stack, and exact-HEAD evidence;
 - Feature acceptance evidence bound to each final candidate SHA;
-- one registry-derived `closing_issue_refs` set per Feature containing only
-  that Feature and every associated local Macro Task, plus exact PR-body
+- one source-derived `closing_issue_refs` set per Feature containing only that
+  parent Feature and every verified existing associated local Macro Task, plus exact PR-body
   closure-intent readback; any GitHub `closingIssuesReferences` observation is
   optional diagnostic evidence and never a gate;
 - aggregate outcome complete, deferred, or blocked.
 
 Never claim completion while an eligible Feature lacks a verified PR,
-current exact-HEAD evidence, verified Feature acceptance coverage, or verified
-Macro Task coverage.
+current exact-HEAD evidence, or verified F-AC and derived T-AC coverage. A
+reported `partial` or `absent` Macro projection is not by itself incomplete.
 
 ## Terminal meanings
 

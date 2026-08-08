@@ -17,11 +17,12 @@ clean and pinned to that candidate before review. Do not create a reviewer task
 or a second review worktree.
 
 The authoritative requirements remain the current published Feature Plan Set,
-the selected Feature member, and its stable F-AC-NN criteria. The hosted local
-Macro Task registry and child Task issues are durable macro-planning
-projections of that same Feature outcome;
+the selected parent Feature semantic contract, and its stable F-AC-NN
+criteria. The hosted local Macro Task registry and child Task issues are
+durable macro-planning projections of that same Feature outcome. Implement
+records their observed availability as `complete`, `partial`, or `absent`;
 they are not technical execution units, T-AC-NN records, worker assignments,
-or PR boundaries.
+PR boundaries, or an acceptance gate when the parent contract is sufficient.
 
 For a dependency-bearing assignment, also freeze the exact prerequisite HEAD
 vector and prove every member is an ancestor of the candidate. The candidate's
@@ -66,11 +67,12 @@ are not required by final verification and are not assignment statuses.
 Implement terminates with a PR published and verified on its exact HEAD. The PR
 may remain open; merge, the effective closure of the Feature and its Macro
 Tasks, and every post-merge activity are outside this workflow. The
-`closing_issue_refs` values are closure intent derived from the verified local
-registry: the parent Feature plus every associated Macro Task. They become
-effective only when GitHub merges the PR.
+`closing_issue_refs` values are closure intent derived from authoritative
+hosted identities: the parent Feature plus every verified existing associated
+local Macro Task. A missing or quarantined projection is reported and never
+invented. They become effective only when GitHub merges the PR.
 
-Preserve exact readback of the current PR HEAD, the PR body carrying registry-derived closure intent, the stack link, CI, and review evidence. If the
+Preserve exact readback of the current PR HEAD, the PR body carrying source-derived closure intent, the stack link, CI, and review evidence. If the
 provider exposes `closingIssuesReferences`, record it as optional diagnostic
 evidence only; it never affects a workflow transition, does not authorize
 merge, and does not imply that the Feature or Macro Tasks are already closed.
@@ -98,7 +100,7 @@ portable marker and full SHA still passes the same final gate.
 | Starting-branch refresh and exact base snapshot | G-owned branch transport; the orchestrator owns selection and bootstrap gating | Exact repository, caller-selected or provider-default branch, authoritative upstream tip, fast-forward-only or isolated-ref refresh evidence, and full base SHA readback before worktree creation. |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; Feature Worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Feature-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; Feature Worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
-| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and Feature publication scope; derive `closing_issue_refs` from that Feature's verified local registry, then read back repository, base, branch, full PR HEAD, URL, canonical body/closure intent, and draft state. Any `closingIssuesReferences` field is optional diagnostic readback only. |
+| One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and Feature publication scope; derive `closing_issue_refs` from the parent and verified existing local Task projections, then read back repository, base, branch, full PR HEAD, URL, canonical body/closure intent, and draft state. Any `closingIssuesReferences` field is optional diagnostic readback only. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
 | Ready transition or issue linkage | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | Branch protection, rulesets, mergeability policy, merge queue, and auto-merge | Outside Implement completion | Do not invoke or require these policy surfaces; any supplied observation is diagnostic only and cannot block completion. |
@@ -131,31 +133,33 @@ Publish only after native review is clean and the exact publication scope is
 resolved from the explicit Implement request.
 
 For every implementation-eligible Feature, derive
-`closing_issue_refs` deterministically from that Feature's verified local
-hosted registry:
+`closing_issue_refs` deterministically from that parent Feature and the
+verified existing subset of its local hosted Task projections:
 
 ```text
 closing_issue_refs =
-  [this parent Feature issue] + [every Macro Task child issue owned by this Feature]
+  [this parent Feature issue] + [every verified existing Macro Task child issue owned by this Feature]
 ```
-This parent Feature and every associated local Macro Task are one closed
-planning set. There is no per-Task opt-out, no Worker-supplied closure list,
-and no one-to-one requirement between Macro Tasks and technical execution
-units. Sibling Features and their Tasks are never included. Implement may
-combine, distribute, or otherwise realize local Macro Tasks through its
-internal execution graph, but the final candidate must cover every local Macro
-Task outcome and every criterion for this Feature.
+This parent Feature and every verified existing associated local Macro Task
+form the source-derived closure set. There is no per-Task opt-out among those
+verified refs, no Worker-supplied closure list, and no one-to-one requirement
+between Macro Tasks and technical execution units. Sibling Features and their
+Tasks are never included. Implement may combine, distribute, or otherwise
+realize available local Macro Tasks through its internal execution graph, but
+the final candidate is gated by every F-AC and derived T-AC for this Feature,
+not by an absent Macro projection.
 
-Require every local registry entry to resolve to one real,
-repository-unambiguous child issue under this exact parent Feature. Reject a
-missing, extra, duplicate, cross-parent, cross-Feature, or ambiguous registry
-ref instead of silently changing the closing set. Never invent closure refs
-from narrative text, include a sibling Feature, or close an Idea or unrelated
-source issue.
+Include only a real, repository-unambiguous child issue verified under this
+exact parent Feature. Quarantine and report a missing, extra, duplicate,
+cross-parent, cross-Feature, or ambiguous Task projection instead of treating
+it as closure authority. A `partial` or `absent` projection does not block PR
+publication when the parent Feature semantic contract is sufficient. Never
+invent closure refs from narrative text, include a sibling Feature, or close
+an Idea or unrelated source issue.
 
 Pass the verified set unchanged to the G-owned single-PR publication workflow.
 G renders the canonical closing lines and reads back the exact body and
-registry-derived closure intent. The provider's `closingIssuesReferences`
+source-derived closure intent. The provider's `closingIssuesReferences`
 field is not a stable pre-merge contract for stacked PRs: it may be empty,
 partial, or unavailable while the PR is still based on an intermediate branch.
 Record that field when available, but never require it to equal
@@ -174,7 +178,7 @@ Independently read back repository, base, branch, full PR HEAD, URL, canonical
 body/closure intent, and draft state. Optionally record GitHub
 `closingIssuesReferences` as provider diagnostics; an empty, partial, or
 unavailable value is non-blocking. Verify the PR body carries the exact
-registry-derived closure intent. The PR HEAD must equal the reviewed candidate
+source-derived closure intent. The PR HEAD must equal the reviewed candidate
 HEAD.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
@@ -212,7 +216,7 @@ unreconciled link blocks only that assignment while independent work continues.
 For a standalone PR, complete publication readback establishes
 `candidate-published`. For a stacked PR, require both publication readback and
 successful stack reconciliation first. Record the exact repository, PR, base
-and head branches, candidate full SHA, registry-derived closure intent and
+and head branches, candidate full SHA, source-derived closure intent and
 PR-body readback, and any parent PR, parent full SHA, stack position, and link
 receipt. A provider `closingIssuesReferences` observation may be retained as
 diagnostic evidence but is not required for this checkpoint.
@@ -296,9 +300,9 @@ The orchestrator performs read-only final verification. Require:
 
 - exact caller-supplied parent issue ref, Feature Plan Set ref/revision,
   selected Feature ID, repository, and complete hosted sibling readback;
-- exact Feature-level registry/dependency readback plus the local Macro Task
-  registry, one-to-one child Task readback, parent/child relations, and
-  same-parent-only macro dependency readback;
+- exact Feature-level registry/dependency readback plus Macro projection state
+  (`complete`, `partial`, or `absent`), every verified existing local child,
+  and every quarantined projection defect;
 - Feature-level scheduling evidence and the repository-sensitive projection
   that justifies standalone or stacked delivery;
 - exact current F-AC-NN set with no missing, duplicate, malformed, or
@@ -309,16 +313,18 @@ The orchestrator performs read-only final verification. Require:
 - clean implementation worktree and exact current HEAD;
 - a complete acceptance matrix for every F-AC-NN whose evidence is bound to
   the same exact current candidate HEAD;
-- complete Macro Task coverage evidence bound to the same exact current
-  candidate HEAD;
+- deterministic T-AC-NN criteria, their F-AC mapping, and complete exact-HEAD
+  evidence without replacing or weakening any F-AC;
+- available Macro Task contextual coverage evidence bound to the same exact
+  current candidate HEAD;
 - current-head validation and native review evidence;
 - current-head CI evidence with no failing or pending applicable checks;
 - evidence that final verification started from
   `delivery-pending @ candidate-published`, plus the exact Worker handoff and
   any later resumption lineage;
 - PR publication readback and exact PR HEAD equality;
-- the exact Feature-local registry-derived `closing_issue_refs` set containing
-  this parent Feature and every associated local Macro Task, with the same
+- the exact Feature-local source-derived `closing_issue_refs` set containing
+  this parent Feature and every verified existing associated local Macro Task, with the same
   closure intent read back from the PR body and no sibling or unrequested
   source closure; GitHub `closingIssuesReferences`, when available, is
   diagnostic only and cannot block final verification;
@@ -337,22 +343,25 @@ When every requirement passes for the same exact HEAD, persist
 `delivery-pending @ candidate-published` unless a repair, rebase, plan question,
 or blocker changes assignment ownership.
 
-Aggregate every current F-AC-NN and every local Macro Task through the Feature
-Worker evidence map and retain the exact candidate SHA. Any uncovered,
-unverified, stale, or ambiguous criterion or local Macro Task outcome prevents
-delivery readiness. A planning-only local Macro Task status of `blocked`
-caused by another local Macro Task does not block delivery by itself once the
-final candidate covers this Feature outcome. A Feature-level `blocked_by`
+Aggregate every current F-AC-NN and derived T-AC-NN through the Feature Worker
+evidence map and retain the exact candidate SHA. Every F-AC must have direct
+evidence or one or more mapped T-AC criteria, and every T-AC must have
+exact-HEAD proof. An uncovered, unverified, stale, or ambiguous criterion
+prevents delivery readiness. Map every available local Macro Task outcome as
+context, but a `partial` or `absent` projection and a planning-only local Macro
+Task status of `blocked` do not block delivery once the final candidate covers
+the Feature semantic contract. A Feature-level `blocked_by`
 relation controls stack intent or cross-repository scheduling, but it does not
 add a sibling to this PR's closing set. This acceptance verification is
 evidence-only and never edits the Feature Plan Set or any registry.
 
 On recovery, use the assignment's stored worker_task_id and candidate_sha to
 reread the Feature Worker's final acceptance matrix. Accept it only when its
-Feature Plan Set ref, Feature ID, complete local Macro Task registry, complete
-F-AC-NN set, set/plan revision, and candidate SHA exactly match current
-authoritative state. Feature membership or local Macro Task registry drift, or
-worker-report invisibility, invalidates the matrix.
+Feature Plan Set ref, Feature ID, observed Macro projection state, complete
+F-AC-NN set, T-AC mapping, set/plan revision, and candidate SHA exactly match
+current authoritative state. Feature membership or semantic-contract drift,
+an unreported Macro projection change, or worker-report invisibility
+invalidates the matrix.
 
 Return repairable evidence mismatches to the Feature Worker without diagnosis.
 The Feature Worker owns repair and replacement evidence. Final verification

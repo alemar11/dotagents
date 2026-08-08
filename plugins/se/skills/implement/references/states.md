@@ -67,14 +67,14 @@ the whole run, one assignment, or the current invocation.
 | Node | Scope | Description |
 | --- | --- | --- |
 | `intake` | Run | Accept one or more exact caller-supplied parent Feature issue refs for implementation or resume. |
-| `source-preflight` | Run | Resolve only the supplied parent issues and verify their Plan Sets, selected Feature members, Macro Tasks, registries, and relations without GitHub label or Issue Type metadata. |
+| `source-preflight` | Run | Resolve only the supplied parent issues, verify each parent Feature semantic contract and Feature dependencies, and classify Macro projections as complete, partial, or absent without GitHub label or Issue Type metadata. |
 | `runtime-preflight` | Run | Verify repositories, destinations, required roles, required G-owned workflows, and each selected or default starting branch's refreshability. |
 | `prepare-run` | Run | Derive assignments, refreshed base snapshots, execution units, path envelopes, dependencies, and delivery topology. |
 | `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
 | `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
 | `worker-bootstrap` | Assignment | Create or resume the Feature Worker and bind its destination, worktree, branch, and verified exact base. |
-| `implement-validate` | Assignment | Implement and validate the complete Feature outcome or surface one bounded product question. |
-| `plan-question` | Assignment | Present one product decision that requires explicit user authority. |
+| `implement-validate` | Assignment | Derive technical units and T-AC, then implement and validate the complete Feature semantic contract. |
+| `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
 | `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence. |
 | `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker. |
 | `review-decision` | Assignment | Send a clean candidate to publication or return actionable findings for repair. |
@@ -82,7 +82,7 @@ the whole run, one assignment, or the current invocation.
 | `stack-reconcile` | Assignment | Verify the immediate parent, base, ancestry, stack order, and link for a stacked PR. |
 | `candidate-published` | Assignment | Verify that PR publication and any required stack link match the exact candidate HEAD. |
 | `delivery-monitor` | Run | Observe ready transition, hosted review, CI, and stack drift for published assignments. |
-| `final-verify` | Assignment | Verify all exact-HEAD acceptance, review, CI, topology, and registry-derived closure-intent evidence. |
+| `final-verify` | Assignment | Verify exact-HEAD F-AC/T-AC, review, CI, topology, Macro projection reporting, and source-derived closure-intent evidence. |
 | `assignment-blocked` | Assignment | Record a non-authority blocker while independent assignments continue. |
 | `assignment-deferred` | Assignment | Record a user-authority wait while independent assignments continue. |
 | `release-claims` | Run | Atomically release all Feature claims after every assignment is delivery-ready and operations are resolved. |

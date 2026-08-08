@@ -437,20 +437,30 @@ Idea.
 
 ### Implement handoff
 
-Only a complete published Feature Plan Set and its verified sibling/Macro
-projections are implementation input. Implement reads the authoritative set,
+Feature must publish and reconcile the complete Feature Plan Set and every
+planned child projection before it can report its own workflow complete. At
+the Implement handoff, however, each published parent Feature issue is the
+required semantic contract; its Macro Task children are useful planning
+projections rather than an implementation gate. Implement may classify those
+projections as `complete`, `partial`, or `absent`, report any degradation, and
+derive missing execution coverage from outcome, scope, and F-AC without
+creating or repairing Task issues. Implement reads the authoritative set,
 projects same-repository Feature `blocked_by` as mandatory stack intent and
 cross-repository Feature `blocked_by` as scheduling-only, re-evaluates real
-technical prerequisites, and derives technical execution units, path
-envelopes, and runtime waves in its own control plane. It may combine, reorder,
-or internalize Macro Task dependencies while preserving every Macro outcome
-and Feature criterion. It creates one Feature Worker and one PR per
+technical prerequisites, and derives technical execution units, stable
+assignment-scoped T-AC criteria, path envelopes, and runtime waves in its own
+control plane. It may combine, reorder, or internalize available Macro Task
+dependencies while preserving every Feature criterion and available Macro
+outcome. A T-AC may specialize an F-AC but never replace, weaken, or change it.
+It creates one Feature Worker and one PR per
 implementation-eligible Feature member. A same-repository child may start from
 its parent's verified `candidate-published` exact HEAD before that parent is
 delivery-ready. Technical interpretation remains in Implement. A product-level
-contradiction is reported to the user as a bounded plan question; Implement
-must not create an automatic plan-repair planner for ordinary implementation
-detail.
+contradiction that cannot be resolved without changing outcome, scope, F-AC,
+or Feature dependencies is reported to the user as a bounded plan question;
+missing task decomposition, technical ambiguity, and acceptance specificity
+remain autonomous Implement work. Implement must not create an automatic
+plan-repair planner for ordinary implementation detail.
 
 ## Transient state and terminal report
 

@@ -34,17 +34,18 @@ assignment state and live Feature Worker or path-claim modes.
         topology: bounded-feature-worker-support
     topology: orchestrator-with-feature-workers-and-optional-support
 
-The orchestrator coordinates one or more authoritative Feature Plan Sets and
-their verified sibling/Macro projections, then derives transient technical
-execution units for each Feature. It also owns central exact-head PR
+The orchestrator coordinates one or more authoritative parent Feature semantic
+contracts and their verified sibling context, records each Macro projection as
+`complete`, `partial`, or `absent`, then derives transient technical execution
+units and assignment-scoped T-AC criteria for each Feature. It also owns central exact-head PR
 monitoring, stack-wide parent-drift reconciliation, assignment state, and
 aggregate completion. The Feature Worker owns one complete
-Feature member, its complete local Macro Task set, its derived execution
-units, one verified repository/project destination, one isolated worktree,
-and one PR.
+Feature member, its observed Macro projection and available local Task context,
+its derived execution units and T-AC criteria, one verified repository/project
+destination, one isolated worktree, and one PR.
 
 The Feature Worker chooses technical design, implements and validates the
-derived units, binds Feature acceptance criteria to the final exact HEAD, and
+derived units, binds F-AC and mapped T-AC criteria to the final exact HEAD, and
 runs native review in the same task and worktree. Review is a phase of the
 Feature Worker lifecycle, not another role or task.
 
