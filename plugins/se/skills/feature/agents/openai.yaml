@@ -2,6 +2,6 @@ interface:
   display_name: "📚 Feature Planning"
   short_description: "Turn related requests into clear Features and coherent Macro Tasks."
   brand_color: "#BE185D"
-  default_prompt: "Use $se:feature to analyze one or more related requests, describe each Feature from evidence, ask material questions together, create separate Features when outcomes are genuinely distinct, use vertical Macro Tasks when the outcome supports clean slices, and publish the plan by default without writing code."
+  default_prompt: "Use $se:feature to analyze one or more related requests, describe each Feature from evidence, ask material questions together, create separate Features when outcomes are genuinely distinct, use vertical Macro Tasks when the outcome supports clean slices, and publish the plan by default without writing code. Treat native GitHub Issue Types as optional publication metadata."
 policy:
   allow_implicit_invocation: false

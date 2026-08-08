@@ -65,7 +65,7 @@ class StateReferenceTests(unittest.TestCase):
             for value in registry[family]:
                 self.assertIn(f"`{value}`", states)
 
-    def test_plugin_cli_and_runtime_contract_versions_are_aligned(self) -> None:
+    def test_plugin_cli_version_is_aligned_and_runtime_contract_is_stable(self) -> None:
         manifest = json.loads(
             (PLUGIN / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
         )
@@ -83,7 +83,7 @@ class StateReferenceTests(unittest.TestCase):
         ).stdout)
 
         self.assertEqual(manifest["version"], version)
-        self.assertEqual(capabilities["runtime_contract_version"], version)
+        self.assertEqual(capabilities["runtime_contract_version"], "3.1.1")
 
 
 if __name__ == "__main__":

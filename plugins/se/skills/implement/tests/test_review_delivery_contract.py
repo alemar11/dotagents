@@ -8,6 +8,7 @@ SKILL = Path(__file__).resolve().parents[1] / "SKILL.md"
 PREFLIGHT = Path(__file__).resolve().parents[3] / "references/codex-dependency-preflight.md"
 TASK_PROFILE = Path(__file__).resolve().parents[1] / "references/task-profile.md"
 RUN_STATE = Path(__file__).resolve().parents[1] / "references/run-state.md"
+STATES = Path(__file__).resolve().parents[1] / "references/states.md"
 
 
 class ReviewDeliveryContractTests(unittest.TestCase):
@@ -21,13 +22,29 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn('title_template: "🛠️ Feature Worker · <Feature outcome>"', profile)
         self.assertIn("For every Feature member, bootstrap exactly one Feature Worker", orchestration)
         self.assertIn("executes its derived units in deterministic prerequisite order", " ".join(orchestration.split()))
-        self.assertIn("The hosted Feature Plan Set and every local Macro Task projection are required input", " ".join(skill.split()))
+        self.assertIn("The hosted Feature Plan Set and every local Macro Task projection reached from", " ".join(skill.split()))
         self.assertIn("one verified child Task issue per stable", skill)
         self.assertIn("Exactly one assignment may exist per claimed Feature", run_state)
         self.assertIn(
             "must not receive an empty commit, empty PR, cosmetic change, or artificial proof",
             " ".join(skill.split()),
         )
+
+    def test_issue_refs_are_the_only_selection_input_and_metadata_is_ignored(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+
+        self.assertIn("caller-supplied GitHub parent issue references", skill)
+        self.assertIn("selected implementation set is exactly those parent issues", skill)
+        self.assertIn("never enlarge the selected implementation set", skill)
+        self.assertIn(
+            "Do not read, search, infer, validate, mutate, or gate on them",
+            skill,
+        )
+        self.assertIn("resolves only the exact caller-supplied parent issue refs", orchestration)
+        self.assertIn("never expand the selected implementation set", orchestration)
+        self.assertIn("without GitHub label or Issue Type metadata", states)
 
     def test_feature_worker_support_delegation_is_optional_and_parent_owned(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
@@ -104,6 +121,27 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("The parent may remain `delivery-pending`", orchestration_normalized)
         self.assertNotIn("Task-only", normalized)
         self.assertIn("this parent Feature and every associated local Macro Task", normalized)
+
+    def test_starting_branch_is_selectable_refreshed_and_frozen_before_bootstrap(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        run_state = " ".join(RUN_STATE.read_text(encoding="utf-8").split())
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+
+        self.assertIn("optional `starting_branch` selection per target repository", skill)
+        self.assertIn("authoritative provider default branch", skill)
+        self.assertIn("never silently substitute the default branch", skill)
+        self.assertIn("Before every standalone or root Feature Worker bootstrap wave", orchestration)
+        self.assertIn("refresh the selected branch from its authoritative upstream", orchestration)
+        self.assertIn("must be fast-forward-only", orchestration)
+        self.assertIn("never mix two starting SHAs inside one bootstrap wave", orchestration)
+        self.assertIn("initial base resolves to the frozen `base_sha`", orchestration)
+        self.assertIn("stacked child instead starts from its verified immediate parent's", orchestration)
+        self.assertIn("existing assignment `base_branch` and `base_sha` fields", run_state)
+        self.assertIn("requires no table, schema, runtime-contract, envelope, or CLI-behavior change", run_state)
+        self.assertIn("selected starting branch", reference)
+        self.assertIn("verified exact base", states)
 
     def test_feature_plan_set_scheduling_and_per_feature_closure_are_explicit(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")

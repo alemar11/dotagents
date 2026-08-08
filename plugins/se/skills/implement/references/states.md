@@ -66,13 +66,13 @@ the whole run, one assignment, or the current invocation.
 
 | Node | Scope | Description |
 | --- | --- | --- |
-| `intake` | Run | Accept an explicit implementation or resume request for published Feature Plan Sets. |
-| `source-preflight` | Run | Verify the hosted Plan Sets, Feature members, Macro Tasks, registries, and relations. |
-| `runtime-preflight` | Run | Verify repositories, destinations, required roles, and required G-owned workflows. |
-| `prepare-run` | Run | Derive assignments, execution units, path envelopes, dependencies, and delivery topology. |
+| `intake` | Run | Accept one or more exact caller-supplied parent Feature issue refs for implementation or resume. |
+| `source-preflight` | Run | Resolve only the supplied parent issues and verify their Plan Sets, selected Feature members, Macro Tasks, registries, and relations without GitHub label or Issue Type metadata. |
+| `runtime-preflight` | Run | Verify repositories, destinations, required roles, required G-owned workflows, and each selected or default starting branch's refreshability. |
+| `prepare-run` | Run | Derive assignments, refreshed base snapshots, execution units, path envelopes, dependencies, and delivery topology. |
 | `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
-| `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start. |
-| `worker-bootstrap` | Assignment | Create or resume the Feature Worker and bind its destination, worktree, branch, and base. |
+| `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
+| `worker-bootstrap` | Assignment | Create or resume the Feature Worker and bind its destination, worktree, branch, and verified exact base. |
 | `implement-validate` | Assignment | Implement and validate the complete Feature outcome or surface one bounded product question. |
 | `plan-question` | Assignment | Present one product decision that requires explicit user authority. |
 | `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence. |
@@ -140,7 +140,7 @@ outcomes for the current invocation but remain resumable run statuses.
 
 | Checkpoint | Description |
 | --- | --- |
-| `worker-bootstrap` | Worker identity, destination, worktree, branch, and base are the last durable recovery boundary. |
+| `worker-bootstrap` | Worker identity, destination, worktree, branch, refreshed base branch, and exact base SHA are the last durable recovery boundary. |
 | `native-review` | A committed candidate exists and exact-HEAD native review is the last durable recovery boundary. |
 | `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
 | `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |

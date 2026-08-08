@@ -53,16 +53,26 @@ Its skills are deliberately separated by responsibility:
   orchestrator, and Feature Worker task identity, then applies the established
   SE Implement emoji-title grammar with authoritative readback and at most one
   bounded correction before monitoring; titles remain display metadata.
-- skills/implement/ accepts one or more complete authoritative GitHub Feature
-  Plan Sets with verified sibling Feature/Macro projections and returns a
+- skills/implement/ accepts one or more explicit GitHub parent Feature issue
+  references, verifies their authoritative Feature Plan Set and local Macro
+  projections, and returns a
   verified standalone or stacked PR topology. Its graph owns Feature-level
   scheduling, derives technical execution units from each Feature and its
   local Macro Tasks, creates one isolated Sol Feature Worker and one PR per
   implementation-eligible Feature, and may use bounded delegated support
   assignments for code analysis, execution-unit assistance, validation, or
   critique when delegation and capacity are observed; otherwise the parent
-  Worker continues serially. The Worker performs exact-HEAD in-session review
-  and the workflow handles stack reconciliation and final exact-HEAD evidence.
+  Worker continues serially. Implement selects exactly the parent Feature
+  issues supplied by the caller and never discovers, selects, validates, or
+  gates Features through GitHub labels or Issue Types. Sibling registries are
+  read for consistency and dependency evidence, not to expand the selected
+  implementation set. The caller may select a starting branch per
+  target repository; otherwise Implement uses that repository's provider
+  default. The orchestrator refreshes and freezes the selected branch's exact
+  upstream tip before each root worker wave and verifies every isolated
+  worktree against that base before implementation begins. The Worker performs
+  exact-HEAD in-session review and the workflow handles stack reconciliation
+  and final exact-HEAD evidence.
   Every same-repository Feature dependency is mandatory stack intent, while a
   cross-repository dependency remains scheduling-only and standalone. A
   stacked child may begin from its parent's verified `candidate-published`
@@ -111,9 +121,11 @@ Its skills are deliberately separated by responsibility:
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by
-  default; it never creates a container issue. Explicit preview remains local
-  and non-durable. Hosted publication requires G preflight and read-after-write
-  verification.
+  default; it never creates a container issue. Native GitHub Issue Types are
+  optional publication metadata: Feature applies `Feature` and `Task` when the
+  repository supports them, while absent or unavailable types never block the
+  semantic publication. Explicit preview remains local and non-durable. Hosted
+  publication requires G preflight and read-after-write verification.
 - Feature maintenance is an alternate entry into the same Plan Set graph:
   it rehydrates the existing sibling Features, reconciles an explicit
   indication, and republishes the revised projections when requested. It does

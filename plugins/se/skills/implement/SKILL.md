@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement or resume published Feature Plans. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
+description: "Implement or resume only the published Features named by caller-supplied GitHub issue references, from refreshed selected base branches. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
 ---
 
 # Implement Feature Plan Sets
@@ -8,13 +8,20 @@ description: "Implement or resume published Feature Plans. Deliver each Feature 
 ## Input and output invariant
 
 Use this skill only for an explicit request to implement or resume one or more
-published SE Feature Plan Sets from GitHub. Every selected set must resolve to
-one complete, authoritative sibling Feature registry, and every selected
-Feature member must have:
+published SE Features identified by caller-supplied GitHub parent issue
+references. The caller must provide one or more exact issue URLs or
+repository-qualified issue IDs; an unqualified numeric issue ID is valid only
+when one target repository is already unambiguous. The selected implementation
+set is exactly those parent issues. Never discover or auto-add a Feature from a
+Plan Set ID, sibling registry, title, search result, GitHub label, or native
+Issue Type.
+
+Each supplied parent issue must resolve to one complete, authoritative sibling
+Feature registry, and every selected Feature member must have:
 
 - `feature_plan_set_id`, revision, stable `feature_id`, repository identity,
   and complete hosted readback;
-- one authoritative parent Feature issue of type Feature;
+- the exact authoritative parent issue reference supplied by the caller;
 - an observable outcome, scope, and non-goals;
 - a usable landing state, ownership boundary, and delivery reason;
 - stable Feature acceptance criteria using F-AC-NN identities;
@@ -26,16 +33,28 @@ Feature member must have:
 - Feature-level `blocked_by` readback to Feature IDs in the same set;
 - macro-local `blocked_by` readback to Macro Task IDs with the same
   `parent_feature_id` only;
-- authoritative parent/child, issue-type, registry, set-membership, and
-  dependency readback;
+- authoritative parent/child, registry, set-membership, and dependency
+  readback;
 - a complete textual handoff that is ready for technical interpretation;
 - publication and readiness evidence.
 
-The hosted Feature Plan Set and every local Macro Task projection are required
-input, but they are planning projections rather than a technical execution
-graph. Feature-level `blocked_by` relations express hard outcome dependencies
-and may cross repositories. Implement projects every same-repository edge as
-mandatory stack intent and every cross-repository edge as scheduling-only.
+The caller may provide one optional `starting_branch` selection per target
+repository. This is a selectable invocation input, not Feature Plan content or
+durable configuration. An unqualified value is valid only when every selected
+Feature targets one repository; a multi-repository run requires each override
+to be repository-qualified. When an override is omitted, resolve that
+repository's authoritative provider default branch. A supplied branch must
+exist in the declared target repository; never silently substitute the default
+branch, another local branch, or the current checkout.
+
+The hosted Feature Plan Set and every local Macro Task projection reached from
+each supplied parent issue are required input, but they are planning
+projections rather than a technical execution graph. Read sibling registry
+entries only to validate set consistency and dependency context; do not expand
+the implementation selection beyond the caller-supplied parent issue refs.
+Feature-level `blocked_by` relations express hard outcome dependencies and may
+cross repositories. Implement projects every same-repository edge as mandatory
+stack intent and every cross-repository edge as scheduling-only.
 Macro `blocked_by` relations are local to one `parent_feature_id` and remain
 eligible for technical internalization. An authoritative technical Task
 dependency graph, T-AC identifiers, or automatic plan-repair result is not
@@ -95,11 +114,17 @@ Read the canonical human-readable [state model](references/states.md) before
 interpreting a workflow node, persisted status/checkpoint pair, operation
 result, provider disposition, runtime-only mode, or output label.
 
-Before the mandatory first GitHub Feature Plan, issue, PR, review, label, or
-relation read or write, load the shared G dependency preflight. All GitHub
+Before the mandatory first GitHub Feature Plan, issue, PR, review, or relation
+read or write, load the shared G dependency preflight. All GitHub
 transport, hosted mutation safety, publication, and read-after-write
 verification belong to G-owned workflows. The explicit Implement request
 implicitly authorizes only the exact selected plan and delivery writes.
+
+GitHub labels and native Issue Types are outside the Implement input and state
+model. Do not read, search, infer, validate, mutate, or gate on them. Semantic
+Feature identity comes only from each caller-supplied parent issue reference
+plus its structured body, Plan Set registry, and verified parent/child
+relations.
 
 Do not require or invoke $g:github-delivery-status as an Implement completion
 gate. Use the focused G-owned PR publication, CI, review, and stack workflows
@@ -160,10 +185,10 @@ workflow transitions.
 
 | node_id | kind | entry condition | transitions | side effects | terminal state |
 | --- | --- | --- | --- | --- | --- |
-| intake | action | explicit implementation or resume request with one or more published Feature Plan Set refs | source-preflight, blocked | none | none |
-| source-preflight | validation | complete Feature Plan Sets and selected Features are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
-| runtime-preflight | validation | plans and target repositories are known | prepare-run, blocked | read | none |
-| prepare-run | action | required roles, destinations, and plan interpretation are ready | schedule, blocked | durable | none |
+| intake | action | explicit implementation or resume request with one or more exact parent Feature issue refs | source-preflight, blocked | none | none |
+| source-preflight | validation | every supplied parent issue and its complete Feature Plan Set projection are readable from the authoritative hosted source | runtime-preflight, blocked | hosted | none |
+| runtime-preflight | validation | plans, target repositories, and selected or default starting branches are known and refreshable | prepare-run, blocked | read | none |
+| prepare-run | action | required roles, destinations, refreshed base snapshots, and plan interpretation are ready | schedule, blocked | durable | none |
 | schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
@@ -259,17 +284,27 @@ nodes, Feature members, or ledger assignments.
 
 ## Plan interpretation and orchestration
 
-Source-preflight reads the authoritative Feature Plan Set manifest and every
-hosted sibling Feature with its local Macro Task children. It verifies set
-identity/revision, distinct Feature membership, repository identity, Feature
-criteria, Feature-level `blocked_by`, each local Macro Task registry,
-one-to-one parent/child issue mapping, parent/child relations, issue types,
-same-parent-only macro dependencies, publication readback, resolved
-questions, and plan status. A missing, extra, duplicate, cross-set,
-cross-parent, cyclic, or mismatched identity blocks before worker creation.
+Source-preflight resolves only the exact caller-supplied parent issue refs,
+then reads each authoritative Feature Plan Set manifest, its hosted sibling
+registry, and the selected Feature's local Macro Task children. It verifies
+set identity/revision, distinct Feature membership, repository identity,
+Feature criteria, Feature-level `blocked_by`, each selected local Macro Task
+registry, one-to-one parent/child issue mapping, parent/child relations,
+same-parent-only macro dependencies, publication readback, resolved questions,
+and plan status. Sibling entries are consistency and dependency evidence only;
+they never enlarge the selected implementation set. A missing, extra,
+duplicate, cross-set, cross-parent, cyclic, or mismatched identity blocks
+before worker creation. GitHub labels and native Issue Types are never read or
+evaluated.
 Runtime-preflight independently verifies every selected repository, project,
 current checkout, required application roles, and the G-owned workflows
-needed for the run.
+needed for the run. For each repository, it resolves the caller-selected
+`starting_branch` or the authoritative provider default, verifies its upstream
+identity, refreshes the branch state used for isolated worktree creation, and
+freezes the resulting full tip SHA. Current checkout state or a previously
+fetched local ref is never freshness evidence. The detailed refresh,
+drift, and worker-bootstrap rules are owned by
+[orchestration.md](references/orchestration.md).
 
 Prepare Run uses the Feature Plan Set and each local Macro Task registry as
 the complete macro planning context, then translates each Feature into a
@@ -402,12 +437,15 @@ and hosted delivery state before another side effect.
 
 Return one aggregate report with:
 
-- the authoritative Feature Plan Set and every Feature/repository member;
+- every caller-supplied parent issue ref and its authoritative Feature Plan Set
+  and Feature/repository member;
 - every verified local Macro Task registry and parent/child Task identity;
 - every Feature-level dependency and its scheduling/technical interpretation;
 - every derived execution unit and its Feature-criterion/Macro mapping;
 - local Macro Task coverage and its mapping to final Feature evidence;
 - every Feature Worker identity and verified destination;
+- every repository's requested or default starting branch, refreshed full base
+  SHA, and the worktree-bootstrap readback bound to that SHA;
 - execution waves, path-overlap evidence, and deferred or blocked assignments;
 - candidate, `delivery-pending @ candidate-published`, Worker resumption,
   review, publication, CI, stack, and exact-HEAD evidence;

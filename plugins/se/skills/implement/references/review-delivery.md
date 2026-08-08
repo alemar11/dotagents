@@ -35,11 +35,14 @@ delivery record still proves the exact parent branch, full HEAD, and ancestry;
 the relation never substitutes for Git evidence or creates technical
 execution-unit edges.
 
-Freeze one transient delivery record before review. A standalone candidate uses
-the verified default branch. A stacked candidate names exactly one immediate
-parent assignment and PR, the parent head branch, the exact parent candidate
-SHA used as base_sha, and its bottom-to-top position. Do not infer a parent from
-branch naming, plan order, display metadata, or operational serialization.
+Freeze one transient delivery record before review. A standalone or stack-root
+candidate uses the verified caller-selected starting branch, or the
+authoritative provider default branch when the caller omitted the selection,
+plus the exact refreshed base SHA used for worktree bootstrap. A stacked child
+names exactly one immediate parent assignment and PR, the parent head branch,
+the exact parent candidate SHA used as base_sha, and its bottom-to-top
+position. Do not infer a parent from branch naming, plan order, display
+metadata, or operational serialization.
 
 ## Delivery lifecycle boundary
 
@@ -92,11 +95,12 @@ portable marker and full SHA still passes the same final gate.
 
 | Operation | Semantic owner | Required authority and readback |
 | --- | --- | --- |
+| Starting-branch refresh and exact base snapshot | G-owned branch transport; the orchestrator owns selection and bootstrap gating | Exact repository, caller-selected or provider-default branch, authoritative upstream tip, fast-forward-only or isolated-ref refresh evidence, and full base SHA readback before worktree creation. |
 | Worktree inspection, scoped staging, and candidate commit | G-owned local Git workflow; Feature Worker owns the content and validation evidence | Authorized repository and paths; read back branch, clean worktree, full candidate HEAD, and staged scope. |
 | Feature-branch creation, checkout, or scoped rebase after parent drift | G-owned branch transport; Feature Worker owns conflict resolution and revalidation | Exact repository, source/base HEAD, target branch, resulting full HEAD, and a fresh validation record. |
 | One candidate branch push and draft PR create/update | G-owned single-PR publication workflow | Implicit authority from the explicit Implement request for the exact declared repository and Feature publication scope; derive `closing_issue_refs` from that Feature's verified local registry, then read back repository, base, branch, full PR HEAD, URL, canonical body/closure intent, and draft state. Any `closingIssuesReferences` field is optional diagnostic readback only. |
 | Link one child PR to one immediate parent PR | G-owned pairwise stack-link workflow, invoked separately after Send publication | Implicit authority from the explicit Implement request for the one derived parent/current pair; read back both identities, child base, stack order, and link receipt. |
-| Ready transition, issue linkage, labels, or type metadata | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
+| Ready transition or issue linkage | G-owned hosted publication or issue workflow for the exact operation | Implicit authority from the explicit Implement request for each declared mutation; read back the resulting state and bind it to the current full PR HEAD or issue identity. |
 | Branch protection, rulesets, mergeability policy, merge queue, and auto-merge | Outside Implement completion | Do not invoke or require these policy surfaces; any supplied observation is diagnostic only and cannot block completion. |
 | Hosted Codex review and actionable review-thread observation | G-owned review workflow, centrally coordinated by the Implement orchestrator | Reconcile against the current full PR HEAD; pending, stale, ambiguous, or draft-only evidence is non-terminal. Feature Workers do not poll while inactive. |
 | Merge, deploy, release, or post-merge closure | No Implement owner; outside this skill | Never perform these operations as part of Implement completion. |
@@ -159,8 +163,9 @@ Record that field when available, but never require it to equal
 The PR declares closure intent; GitHub closes this Feature and its local Macro
 Tasks only when the PR is merged. Implement does not merge or perform
 post-merge closure. The delivery mode, not Send, determines the intended base:
-a standalone candidate uses the verified default branch, while a stacked child
-uses the verified parent branch.
+a standalone or stack-root candidate uses the verified selected starting
+branch, defaulting to the authoritative provider default when omitted, while a
+stacked child uses the verified parent branch.
 
 Apply the shared hosted-content safety gate to the exact final PR title and
 body immediately before publication. Use the G-owned single-PR publication
@@ -289,11 +294,11 @@ work.
 
 The orchestrator performs read-only final verification. Require:
 
-- exact Feature Plan Set ref/revision, selected Feature ID, repository, and
-  complete hosted sibling readback;
+- exact caller-supplied parent issue ref, Feature Plan Set ref/revision,
+  selected Feature ID, repository, and complete hosted sibling readback;
 - exact Feature-level registry/dependency readback plus the local Macro Task
-  registry, one-to-one child Task readback, parent/child relations, issue
-  types, and same-parent-only macro dependency readback;
+  registry, one-to-one child Task readback, parent/child relations, and
+  same-parent-only macro dependency readback;
 - Feature-level scheduling evidence and the repository-sensitive projection
   that justifies standalone or stacked delivery;
 - exact current F-AC-NN set with no missing, duplicate, malformed, or
@@ -317,8 +322,9 @@ The orchestrator performs read-only final verification. Require:
   closure intent read back from the PR body and no sibling or unrequested
   source closure; GitHub `closingIssuesReferences`, when available, is
   diagnostic only and cannot block final verification;
-- standalone default-base evidence, or stacked parent identity, unchanged
-  parent HEAD, exact child base, stack order, and verified link receipt;
+- standalone selected-base evidence including refreshed branch and exact base
+  SHA, or stacked parent identity, unchanged parent HEAD, exact child base,
+  stack order, and verified link receipt;
 - ready-transition receipt plus a clean current-head automatic-review
   certificate for an unchanged initial HEAD, or the latest explicit-request
   receipt plus its clean current-head review result after one or more fix

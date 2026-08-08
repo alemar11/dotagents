@@ -12,9 +12,10 @@ contract to the exact final content. G owns transport and readback.
 
 ## Control plane
 
-The orchestrator coordinates one run containing one or more authoritative
-GitHub Feature Plan Sets and their verified sibling/Macro projections. Each
-Feature member retains its Feature ID, repository binding, one Feature
+The orchestrator coordinates one run containing one or more caller-supplied
+GitHub parent Feature issue refs and the authoritative Feature Plan Sets and
+Macro projections resolved from them. Each selected Feature member retains its
+Feature ID, repository binding, one Feature
 assignment, one complete local Macro Task set, one Feature Worker, and one PR
 output. The orchestrator derives technical execution units from the Feature
 and its local Macro Task registry before scheduling; the Plan Set does not
@@ -41,16 +42,59 @@ ledger transaction. A conflicting active claim blocks startup without partial
 claims or a competing orchestrator. Release all claims atomically after
 terminal reconciliation.
 
+## Starting-branch selection and freshness
+
+Treat `starting_branch` as an optional caller-owned selection scoped to one
+target repository. One unqualified selection is valid only for a
+single-repository run. For multiple repositories, require repository-qualified
+selections for every override; a repository without an override uses its own
+authoritative provider default branch. Resolve the selection during
+runtime-preflight and reject a missing, ambiguous, inaccessible, or
+wrong-repository branch. Never fall back silently to the provider default,
+current checkout, or another local branch after the caller supplied a value.
+
+Before every standalone or root Feature Worker bootstrap wave, refresh the
+selected branch from its authoritative upstream through the G-owned branch
+transport and read back its full remote tip SHA. The branch or ref used as the
+application-managed worktree starting state must equal that tip. A fetch-only
+receipt, stale remote-tracking ref, current checkout HEAD, or branch name
+without exact-SHA readback is insufficient. Updating the caller's active
+checkout is not required. Any local branch update used for bootstrap must be
+fast-forward-only and preserve unrelated or dirty checkout state; never merge,
+rebase, force-update, discard user changes, or change branches to manufacture
+freshness. When an exact refreshed starting ref cannot be established safely,
+block before creating a Feature Worker.
+
+Freeze the refreshed branch as the wave's `base_branch` and full `base_sha`.
+Every standalone or root assignment for the same repository in that wave must
+start from that exact snapshot. Re-read the authoritative branch tip
+immediately before each worktree creation. If it changed, stop the remaining
+bootstraps, refresh the snapshot, and recompute the unstarted wave; never mix
+two starting SHAs inside one bootstrap wave. After worktree creation, verify
+that its initial base resolves to the frozen `base_sha` before the Worker may
+write. A mismatch blocks that assignment without treating the task or
+worktree receipt as implementation progress.
+
+The selected starting branch applies to standalone assignments and the root
+of every same-repository stack. A stacked child instead starts from its
+verified immediate parent's `candidate-published` branch and exact candidate
+SHA. That parent base overrides the repository selection only for the child;
+it does not change the selected landing branch at the root of the stack.
+
 ## Macro plan interpretation and execution units
 
-The orchestrator reads the authoritative Feature Plan Set manifest and every
-hosted sibling Feature with its local Macro Task children before deriving a
-transient technical execution unit set. It verifies set identity/revision,
-Feature membership, Feature-level `blocked_by`, each local parent registry,
-one-to-one child issue mapping, parent/child relations, issue types, and
-same-parent-only macro dependencies. A missing, extra, duplicate,
-cross-parent, cyclic, or mismatched identity blocks the assignment before a
-worker starts.
+The orchestrator resolves only the exact caller-supplied parent issue refs,
+then reads the authoritative Feature Plan Set manifest, hosted sibling
+registry, and each selected Feature's local Macro Task children before deriving
+a transient technical execution unit set. It verifies set identity/revision,
+Feature membership, Feature-level `blocked_by`, each selected local parent
+registry, one-to-one child issue mapping, parent/child relations, and
+same-parent-only macro dependencies. Sibling entries provide consistency and
+dependency evidence but never expand the selected implementation set. A
+missing, extra, duplicate, cross-parent, cyclic, or mismatched identity blocks
+the assignment before a worker starts. GitHub labels and native Issue Types
+are outside this workflow and must not be read, searched, inferred, validated,
+mutated, or used as gates.
 
 Feature-level `blocked_by` relations are planning-owned hard outcome
 dependencies and may cross repositories. Repository identity controls their

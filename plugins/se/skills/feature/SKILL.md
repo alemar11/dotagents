@@ -212,11 +212,13 @@ questions belong to se:implement and do not restart Feature planning.
 ## Feature Plan contract
 
 The Feature Plan Set is the canonical semantic content. When published, each
-Feature member becomes one GitHub issue of type Feature. There is no hosted
-container issue. Each parent Feature carries the common Plan Set identity and
-revision, the set-membership manifest, its own Feature identity, and its own
-closed Macro Task registry. The type is metadata and does not carry the
-semantics.
+Feature member becomes one GitHub parent issue. There is no hosted container
+issue. Each parent Feature carries the common Plan Set identity and revision,
+the set-membership manifest, its own Feature identity, and its own closed Macro
+Task registry. Native GitHub Issue Types are optional metadata and do not carry
+the semantics: request `Feature` for parent issues and `Task` for child issues
+when those types are available, but absence or provider unavailability never
+blocks publication.
 
 The plan must contain:
 
@@ -408,9 +410,11 @@ Feature issue and from `(parent_feature_id, macro_task_id)` to child Task
 issue. The hosted projections must all report the same set identity and
 revision. A Feature-level edge may cross repositories; a Macro Task edge may
 not cross parent Features even in one repository. Publication is complete
-only when every parent registry, child issue, parent/child relation, issue
-type, and registry `blocked_by` value passes authoritative read-after-write
-verification.
+only when every parent registry, child issue, parent/child relation, and
+registry `blocked_by` value passes authoritative read-after-write verification.
+Read back native Issue Type metadata when the provider exposes it, but treat
+missing or unavailable types as non-blocking publication evidence rather than
+semantic plan failure.
 
 Each parent Feature plus every associated Macro Task issue forms one closed
 implementation issue set. A Feature's set never includes a sibling Feature or

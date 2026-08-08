@@ -19,7 +19,7 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.1.1` |
+| CLI | `3.3.0` |
 | Runtime contract | `3.1.1` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
@@ -84,6 +84,18 @@ Keep only five tables:
 
 Do not store plan bodies, prompts, messages, findings, logs, arbitrary
 JSON, model/reasoning profiles, code state, or Feature Worker technical state.
+
+The caller's optional `starting_branch` is transient invocation input scoped
+to one repository, not a new run field or durable configuration value. For a
+standalone or stack-root assignment, persist the resolved refreshed selection
+and exact upstream tip through the existing assignment `base_branch` and
+`base_sha` fields at `worker-bootstrap`. A stacked child continues to persist
+its immediate parent branch and exact candidate SHA in those fields. This
+requires no table, schema, runtime-contract, envelope, or CLI-behavior change;
+the shipped CLI version still follows the plugin release version.
+If a run resumes before any assignment captured the selection, recover it from
+the authoritative invocation context; when that evidence is unavailable or
+ambiguous, request the selection again or block instead of defaulting silently.
 
 Path claims are transient control-plane reservations, not a sixth ledger table.
 The orchestrator must normalize the union of the derived execution-unit path
@@ -204,9 +216,10 @@ runtime-contract, envelope, or CLI-version change.
 
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
-explicit state registry and capability readback are runtime-contract and CLI
-version `3.1.1`. The orchestrator remains the only ledger client and the only
-owner of delivery monitoring, Worker resumption, and aggregate completion.
+explicit state registry and capability readback remain runtime-contract
+version `3.1.1`; the shipped CLI version is `3.3.0`. The orchestrator remains
+the only ledger client and the only owner of delivery monitoring, Worker
+resumption, and aggregate completion.
 
 ## Recovery boundary
 
@@ -215,6 +228,13 @@ application tasks, worktrees, repositories, Feature Plan issues, PRs, and
 reviews. For stacked assignments, also re-read parent/child bases, full heads,
 stack order, and link state. Reconcile differences before another side effect.
 Ledger text never proves external state.
+
+For every standalone or stack-root assignment, also re-read the authoritative
+tip of its recorded `base_branch`. Before an unstarted Worker bootstrap,
+refresh and freeze a current wave snapshot as defined by orchestration. After
+a Worker exists, treat base drift as live reconciliation evidence; never
+rewrite `base_sha` or claim that the original worktree started current without
+verified branch transport and worktree readback.
 
 For an assignment recovered at `candidate-published`, verify the PR exact HEAD,
 publication and stack-link readback, Worker resumability, released path claim,

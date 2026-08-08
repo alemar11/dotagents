@@ -14,7 +14,7 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         self.assertIn("close that source Idea as completed", normalized_skill)
         self.assertIn("complete Feature Plan Set", normalized_skill)
         self.assertIn(
-            "Publish one parent issue of type Feature per Feature member",
+            "Publish one parent issue per Feature member",
             " ".join(publication.split()),
         )
         self.assertIn("authoritative read-after-write evidence", publication)
@@ -36,7 +36,15 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
 
         self.assertIn("closed set of Macro Tasks", normalized_skill)
         self.assertIn("one hosted child Task projection for every Macro Task", normalized_skill)
-        self.assertIn("one child issue of type Task per Macro Task", normalized_publication)
+        self.assertIn("one child issue per Macro Task", normalized_publication)
+        self.assertIn(
+            "Native GitHub Issue Types are optional publication metadata",
+            normalized_publication,
+        )
+        self.assertIn(
+            "missing or unavailable Issue Type metadata alone never blocks completion",
+            normalized_publication,
+        )
         self.assertIn("final set registry", normalized_publication)
         self.assertIn("one or more local Macro Tasks", normalized_validation)
         self.assertIn("cyclic reference", normalized_validation)
@@ -69,7 +77,7 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         ):
             self.assertIn(required, normalized_skill)
 
-        self.assertIn("one parent issue of type Feature per Feature member", normalized_publication)
+        self.assertIn("one parent issue per Feature member", normalized_publication)
         self.assertIn("same `parent_feature_id`", normalized_validation)
         self.assertIn("cross-parent", normalized_validation)
         self.assertIn("Feature-level `blocked_by` relations only between Feature IDs", normalized_convergence)
