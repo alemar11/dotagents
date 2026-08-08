@@ -13,12 +13,19 @@ from pathlib import Path
 from typing import Iterable
 
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 DEFAULT_INITIAL_VERSION = (0, 1, 0)
 TAG_APPLICATION_POLICY = "explicit-confirmation-required"
+TAG_APPLICATION_BLOCKED = "blocked-noncanonical"
 
 TAG_PATTERN = re.compile(
     r"^(?P<prefix>v?)(?P<major>0|[1-9][0-9]*)\."
+    r"(?P<minor>0|[1-9][0-9]*)\."
+    r"(?P<patch>0|[1-9][0-9]*)"
+    r"(?:-rc\.(?P<rc>[1-9][0-9]*))?$"
+)
+CANONICAL_APPLICATION_TAG_PATTERN = re.compile(
+    r"^v(?P<major>0|[1-9][0-9]*)\."
     r"(?P<minor>0|[1-9][0-9]*)\."
     r"(?P<patch>0|[1-9][0-9]*)"
     r"(?:-rc\.(?P<rc>[1-9][0-9]*))?$"
@@ -166,6 +173,41 @@ def parse_initial_version(value: str) -> Version:
     if parsed is None or not parsed.version.stable:
         raise ValueError("initial version must be a stable X.Y.Z or vX.Y.Z value")
     return parsed.version
+
+
+def validate_application_tag(raw: str) -> dict[str, object]:
+    value = raw
+    match = CANONICAL_APPLICATION_TAG_PATTERN.fullmatch(value)
+    if match is None:
+        return {
+            "format": "vX.Y.Z or vX.Y.Z-rc.N",
+            "mode": "validate",
+            "requested_tag": value,
+            "canonical": False,
+            "status": TAG_APPLICATION_BLOCKED,
+            "tag_application": TAG_APPLICATION_BLOCKED,
+            "reason": (
+                "tag applications must match exactly vX.Y.Z or vX.Y.Z-rc.N; "
+                "user confirmation cannot override this format gate"
+            ),
+        }
+
+    version = Version(
+        major=int(match.group("major")),
+        minor=int(match.group("minor")),
+        patch=int(match.group("patch")),
+        rc=int(match.group("rc")) if match.group("rc") else None,
+    )
+    return {
+        "format": "vX.Y.Z or vX.Y.Z-rc.N",
+        "mode": "validate",
+        "requested_tag": value,
+        "canonical": True,
+        "status": "canonical-format",
+        "kind": "candidate" if version.rc is not None else "final",
+        "tag": version.tag,
+        "tag_application": TAG_APPLICATION_POLICY,
+    }
 
 
 def main_suggestions(
@@ -366,7 +408,12 @@ def human_output(result: dict[str, object]) -> str:
         f"Mode: {result['mode']}",
         f"Tag application: {result['tag_application']}",
     ]
-    if result["mode"] == "main":
+    if result["mode"] == "validate":
+        lines.append(f"Requested tag: {result['requested_tag']}")
+        lines.append(f"Status: {result['status']}")
+        if result.get("reason"):
+            lines.append(f"Reason: {result['reason']}")
+    elif result["mode"] == "main":
         lines.append(f"Latest tag: {result['latest_tag'] or 'none (bootstrap)'}")
         for suggestion in result["suggestions"]:
             tag = suggestion["tag"] or "blocked"
@@ -397,7 +444,11 @@ def build_parser() -> argparse.ArgumentParser:
         description="Calculate canonical SemVer release-tag suggestions from Git tags."
     )
     parser.add_argument("--version", action="version", version=__version__)
-    parser.add_argument("--mode", choices=("main", "release", "migration"), required=True)
+    parser.add_argument(
+        "--mode",
+        choices=("main", "release", "migration", "validate"),
+        required=True,
+    )
     parser.add_argument(
         "--line",
         help="Release line for release mode: release/vX.Y.Z or vX.Y.Z",
@@ -405,6 +456,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--initial-version",
         help="Stable version to use for a tag-less main branch (defaults to v0.1.0)",
+    )
+    parser.add_argument(
+        "--application-tag",
+        help="Exact tag proposed for application; valid only with --mode validate",
     )
     parser.add_argument("--repo", default=".", help="Repository path when reading local tags")
     parser.add_argument(
@@ -419,6 +474,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run(args: argparse.Namespace) -> dict[str, object]:
+    if args.mode == "validate":
+        if not args.application_tag:
+            raise ValueError("--application-tag is required when --mode validate is selected")
+        if args.line or args.initial_version or args.tags or args.tags_file:
+            raise ValueError(
+                "validate mode accepts only --application-tag and does not read repository tags"
+            )
+        return validate_application_tag(args.application_tag)
+    if args.application_tag:
+        raise ValueError("--application-tag is only valid with --mode validate")
     if args.mode == "release" and not args.line:
         raise ValueError("--line is required when --mode release is selected")
     if args.mode == "migration" and (args.tags or args.tags_file):
@@ -449,7 +514,7 @@ def main() -> int:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         print(human_output(result))
-    return 0
+    return 2 if result.get("status") == TAG_APPLICATION_BLOCKED else 0
 
 
 if __name__ == "__main__":

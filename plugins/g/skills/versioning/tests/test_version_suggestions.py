@@ -18,7 +18,61 @@ class VersionSuggestionsTests(unittest.TestCase):
 
     def test_version_is_reported(self) -> None:
         completed = subprocess.run([str(SCRIPT), "--version"], check=True, capture_output=True, text=True)
-        self.assertEqual(completed.stdout.strip(), "1.0.0")
+        self.assertEqual(completed.stdout.strip(), "1.1.0")
+
+    def test_validate_accepts_only_canonical_stable_and_candidate_tags(self) -> None:
+        stable = self.run_cli(
+            "--mode",
+            "validate",
+            "--application-tag",
+            "v1.0.0",
+        )
+        candidate = self.run_cli(
+            "--mode",
+            "validate",
+            "--application-tag",
+            "v1.0.0-rc.10",
+        )
+
+        self.assertEqual(stable["status"], "canonical-format")
+        self.assertEqual(stable["kind"], "final")
+        self.assertEqual(candidate["status"], "canonical-format")
+        self.assertEqual(candidate["kind"], "candidate")
+        self.assertEqual(stable["tag_application"], "explicit-confirmation-required")
+
+    def test_validate_blocks_every_noncanonical_application_tag(self) -> None:
+        invalid_tags = (
+            "1.0.0",
+            "v1.0.0-beta",
+            "v1.0.0-alpha.1",
+            "v1.0.0-rc01",
+            "v1.0.0-rc.01",
+            "v1.0.0-RC.1",
+            "v1.0.0+build.1",
+            "refs/tags/v1.0.0",
+            " v1.0.0",
+            "v1.0.0 ",
+        )
+
+        for tag in invalid_tags:
+            with self.subTest(tag=tag):
+                completed = subprocess.run(
+                    [
+                        str(SCRIPT),
+                        "--json",
+                        "--mode",
+                        "validate",
+                        "--application-tag",
+                        tag,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(completed.returncode, 2)
+                result = json.loads(completed.stdout)
+                self.assertFalse(result["canonical"])
+                self.assertEqual(result["status"], "blocked-noncanonical")
+                self.assertEqual(result["tag_application"], "blocked-noncanonical")
 
     def test_main_suggests_patch_minor_and_major_from_rc(self) -> None:
         result = self.run_cli(

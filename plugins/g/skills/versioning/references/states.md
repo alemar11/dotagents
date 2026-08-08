@@ -15,10 +15,14 @@ from the selected mode, the current tags, and the requested release line.
 | `target-conflict` | Derived | The canonical target exists but resolves to a different commit; migration must stop. |
 | `source-missing` | Derived | The legacy source tag is listed but its commit object cannot be resolved locally. |
 | `nothing-to-migrate` | Derived | No stable legacy tags exist, so migration has no work. |
+| `canonical-format` | Derived | The exact requested application tag matches `vX.Y.Z` or `vX.Y.Z-rc.N`; availability and confirmation still require separate checks. |
+| `blocked-noncanonical` | Mutation gate | The requested application tag is outside the canonical format. Explain the mismatch and stop; confirmation can never authorize this tag. |
 | `confirmation-required` | Mutation gate | Any tag application needs explicit confirmation of the exact tag, operation, and commit. |
 | `invalid-input` | Transient error | The requested mode, line, or tag does not match the canonical contract. |
 
 `main` and `release` are selectable calculation modes, not persisted release
 states. The helper remains read-only in every state. Every JSON preview also
 reports `tag_application=explicit-confirmation-required`; a suggestion is not
-authorization to create or push a tag.
+authorization to create or push a tag. A validation failure instead reports
+`tag_application=blocked-noncanonical` and exits nonzero so automation fails
+closed.

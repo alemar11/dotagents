@@ -2,4 +2,4 @@ interface:
   display_name: "Versioning"
   short_description: "Preview context-aware SemVer tags and safe migrations"
   brand_color: "#0F766E"
-  default_prompt: "Use $g:versioning to validate the shared vX.Y.Z convention, calculate context-aware release suggestions, bootstrap tag-less repositories, or plan stable legacy-tag aliases; always request explicit confirmation before applying a tag."
+  default_prompt: "Use $g:versioning to validate the shared vX.Y.Z convention, calculate context-aware release suggestions, bootstrap tag-less repositories, or plan stable legacy-tag aliases; never apply a noncanonical tag even when requested or confirmed, and always request separate explicit confirmation before applying a canonical tag."

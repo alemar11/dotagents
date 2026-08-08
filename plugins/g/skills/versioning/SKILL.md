@@ -52,6 +52,32 @@ be migrated by adding `vX.Y.Z` at the exact same commit when that canonical tag
 does not already exist. The old tag remains untouched. All new release tags
 use the canonical form above.
 
+## Noncanonical application gate
+
+Before any tag can enter the confirmation or mutation path, validate the exact
+requested tag with `scripts/version-suggestions --mode validate
+--application-tag <tag> --json`. Only an exact `vX.Y.Z` or `vX.Y.Z-rc.N`
+result with status `canonical-format` may proceed.
+
+Treat every other spelling as `blocked-noncanonical`, including:
+
+- `1.0.0` without the required `v` prefix;
+- `v1.0.0-beta`, `v1.0.0-alpha.1`, or any prerelease other than `rc.N`;
+- `v1.0.0-rc01`, `v1.0.0-rc.01`, or `v1.0.0-RC.1`;
+- tags with build metadata or any additional suffix.
+
+Explain the mismatch and the two accepted formats. A canonical replacement may
+be offered as a new proposal, but never silently normalize the rejected input
+or treat authority for the rejected tag as confirmation of the replacement.
+The user must select the canonical tag and pass the normal preview and explicit
+confirmation gate again.
+
+This gate is not overridable. Never create, annotate, push, or delegate a
+noncanonical tag to `$g:github-releases`, even when the user insists, confirms
+the exact noncanonical spelling, or asks to preserve an existing project
+convention. Legacy tags without `v` remain read-only calculation or migration
+sources; they are never valid targets for a new tag application.
+
 ## Suggestion behavior
 
 The bundled `scripts/version-suggestions` helper reads local Git tags by
@@ -113,14 +139,20 @@ already asked generally to “release” or “create the tag”:
 
 1. Inspect the current branch, `HEAD`, local/remote tag view, and any explicit
    version or intent in the user's instructions.
-2. Select only the proposals relevant to that context: `main` gets patch,
+2. Validate the exact requested application tag. If it is
+   `blocked-noncanonical`, explain the failure and stop before confirmation or
+   mutation; user confirmation cannot override this result.
+3. Select only the proposals relevant to that context: `main` gets patch,
    minor, and major; `release/vX.Y.Z` gets the next candidate and final; a
    legacy migration gets only missing canonical aliases.
-3. Display a preview containing the context, exact tag, target commit, branch,
+4. Display a preview containing the context, exact tag, target commit, branch,
    and whether the operation is candidate, final, or migration.
-4. Ask for explicit confirmation of the exact tag and operation. Do not create,
+5. Ask for explicit confirmation of the exact tag and operation. Do not create,
    move, delete, or push a tag before that confirmation.
-5. After confirmation, use `$g:github-releases` for the tag/release mutation,
+6. Re-run the exact application-tag validation immediately before delegation.
+   If the result is not `canonical-format`, stop without performing a write.
+7. After confirmation and successful revalidation, use `$g:github-releases`
+   for the tag/release mutation,
    then verify the resulting ref and commit. A final tag and its release are
    separate operations and each must remain within the user's confirmed scope.
 
@@ -141,11 +173,14 @@ ask which release line or migration the user wants.
    the explicitly requested workflow and keep its status pending configuration.
 3. Run the helper in the correct mode and inspect its resolved `latest_tag`,
    `suggestions`, `migrations`, and status values.
-4. For migration, re-read the source and target refs immediately before the
+4. Validate the exact tag selected for application. A
+   `blocked-noncanonical` result is terminal for that request and must never be
+   handed to a mutation workflow.
+5. For migration, re-read the source and target refs immediately before the
    authorized create operation and require the target to be absent.
-5. For release publication, re-read the relevant branch and tags immediately
+6. For release publication, re-read the relevant branch and tags immediately
    before the authorized operation.
-6. Preserve exact tag and branch SHAs; reject an existing tag or a finalized
+7. Preserve exact tag and branch SHAs; reject an existing tag or a finalized
    release line.
 
 Examples from the skill directory:
@@ -156,6 +191,7 @@ scripts/version-suggestions --mode main --initial-version 2.3.0 --json
 scripts/version-suggestions --mode release --line release/v2.4.0 --json
 scripts/version-suggestions --mode main --tag v2.3.1-rc.2
 scripts/version-suggestions --mode migration --repo /path/to/project --json
+scripts/version-suggestions --mode validate --application-tag v2.4.0-rc.1 --json
 ```
 
 For deterministic automation or tests, pass one or more `--tag` values or a
@@ -164,6 +200,8 @@ read a real repository so it can resolve source commit SHAs.
 
 The command is read-only and exits successfully when a release line is
 finalized but has no available suggestions; the JSON status explains why.
+Validate mode exits nonzero with status `blocked-noncanonical` when the exact
+application tag violates the canonical format.
 
 ## References
 
