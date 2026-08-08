@@ -75,14 +75,24 @@ surface.
   same-repository edge is mandatory stack intent and a cross-repository edge
   is scheduling-only. Macro-local `blocked_by` remains planning-only and may be
   internalized by Implement while preserving every available Macro Task
-  outcome. Implement consumes each selected parent Feature as the required
-  semantic contract, treats hosted Macro Tasks as `complete`, `partial`, or
+  outcome. The Plan Set body and registries remain semantic authority for both
+  relation levels. After exact hosted identities exist, Feature must always
+  attempt one native GitHub `blocked by` projection per canonical edge:
+  parent Feature to parent Feature, including exact URLs across repositories,
+  and child Task to child Task only inside one parent Feature. A missing
+  attempt or terminal result blocks publication, but a recorded `failed`,
+  `unavailable`, or `unknown` provider result is a non-blocking warning and
+  never invalidates the body-backed graph. Implement consumes each selected
+  parent Feature as the required semantic contract, treats hosted Macro Tasks
+  as `complete`, `partial`, or
   `absent` planning projections, derives technical execution units and T-AC
   criteria internally, and returns a verified standalone or stacked PR
   topology. A degraded Macro projection is reported but does not block when
   outcome, scope, F-AC, and Feature dependencies remain sufficient. Implement
   may derive missing execution coverage from the parent contract but never
-  creates or repairs Task projections automatically.
+  creates or repairs Task projections or native issue dependencies
+  automatically. Native `blockedBy`/`blocking` state is diagnostic only in
+  Implement and never changes scheduling or stack intent.
   Implement must not create an automatic plan-repair planner for ordinary
   technical interpretation.
 - Keep one human-readable `references/states.md` in every bundled SE skill.
@@ -175,12 +185,15 @@ surface.
   adapter and G-owned issue workflow before any hosted mutation. Publication
   creates every sibling parent Feature, every local child Macro Task, their
   planning relations, and the final set registry readback without a container
-  issue. After each exact issue projection is final, delegate optional label
-  and native type selection to `g:github-tagger`; Feature must not preselect
-  metadata values. Preserve the tagger's smallest-set policy: zero or more
-  relevant labels and zero or one relevant type, with empty selections valid.
-  Preview is opt-in and must never be selected implicitly when publish
-  authority or G is unavailable.
+  issue. After identities are final, attempt every exact native Feature and
+  same-parent Macro dependency through `g:github-issues`, recording one
+  verified, no-op, failed, unavailable, or unknown result per edge. Native
+  failure does not downgrade a complete semantic publication. Then delegate
+  optional label and native type selection to `g:github-tagger`; Feature must
+  not preselect metadata values. Preserve the tagger's smallest-set policy:
+  zero or more relevant labels and zero or one relevant type, with empty
+  selections valid. Preview is opt-in and must never be selected implicitly
+  when publish authority or G is unavailable.
 - Keep Implement GitHub-backed end to end. It accepts authoritative published
   parent Feature semantic contracts with verified sibling context, tolerates
   `complete`, `partial`, or `absent` Macro projections, derives technical
@@ -223,15 +236,17 @@ surface.
   planning relations, each local Macro Task registry, same-parent-only macro
   relations, the question-batch wait boundary, optional delegation fallback,
   publication-before-hosted-access, parent/child publication and readback,
-  reconciliation to `complete` or `blocked`, and the absence of side effects
-  or outgoing edges on terminal nodes.
+  mandatory native-dependency attempts for every canonical edge, non-blocking
+  native failure outcomes, reconciliation to `complete` or `blocked`, and the
+  absence of side effects or outgoing edges on terminal nodes.
 - Validate Idea default-publish/explicit-preview routing, Learn's local-only
   boundary, and Implement's mandatory hosted-source and PR-output path.
 - Validate Implement registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges, and
   the delivery gate, Feature-level scheduling, optional Feature Worker
   delegation fallback, exact sibling readback, degraded Macro projection
-  tolerance, per-Feature source-derived closing sets, deterministic
+  tolerance, diagnostic-only native dependency drift without repair or gates,
+  per-Feature source-derived closing sets, deterministic
   same-repository stack intent, F-AC-to-T-AC evidence mapping,
   `candidate-published` child unblocking, orchestrator-owned delivery
   monitoring, resumable Worker repair, and stack-reconcile paths.

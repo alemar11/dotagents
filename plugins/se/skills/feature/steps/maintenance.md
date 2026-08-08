@@ -38,11 +38,16 @@ semantic change into Analysis.
 For an existing-source route, run the shared G dependency preflight before the
 first hosted rehydration read. Rehydrate the authoritative Feature Plan Set,
 every sibling Feature, each local Macro Task registry, child Task identities,
-and both Feature-level and macro-local planning relations. Reject missing,
-duplicate, cross-set, cross-parent, or cyclic relations. Do not rehydrate or
-infer technical execution units, technical dependencies, or implementation
-state. An unclear, contradictory, foreign, or missing target transitions to
-blocked with the smallest recovery input.
+both Feature-level and macro-local planning relations, and each current native
+GitHub dependency result. Reject missing, duplicate, cross-set, cross-parent,
+or cyclic semantic relations. Preserve the prior semantic graph as ownership
+evidence for an explicit dependency-removal attempt during publication; never
+infer ownership or planning intent from provider metadata alone. A failed or
+missing native projection is reported but does not invalidate a complete body
+and registry. Do not rehydrate or infer technical execution units, technical
+dependencies, or implementation state. An unclear, contradictory, foreign, or
+missing semantic target transitions to blocked with the smallest recovery
+input.
 
 Maintenance uses the same analysis, critic, question-batch, convergence, plan,
 validation, and publication path as a new Plan Set. It does not create a

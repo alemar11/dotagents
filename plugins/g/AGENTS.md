@@ -51,6 +51,10 @@ unversioned, or belongs to another repository.
   skills or provider-owned metadata. GitHub Tagger may interpret the current
   provider-owned taxonomy or propose a minimal evidence-backed extension when
   explicitly requested, but proposal mode must remain read-only.
+- Keep native issue dependencies in `github-issues` as exact provider-identity
+  operations. One operation owns one directed blocked-issue/blocker edge,
+  supports cross-repository blockers by URL, and verifies both `blockedBy` and
+  reciprocal `blocking` readback. Composing planners own why the edge exists.
 - Do not add a second Git/GitHub transport or move publication policy into the
   shared helper. Preserve explicit authority for every GitHub mutation.
 - Treat plugin caches as verification surfaces, never editable sources.

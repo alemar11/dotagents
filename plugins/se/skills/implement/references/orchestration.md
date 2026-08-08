@@ -100,6 +100,14 @@ topology ambiguous. Never create or repair hosted Task projections. GitHub
 labels and native Issue Types are outside this workflow and must not be read,
 searched, inferred, validated, mutated, or used as gates.
 
+When native GitHub issue dependencies are observable, compare `blockedBy` and
+reciprocal `blocking` with the body-backed Feature and Macro graphs. Treat the
+native relation as diagnostic projection evidence only. A missing, failed,
+unavailable, unknown, extra, or stale provider edge is reported without
+blocking or changing scheduling, stack intent, execution units, or closure.
+Never infer a semantic edge from provider metadata and never repair a native
+dependency during Implement.
+
 Feature-level `blocked_by` relations are planning-owned hard outcome
 dependencies and may cross repositories. Repository identity controls their
 deterministic delivery projection: every same-repository edge is mandatory

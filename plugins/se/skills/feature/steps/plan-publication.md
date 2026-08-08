@@ -16,14 +16,15 @@ outputs:
   - frozen-plan
   - feature-plan-set-projection
   - macro-task-projection
+  - native-issue-dependency-projection
   - run_mode
   - publication-evidence
   - source-idea-lifecycle-evidence
 transitions:
   - to: complete
-    when: explicit-preview-is-frozen-or-publish-is-verified
+    when: explicit-preview-is-frozen-or-semantic-publish-is-verified-and-native-attempt-results-are-recorded
   - to: blocked
-    when: publish-operation-or-readback-cannot-be-verified
+    when: semantic-publish-cannot-be-verified-or-native-attempt-result-is-missing
 stop_if:
   - plan-is-not-ready
   - publication-target-is-ambiguous
@@ -49,10 +50,27 @@ Publish one parent issue per Feature member through the G-owned hosted issue
 workflow. Never publish a Feature Plan Set container or integration issue.
 Then publish one child issue per Macro Task, link each child to its own parent
 Feature issue, and project Feature-level and macro-local planning `blocked_by`
-values into the set manifest, parent Feature bodies, and child Task bodies. Do
-not invent a provider-native blocker relation. Update every parent Feature
-projection with the final set membership, exact parent issue refs, local child
-issue refs, and registry after all parent and child identities are known.
+values into the set manifest, parent Feature bodies, and child Task bodies.
+Update every parent Feature projection with the final set membership, exact
+parent issue refs, local child issue refs, and registry after all parent and
+child identities are known.
+
+After those exact identities are verified, mirror every canonical planning
+edge through the G-owned native issue-dependency workflow:
+
+- for each Feature `A blocked_by B`, make parent Feature issue A natively
+  blocked by parent Feature issue B; use exact issue URLs when repositories
+  differ;
+- for each Macro Task `X blocked_by Y`, make child Task issue X natively
+  blocked by child Task issue Y only when both have the same
+  `parent_feature_id`.
+
+Invoke one deterministic edge operation at a time with
+`mutation_mode=apply`, `issue_operation=add-blocked-by`, the dependent issue as
+target, and the blocking issue as dependency. Preserve the Plan Set registry as
+semantic authority. The native dependency operation is a mandatory provider
+projection attempt, not a source from which planning edges may be inferred.
+Success is preferred but not a semantic publication gate.
 
 After every final parent and child projection, relation, and exact identity are
 verified, invoke `$g:github-tagger` separately for each exact issue with
@@ -82,7 +100,13 @@ For an existing-source maintenance route, reuse the exact Plan Set identity,
 Feature identities, parent Feature issues, and stable Macro Task identities
 from authoritative readback. Reconcile the existing sibling parent/child
 projections in place and never create a second Feature, a container issue, or
-a duplicate child set from local assumptions.
+a duplicate child set from local assumptions. Compare the prior authoritative
+semantic dependency graph, the revised graph, and current native dependencies.
+Add a missing desired edge. Remove an edge only when it was an SE-owned edge in
+the prior Plan Set and the explicit semantic revision removed it, using one
+`issue_operation=remove-blocked-by` handoff for that exact edge. A foreign or
+unattributed native dependency is never removed automatically; report it as
+provider drift without changing the semantic graph or blocking publication.
 
 Do not create technical execution-unit issues, technical dependency IDs,
 execution waves, or worker assignments here. Macro Task issues are durable
@@ -91,13 +115,26 @@ planning projections and are not one-to-one execution units.
 Verify every parent Feature issue, every child Task, every parent/child
 relation, every Feature identity, every parent issue ref, every registry
 `blocked_by` value, shared set identity/revision, and the final set registry
-with authoritative read-after-write evidence. Verify every tagger handoff has
-a reconciled result and retain its independently read-back final labels and
-type when it attempted a mutation. Publication is not complete while a Feature
-or Macro Task lacks its exact hosted identity, a Feature-level edge points
-outside the set, a Macro edge crosses a parent Feature, sibling projections
-disagree, or a tagger result remains unresolved; an empty optional metadata
-assignment alone never blocks completion.
+with authoritative read-after-write evidence. For every canonical dependency,
+always invoke one G-owned operation and attempt the dependent issue's native
+`blockedBy` readback plus the blocker's reciprocal `blocking` readback. Record
+one terminal result: `verified`, `no-op`, `failed`, `unavailable`, or `unknown`.
+A missing operation attempt or missing result is a workflow blocker; a
+`failed`, `unavailable`, or `unknown` native result is a non-blocking warning
+because the body and registry remain semantic authority. Verify every tagger
+handoff has a reconciled result and retain its independently read-back final
+labels and type when it attempted a mutation. Publication is not complete
+while a Feature or Macro Task lacks its exact hosted identity, a Feature-level
+edge points outside the set, a Macro edge crosses a parent Feature, sibling
+projections disagree, a dependency attempt is absent, or a tagger result
+remains unresolved. An empty optional metadata assignment alone never blocks
+completion. Native dependency failure alone also never blocks completion.
+
+If one dependency mutation fails after earlier edges succeeded, preserve every
+verified receipt and make one bounded readback attempt for the failed edge.
+Record the resulting failure or uncertainty and continue; never replay the
+full graph, retry an ambiguous mutation blindly, or create duplicate issues to
+recover a relationship failure.
 
 Verify every hosted operation with authoritative read-after-write evidence.
 Retain the calculated plan when publication fails and report the smallest
@@ -105,6 +142,7 @@ recovery input. Do not silently downgrade a default publish to preview.
 
 When one exact hosted Idea is the source, close that Idea with reason
 completed only after the complete Feature Plan Set, every sibling Feature,
-every Macro Task projection, the final registry, all authoritative readbacks,
-and every required tagger handoff reconcile. Preview and ambiguous source
-identity never close an Idea.
+every Macro Task projection, the final registry, all semantic readbacks, every
+native dependency attempt result, and every required tagger handoff reconcile.
+A failed native dependency result alone is non-blocking. Preview and ambiguous
+source identity never close an Idea.

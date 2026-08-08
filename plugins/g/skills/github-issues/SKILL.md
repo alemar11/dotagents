@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Manage individual GitHub issues and their lifecycle. Use when the exact content, label, type, comment, state, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
+description: Manage individual GitHub issues and their lifecycle. Use when the exact content, label, type, comment, state, native dependency, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
 ---
 
 # GitHub Issues
@@ -14,7 +14,10 @@ Connector calls and local-only commands do not use shell escalation.
 Prefer the required GitHub connector for supported remote reads and writes. Use
 `gh` for connector gaps. An authorized connector write may fall back
 automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+authentication and access succeed, and the transport switch is reported. A
+connector gap is safe for direct `gh` when the operation contains only exact
+provider identities, as with native issue dependencies, or when every
+free-form provider field is genuinely file-backed. Otherwise fail closed.
 When a connector gap requires direct `gh`, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
 immediately before that fallback. Connector-only operations do not require the
@@ -55,6 +58,20 @@ handles GitHub Issues lifecycle mechanics.
   Markdown bodies commonly contain backticks, `$...`, and fenced code.
 - Inspect current labels, issue type, state, and relationships before changing
   them.
+- Treat a native issue dependency as one directed edge: the exact target issue
+  is blocked by one exact blocker issue. Accept a repository-qualified number
+  or URL for the blocker; require an exact URL for a cross-repository edge.
+  Read `blockedBy` and `blocking` before mutation, skip an already-correct edge,
+  mutate one edge per operation, and require exact readback afterward.
+- Native dependency state is provider projection, not planning authority. Add
+  or remove only the exact caller-authorized edge. Never infer an edge from
+  issue order, titles, labels, types, parent/sub-issue hierarchy, or prose.
+- Return exactly one native dependency result per invocation: `verified` after
+  a successful mutation and reciprocal readback, `no-op` when pre-read already
+  proves the requested state, `failed` for a definite rejected mutation,
+  `unavailable` when the operation cannot be attempted, or `unknown` when an
+  attempted mutation or readback is inconclusive. The caller owns whether a
+  non-success result is a workflow gate.
 - When verifying native GitHub Issue Types with `gh issue view --json`, request
   `issueType`; do not request `type`, which is not a valid issue JSON field.
 - Do not create labels, close issues, or mutate issue relationships unless the
@@ -94,15 +111,18 @@ handles GitHub Issues lifecycle mechanics.
    - add or remove labels,
    - add comments,
    - attach parent/sub-issue relationships,
+   - add or remove one native `blocked by` issue dependency,
    - close only after the requested disposition is explicit,
    - reopen only when the requested transition is explicit.
 8. If any multi-issue publication step fails after a partial mutation, stop,
    verify the current tracker state, clean up temp files, and retry only the
-   missing or incorrect operations. Do not create duplicates from stale local
-   assumptions.
+   missing or incorrect issue operations. A native dependency invocation owns
+   one edge only: make one bounded readback after failure or ambiguity, return
+   its terminal result, and never replay the mutation blindly.
 9. Verify the changed issue or queue state after mutation.
-10. Report the issue URL/number, commands run or drafted, and any skipped
-    mutation.
+10. Report the issue URL/number, commands run or drafted, any skipped mutation,
+    and, for a dependency operation, its terminal result plus every available
+    exact `blockedBy`/`blocking` readback.
 
 ## Routing
 

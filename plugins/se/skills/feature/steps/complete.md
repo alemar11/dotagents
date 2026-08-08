@@ -3,7 +3,7 @@ node_id: complete
 kind: terminal
 purpose: report-the-complete-feature-plan-set-and-macro-projections
 entry_conditions:
-  - preview-is-frozen-or-publication-is-verified
+  - preview-is-frozen-or-semantic-publication-is-verified-and-native-attempt-results-are-recorded
 inputs:
   - feature-plan
   - feature-plan-set-registry
@@ -40,8 +40,9 @@ batch, validation intent, and Implement handoff.
 Include the selected preview or publish operation and its evidence. For
 published sets, include every parent Feature identity, every child Macro
 Task identity, the final set registry, the verified Feature/Macro boundaries,
-and the authoritative read-after-write results. Include exact source-Idea
-lifecycle evidence when a hosted Idea was promoted.
+every native dependency attempt and outcome, and the authoritative semantic
+plus available `blockedBy`/`blocking` read-after-write results. Include exact
+source-Idea lifecycle evidence when a hosted Idea was promoted.
 
 This node performs no publication, recovery, technical execution-unit
 creation, implementation planning, or worker scheduling. It reports the

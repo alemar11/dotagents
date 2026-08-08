@@ -147,6 +147,54 @@ gh issue edit <issue-number-or-url> --parent <parent-number-or-url>
 gh issue edit <issue-number-or-url> --remove-parent
 ```
 
+## Native Issue Dependencies
+
+Represent one directed dependency as `<blocked issue> blocked by <blocker
+issue>`. Normalize an add to `issue_operation=add-blocked-by` and a removal to
+`issue_operation=remove-blocked-by`. The exact blocked issue is the operation
+target; the exact blocker is a separate factual reference, never an option
+value. Use a full issue URL whenever the blocker is in another repository.
+
+Read both directions before mutation:
+
+```bash
+gh issue view <blocked-issue-number-or-url> --json number,url,blockedBy,blocking
+gh issue view <blocker-issue-number-or-url> --json number,url,blockedBy,blocking
+```
+
+If the exact edge already has the requested state, return a verified no-op. For
+an authorized missing edge, mutate only that edge:
+
+```bash
+gh issue edit <blocked-issue-number-or-url> --add-blocked-by <blocker-issue-number-or-url>
+gh issue edit <blocked-issue-number-or-url> --remove-blocked-by <blocker-issue-number-or-url>
+```
+
+Run only the command selected by `issue_operation`, then repeat both reads.
+Require the blocked issue's `blockedBy` set and the blocker's reciprocal
+`blocking` set to contain or omit the exact opposite URL as requested. A
+one-sided, missing, ambiguous, inaccessible, or stale readback is not success.
+
+Return exactly one terminal result for the edge:
+
+- `verified` after the mutation and both reciprocal reads prove the requested
+  state;
+- `no-op` when both pre-reads already prove the requested state;
+- `failed` when GitHub definitively rejects the mutation;
+- `unavailable` when capability, authentication, or access prevents an
+  operation attempt;
+- `unknown` when the mutation may have happened or reciprocal readback remains
+  inconclusive after one bounded reread.
+
+A composing workflow invokes and records each deterministic edge separately
+and owns whether a non-success result blocks its wider operation. This skill
+never replays an ambiguous mutation or reconciles a full dependency graph.
+Never infer native dependencies from titles, labels, issue types,
+parent/sub-issue hierarchy, body text, or plan order. Removing a provider edge
+requires explicit authority for that exact edge; a caller may not use broad
+reconciliation language to remove foreign relationships whose prior ownership
+is unproven.
+
 ## Comments
 
 Use `--body-file` for non-trivial comments.

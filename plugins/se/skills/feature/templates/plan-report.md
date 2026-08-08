@@ -74,6 +74,8 @@
 - parent Feature publication and set readback:
 - Macro Task child publication and local registry readback:
 - Feature-level dependency readback:
+- native Feature dependency attempt and `blockedBy`/`blocking` result:
+- native same-parent Task dependency attempt and `blockedBy`/`blocking` result:
 - delegated tagger result per issue, including final labels and type:
 - source-Idea lifecycle:
 - blockers:

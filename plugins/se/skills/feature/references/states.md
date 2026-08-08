@@ -20,7 +20,7 @@ transient and are never Feature, Macro Task, publication, or provider states.
 | `plan` | action | Compose the Feature Plan Set and each Feature's Macro Task registry. |
 | `plan-validation` | validation | Verify that the planning contract is complete and internally consistent. |
 | `plan-publication` | action | Freeze a preview or publish and verify the hosted planning projections. |
-| `complete` | terminal | Finish with a frozen preview or a publication verified by read-after-write evidence. |
+| `complete` | terminal | Finish with a frozen preview or a semantic publication verified by read-after-write evidence with one recorded native dependency result per edge. |
 | `blocked` | terminal | Stop because a required planning or publication contract needs a specific recovery input. |
 
 `current_node_id` contains exactly one node from this table. The question batch
@@ -54,6 +54,7 @@ represented by the transition from `plan-validation` and by `plan_status`.
 | `goal_status` | `active`, `complete`, `not-available` | goal runtime and report | Reports the optional goal lifecycle. Goal `complete` is not the Feature workflow node `complete`. |
 | delegation outcome | `parallel-analysis`, `serial-fallback`, `unavailable`, `unknown` | planner report | Reports how optional analysis roles were handled; it does not change the planning contract. |
 | tagger result | values defined by `$g:github-tagger` | `$g:github-tagger` | Records the reconciled classification and application result for each published issue. It may contain zero selected labels and zero selected types and is not Feature or Macro Task semantic state. |
+| native dependency result | `verified`, `no-op`, `failed`, `unavailable`, `unknown` | `$g:github-issues` result and Feature report | Records the mandatory native projection attempt for one canonical dependency. Only an absent attempt/result blocks publication; failure does not override the body-backed semantic graph. |
 | source Idea close reason | `completed` | hosted issue provider | Used only after the complete Plan Set, all projections, and every tagger handoff have reconciled. |
 
 ## Persistence boundary

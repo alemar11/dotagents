@@ -31,6 +31,8 @@ contract, and every selected Feature member must have:
   intent;
 - Feature-level `blocked_by` readback to Feature IDs in the same set;
 - authoritative set-membership and Feature dependency readback;
+- available native GitHub dependency attempt/readback evidence as diagnostic
+  provider projection only;
 - a complete textual handoff that is ready for technical interpretation;
 - publication and readiness evidence.
 
@@ -63,6 +65,11 @@ the implementation selection beyond the caller-supplied parent issue refs.
 Feature-level `blocked_by` relations express hard outcome dependencies and may
 cross repositories. Implement projects every same-repository edge as mandatory
 stack intent and every cross-repository edge as scheduling-only.
+Read native `blockedBy`/`blocking` relations when available and compare them to
+the body-backed graph, but never use them as semantic authority or a gate. A
+missing, failed, unavailable, unknown, extra, or stale native projection is
+reported as provider drift and does not erase, add, or alter a Plan Set edge.
+Implement never repairs native issue dependencies automatically.
 Macro `blocked_by` relations are local to one `parent_feature_id` and remain
 eligible for technical internalization when their projections are available.
 An authoritative technical Task dependency graph, published T-AC identifiers,
@@ -319,7 +326,9 @@ quarantine malformed or foreign projections, and report the degradation
 without blocking when the parent semantic contract remains sufficient. A
 contradictory or cyclic Feature dependency topology, or an ambiguous parent
 semantic contract, blocks before worker creation. GitHub labels and native
-Issue Types are never read or evaluated.
+Issue Types are never read or evaluated. Native issue dependencies may be read
+only as diagnostic projection evidence; mismatch or absence never changes the
+body-backed graph and is non-blocking.
 Runtime-preflight independently verifies every selected repository, project,
 current checkout, required application roles, and the G-owned workflows
 needed for the run. For each repository, it resolves the caller-selected
@@ -474,6 +483,8 @@ Return one aggregate report with:
 - the Macro projection state (`complete`, `partial`, or `absent`), every
   verified local parent/child Task identity, and every quarantined defect;
 - every Feature-level dependency and its scheduling/technical interpretation;
+- every observed native dependency result or drift warning, explicitly marked
+  non-authoritative and non-blocking;
 - every derived execution unit and its F-AC/T-AC mapping plus any available
   Macro context;
 - every T-AC and its mapping to final Feature evidence;

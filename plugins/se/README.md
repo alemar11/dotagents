@@ -100,7 +100,8 @@ Its skills are deliberately separated by responsibility:
   never included. Semantic contradictions that require changing outcome,
   scope, F-AC, or Feature dependencies are surfaced to the user; missing task
   decomposition, acceptance specificity, and ordinary technical interpretation
-  remain Implement-owned.
+  remain Implement-owned. Native GitHub dependency state is diagnostic in
+  Implement and is never repaired or used to override the body-backed graph.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.
@@ -127,8 +128,12 @@ Its skills are deliberately separated by responsibility:
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by
-  default; it never creates a container issue. After exact issue publication,
-  Feature delegates optional label and native type classification to
+  default; it never creates a container issue. The body and registries remain
+  semantic authority. After exact issue publication, Feature always attempts
+  to mirror every Feature edge and every same-parent Macro edge as a native
+  GitHub `blocked by` relationship. Each attempt is recorded; a native failure
+  is reported but does not block a complete body-backed publication. Feature
+  then delegates optional label and native type classification to
   `g:github-tagger` for each issue. The tagger chooses the smallest relevant
   existing label set, including none, and zero or one available native type;
   Feature never presets `Feature`, `Task`, or any other metadata value. An

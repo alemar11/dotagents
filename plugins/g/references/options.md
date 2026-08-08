@@ -12,7 +12,7 @@ lower-kebab.
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
 | `mutation_mode` | `apply`, `dry-run` | `dry-run` | For a write-shaped GitHub operation, whether it executes or returns a preview. Omit this field for pure reads. |
-| `issue_operation` | `create`, `edit`, `set-type`, `remove-type`, `create-label`, `add-label`, `remove-label`, `comment`, `attach-parent`, `remove-parent`, `add-sub-issue`, `remove-sub-issue`, `close`, `reopen` | none | The one issue lifecycle operation being requested. |
+| `issue_operation` | `create`, `edit`, `set-type`, `remove-type`, `create-label`, `add-label`, `remove-label`, `comment`, `attach-parent`, `remove-parent`, `add-sub-issue`, `remove-sub-issue`, `add-blocked-by`, `remove-blocked-by`, `close`, `reopen` | none | The one issue lifecycle operation being requested. |
 | `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by Git Commit. |
 | `commit_kind` | `regular`, `fixup`, `amend-fixup` | `regular` | The commit form for a commit-producing operation. Non-regular kinds require an exact `target_commit`. |
 | `review_operation` | `inspect`, `check`, `wait`, `ready-check`, `ready-wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation being requested. `ready-check` and `ready-wait` observe the provider review caused by one typed ready transition; they never post a request. |

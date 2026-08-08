@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish the plan by default, delegate optional issue label and type classification, and never implement code."
+description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish semantic and native GitHub dependency projections by default, delegate optional issue label and type classification, and never implement code."
 ---
 
 # Feature Planning
@@ -169,6 +169,13 @@ Plan Set and express a hard outcome dependency, never preferred order alone.
 Repository identity gives the relation a deterministic Implement projection:
 a same-repository edge is mandatory stack intent, while a cross-repository
 edge remains scheduling-only because no Git ancestry can span repositories.
+After every parent issue identity is known, publication must mirror each edge
+as an exact native GitHub `blocked by` relationship from the dependent Feature
+issue to the blocking Feature issue. Cross-repository Feature dependencies use
+exact issue URLs. The Plan Set remains semantic authority; the native edge is
+an expected provider projection that publication must always attempt. A
+verified edge is preferred, but a failed, unavailable, or unknown native result
+is reported and does not block the body-backed semantic publication.
 This projection does not make Feature the owner of branches, exact heads,
 technical execution edges, or worker scheduling. Record non-blocking preferred
 order as prose instead of `blocked_by`.
@@ -176,7 +183,10 @@ order as prose instead of `blocked_by`.
 A Macro Task `blocked_by` relation is narrower: it may reference only a Macro
 Task whose `parent_feature_id` is exactly the current Feature ID.
 Cross-Feature Task-to-Task edges are invalid, including when the Features
-share a repository.
+share a repository. After all child issue identities are known, publication
+must mirror every valid macro-local edge as a native GitHub `blocked by`
+relationship from the dependent child Task to the blocking child Task. A
+native Task dependency may never cross parent Features.
 
 Macro Task `blocked_by` relations are planning structure and sequencing
 context. They are not Implement execution edges, worker gates, PR boundaries,
@@ -239,10 +249,15 @@ The plan must contain:
 - the repository-sensitive projection rule that same-repository Feature
   `blocked_by` is mandatory stack intent and cross-repository `blocked_by` is
   scheduling-only;
+- one native GitHub `blocked by` operation and readback attempt for every
+  Feature-level dependency, including cross-repository edges, with its
+  verified, no-op, failed, unavailable, or unknown outcome;
 - one hosted child Task projection for every Macro Task, linked to its own
   parent Feature issue;
 - Macro `blocked_by` relations that reference only Macro Tasks with the same
   `parent_feature_id` and remain planning-only;
+- one native GitHub `blocked by` operation and readback attempt for every
+  macro-local dependency, with its outcome and no cross-Feature Task edge;
 - the per-Feature closure policy that each parent Feature and only its own
   associated Macro Tasks belong to that Feature's final implementation
   closing set;
@@ -320,8 +335,8 @@ flowchart TD
     plan -->|missing required content| blocked
     plan-validation -->|plan-ready| plan-publication
     plan-validation -->|invalid or contradictory plan| blocked
-    plan-publication -->|preview or verified publish| complete
-    plan-publication -->|operation or reconciliation failure| blocked
+    plan-publication -->|preview or verified semantic publish with dependency attempt results| complete
+    plan-publication -->|semantic publication failure or missing dependency attempt result| blocked
 ~~~
 
 Only the following files are graph nodes:
@@ -403,10 +418,23 @@ parent Feature issue through the G-owned hosted issue workflow. Do not create
 a Feature Plan Set container or integration issue. Then publish one child
 Task issue per Macro Task, link each child to its own parent Feature issue,
 and project Feature-level and Macro-level planning `blocked_by` values into
-the set manifest, parent Feature bodies, and child Task bodies. Do not invent
-a provider-native blocker relation. Update every parent Feature projection
-with the final set membership, authoritative parent issue refs, local child
-issue refs, and registry after all parent and child identities are known.
+the set manifest, parent Feature bodies, and child Task bodies. After every
+parent and child identity is known, invoke the G-owned native issue-dependency
+workflow once per canonical edge: parent Feature issue to parent Feature issue
+for every Feature dependency, and child Task issue to child Task issue for
+every same-parent Macro dependency. Update every parent Feature projection with
+the final set membership, authoritative parent issue refs, local child issue
+refs, and registry after all identities are known.
+
+For each edge, normalize the G handoff to `mutation_mode=apply` and
+`issue_operation=add-blocked-by`, with the dependent issue as exact target and
+the blocking issue as exact dependency. Use repository-qualified identities
+and exact URLs for cross-repository Feature edges. Attempt both the dependent
+issue's native `blockedBy` readback and the blocker's reciprocal `blocking`
+readback. An already-correct edge is a verified no-op. A failed mutation,
+unsupported capability, inaccessible relation, or indeterminate readback is a
+non-blocking publication warning after its exact outcome and evidence are
+recorded; never hide the failure or retry it blindly.
 
 The set registry remains the canonical mapping from `feature_id` to parent
 Feature issue and from `(parent_feature_id, macro_task_id)` to child Task
@@ -414,7 +442,9 @@ issue. The hosted projections must all report the same set identity and
 revision. A Feature-level edge may cross repositories; a Macro Task edge may
 not cross parent Features even in one repository. Publication is complete
 only when every parent registry, child issue, parent/child relation, and
-registry `blocked_by` value passes authoritative read-after-write verification.
+registry `blocked_by` value passes authoritative read-after-write verification,
+and every semantic edge has one recorded native GitHub dependency attempt and
+terminal result.
 Then invoke `$g:github-tagger` once for every exact parent and child issue with
 `mutation_mode=apply` and both classification dimensions. Do not supply label
 names or type values. Record its reconciled result, including the final
@@ -431,9 +461,10 @@ preview; retain the calculated Plan Set and report the blocker.
 
 When one exact hosted Idea was the source and the complete Feature Plan Set,
 every sibling Feature, every child Task, all relations, and their
-authoritative readbacks and tagger results reconcile successfully, close that
-source Idea as completed. Preview and ambiguous source identity never close an
-Idea.
+authoritative semantic readbacks, native dependency attempt results, and tagger
+results reconcile, close that source Idea as completed. A failed native
+dependency projection alone does not keep the Idea open. Preview and ambiguous
+source identity never close an Idea.
 
 ### Implement handoff
 
@@ -479,6 +510,9 @@ A complete report contains:
 - the complete Feature registry, Feature-level dependency relations, every
   local Macro Task registry, and projected parent/child issue identities when
   published;
+- native GitHub dependency attempt and `blockedBy`/reciprocal `blocking`
+  readback or failure evidence for every published Feature-level and
+  macro-local edge;
 - assumptions, risks, validation intent, and critic findings;
 - the full question batch and the user's resolutions;
 - the complete textual plan and Implement handoff;

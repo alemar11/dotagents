@@ -30,6 +30,11 @@ use a vertical slice when the Feature outcome supports one.>
 - blocked_by: <Macro Task IDs owned by the same parent Feature or none>
 - dependency_semantics: planning-only; Implement may combine, reorder, or internalize the relation while preserving this outcome and its Feature criteria
 
+The body-backed Macro registry is semantic authority. Publication always
+attempts to mirror each listed edge as a native GitHub dependency between the
+two child Task issues. A recorded provider failure is non-blocking; no native
+Task dependency may cross parent Features.
+
 Cross-Feature Macro Task references are invalid, even when the parent Features
 share a repository. Feature-level dependencies belong in the Feature Plan Set
 registry and parent Feature projections.

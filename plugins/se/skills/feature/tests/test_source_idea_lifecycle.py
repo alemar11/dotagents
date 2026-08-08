@@ -106,6 +106,43 @@ class SourceIdeaLifecycleContractTests(unittest.TestCase):
         self.assertIn("parent_feature_id", macro_task)
         self.assertIn("Cross-Feature Macro Task references are invalid", macro_task)
 
+    def test_native_dependency_projection_is_mandatory_but_failure_is_non_blocking(self) -> None:
+        skill = " ".join((ROOT / "SKILL.md").read_text(encoding="utf-8").split())
+        publication = " ".join(
+            (ROOT / "steps/plan-publication.md").read_text(encoding="utf-8").split()
+        )
+        maintenance = " ".join(
+            (ROOT / "steps/maintenance.md").read_text(encoding="utf-8").split()
+        )
+        states = " ".join(
+            (ROOT / "references/states.md").read_text(encoding="utf-8").split()
+        )
+        macro_task = " ".join(
+            (ROOT / "templates/macro-task.md").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("publication must always attempt", skill)
+        self.assertIn("Plan Set remains semantic authority", skill)
+        self.assertIn("failed, unavailable, or unknown native result", skill)
+        self.assertIn("does not block the body-backed semantic publication", skill)
+        self.assertIn("parent Feature issue A natively blocked by parent Feature issue B", publication)
+        self.assertIn("use exact issue URLs when repositories differ", publication)
+        self.assertIn("child Task issue X natively blocked by child Task issue Y", publication)
+        self.assertIn("only when both have the same `parent_feature_id`", publication)
+        self.assertIn("`issue_operation=add-blocked-by`", publication)
+        self.assertIn("`issue_operation=remove-blocked-by`", publication)
+        self.assertIn("A missing operation attempt or missing result is a workflow blocker", publication)
+        self.assertIn("a non-blocking warning because the body and registry remain semantic authority", publication)
+        self.assertIn("semantic-publish-cannot-be-verified-or-native-attempt-result-is-missing", publication)
+        self.assertNotIn("publish-operation-or-readback-cannot-be-verified", publication)
+        for result in ("`verified`", "`no-op`", "`failed`", "`unavailable`", "`unknown`"):
+            self.assertIn(result, publication)
+            self.assertIn(result, states)
+        self.assertIn("prior semantic graph as ownership evidence", maintenance)
+        self.assertIn("never infer ownership or planning intent from provider metadata alone", maintenance)
+        self.assertIn("recorded provider failure is non-blocking", macro_task)
+        self.assertNotIn("Do not invent a provider-native blocker relation", skill + publication)
+
     def test_feature_publication_stays_strict_while_implement_tolerates_projection_degradation(self) -> None:
         skill = " ".join((ROOT / "SKILL.md").read_text(encoding="utf-8").split())
         publication = " ".join(

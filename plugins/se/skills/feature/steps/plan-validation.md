@@ -68,7 +68,12 @@ name an existing Macro Task with the same `parent_feature_id`, with no
 missing, duplicate, cross-parent, self, or cyclic reference. Mark both
 relation levels as planning-owned rather than technical execution edges.
 Macro-local relations are not Implement gates and may be internalized while
-preserving every Macro Task outcome.
+preserving every Macro Task outcome. Require every valid Feature and Macro
+edge to have an unambiguous future hosted issue mapping: Feature edges map
+parent issue to parent issue, including exact cross-repository identities, and
+Macro edges map child issue to child issue under one parent Feature. This is
+provider-projectability validation, not provider mutation; preview remains
+local-only.
 
 Confirm that the plan explains what must be true without pretending to decide
 how code will be written. Reject missing or duplicate F-AC-NN identities,

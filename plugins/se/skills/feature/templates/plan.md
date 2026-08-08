@@ -27,6 +27,11 @@ Feature ID in this table and represents a hard outcome dependency, not
 preferred order. se:implement projects a same-repository edge as mandatory
 stack intent and a cross-repository edge as scheduling-only.
 
+The registry and Feature bodies are semantic authority. Hosted publication
+always attempts the corresponding native GitHub dependency between exact
+parent Feature issues, including across repositories, but a recorded provider
+failure does not invalidate this graph.
+
 ## Plan Set context
 
 <Explain the shared source context and why the set contains separate Feature
@@ -114,6 +119,11 @@ expresses planning order, not a technical Implement gate. Cross-Feature
 Task-to-Task edges are invalid. The local registry must cover every F-AC-NN
 in this Feature and must not add scope outside it.
 
+Hosted publication always attempts each macro-local edge as a native GitHub
+dependency between the corresponding child Task issues. The local body-backed
+registry remains authoritative, and a recorded provider failure is
+non-blocking.
+
 ## Constraints and assumptions
 
 ### Confirmed constraints
@@ -176,8 +186,11 @@ waves, or worker scheduling.>
 ## Plan operation
 
 - run_mode: publish
+- dependency_semantic_authority: body-and-registries
+- native_dependency_policy: always-attempt; provider-failure-non-blocking
 - feature_plan_set_registry_readback:
 - parent_feature_issue_refs:
+- native_dependency_results: <one attempted outcome per Feature and Macro edge; none only when the graph has no edges>
 - macro_task_issue_refs_by_feature:
 - feature_dependency_readback:
 - macro_task_registry_readback_by_feature:

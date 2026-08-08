@@ -175,6 +175,20 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("verified existing subset", normalized_reference)
         self.assertIn("cross-parent", normalized_reference)
 
+    def test_native_issue_dependencies_are_diagnostic_and_never_repaired(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+
+        self.assertIn("never use them as semantic authority or a gate", skill)
+        self.assertIn("body-backed graph", skill)
+        self.assertIn("Implement never repairs native issue dependencies automatically", skill)
+        for drift in ("missing", "failed", "unavailable", "unknown", "extra", "stale"):
+            self.assertIn(drift, skill)
+            self.assertIn(drift, orchestration)
+        self.assertIn("diagnostic projection evidence only", orchestration)
+        self.assertIn("without blocking or changing scheduling, stack intent", orchestration)
+        self.assertIn("never repair a native dependency during Implement", orchestration)
+
     def test_parent_feature_contract_allows_degraded_macro_projections(self) -> None:
         skill = " ".join(SKILL.read_text(encoding="utf-8").split())
         orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
