@@ -1,6 +1,6 @@
 interface:
   display_name: "Ms. Roberts"
-  short_description: "Review grammar in medium or complex prompts."
+  short_description: "👩🏻‍🏫 Review grammar in medium or complex prompts."
   default_prompt: "Use $ms-roberts to track substantive grammar issues in my medium-length or complex prompts, preserve their context, and finish with a concise Markdown report using American English."
   brand_color: "#4F46E5"
 policy:
