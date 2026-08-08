@@ -57,6 +57,16 @@ model or reasoning level. Optional workers may fall back to the parent, but
 the planner has no automatic model or destination fallback. If the live
 runtime cannot verify the planner profile, stop with unsupported-runtime.
 
+Resolve the planner's requested model and reasoning from this profile before
+creation or resume. After stable task identity readback, require the shared
+task handoff's typed `role_observation` to contain authoritative effective
+values that exactly match them. A request or creation receipt is not proof. A
+missing, unobservable, or mismatched effective value is
+`unsupported-runtime`; preserve the observed task and do not create a
+replacement. Apply the same rule to an optional role only when it is
+instantiated as its own application task; otherwise the delegation evidence
+below remains authoritative.
+
 ## Optional goal and delegation facts
 
 When goal tools are available, create or adopt one goal for the whole Feature

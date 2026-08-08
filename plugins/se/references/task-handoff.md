@@ -11,6 +11,7 @@ authorization decisions.
 - [Handoff boundary](#handoff-boundary)
 - [Canonical title metadata](#canonical-title-metadata)
 - [Title reconciliation](#title-reconciliation)
+- [Role-profile observation](#role-profile-observation)
 - [Observation record](#observation-record)
 - [Update relay](#update-relay)
 - [Failure and recovery evidence](#failure-and-recovery-evidence)
@@ -29,6 +30,7 @@ The handoff must contain, or link to:
 - the exact repository destination and allowed scope;
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
+- the exact requested model and reasoning resolved for this assignment;
 - expected partial-update and final-report behavior;
 - validation and terminal-readiness expectations;
 - the preflight record, including its separate authorization decisions.
@@ -121,6 +123,38 @@ again. If retained evidence cannot prove that no prior attempt occurred, do
 not adjust: preserve the task and finalize `verified` when authoritative
 readback already matches, otherwise record `title-unverified` or `title-drift`.
 
+## Role-profile observation
+
+Every application task created or resumed under a skill-owned profile must
+carry a typed role observation. Resolve the exact requested model and reasoning
+before the task effect. When a profile selects reasoning per assignment, such
+as one Implement Feature Worker per Feature, freeze that resolved value in the
+handoff before startup.
+
+After stable task identity is independently observed, read the effective model
+and reasoning from the authoritative runtime view. A request payload, creation
+receipt, configured default, conversation text, cached record, or inferred
+value is not authoritative readback. Bind the observation to the same exact
+task by nesting it in the task observation below. If an unexpected post-effect
+readback omits either value, retain that field as `null` with the authoritative
+evidence reference before blocking; never fabricate or silently omit it.
+
+For a required role, both effective values must be present and exactly match
+the resolved requested values before normal monitoring or update relay. A
+missing, unobservable, or mismatched value is `blocked` with `blocker:
+unsupported-runtime`. Preserve the observed task identity and reconcile the
+original effect; never create a replacement task merely to seek a matching
+profile. For an optional role instantiated as its own application task, apply
+the invoking skill's declared fallback and do not claim delegated work unless
+the task and its effective profile were both observed.
+
+The role observation is evidence, not a new state machine. Do not add an
+`accepted` or routing-status field: the invoking workflow retains its existing
+`ready`, fallback, `complete`, and `blocked` outcomes. Do not add generic
+sandbox or permission fields here. Repository, project, host, checkout, and
+worktree boundaries remain with their existing owners; a skill that requires
+another execution-boundary fact must define its semantic requirement itself.
+
 ## Observation record
 
 After creation or resume, append an authoritative observation with these
@@ -130,6 +164,14 @@ minimum fields:
 task_observation:
   task_profile_ref: "<skill-owned profile>"
   role: "<profile role>"
+  assignment_ref: "<planner, orchestration, Feature, or other stable scope>"
+  role_observation:
+    requested_model: "<assignment-resolved model>"
+    requested_reasoning: "<assignment-resolved reasoning>"
+    observed_model: "<authoritative effective model or null>"
+    observed_reasoning: "<authoritative effective reasoning or null>"
+    evidence_ref: "<authoritative runtime readback>"
+    independently_observed: true
   requested_title: "<canonical display title>"
   observed_title: "<final read-back display title or null>"
   title_status: verified
@@ -143,16 +185,18 @@ task_observation:
   independently_observed: true
 ```
 
-The observation must be compared with the preflight target. A mismatch in task
+The observation must be compared with the preflight target and the resolved
+skill-owned profile. A mismatch in effective model, effective reasoning, task
 identity, project, host, repository, or state is a blocker until reconciled.
-The task identity is stable evidence; titles and other display metadata are
-not.
+The task identity and authoritative role readback are execution evidence;
+titles and other display metadata are not.
 
 ## Update relay
 
-Do not begin normal monitoring or relay a partial update until title
-reconciliation has produced either `verified`, `title-unverified`, or
-`title-drift`. The warning outcomes do not suspend otherwise valid work.
+Do not begin normal monitoring or relay a partial update until the required
+role observation matches and title reconciliation has produced either
+`verified`, `title-unverified`, or `title-drift`. The title warning outcomes do
+not suspend otherwise valid work.
 
 Relay updates without changing their meaning or presenting a partial update as
 final. Each relayed update must identify the observed task and distinguish its
@@ -200,6 +244,8 @@ the authoritative evidence that remains available.
 The final relay must preserve the exact task identity and include:
 
 - the final independently observed task, project, host, repository, and state;
+- the final typed role observation and authoritative effective-profile
+  evidence;
 - the final title-reconciliation status and any display-metadata warning;
 - the Feature Plan outcome and validation evidence;
 - any repository or documentation changes actually made by the task;

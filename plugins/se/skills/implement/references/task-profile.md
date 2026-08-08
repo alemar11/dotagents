@@ -68,6 +68,16 @@ cross-system-contract work; high for several interacting components or
 validation surfaces; medium for routine work. Issue count alone never selects
 the level.
 
+Freeze the resolved requested model and reasoning in each orchestrator or
+Feature Worker handoff before creation or resume. After stable task identity
+readback, require the shared task handoff's typed `role_observation` to contain
+authoritative effective values that exactly match them. A request or creation
+receipt is not proof. A missing, unobservable, or mismatched effective value is
+`unsupported-runtime`; preserve the observed task and do not create a
+replacement. Apply the same rule to optional support only when it is
+instantiated as its own application task; subordinate in-task delegation
+continues to use the delegation evidence below.
+
 There is no model or reasoning fallback for the required orchestrator or
 Feature Worker role. If the live runtime cannot verify the selected profile,
 stop with unsupported-runtime before creating or monitoring the role.

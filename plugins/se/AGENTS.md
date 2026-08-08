@@ -11,11 +11,11 @@ surface.
 - .codex-plugin/plugin.json owns SE identity, version, discovery metadata,
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability,
-  destination, observation, authorization, display-title capability,
-  update-relay, and recovery gates.
-- references/task-handoff.md owns the shared task assignment, observation,
-  partial/final relay, deterministic emoji title grammar, bounded title
-  reconciliation, and terminal-report evidence.
+  effective-role-readback capability, destination, observation, authorization,
+  display-title capability, update-relay, and recovery gates.
+- references/task-handoff.md owns the shared task assignment, typed requested
+  versus effective role observation, partial/final relay, deterministic emoji
+  title grammar, bounded title reconciliation, and terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea hosted shape for SE
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -139,6 +139,13 @@ surface.
   outcome before monitoring: exact verification or an explicit
   `title-unverified`/`title-drift` warning. Never use a title as identity,
   repeat an adjustment, or create a replacement task for title failure.
+- Keep effective task-profile verification shared by every task-managed SE
+  skill. The invoking skill owns requested role, model, reasoning, and topology;
+  the shared preflight owns authoritative-readback capability; and the shared
+  handoff owns one typed assignment-specific comparison bound to the observed
+  task identity. Reuse existing workflow outcomes, never persist this evidence
+  in the Implement ledger, and never create a replacement after a mismatch or
+  unobservable required profile.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -214,8 +221,9 @@ surface.
   Implement, and their write-owning references route through the one canonical
   hosted-content owner without duplicate Idea doctrine.
 - Validate that Feature and Implement both route every created task through the
-  shared title-reconciliation outcome before normal monitoring or update relay,
-  and that resume paths cannot repeat an uncertain adjustment.
+  shared typed effective-role observation and title-reconciliation outcome
+  before normal monitoring or update relay, and that resume paths cannot repeat
+  an uncertain adjustment or create a replacement after profile mismatch.
 - Validate the canonical bracketed Feature acceptance syntax, monotonic
   high-water marks, plan publication/readback, malformed and legacy-checkbox
   rejection, question-batch completeness, and Implement evidence bound to the

@@ -19,7 +19,9 @@ Its skills are deliberately separated by responsibility:
   table that distinguishes workflow nodes from domain values, persisted
   statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
-  contracts shared by task-managed Feature and Implement runs.
+  contracts shared by task-managed Feature and Implement runs. They require an
+  authoritative, assignment-specific comparison between requested and
+  effective model/reasoning before normal task monitoring.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
@@ -47,10 +49,10 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
-- task-handoff.md applies the established SE Implement emoji-title grammar
-  to planner, orchestrator, and Feature Worker tasks, with authoritative readback and
-  at most one bounded correction before monitoring; titles remain display
-  metadata.
+- task-handoff.md binds a typed effective-role observation to planner,
+  orchestrator, and Feature Worker task identity, then applies the established
+  SE Implement emoji-title grammar with authoritative readback and at most one
+  bounded correction before monitoring; titles remain display metadata.
 - skills/implement/ accepts one or more complete authoritative GitHub Feature
   Plan Sets with verified sibling Feature/Macro projections and returns a
   verified standalone or stacked PR topology. Its graph owns Feature-level

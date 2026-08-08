@@ -18,6 +18,8 @@ The contract owns the common gates for task creation and observation:
 
 - explicit invocation;
 - live application capabilities;
+- authoritative effective model and reasoning readback for created or resumed
+  task roles;
 - independent identity, project, host, and state observation;
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
@@ -28,6 +30,12 @@ The contract owns the common gates for task creation and observation:
 The invoking skill owns its task profile and topology. This contract contains
 no model, reasoning, worker, or topology default. GitHub issue planning and
 publication remain governed by the invoking skill's own contract.
+
+The invoking skill also owns the requested model and reasoning values for each
+role and resolves any assignment-specific choice before task creation or
+resume. This contract owns the live capability gate for reading those values
+back authoritatively; [Task Handoff](task-handoff.md) owns the typed
+per-task observation and comparison evidence.
 
 The invoking skill must pass a reference to its complete task profile and the
 roles required by the selected topology. The preflight verifies the live
@@ -52,6 +60,8 @@ the requested topology:
 
 - create or resume a task;
 - independently observe the task after the effect;
+- independently read back the effective model and reasoning for the exact
+  observed task;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
 
@@ -59,13 +69,24 @@ Documentation, cached metadata, an earlier receipt, or a static validator is
 not evidence that a live capability is available. If creation, observation, or
 monitoring cannot be verified, fail closed before creating or retrying a task.
 
+Before recording a required role as verified, establish that the current
+runtime can both accept the resolved requested profile and expose an
+authoritative post-effect readback of the effective model and reasoning. A
+request payload, configured default, creation receipt, conversation text, or
+locally inferred value is not effective-profile evidence. `roles_verified:
+true` means every required role is supported and has this readback capability;
+it does not claim that a task has already been created or that its effective
+profile has matched. The handoff supplies that proof after stable task identity
+observation.
+
 The profile capability check is equally strict for required roles. If any
-required role is not supported by the live runtime, the preflight result is
-`blocked` with `blocker: unsupported-runtime`. There is no automatic model,
-reasoning, or required-topology fallback. A skill may declare optional roles
-or optional capabilities with an explicit parent or serial fallback. Those
-facts must be recorded and must not be reported as delegated work unless a
-worker was actually started and independently observed.
+required role is not supported by the live runtime, or its effective profile
+cannot later be read back authoritatively, the preflight result is `blocked`
+with `blocker: unsupported-runtime`. There is no automatic model, reasoning,
+or required-topology fallback. A skill may declare optional roles or optional
+capabilities with an explicit parent or serial fallback. Those facts must be
+recorded and must not be reported as delegated work unless a worker was
+actually started and independently observed.
 
 ### Optional runtime capabilities
 
@@ -107,8 +128,16 @@ run, verify each repository/project destination separately.
 After creating or resuming a task, read the resulting state independently from
 the authoritative application view. The observation must preserve the exact
 `task_identity`, `project_identity`, `host_identity`, repository destination,
-and current `state`. A display title, conversation text, or caller-supplied
-identifier is not identity evidence.
+current `state`, and the task handoff's typed effective-role observation. A
+display title, conversation text, caller-supplied identifier, or echoed request
+profile is not identity or effective-profile evidence.
+
+Compare the effective model and reasoning with the assignment-specific values
+resolved from the skill-owned profile. A missing or mismatched observation for
+a required role is `blocked` with `blocker: unsupported-runtime` before normal
+monitoring or update relay. Preserve and reconcile the observed task identity;
+do not create a replacement. For an optional role, use only the invoking
+skill's declared parent or serial fallback and do not claim delegated work.
 
 The same observation boundary applies after a resume, a host change, a
 monitoring gap, or a final update. Do not report a task as running or complete
@@ -174,6 +203,7 @@ preflight:
   capabilities:
     create_task: available
     observe_task: available
+    observe_effective_role_profile: available
     monitor_task: available
     relay_partial_updates: available
     relay_final_update: available
@@ -205,10 +235,10 @@ status.
 ## Fail-closed rule
 
 If the ChatGPT/Codex application, live task creation, independent observation,
-or monitoring/relay path is unavailable, the outcome is `blocked`. The skill
-must return the smallest recovery input and stop before the affected task
-effect. It must not claim that a task exists, is being monitored, or completed
-until the required live evidence is available.
+effective required-role readback, or monitoring/relay path is unavailable, the
+outcome is `blocked`. The skill must return the smallest recovery input and
+stop before the affected task effect. It must not claim that a task exists, is
+being monitored, or completed until the required live evidence is available.
 
 A missing title-request or title-adjustment capability alone is not a topology
 blocker because a title is display metadata. Continue only after recording the

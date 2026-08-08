@@ -19,8 +19,8 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.1.0` |
-| Runtime contract | `3.1.0` |
+| CLI | `3.1.1` |
+| Runtime contract | `3.1.1` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
 
@@ -205,7 +205,7 @@ runtime-contract, envelope, or CLI-version change.
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
 explicit state registry and capability readback are runtime-contract and CLI
-version `3.1.0`. The orchestrator remains the only ledger client and the only
+version `3.1.1`. The orchestrator remains the only ledger client and the only
 owner of delivery monitoring, Worker resumption, and aggregate completion.
 
 ## Recovery boundary

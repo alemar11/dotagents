@@ -45,10 +45,10 @@ projections.
 
 ## Application task, delegation, and goal
 
-For a task-managed run, load the skill-owned task profile and the shared task
-preflight before creating, resuming, or monitoring the planner task. The
-application task is an execution envelope for the current planning run; it is
-not a Feature graph node.
+For a task-managed run, load the skill-owned task profile, shared task
+preflight, and shared task handoff before creating, resuming, or monitoring the
+planner task. The application task is an execution envelope for the current
+planning run; it is not a Feature graph node.
 
 The planner is required. Read-only analysis-worker and critic-analyst roles
 are optional capability-conditioned roles. When delegation is available, the
@@ -70,10 +70,13 @@ blocked merely because the plan is awaiting user input; the plan run-state
 owns awaiting-user-input separately. If goal tools are unavailable, preserve
 the same objective in the task report and continue.
 
-The shared task preflight must verify required task creation, observation,
-monitoring, and relay capabilities. It records delegation and goal
-capabilities as optional runtime facts. A missing optional capability selects
-the documented fallback; it does not authorize a replacement planner task.
+The shared task preflight must verify required task creation, effective planner
+profile readback, observation, monitoring, and relay capabilities. After task
+identity readback, the shared handoff must bind the exact requested and
+effective planner model and reasoning before normal monitoring. It records
+delegation and goal capabilities as optional runtime facts. A missing optional
+capability selects the documented fallback; it does not authorize a
+replacement planner task.
 
 ## Analysis worker contract
 
