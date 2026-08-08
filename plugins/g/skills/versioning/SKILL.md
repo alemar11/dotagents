@@ -18,12 +18,16 @@ operation.
 
 ## Canonical convention
 
-Use SemVer 2.0.0 with a `v` prefix on new Git tags:
+Use SemVer 2.0.0 as the version model and `v` as the mandatory G prefix on
+new Git tags:
 
 ```text
 vX.Y.Z
 vX.Y.Z-rc.N
 ```
+
+The semantic version itself is `X.Y.Z` or `X.Y.Z-rc.N`; `v` belongs to the
+Git tag name and does not participate in SemVer precedence.
 
 Where:
 
@@ -39,6 +43,21 @@ v2.4.0-rc.1
 v2.4.0-rc.2
 v2.4.0
 ```
+
+A release candidate is optional in SemVer. The stable `vX.Y.Z` may be
+proposed and published without any prior `vX.Y.Z-rc.N`, subject to the normal
+preview and confirmation gates. For the same `X.Y.Z` core, every release
+candidate has lower precedence than the stable version:
+
+```text
+v2.4.0-rc.1 < v2.4.0-rc.2 < v2.4.0
+```
+
+SemVer defines version meaning and precedence; it does not define Git tag
+prefixes, branch names, the number of active release lines, pull requests,
+approvals, or automation. The `v` prefix, the restricted `rc.N` spelling, the
+hard application gate, and `release/vX.Y.Z` are G workflow conventions rather
+than universal SemVer requirements.
 
 Use `release/vX.Y.Z` for the corresponding stabilization branch. Do not use
 `rc01`, `rc.01`, `RC`, or a leading zero in the numeric candidate identifier.
@@ -99,6 +118,10 @@ For `release/vX.Y.Z`, it proposes:
 
 - `candidate`: the next unused `vX.Y.Z-rc.N`;
 - `final`: `vX.Y.Z`.
+
+The final proposal does not require an existing candidate tag. Do not impose a
+candidate-first rule unless an explicit repository policy requires one; that
+policy is outside SemVer itself.
 
 If `vX.Y.Z` already exists, both operations are blocked. Never remove the
 final tag to restart an RC sequence.

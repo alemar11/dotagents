@@ -1,6 +1,6 @@
 {
   "name": "g",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "description": "Manage Git and GitHub work from commits, evidence-backed issue classification, and read-only taxonomy proposals through delivery status, reviewed pull-request delivery, active-session audits, and consistent SemVer versioning.",
   "author": {
     "name": "alemar11",
