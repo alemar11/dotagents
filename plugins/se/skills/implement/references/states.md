@@ -144,7 +144,7 @@ outcomes for the current invocation but remain resumable run statuses.
 | `native-review` | A committed candidate exists and exact-HEAD native review is the last durable recovery boundary. |
 | `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
 | `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |
-| `final-verify` | Acceptance, review, CI, topology, and registry-derived closure intent in the PR body passed for the exact final HEAD; `closingIssuesReferences` is diagnostic only. |
+| `final-verify` | Acceptance, review, CI, topology, minimal durable PR-body content, and registry-derived closure intent passed for the exact final HEAD; `closingIssuesReferences` is diagnostic only. |
 
 ### Canonical assignment pairs
 

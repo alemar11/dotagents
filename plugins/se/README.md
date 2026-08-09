@@ -104,6 +104,10 @@ Its skills are deliberately separated by responsibility:
   decomposition, acceptance specificity, and ordinary technical interpretation
   remain Implement-owned. Native GitHub dependency state is diagnostic in
   Implement and is never repaired or used to override the body-backed graph.
+  SE-authored PR bodies remain concise and durable: outcome summary, compact
+  validation command or check names, material operational notes when needed,
+  and canonical closing lines, without routine test counts or internal
+  delivery logs.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.

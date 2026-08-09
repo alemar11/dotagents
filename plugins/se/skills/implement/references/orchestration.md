@@ -213,8 +213,9 @@ orchestrator coordinates this sequence but never edits or rebases worker code.
 ## Candidate publication and central delivery monitoring
 
 After native review and publication, the orchestrator verifies repository, PR,
-branch, full candidate HEAD, draft state, registry-derived closure intent in
-the PR body, and any required stack link. If available, it records GitHub's
+branch, full candidate HEAD, draft state, the minimal durable SE-owned PR body,
+registry-derived closure intent in that body, and any required stack link. If
+available, it records GitHub's
 `closingIssuesReferences` as optional provider diagnostics; that field never
 blocks publication. Only the remaining exact-head and topology readback
 establishes `candidate-published`.

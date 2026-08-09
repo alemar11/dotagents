@@ -124,6 +124,13 @@ implementation delta must not receive an empty commit, empty PR, cosmetic
 change, or artificial proof; report the zero-delta product question to the
 user and stop that assignment.
 
+Keep SE-authored PR bodies reviewer-facing and durable: a short outcome
+summary, compact names of validation commands or check categories, only
+material operational notes, and the G-rendered closing lines. Do not publish
+routine test counts, pass totals, raw output, internal execution evidence, or
+other mutable delivery diagnostics in the PR body. The exact contract lives in
+[review-delivery.md](references/review-delivery.md).
+
 This skill never merges, deploys, releases, or performs post-merge closure.
 GitHub interaction is mandatory end to end. Local worktrees and local Git
 transport are execution surfaces inside the implementation flow, never an

@@ -132,6 +132,39 @@ against the new exact SHA.
 Publish only after native review is clean and the exact publication scope is
 resolved from the explicit Implement request.
 
+### Minimal durable PR body
+
+The SE-authored PR body is a reviewer-facing summary, not an execution ledger.
+Implement owns the semantic content it supplies to G; G owns repository-template
+preservation, canonical closing lines, transport, and readback. Limit new or
+updated SE-owned content to:
+
+- **Summary:** one short paragraph or at most three bullets describing the
+  observable outcome, its reason, and any material scope boundary;
+- **Validation:** one compact bullet per distinct command or check category
+  actually run against the candidate, collapsing reruns and reporting names
+  only rather than counts or output;
+- **Operational notes:** only a concrete migration, compatibility, rollout, or
+  manual action that a reviewer or operator must know; omit the section when no
+  such action exists;
+- **Issues:** the canonical closing lines derived from `closing_issue_refs` and
+  rendered and verified by G.
+
+Do not copy the Feature Plan, Macro Task list, F-AC/T-AC evidence matrix,
+implementation-unit inventory, changed-file list, worker identity, local path,
+branch or SHA diagnostics, stack diagnostics, raw command output, review or CI
+progress, timestamps, durations, routine test counts, or pass/fail totals into
+SE-owned PR content. Exact-HEAD acceptance, validation, review, CI, and topology
+proof remains in the Implement delivery record and provider evidence.
+
+A product metric may appear only when that metric is itself an observable
+Feature acceptance outcome; bind it to the current exact HEAD and refresh it
+after any candidate change. Before every PR create or body update, reconstruct
+the SE-owned sections from the current candidate instead of carrying forward an
+execution log or patching stale values. Remove disallowed stale SE-owned content
+in that same update. Preserve repository-required template fields and unrelated
+existing author content through the G-owned publication workflow.
+
 For every implementation-eligible Feature, derive
 `closing_issue_refs` deterministically from that parent Feature and the
 verified existing subset of its local hosted Task projections:
@@ -172,10 +205,11 @@ branch, defaulting to the authoritative provider default when omitted, while a
 stacked child uses the verified parent branch.
 
 Apply the shared hosted-content safety gate to the exact final PR title and
-body immediately before publication. Use the G-owned single-PR publication
+body immediately before publication. Verify the SE-owned body against the
+minimal durable body contract, then use the G-owned single-PR publication
 workflow to push the committed candidate and create or reuse a draft PR.
-Independently read back repository, base, branch, full PR HEAD, URL, canonical
-body/closure intent, and draft state. Optionally record GitHub
+Independently read back repository, base, branch, full PR HEAD, URL, minimal
+durable body/closure intent, and draft state. Optionally record GitHub
 `closingIssuesReferences` as provider diagnostics; an empty, partial, or
 unavailable value is non-blocking. Verify the PR body carries the exact
 source-derived closure intent. The PR HEAD must equal the reviewed candidate
@@ -216,10 +250,10 @@ unreconciled link blocks only that assignment while independent work continues.
 For a standalone PR, complete publication readback establishes
 `candidate-published`. For a stacked PR, require both publication readback and
 successful stack reconciliation first. Record the exact repository, PR, base
-and head branches, candidate full SHA, source-derived closure intent and
-PR-body readback, and any parent PR, parent full SHA, stack position, and link
-receipt. A provider `closingIssuesReferences` observation may be retained as
-diagnostic evidence but is not required for this checkpoint.
+and head branches, candidate full SHA, minimal durable PR-body readback,
+source-derived closure intent, and any parent PR, parent full SHA, stack
+position, and link receipt. A provider `closingIssuesReferences` observation
+may be retained as diagnostic evidence but is not required for this checkpoint.
 
 The orchestrator then checkpoints `status=delivery-pending` and
 `checkpoint=candidate-published`, releases the transient active path claim,
@@ -323,6 +357,8 @@ The orchestrator performs read-only final verification. Require:
   `delivery-pending @ candidate-published`, plus the exact Worker handoff and
   any later resumption lineage;
 - PR publication readback and exact PR HEAD equality;
+- minimal durable SE-owned PR-body readback with no routine execution counts or
+  internal delivery evidence;
 - the exact Feature-local source-derived `closing_issue_refs` set containing
   this parent Feature and every verified existing associated local Macro Task, with the same
   closure intent read back from the PR body and no sibling or unrequested

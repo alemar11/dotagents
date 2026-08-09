@@ -138,6 +138,26 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("available Macro Task contextual coverage evidence", normalized)
         self.assertIn("Never invent closure refs", normalized)
 
+    def test_pr_body_is_minimal_durable_and_free_of_routine_counts(self) -> None:
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "The SE-authored PR body is a reviewer-facing summary, not an execution ledger",
+            "one short paragraph or at most three bullets",
+            "reporting names only rather than counts or output",
+            "routine test counts, or pass/fail totals",
+            "reconstruct the SE-owned sections from the current candidate",
+            "Remove disallowed stale SE-owned content in that same update",
+            "Preserve repository-required template fields and unrelated existing author content",
+            "minimal durable SE-owned PR-body readback",
+        ):
+            self.assertIn(required, reference)
+
+        self.assertIn(
+            "Exact-HEAD acceptance, validation, review, CI, and topology proof remains",
+            reference,
+        )
+
     def test_stacked_children_link_separately(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")

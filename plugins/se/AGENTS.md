@@ -47,8 +47,8 @@ surface.
   Mermaid projection. Its references own multi-Feature orchestration,
   execution and delivery topology, orchestrator/worker profiles, optional
   Feature Worker support delegation, worker-session review, standalone and
-  stacked delivery, stack reconciliation, and the SQLite WAL run-state
-  contract.
+  stacked delivery, stack reconciliation, the minimal durable SE-authored PR
+  body, and the SQLite WAL run-state contract.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
@@ -210,6 +210,12 @@ surface.
   `closingIssuesReferences` is optional
   diagnostic provider data and never a gate. It has no local-only or preview
   implementation mode.
+- Keep SE-authored Implement PR bodies limited to a concise outcome summary,
+  compact validation command or check names, material operational notes only
+  when needed, and G-rendered closing lines. Keep routine test counts, pass
+  totals, raw output, internal execution evidence, and mutable delivery
+  diagnostics in exact-HEAD run evidence rather than hosted PR content. G
+  preserves repository templates and unrelated existing author content.
 - Keep Audit strictly observational. Attribute SE use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task
   contact, repository/GitHub mutation, delegation, or persistent audit state.
@@ -255,6 +261,9 @@ surface.
   same-repository stack intent, F-AC-to-T-AC evidence mapping,
   `candidate-published` child unblocking, orchestrator-owned delivery
   monitoring, resumable Worker repair, and stack-reconcile paths.
+- Validate Implement's minimal durable PR-body projection, exclusion of routine
+  execution counts, preservation of external template/author content, and
+  exact closure-intent readback.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's documented
   persisted values exactly match the run-state capability registry.
