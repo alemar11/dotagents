@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns.
+description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, or pgvector patterns.
 ---
 
 # Postgres
@@ -9,7 +9,8 @@ description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migration
 
 Use this skill to connect to Postgres, run SQL, inspect schemas, review query
 performance, design tables and indexes, work with common PostGIS or pgvector
-patterns, and manage migration release flow through the shipped
+patterns, select SQL supported by the target PostgreSQL major, and manage
+migration release flow through the shipped
 `scripts/postgres` launcher in the skill package.
 
 ## Runtime surface
@@ -74,6 +75,24 @@ Use `references/common-workflows.md` for copy/paste playbooks:
 - confirm which DB you are connected to
 - safe “quick lookup” templates
 
+## Version-aware SQL
+
+Before proposing syntax whose availability depends on the PostgreSQL major,
+resolve the oldest deployed major and load
+`references/postgres-sql-versions.md`. Select the relevant capability route and
+load only its linked guide sections. Do not load all per-version guides for an
+ordinary SQL task.
+
+Load a complete PostgreSQL 14–19 guide only for an explicit upgrade review,
+broad release comparison, or targeted lookup of a feature omitted from the
+high-impact router. Never load a guide newer than the target unless the caller
+is considering that upgrade.
+
+If the target major is unknown, prefer portable syntax or state the minimum
+required major and a fallback. Treat PostgreSQL 19 release status as volatile:
+verify the current official documentation and exact target build before using
+its syntax or behavior.
+
 ## Guardrails (short)
 
 - Before you run any non-trivial query, confirm the target:
@@ -101,3 +120,6 @@ Use `references/common-workflows.md` for copy/paste playbooks:
 - Migration guardrails: `references/postgres_guardrails.md`
 - Local/Docker recovery: `references/postgres_local_recovery.md`
 - Design guidance: `references/postgres_best_practices/README.md`
+- SQL capability router and version-selection rules: `references/postgres-sql-versions.md`
+- Optional PostgreSQL release catalogs: `references/postgres-sql-14.md` through
+  `references/postgres-sql-19.md`

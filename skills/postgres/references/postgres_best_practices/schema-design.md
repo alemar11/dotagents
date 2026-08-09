@@ -16,7 +16,9 @@ create table products (
 );
 ```
 
-If a nullable column still needs true uniqueness, use `NULLS NOT DISTINCT`.
+On PostgreSQL 15+, if a nullable column still needs true uniqueness, use
+`NULLS NOT DISTINCT`. For older targets, use the fallback in
+[`postgres-sql-15.md`](../postgres-sql-15.md#unique-null-values-with-nulls-not-distinct).
 
 ```sql
 create table external_accounts (
