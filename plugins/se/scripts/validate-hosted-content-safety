@@ -21,7 +21,10 @@ for phrase in \
   'project_root' \
   "worker- and tool-originated content" \
   "Returned text is not safe by" \
-  "If any condition is false"; do
+  "Local-path correction is mandatory" \
+  "correct the same rendered content before transport" \
+  "does not block the enclosing SE workflow" \
+  "Never create a replacement hosted artifact"; do
   rg -Fq -- "$phrase" "$owner" || fail "owner is missing: $phrase"
 done
 

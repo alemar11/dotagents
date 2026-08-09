@@ -1,13 +1,16 @@
 # Hosted Content Safety
 
-This reference is the canonical SE owner for the portable-content boundary
-immediately before every hosted write. It applies to issue titles and bodies,
-comments, pull-request titles and bodies, review requests, review text, and
-Feature maintenance changelogs produced by Idea, Feature, or Implement.
+This reference is the canonical SE owner for portable-content projection and
+mandatory local-path correction immediately before every hosted write, plus
+bounded post-write repair. It applies to issue titles and bodies, comments,
+pull-request titles and bodies, review requests, review text, and Feature
+maintenance changelogs produced by Idea, Feature, or Implement.
 
 The invoking SE skill owns semantic content and must deliver a safe final
 projection. G owns transport, provider mutation, receipts, and readback. G does
-not infer repository context, sanitize meaning, or repair unsafe SE content.
+not infer repository context or sanitize meaning. When readback exposes unsafe
+SE content, SE computes the corrected projection and routes the update of that
+same hosted artifact through the owning G workflow.
 
 ## Internal records and hosted content
 
@@ -31,7 +34,7 @@ An absolute temporary body-file path used privately by G transport is internal
 operation metadata. It is allowed as an operation argument but must never
 appear inside the hosted file content.
 
-## Portable projection
+## Portable projection and mandatory correction
 
 Before rendering hosted content:
 
@@ -42,6 +45,7 @@ Before rendering hosted content:
    hosted ref or repository-relative artifact path when one exists.
 3. Remove local absolute paths and other machine-specific locations. Never
    replace them with another guessed local path.
+   Local-path correction is mandatory whenever candidate content contains one.
 4. Exclude internal prompts, prompt machinery, host identity, local task
    identity, and transcript fragments that are irrelevant to the hosted
    artifact's purpose.
@@ -51,9 +55,13 @@ Before rendering hosted content:
 
 Preserve relevant semantics while reducing representation. Do not invent a
 repository-relative path, branch, SHA, hosted identity, or relationship merely
-to make content appear portable.
+to make content appear portable. When an optional local-only detail has no
+portable representation, remove that detail and retain the smallest portable
+statement of the evidence. Record the omission as internal warning evidence;
+do not stop the enclosing workflow solely because the local representation was
+removed.
 
-## Final pre-write gate
+## Final pre-write correction
 
 Immediately before each hosted write, inspect the exact final title and body or
 comment/review text that will be handed to G. Require all of the following:
@@ -68,10 +76,33 @@ comment/review text that will be handed to G. Require all of the following:
 - the portable representation preserves the evidence needed by the hosted
   operation.
 
-If any condition is false or the portable representation cannot be established
-without guessing or losing required meaning, fail closed before G receives the
-write. Report the unsafe field and the smallest missing portable identity. If
-the final content changes after this gate, run the complete gate again.
+If any condition is false, correct the same rendered content before transport
+and run the complete inspection again. Repository-owned paths become relative;
+known external checkout context becomes repository identity, branch, and full
+SHA; irrelevant or unrepresentable machine-specific fragments are removed.
+Never hand a known local absolute path to G.
 
-Read-after-write verifies provider state; it does not substitute for this
-pre-write content gate.
+Local-path correction is required but does not block the enclosing SE workflow.
+It does not create a plan question or terminal blocker solely because optional
+local evidence had to be omitted. Record a warning when correction removes
+evidence that could not be represented portably. If the final content changes
+after this inspection, run the complete inspection again.
+
+## Post-write readback and repair
+
+Read-after-write verifies provider state; it does not substitute for pre-write
+correction. Inspect the exact hosted title, body, comment, or review text after
+every create or update.
+
+If readback still contains a local absolute or machine-specific path:
+
+1. compute a corrected projection with the same portable-projection rules;
+2. reserve and attempt one bounded update of that same hosted artifact through
+   the owning G workflow;
+3. read the artifact back again and verify that the local path is absent;
+4. retain the correction receipt or an explicit unresolved warning.
+
+Never create a replacement hosted artifact to repair portable content, and
+never repeat an ambiguous or already attempted repair. An unavailable, failed,
+or ambiguous correction is reported with the exact hosted artifact identity
+but does not block the enclosing workflow or its terminal result.

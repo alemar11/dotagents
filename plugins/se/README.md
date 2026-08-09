@@ -26,9 +26,10 @@ Its skills are deliberately separated by responsibility:
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
-- references/hosted-content-safety.md owns the portable-content projection and
-  fail-closed check immediately before every SE-hosted issue, comment, PR, or
-  review write. SE owns semantics; G owns transport and readback.
+- references/hosted-content-safety.md owns mandatory portable-content
+  projection and local-path correction before every SE-hosted issue, comment,
+  PR, or review write, plus one bounded non-blocking repair after readback. SE
+  owns semantics; G owns transport and readback.
 - scripts/validate-hosted-content-safety checks the shared owner routes, removed
   Idea duplication, and hosted templates for machine-specific absolute paths.
 - skills/idea/references/idea-source.md owns the typed transient handoff from

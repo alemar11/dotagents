@@ -23,9 +23,10 @@ surface.
   expectations. It does not own Idea hosted metadata or Feature Plan semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before any SE workflow uses a required G-owned GitHub workflow.
-- references/hosted-content-safety.md owns the final portable-content projection
-  and fail-closed gate immediately before every hosted write produced by Idea,
-  Feature, or Implement. G owns transport and readback, not semantic cleanup.
+- references/hosted-content-safety.md owns mandatory portable-content
+  projection and local-path correction before every hosted write produced by
+  Idea, Feature, or Implement, plus one bounded non-blocking repair of the same
+  artifact after readback. G owns transport and readback, not semantic cleanup.
 - scripts/validate-hosted-content-safety owns the static owner-routing,
   duplicate-doctrine, and hosted-template path checks for that contract.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
@@ -179,8 +180,10 @@ surface.
 - Keep internal orchestration records distinct from hosted content. Internal
   records may retain local task/project/worktree facts; every hosted projection
   must pass references/hosted-content-safety.md immediately before write,
-  including worker/tool-originated content, and fail closed when portable
-  identity cannot be established.
+  including worker/tool-originated content. Correct or remove local paths before
+  transport; if readback still exposes one, attempt one bounded update of the
+  same artifact and retain a non-blocking warning when repair is unavailable,
+  failed, or ambiguous.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
   hosted Plan Set rehydration through the shared G dependency gate before
   hosted reads, and route default publication through the single publication
