@@ -52,9 +52,15 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.1.0")
-        self.assertEqual(completed.stdout.strip(), "0.1.0")
+        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.0")
+        self.assertEqual(completed.stdout.strip(), "0.2.0")
         self.assertEqual(completed.stderr, "")
+
+    def test_final_tag_classification_requires_canonical_stable_form(self) -> None:
+        self.assertTrue(self.resolver.is_final_tag("v1.2.3"))
+        self.assertFalse(self.resolver.is_final_tag("v1.2.3-rc.1"))
+        self.assertFalse(self.resolver.is_final_tag("1.2.3"))
+        self.assertFalse(self.resolver.is_final_tag("v1.2.3-beta"))
 
     def test_asset_help_is_available_without_workflow_arguments(self) -> None:
         completed = subprocess.run(
@@ -73,6 +79,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         )
         self.assertTrue(result["ok"])
         self.assertEqual(result["tag"], "v1.0.1-rc.1")
+        self.assertFalse(result["is_final"])
 
     def test_same_line_must_continue_from_release_branch(self) -> None:
         result = self.resolve(
@@ -91,6 +98,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         )
         self.assertTrue(result["ok"])
         self.assertEqual(result["tag"], "v2.0.0")
+        self.assertTrue(result["is_final"])
 
     def test_noncanonical_confirmation_is_never_normalized(self) -> None:
         for confirmed_tag in (
@@ -119,6 +127,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["status"], "reconcile-existing-final")
         self.assertEqual(result["tag_state"], "existing-final")
+        self.assertTrue(result["is_final"])
 
     def test_asset_has_no_project_or_network_dependency(self) -> None:
         source = ASSET.read_text(encoding="utf-8")
@@ -132,12 +141,14 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertEqual(reference.count("```yaml"), 2)
         self.assertIn("name: Release version (dry run)", reference)
         self.assertIn("name: Release version (apply)", reference)
-        self.assertIn("resolver API 0.1.0", reference)
+        self.assertIn("resolver API 0.2.0", reference)
         self.assertIn(
             "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
             reference,
         )
-        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.1.0"', reference)
+        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.0"', reference)
+        self.assertIn("is_final: ${{ steps.resolve.outputs.is_final }}", reference)
+        self.assertIn("needs.resolve.outputs.is_final == 'true'", reference)
         self.assertIn("pull-requests: write", reference)
         self.assertIn("No application source or package metadata", reference)
 

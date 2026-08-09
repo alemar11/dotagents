@@ -48,6 +48,9 @@ Preserve all of these invariants in every project:
   the normal `g:versioning` preview and confirmation flow; the Actions do not
   infer it from source or package metadata.
 - Permit a stable final without a prior RC, because prereleases are optional.
+- Expose `is_final` as a lowercase boolean workflow output derived from the
+  exact resolved canonical tag, so downstream jobs can distinguish a stable
+  `vX.Y.Z` from a candidate `vX.Y.Z-rc.N` without reparsing the tag.
 - Treat branches and tags as immutable: create missing refs, verify exact SHAs,
   and never move, replace, or delete an existing ref.
 - Hash the sorted remote tag-name snapshot and reject stale application state.
@@ -84,6 +87,20 @@ Do not bake project language, build commands, package managers, deployment
 targets, changelog generation, issue policy, reviewers, labels, or branch
 protection assumptions into these workflows.
 
+## Downstream stable-only work
+
+Use `is_final == 'true'` together with `application_ready == 'true'` to gate a
+build, publish, or deployment job in the same workflow or in a reusable
+workflow caller. The output is a decision fact; it does not trigger another
+workflow by itself.
+
+A tag created with the repository `GITHUB_TOKEN` does not cause a separate
+tag-`push` workflow run. If a project later needs an independent build
+workflow, add an explicitly authorized `workflow_dispatch` or
+`repository_dispatch` after the final tag readback, or use a separately
+approved GitHub App or personal access token. Keep that project-specific build
+and credential policy outside the portable release-version templates.
+
 ## Permissions preflight
 
 Before writing or upgrading the workflows, run the read-only preflight from
@@ -95,10 +112,10 @@ claim that PR creation is functional.
 
 ## Resolver asset and version lifecycle
 
-The bundled source is `assets/resolve_release_version.py`. Its independent
-resolver version starts at `0.1.0`; it is not the G plugin version and not a
-project release version. `RESOLVER_VERSION` is the single source of truth and
-`python3 <path> --version` must print only that SemVer value.
+The bundled source is `assets/resolve_release_version.py`. Its current
+independent resolver version is `0.2.0`; it is not the G plugin version and not
+a project release version. `RESOLVER_VERSION` is the single source of truth
+and `python3 <path> --version` must print only that SemVer value.
 
 Inspect both versions before copying:
 
@@ -163,7 +180,7 @@ semantic input prefixes (`[patch]`, `[minor]`, `[major]`, `[candidate]`, and
 change.
 
 ```yaml
-# g:versioning release workflow template; resolver API 0.1.0
+# g:versioning release workflow template; resolver API 0.2.0
 name: Release version (dry run)
 
 run-name: Dry run · ${{ github.ref_name }}
@@ -215,6 +232,9 @@ on:
       default_branch:
         description: Current repository default branch
         value: ${{ jobs.resolve.outputs.default_branch }}
+      is_final:
+        description: Whether the exact resolved tag is a stable final tag
+        value: ${{ jobs.resolve.outputs.is_final }}
       kind:
         description: Candidate or final operation kind
         value: ${{ jobs.resolve.outputs.kind }}
@@ -253,6 +273,7 @@ jobs:
       application_ready: ${{ steps.resolve.outputs.application_ready }}
       context: ${{ steps.resolve.outputs.context }}
       default_branch: ${{ steps.resolve.outputs.default_branch }}
+      is_final: ${{ steps.resolve.outputs.is_final }}
       kind: ${{ steps.resolve.outputs.kind }}
       release_branch: ${{ steps.resolve.outputs.release_branch }}
       resolver_version: ${{ steps.resolve.outputs.resolver_version }}
@@ -316,7 +337,7 @@ jobs:
 
       - name: Verify release resolver API version
         env:
-          EXPECTED_RESOLVER_VERSION: "0.1.0"
+          EXPECTED_RESOLVER_VERSION: "0.2.0"
         shell: bash
         run: |
           set -euo pipefail
@@ -363,7 +384,7 @@ jobs:
 | YAML surface | Why it is portable |
 | --- | --- |
 | `workflow_dispatch.inputs.operation` | One manual menu covers default-branch increments and release-branch candidate/final operations |
-| `workflow_call` and outputs | The apply workflow reuses the exact same resolver instead of duplicating calculation logic |
+| `workflow_call` and outputs | The apply workflow reuses the exact same resolver; `is_final` gives downstream jobs a parser-free stable/candidate gate |
 | top-level `permissions: {}` | Denies implicit write scope before job-level least privilege |
 | `concurrency` | Superseded planning runs are disposable; application-mode calls get an isolated key because the caller owns mutation serialization |
 | `Capture repository version state` | Reads only provider-owned refs and current default-branch identity |
@@ -374,7 +395,7 @@ jobs:
 ## Complete apply workflow template
 
 ```yaml
-# g:versioning release workflow template; resolver API 0.1.0
+# g:versioning release workflow template; resolver API 0.2.0
 name: Release version (apply)
 
 run-name: Apply · ${{ inputs.confirmed_tag }} · ${{ github.ref_name }}
@@ -410,6 +431,7 @@ jobs:
     name: Create candidate tag and release branch
     if: >-
       needs.resolve.outputs.application_ready == 'true' &&
+      needs.resolve.outputs.is_final == 'false' &&
       needs.resolve.outputs.kind == 'candidate'
     needs: resolve
     runs-on: ubuntu-latest
@@ -541,6 +563,7 @@ jobs:
     name: Create final tag and reconcile release PR
     if: >-
       needs.resolve.outputs.application_ready == 'true' &&
+      needs.resolve.outputs.is_final == 'true' &&
       needs.resolve.outputs.kind == 'final'
     needs: resolve
     runs-on: ubuntu-latest
@@ -742,7 +765,7 @@ jobs:
 | `confirmed_tag` | Human confirmation is exact data, not a boolean approval |
 | apply `concurrency` | Prevents parallel mutations while allowing the current transaction to finish |
 | reusable `resolve` job | Recalculates against current tags and selected SHA immediately before writes |
-| `candidate` condition and permission | Only a confirmed candidate gets `contents: write` |
+| candidate/final conditions | Require both the semantic operation kind and the resolver-derived `is_final` value before either mutation path runs |
 | tag snapshot, regex, default-branch, and selected-SHA checks | Fail closed on stale or noncanonical state |
 | annotated tag object plus ref readback | Creates an immutable provider ref and verifies its commit target |
 | `final` recovery through `existing-final` | Supports retrying PR reconciliation without moving or recreating the tag |

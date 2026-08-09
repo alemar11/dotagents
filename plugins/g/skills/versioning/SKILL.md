@@ -229,7 +229,9 @@ The Actions may read only provider-owned repository metadata, tags, branches,
 commits, and pull requests. They must not read package manifests, inspect or
 edit application code, run project build/test commands, create commits, or
 merge the final pull request. Preserve the exact canonical tag gate and the
-separate dry-run/application confirmation boundary.
+separate dry-run/application confirmation boundary. Preserve the resolver's
+`is_final` workflow output so downstream jobs can gate stable-only work without
+reparsing the tag.
 
 Examples from the skill directory:
 

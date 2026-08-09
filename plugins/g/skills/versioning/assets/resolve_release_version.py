@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-RESOLVER_VERSION = "0.1.0"
+RESOLVER_VERSION = "0.2.0"
 TAG_PATTERN = re.compile(
     r"^(?P<prefix>v?)(?P<major>0|[1-9][0-9]*)\."
     r"(?P<minor>0|[1-9][0-9]*)\."
@@ -79,6 +79,11 @@ def parse_tag(raw: str) -> ParsedTag | None:
         rc=int(match.group("rc")) if match.group("rc") else None,
     )
     return ParsedTag(raw=value, version=version, canonical=value.startswith("v"))
+
+
+def is_final_tag(raw: str) -> bool:
+    parsed = parse_tag(raw)
+    return parsed is not None and parsed.canonical and parsed.version.stable
 
 
 def parse_tags(raw_tags: Iterable[str]) -> tuple[list[ParsedTag], int]:
@@ -211,6 +216,7 @@ def blocked(
         "release_branch": release_branch,
         "latest_tag": latest,
         "ignored_tag_count": ignored,
+        "is_final": is_final_tag(tag),
         "status": status,
         "reason": reason,
         "tag_state": "unknown",
@@ -395,6 +401,7 @@ def resolve(
                     "release_branch": branch,
                     "latest_tag": latest,
                     "ignored_tag_count": ignored,
+                    "is_final": True,
                     "status": "reconcile-existing-final",
                     "reason": (
                         "the final tag already exists; verify its commit and "
@@ -438,6 +445,7 @@ def resolve(
         "release_branch": branch,
         "latest_tag": latest,
         "ignored_tag_count": ignored,
+        "is_final": is_final_tag(proposal),
         "status": "application-ready" if confirmed_tag is not None else "proposal-ready",
         "reason": "",
         "tag_state": "absent",
@@ -454,6 +462,7 @@ def write_outputs(path: Path, result: dict[str, object]) -> None:
         "application_ready",
         "context",
         "default_branch",
+        "is_final",
         "kind",
         "release_branch",
         "resolver_version",
@@ -487,6 +496,7 @@ def write_summary(
         ("Legacy SemVer tags", result["legacy_tag_count"]),
         ("Ignored non-SemVer tags", result["ignored_tag_count"]),
         ("Resolved tag", result["tag"] or "blocked"),
+        ("Final tag", result["is_final"]),
         ("Release branch", result["release_branch"] or "n/a"),
         ("Status", result["status"]),
     )
@@ -588,7 +598,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ref_name=args.ref_name,
         target_sha=args.target_sha,
     )
-    print(f"status={result['status']} tag={result['tag'] or 'blocked'}")
+    print(
+        f"status={result['status']} tag={result['tag'] or 'blocked'} "
+        f"is_final={str(result['is_final']).lower()}"
+    )
     return 0 if result["ok"] else 2
 
 
