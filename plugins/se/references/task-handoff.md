@@ -10,6 +10,7 @@ authorization decisions.
 
 - [Handoff boundary](#handoff-boundary)
 - [Prompt projection](#prompt-projection)
+- [Controller observation and assigned-task bootstrap](#controller-observation-and-assigned-task-bootstrap)
 - [Canonical title metadata](#canonical-title-metadata)
 - [Title reconciliation](#title-reconciliation)
 - [Role-profile request](#role-profile-request)
@@ -63,6 +64,55 @@ embedding its raw envelope.
 
 The projected prompt is internal control-plane content. It is not hosted
 content, task identity, project evidence, or durable plan authority.
+
+## Controller observation and assigned-task bootstrap
+
+The task controller owns the create or resume effect and the independent
+post-effect observation of the exact assigned task. The assigned task owns a
+bootstrap self-check inside its first execution turn. These checks are
+complementary:
+
+1. before the effect, the controller completes Task Preflight and freezes the
+   explicit profile request and destination;
+2. after the effect, the controller observes the stable task identity and
+   reads its project, effective profile, host, state, and title from
+   authoritative task-scoped runtime evidence;
+3. before role-owned planning, orchestration, implementation, repository, or
+   hosted work, the assigned task reads its own authoritative task-scoped
+   execution context and stops if its effective profile or destination does
+   not match the handoff, using the same blocker distinction defined below;
+4. before normal monitoring or update relay, the controller completes its own
+   independent comparison and title reconciliation.
+
+The two post-effect reads may overlap. The sequence defines ownership and
+gates, not a requirement to relay the controller's observed values back to the
+assigned task: role-owned work waits for the assigned-task self-check, while
+normal controller monitoring and relay wait for the controller observation.
+
+The controller and assigned task may run under intentionally different model
+or reasoning profiles. Only the assigned task's observed values are compared
+with the handoff request. A child message that reports its profile is useful
+bootstrap evidence, but it is not independent controller evidence; the
+controller must read the authoritative task-scoped source directly.
+
+The authoritative profile source must expose the identity of the task whose
+effective values it reports. That evidence identity must exactly equal the
+stable assigned-task identity observed by the controller. Evidence from a
+different task is discarded as cross-task evidence: the exact assigned task's
+profile remains unobservable and follows `unsupported-runtime`. When exact-task
+evidence is present but its model or reasoning differs from the request, use
+`effective-profile-mismatch` instead.
+
+An assigned planner, orchestrator, Feature Worker, or optional task that has
+already started from a valid handoff does not create or resume another task for
+its own required role. It performs only the assigned-task bootstrap and then
+enters its role-owned workflow. In the Implement hierarchy, a verified
+orchestrator subsequently becomes the task controller for Feature Workers, and
+each Feature Worker applies the same non-recursive bootstrap rule.
+
+The bootstrap self-check reuses the handoff's request, observation, and
+existing workflow outcomes. It creates no additional workflow state, ledger
+column, replacement task, or second observation schema.
 
 ## Canonical title metadata
 
@@ -200,18 +250,40 @@ After stable task identity is independently observed, read the effective model
 and reasoning from the authoritative runtime view. A request payload, creation
 receipt, configured default, conversation text, cached record, or inferred
 value is not authoritative readback. Bind the observation to the same exact
-task by nesting it in the task observation below. If an unexpected post-effect
-readback omits either value, retain that field as `null` with the authoritative
-evidence reference before blocking; never fabricate or silently omit it.
+task by recording the source task identity and nesting the role observation in
+the task observation below. If an unexpected post-effect readback omits either
+value, retain that field as `null` with the authoritative evidence reference
+before blocking; never fabricate or silently omit it.
 
 For a required role, both effective values must be present and exactly match
 the resolved requested values before normal monitoring or update relay. A
-missing, unobservable, or mismatched value is `blocked` with `blocker:
-unsupported-runtime`. Preserve the observed task identity and reconcile the
-original effect; never create a replacement task merely to seek a matching
-profile. For an optional role instantiated as its own application task, apply
-the invoking skill's declared fallback and do not claim delegated work unless
-the task and its effective profile were both observed.
+missing or unobservable value, non-independent evidence, or evidence bound to
+another task is `blocked` with `blocker: unsupported-runtime`. Present,
+authoritative values bound to the exact assigned task that differ from the
+request are `blocked` with `blocker: effective-profile-mismatch`. Preserve the
+observed task identity and reconcile the original effect; never create a
+replacement task merely to seek a matching profile. For an optional role
+instantiated as its own application task, apply the invoking skill's declared
+fallback and do not claim delegated work unless the task and its effective
+profile were both observed.
+
+Apply this decision table to the controller observation and to the assigned
+task's own bootstrap gate. The bootstrap result does not become independent
+controller evidence.
+
+| case_id | exact assigned-task evidence | effective values | comparison | controller evidence | required result |
+| --- | --- | --- | --- | --- | --- |
+| exact-match | present and identity-matched | present | exact match | independently observed | continue |
+| observed-profile-differs | present and identity-matched | present | model or reasoning differs | independently observed | `effective-profile-mismatch` |
+| missing-effective-values | present and identity-matched | missing or unobservable | unavailable | independently observed | `unsupported-runtime` |
+| wrong-task-identity | absent or bound to another task | any | invalid for this assignment | any | `unsupported-runtime` |
+| self-report-only | child self-report only | any | not independently observed | not independent | `unsupported-runtime` |
+
+The task controller records this authoritative comparison. The assigned task's
+bootstrap self-check protects the start of role-owned work, but its own report
+cannot satisfy `independently_observed: true` on the controller's observation.
+Never substitute the controller's effective profile for the assigned task's
+readback.
 
 The role observation is evidence, not a new state machine. Do not add an
 `accepted` or routing-status field: the invoking workflow retains its existing
@@ -283,6 +355,7 @@ task_observation:
     requested_reasoning: "<assignment-resolved reasoning>"
     observed_model: "<authoritative effective model or null>"
     observed_reasoning: "<authoritative effective reasoning or null>"
+    evidence_task_identity: "<task identity exposed by the authoritative source>"
     evidence_ref: "<authoritative runtime readback>"
     independently_observed: true
   requested_title: "<canonical display title>"
@@ -306,8 +379,10 @@ skill-owned profile, and its `profile_request_ref` must prove the complete
 resolved profile was actively requested. A missing explicit request, ambient
 inheritance, or a mismatch in effective model, effective reasoning, task
 identity, project, host, repository, or state is a blocker until reconciled.
-The task identity and authoritative role readback are execution evidence;
-titles and other display metadata are not.
+Require `role_observation.evidence_task_identity` to equal the enclosing
+`task_observation.task_identity`; a different identity is not evidence about
+the assigned task. The task identity and authoritative role readback are
+execution evidence; titles and other display metadata are not.
 
 A null project readback is not an exact match. Complete the project identity
 subprotocol above before selecting its setup-remediation or
@@ -377,6 +452,9 @@ The final relay must preserve the exact task identity and include:
   inheritance;
 - the final typed role observation and authoritative effective-profile
   evidence;
+- the resulting `unsupported-runtime` or `effective-profile-mismatch` blocker
+  when the role-profile gate does not pass;
+- the assigned-task bootstrap self-check outcome;
 - the final title-reconciliation status and any display-metadata warning;
 - the Feature Plan outcome and validation evidence;
 - any repository or documentation changes actually made by the task;

@@ -182,6 +182,14 @@ surface.
   produce matching effective values. Reuse existing workflow outcomes, never
   persist this evidence in the Implement ledger, and never create a replacement
   after a mismatch or unobservable required profile.
+  The task controller owns pre-effect capability verification and independent
+  post-effect observation; the assigned planner, orchestrator, or Worker owns a
+  non-recursive bootstrap self-check before role work. Never compare the
+  controller's own profile with the assigned child profile or treat child
+  self-report as independent controller evidence. Keep
+  `unsupported-runtime` for unavailable or unobservable exact-task evidence and
+  use `effective-profile-mismatch` when present authoritative values for the
+  exact assigned task differ from the request.
 - Keep effective task-project verification shared by every task-managed SE
   skill. Preflight must select one exact repository-compatible project from the
   live application inventory and return ChatGPT/Codex project-configuration
@@ -305,8 +313,12 @@ surface.
   single-line title artifacts without serialization-added terminators.
 - Validate that Feature and Implement both route every created task through the
   shared typed effective-role observation and title-reconciliation outcome
-  before normal monitoring or update relay, and that resume paths cannot repeat
-  an uncertain adjustment or create a replacement after profile mismatch.
+  before normal monitoring or update relay, require the assigned task's
+  non-recursive bootstrap self-check before role-owned work, exclude the
+  controller's own profile from child comparison, reject profile evidence
+  bound to a different task identity, distinguish `unsupported-runtime` from
+  `effective-profile-mismatch`, and ensure resume paths cannot repeat an
+  uncertain adjustment or create a replacement after profile mismatch.
 - Validate inventory-backed project selection, exact effective-project
   comparison, one bounded same-task re-read, missing-project setup guidance,
   present-but-unobservable `unsupported-runtime`, and the prohibition on

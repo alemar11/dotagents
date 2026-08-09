@@ -33,6 +33,13 @@ Never omit either value or rely on the invoking session, application, project,
 host, or provider default. The required planner is always requested as
 `gpt-5.6-sol` with `medium` reasoning.
 
+The invoking task controller owns planner creation or resume and independently
+observes the resulting planner task. Its own model or reasoning may differ from
+the planner profile and is never compared with this assignment. Once started,
+the planner performs the shared assigned-task bootstrap self-check before
+repository analysis, planning, goals, or hosted work. It does not create or
+resume another planner task for the same run.
+
 The planner owns the application task, the Feature workflow graph, the
 Feature Plan Set registry, each Feature's local Macro Task registry, the
 question batch, the reduction of worker evidence, the canonical textual plan,
@@ -71,11 +78,17 @@ profile-request evidence; a matching value obtained through ambient
 inheritance does not satisfy this invariant. After stable task identity
 readback, require the shared task handoff's typed `role_observation` to contain
 authoritative effective values that exactly match the request. A request or
-creation receipt is not proof. A missing, unobservable, or mismatched effective
-value is `unsupported-runtime`; preserve the observed task and do not create a
-replacement. Apply the same rule to an optional role only when it is
-instantiated as its own application task; otherwise the delegation evidence
-below remains authoritative.
+creation receipt is not proof. A missing or unobservable exact-planner value is
+`unsupported-runtime`; present authoritative exact-planner values that differ
+from the request are `effective-profile-mismatch`. Preserve the observed task
+and do not create a replacement. Apply the same rule to an optional role only
+when it is instantiated as its own application task; otherwise the delegation
+evidence below remains authoritative.
+
+The invoking controller must still read the planner's authoritative
+task-scoped execution evidence directly. The planner's bootstrap result is a
+defense-in-depth gate for its own work, not a conversational substitute for
+the controller's independent `role_observation`.
 
 ## Optional goal and delegation facts
 

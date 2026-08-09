@@ -45,6 +45,20 @@ Handoff owns the post-effect observation and bounded comparison against that
 expected identity. A configured project target is not proof that the resulting
 task received that binding.
 
+The `task controller` is the session that creates or resumes one assigned
+application task and then observes that exact task independently. The
+`assigned task` is the planner, orchestrator, Feature Worker, or separately
+instantiated optional role named by the handoff. The task controller's own
+effective model and reasoning are not assignment evidence and must never be
+compared with the assigned role's requested profile. The two profiles may
+differ intentionally.
+
+Preflight runs in the task controller before the effect and verifies that the
+runtime can request and later observe the assigned profile. It does not perform
+the value comparison before the assigned task exists. Task Handoff owns the
+controller's post-effect comparison and the assigned task's bounded bootstrap
+self-check.
+
 An explicit invocation of a task-managed Feature or Implement workflow also
 selects the exact required role profiles declared by that workflow. For every
 required role, and for every optional role instantiated as its own application
@@ -86,6 +100,13 @@ the requested topology:
   observed task;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
+
+An authoritative task-scoped execution context satisfies effective-profile
+readback when it is independently accessible to the task controller and bound
+to the exact observed task identity. The controller must inspect the complete
+current live runtime surface. Absence from one general task-inventory view is
+not by itself evidence that authoritative assigned-task readback is
+unavailable.
 
 Documentation, cached metadata, an earlier receipt, or a static validator is
 not evidence that a live capability is available. If creation, observation, or
@@ -178,6 +199,11 @@ current `state`, and the task handoff's typed effective-role observation. A
 display title, conversation text, caller-supplied identifier, or echoed request
 profile is not identity or effective-profile evidence.
 
+The task controller owns this independent observation. The assigned task also
+performs the bootstrap self-check defined by Task Handoff before beginning its
+role-owned work, but its message or self-report does not replace the
+controller's direct authoritative readback.
+
 The observed project identity must be present and exactly equal the frozen
 preflight identity. Do not infer task-project binding from the request, the
 creation receipt, the working directory, a checkout or worktree path, the
@@ -186,12 +212,16 @@ mismatch and blocks normal monitoring. A missing or unobservable value must
 complete the handoff's one bounded same-task re-read and refreshed project
 inventory before classification; it is never a match.
 
-Compare the effective model and reasoning with the assignment-specific values
-resolved from the skill-owned profile. A missing or mismatched observation for
-a required role is `blocked` with `blocker: unsupported-runtime` before normal
-monitoring or update relay. Preserve and reconcile the observed task identity;
-do not create a replacement. For an optional role, use only the invoking
-skill's declared parent or serial fallback and do not claim delegated work.
+Compare the assigned task's effective model and reasoning with the
+assignment-specific values resolved from the skill-owned profile. Never
+compare the task controller's own profile with the assigned role. A missing or
+unobservable exact-task observation for a required role is `blocked` with
+`blocker: unsupported-runtime`; an authoritative exact-task observation whose
+effective model or reasoning differs from the request is `blocked` with
+`blocker: effective-profile-mismatch`. Both stop before normal monitoring or
+update relay. Preserve and reconcile the observed task identity; do not create
+a replacement. For an optional role, use only the invoking skill's declared
+parent or serial fallback and do not claim delegated work.
 
 A matching effective readback does not repair a missing explicit profile
 request. Require both the pre-effect request evidence owned by the handoff and
@@ -320,6 +350,18 @@ The same fail-closed rule applies when the exact resolved model and reasoning
 cannot be actively requested. Never omit a required profile value to obtain a
 task receipt and never treat a coincidentally matching inherited profile as a
 valid task initialization.
+
+`unsupported-runtime` means that the required request or authoritative
+exact-task readback capability is unavailable, or that the exact task's values
+remain missing or unobservable. It does not describe a successful readback of
+different effective values; that case is `effective-profile-mismatch`. A
+profile readback whose source identity differs from the assigned task is not a
+mismatch observation for that child: discard it and treat the exact child's
+readback as unavailable.
+
+A difference between the task controller's profile and the assigned role's
+requested profile is not a mismatch. Only the independently observed profile
+of the exact assigned task participates in the comparison.
 
 A missing title-request or title-adjustment capability alone is not a topology
 blocker because a title is display metadata. Continue only after recording the

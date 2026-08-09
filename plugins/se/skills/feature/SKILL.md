@@ -52,6 +52,13 @@ preflight, and shared task handoff before creating, resuming, or monitoring the
 planner task. The application task is an execution envelope for the current
 planning run; it is not a Feature graph node.
 
+The invoking task controller creates or resumes exactly one planner and owns
+the planner's independent post-effect observation. A planner already started
+from that handoff performs the shared assigned-task bootstrap self-check before
+Feature analysis or publication and does not create or resume another planner
+task. The controller's own model or reasoning may differ from the planner's;
+only the exact planner task is compared with the planner profile.
+
 The planner is required. Read-only analysis-worker and critic-analyst roles
 are optional capability-conditioned roles. When delegation is available, the
 planner may dispatch bounded workers with non-overlapping analytical

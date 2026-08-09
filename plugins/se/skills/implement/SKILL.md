@@ -186,6 +186,17 @@ never omit either value or rely on ambient inheritance. Project every
 orchestrator, Feature Worker, and optional support prompt through the shared
 flat prompt projection; never forward a raw parent prompt or transport envelope.
 
+The invoking task controller creates or resumes the orchestrator and owns its
+independent post-effect observation. An orchestrator already started from that
+handoff performs the shared assigned-task bootstrap self-check before ledger,
+repository, worker, or hosted effects and does not create another orchestrator.
+After bootstrap, the orchestrator is the task controller for Feature Workers:
+it creates or resumes and independently observes each Worker, while the Worker
+self-checks its own assigned profile and destination before implementation.
+Never compare the invoking controller's profile with the orchestrator, or the
+orchestrator's profile with a Worker; compare only each exact assigned task
+with its own resolved request.
+
 The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
 After a PR reaches `candidate-published`, its Feature Worker becomes inactive
 but resumable while the assignment remains `delivery-pending`. The
