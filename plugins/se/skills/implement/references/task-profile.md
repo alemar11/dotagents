@@ -42,14 +42,16 @@ session, application, project, host, or provider default. The orchestrator is
 always requested as `gpt-5.6-sol` with `medium` reasoning; each Feature
 Worker uses the assignment-specific reasoning resolved below.
 
-The invoking task controller creates or resumes the orchestrator and
-independently observes that exact task. The orchestrator first performs the
-shared assigned-task bootstrap self-check and never creates or resumes another
-orchestrator for the same run. After bootstrap, the orchestrator becomes the
-task controller for every Feature Worker: it requests and independently
-observes each worker profile, while each Worker self-checks its own
-task-scoped execution context before implementation. A controller's own
-profile is never compared with the assigned child profile.
+The invoking task controller creates or resumes the orchestrator,
+independently observes that exact task's stable identity, and verifies the
+orchestrator's bootstrap identity binding. The orchestrator first reads its own
+authoritative task-scoped execution context, performs the shared assigned-task
+bootstrap self-check, and never creates or resumes another orchestrator for
+the same run. After bootstrap, the orchestrator becomes the task controller
+for every Feature Worker: it requests each Worker profile, independently
+observes the stable Worker identity, and verifies the Worker's authoritative
+self-bootstrap before implementation. A controller's own profile is never
+compared with the assigned child profile.
 
 The orchestrator coordinates one or more authoritative parent Feature semantic
 contracts and their verified sibling context, records each Macro projection as
@@ -90,9 +92,11 @@ Actively request and freeze the resolved model and reasoning in each
 orchestrator or Feature Worker handoff before creation or resume. Require the
 shared handoff's explicit profile-request evidence; a matching value obtained
 through ambient inheritance does not satisfy this invariant. After stable task
-identity readback, require the shared task handoff's typed `role_observation`
-to contain authoritative effective values that exactly match the request. A
-request or creation receipt is not proof. A missing or unobservable exact-task
+identity readback, require the exact assigned task to return the shared
+handoff's typed `assigned_task_bootstrap` with authoritative effective values
+that exactly match the request and an `evidence_task_identity` equal to the
+stable identity observed by its controller. A request, creation receipt, or
+unstructured self-report is not proof. A missing or unobservable exact-task
 value is `unsupported-runtime`; present authoritative exact-task values that
 differ from the assignment request are `effective-profile-mismatch`. Preserve
 the observed task and do not create a replacement. Apply the same rule to
@@ -100,14 +104,17 @@ optional support only when it is instantiated as its own application task;
 subordinate in-task delegation continues to use the delegation evidence below.
 
 There is no model or reasoning fallback for the required orchestrator or
-Feature Worker role. If the live runtime cannot actively request and verify the
-selected profile, stop with unsupported-runtime before creating or monitoring
-the role.
+Feature Worker role. If the live runtime cannot actively request the selected
+profile, observe the stable assigned-task identity, or receive the task's
+authoritative bootstrap result, stop with unsupported-runtime before
+role-owned effects or monitoring.
 
 An Orchestrator or Feature Worker already running from a valid handoff applies
 only the shared assigned-task bootstrap for its own role. It does not rerun the
-controller's creation preflight against itself, and its self-report does not
-replace the parent controller's independent authoritative observation.
+controller's creation preflight against itself. Its structured authoritative
+bootstrap is the operational profile and destination gate; its controller
+verifies identity binding and does not duplicate the raw task-scoped profile
+or project read.
 
 Delegation is an optional capability of the Feature Worker topology. Record
 one effective mode: `delegated-support` when bounded helpers were dispatched

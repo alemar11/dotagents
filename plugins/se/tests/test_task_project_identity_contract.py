@@ -26,15 +26,16 @@ class TaskProjectIdentityContractTests(unittest.TestCase):
             "add or configure that exact repository as a saved project",
             "Never substitute a neighboring project",
             "project_inventory_evidence_ref",
-            "observe_task_project_identity",
+            "assigned_task_bootstrap",
+            "receive_bootstrap_result",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, self.preflight)
 
     def test_handoff_reconciles_missing_project_on_the_same_task(self) -> None:
         for expected in (
-            "exactly one bounded second authoritative readback",
-            "one refresh of the live project inventory",
+            "exactly one bounded second authoritative self-read",
+            "one controller refresh of the live project inventory",
             "blocker: unsupported-runtime",
             "Never create a replacement task",
             "requested_project_identity",
@@ -69,9 +70,9 @@ class TaskProjectIdentityContractTests(unittest.TestCase):
         )
 
         self.assertIn("inventory-backed project selection", feature)
-        self.assertIn("effective task-project", feature)
+        self.assertIn("authoritative self-observed project", feature)
         self.assertIn("Inventory-backed project selection", implement)
-        self.assertIn("authoritative effective-project", implement)
+        self.assertIn("authoritative assigned-task project/profile bootstrap", implement)
 
 
 if __name__ == "__main__":

@@ -11,14 +11,15 @@ surface.
 - .codex-plugin/plugin.json owns SE identity, version, discovery metadata,
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability,
-  effective-role-readback capability, inventory-backed project availability,
-  destination, observation, authorization, display-title capability,
+  explicit-profile request capability, assigned-task authoritative bootstrap
+  capability, inventory-backed project availability, stable task-identity
+  observation, destination, authorization, display-title capability,
   update-relay, and recovery gates.
-- references/task-handoff.md owns the shared task assignment, typed requested
-  versus effective role observation, bounded effective-project reconciliation,
-  flat semantic prompt projection, partial/final relay, deterministic emoji
-  title grammar and first-prompt hint, bounded title reconciliation, and
-  terminal-report evidence.
+- references/task-handoff.md owns the shared task assignment, typed task-owned
+  requested-versus-effective role observation, controller identity binding,
+  bounded effective-project reconciliation, flat semantic prompt projection,
+  partial/final relay, deterministic emoji title grammar and first-prompt hint,
+  bounded title reconciliation, and terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea hosted shape for SE
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -175,30 +176,35 @@ surface.
   transport wrapper as user intent or durable evidence.
 - Keep effective task-profile verification shared by every task-managed SE
   skill. The invoking skill owns requested role, model, reasoning, and topology;
-  the shared preflight owns authoritative-readback capability; and the shared
-  handoff owns one typed assignment-specific comparison bound to the observed
-  task identity. Required profiles must be actively requested in full; ambient
-  or configured-default inheritance is prohibited even when it happens to
-  produce matching effective values. Reuse existing workflow outcomes, never
-  persist this evidence in the Implement ledger, and never create a replacement
-  after a mismatch or unobservable required profile.
-  The task controller owns pre-effect capability verification and independent
-  post-effect observation; the assigned planner, orchestrator, or Worker owns a
+  the shared preflight owns explicit-request, stable task-identity observation,
+  and assigned-task bootstrap capability; and the shared handoff owns one typed
+  assignment-specific self-comparison bound to the controller-observed task
+  identity. Required profiles must be actively requested in full; ambient or
+  configured-default inheritance is prohibited even when it happens to produce
+  matching effective values. Reuse existing workflow outcomes, never persist
+  this evidence in the Implement ledger, and never create a replacement after a
+  mismatch or unobservable required profile.
+  The task controller owns pre-effect capability verification, task creation or
+  resume, independent stable identity observation, and bootstrap-result binding;
+  the assigned planner, orchestrator, or Worker owns the authoritative,
   non-recursive bootstrap self-check before role work. Never compare the
-  controller's own profile with the assigned child profile or treat child
-  self-report as independent controller evidence. Keep
-  `unsupported-runtime` for unavailable or unobservable exact-task evidence and
-  use `effective-profile-mismatch` when present authoritative values for the
-  exact assigned task differ from the request.
+  controller's own profile with the assigned child profile. Reject generic or
+  unstructured self-report, but accept the typed bootstrap only when its
+  authoritative evidence identity exactly matches the controller-observed task.
+  Keep `unsupported-runtime` for unavailable or unobservable exact-task
+  bootstrap evidence and use `effective-profile-mismatch` when present
+  authoritative values for the exact assigned task differ from the request.
 - Keep effective task-project verification shared by every task-managed SE
   skill. Preflight must select one exact repository-compatible project from the
   live application inventory and return ChatGPT/Codex project-configuration
-  guidance when none exists. Handoff must require an exact effective-project
-  readback for the stable task. A missing value permits one bounded same-task
-  re-read plus an inventory refresh: absence selects setup remediation, while
-  continued unobservability for a still-present project selects
-  `unsupported-runtime`. Never infer binding from a request, receipt, local
-  path, worktree, title, or conversation, and never create a replacement task.
+  guidance when none exists. Handoff must require the assigned task to read its
+  exact effective project from authoritative task-scoped context and bind that
+  value to the stable task identity. A missing value permits one bounded
+  assigned-task self-read plus an inventory refresh: absence selects setup
+  remediation, while continued unobservability for a still-present project
+  selects `unsupported-runtime`. Never infer binding from a request, receipt,
+  local path, worktree, title, or conversation, and never create a replacement
+  task.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -312,17 +318,19 @@ surface.
   hosted-content owner without duplicate Idea doctrine. Include exact
   single-line title artifacts without serialization-added terminators.
 - Validate that Feature and Implement both route every created task through the
-  shared typed effective-role observation and title-reconciliation outcome
-  before normal monitoring or update relay, require the assigned task's
-  non-recursive bootstrap self-check before role-owned work, exclude the
-  controller's own profile from child comparison, reject profile evidence
-  bound to a different task identity, distinguish `unsupported-runtime` from
-  `effective-profile-mismatch`, and ensure resume paths cannot repeat an
+  shared typed assigned-task bootstrap, controller identity binding, and
+  title-reconciliation outcome before normal monitoring or update relay;
+  require the assigned task's non-recursive authoritative self-check before
+  role-owned work; exclude the controller's own profile from child comparison;
+  reject unstructured self-report and profile evidence bound to a different
+  task identity; distinguish `unsupported-runtime` from
+  `effective-profile-mismatch`; and ensure resume paths cannot repeat an
   uncertain adjustment or create a replacement after profile mismatch.
-- Validate inventory-backed project selection, exact effective-project
-  comparison, one bounded same-task re-read, missing-project setup guidance,
-  present-but-unobservable `unsupported-runtime`, and the prohibition on
-  path-based inference or replacement-task retries.
+- Validate inventory-backed project selection, exact assigned-task
+  effective-project comparison, one bounded assigned-task self-read,
+  missing-project setup guidance, present-but-unobservable
+  `unsupported-runtime`, and the prohibition on path-based inference or
+  replacement-task retries.
 - Validate flat prompt projection, best-effort canonical-title prompt hints,
   mandatory title readback/correction, and removal of nested or escaped
   transport envelopes without losing semantic constraints.

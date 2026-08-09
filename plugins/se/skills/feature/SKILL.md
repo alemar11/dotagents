@@ -52,12 +52,15 @@ preflight, and shared task handoff before creating, resuming, or monitoring the
 planner task. The application task is an execution envelope for the current
 planning run; it is not a Feature graph node.
 
-The invoking task controller creates or resumes exactly one planner and owns
-the planner's independent post-effect observation. A planner already started
-from that handoff performs the shared assigned-task bootstrap self-check before
-Feature analysis or publication and does not create or resume another planner
-task. The controller's own model or reasoning may differ from the planner's;
-only the exact planner task is compared with the planner profile.
+The invoking task controller creates or resumes exactly one planner,
+independently observes its stable task identity, and binds the planner's
+structured bootstrap result to that identity. A planner already started from
+that handoff reads its own authoritative task-scoped execution context and
+performs the shared assigned-task bootstrap self-check before Feature analysis
+or publication. It does not create or resume another planner task. The
+controller's own model or reasoning may differ from the planner's; only the
+exact planner task's self-observed values are compared with the planner
+profile.
 
 The planner is required. Read-only analysis-worker and critic-analyst roles
 are optional capability-conditioned roles. When delegation is available, the
@@ -80,14 +83,15 @@ owns awaiting-user-input separately. If goal tools are unavailable, preserve
 the same objective in the task report and continue.
 
 The shared task preflight must verify required task creation, inventory-backed
-project selection, effective task-project and planner-profile readback,
-observation, monitoring, and relay capabilities. After task identity readback,
-the shared handoff must bind the exact requested and effective project, model,
-and reasoning before normal monitoring. The planner's complete resolved
-profile must be actively requested rather than obtained through ambient
-inheritance. It records delegation and goal capabilities as optional runtime
-facts. A missing optional capability selects the documented fallback; it does
-not authorize a replacement planner task.
+project selection, stable task-identity observation, assigned-task bootstrap,
+monitoring, and relay capabilities. After task identity readback, the shared
+handoff must bind the planner's authoritative self-observed project, model, and
+reasoning to the exact controller-observed task identity before normal
+monitoring. The planner's complete resolved profile must be actively requested
+rather than obtained through ambient inheritance. It records delegation and
+goal capabilities as optional runtime facts. A missing optional capability
+selects the documented fallback; it does not authorize a replacement planner
+task.
 
 ## Analysis worker contract
 

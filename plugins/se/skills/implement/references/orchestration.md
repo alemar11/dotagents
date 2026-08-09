@@ -47,27 +47,31 @@ terminal reconciliation.
 Apply the shared
 [task handoff](../../../references/task-handoff.md) at both levels of the
 Implement hierarchy. The invoking task controller creates or resumes the one
-orchestrator and independently observes its effective profile, project, host,
-state, and title. The orchestrator's first turn is assigned-task bootstrap: it
-self-checks authoritative task-scoped execution evidence before ledger,
-repository, Worker, or hosted effects and never creates another orchestrator
-for the same run.
+orchestrator, independently observes its stable task identity, state, and
+title, and verifies that the orchestrator's structured bootstrap result is
+bound to that identity. The orchestrator's first turn is assigned-task
+bootstrap: it self-checks authoritative task-scoped execution evidence before
+ledger, repository, Worker, or hosted effects and never creates another
+orchestrator for the same run.
 
 After that bootstrap, the orchestrator becomes the task controller for every
 Feature Worker. It freezes each Worker request, creates or resumes the Worker,
-and independently reads the exact Worker's authoritative task-scoped evidence
-before accepting normal updates. The Feature Worker performs its own bootstrap
-self-check before implementation or worktree writes and does not create or
-resume another Feature Worker. A Worker's profile may intentionally differ
-from the orchestrator's; compare the Worker only with its assignment-specific
-request.
+independently observes the stable Worker identity, and binds the Worker's
+structured bootstrap result to it before accepting normal updates. The Feature
+Worker reads its own authoritative task-scoped context and performs its
+bootstrap self-check before implementation or worktree writes. It does not
+create or resume another Feature Worker. A Worker's profile may intentionally
+differ from the orchestrator's; compare the Worker only with its
+assignment-specific request.
 
-Worker self-report is not the orchestrator's independent observation. A
-missing or unobservable authoritative child profile follows the shared
+An unstructured Worker self-report is not bootstrap evidence. A missing or
+unobservable authoritative child profile follows the shared
 `unsupported-runtime` rules, while a present authoritative exact-Worker
 profile that differs from the request is `effective-profile-mismatch`. Both
-preserve and reconcile the same Worker without replacement. These bootstrap
-checks add no ledger state and do not change the runtime workflow graph.
+preserve and reconcile the same Worker without replacement. The orchestrator
+verifies the bootstrap identity binding but does not duplicate the Worker's raw
+profile or project read. These bootstrap checks add no ledger state and do not
+change the runtime workflow graph.
 
 ## Starting-branch selection and freshness
 

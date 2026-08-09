@@ -179,23 +179,27 @@ Implement owns the final portable projection; G owns transport and readback.
 Before creating, resuming, or monitoring application tasks, load the
 Implement task profile, shared task preflight, and shared task handoff. The
 orchestrator and every Feature Worker are required roles. Inventory-backed
-project selection, authoritative effective-project and role observation, and
-title reconciliation are required before normal monitoring or update relay.
+project selection, stable task-identity observation, authoritative
+assigned-task project/profile bootstrap, and title reconciliation are required
+before normal monitoring or update relay.
 Actively request each role's complete resolved model and reasoning profile;
 never omit either value or rely on ambient inheritance. Project every
 orchestrator, Feature Worker, and optional support prompt through the shared
 flat prompt projection; never forward a raw parent prompt or transport envelope.
 
-The invoking task controller creates or resumes the orchestrator and owns its
-independent post-effect observation. An orchestrator already started from that
-handoff performs the shared assigned-task bootstrap self-check before ledger,
-repository, worker, or hosted effects and does not create another orchestrator.
-After bootstrap, the orchestrator is the task controller for Feature Workers:
-it creates or resumes and independently observes each Worker, while the Worker
-self-checks its own assigned profile and destination before implementation.
-Never compare the invoking controller's profile with the orchestrator, or the
-orchestrator's profile with a Worker; compare only each exact assigned task
-with its own resolved request.
+The invoking task controller creates or resumes the orchestrator,
+independently observes its stable task identity, and binds the orchestrator's
+structured bootstrap result to that identity. An orchestrator already started
+from that handoff reads its own authoritative task-scoped execution context and
+performs the shared assigned-task bootstrap self-check before ledger,
+repository, Worker, or hosted effects. It does not create another
+orchestrator. After bootstrap, the orchestrator is the task controller for
+Feature Workers: it creates or resumes each Worker, independently observes the
+stable Worker identity, and binds that Worker's authoritative bootstrap result
+before accepting implementation. Never compare the invoking controller's
+profile with the orchestrator, or the orchestrator's profile with a Worker;
+compare only each exact assigned task's self-observed values with its own
+resolved request.
 
 The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
 After a PR reaches `candidate-published`, its Feature Worker becomes inactive

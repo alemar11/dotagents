@@ -18,9 +18,9 @@ The contract owns the common gates for task creation and observation:
 
 - explicit invocation;
 - live application capabilities;
-- authoritative effective model and reasoning readback for created or resumed
-  task roles;
-- inventory-backed project selection plus independent task-project, host, and
+- authoritative assigned-task bootstrap for effective model, reasoning,
+  project, repository, and host readback;
+- inventory-backed project selection plus independent stable task identity and
   state observation;
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
@@ -34,30 +34,32 @@ publication remain governed by the invoking skill's own contract.
 
 The invoking skill also owns the requested model and reasoning values for each
 role and resolves any assignment-specific choice before task creation or
-resume. This contract owns the live capability gate for reading those values
-back authoritatively; [Task Handoff](task-handoff.md) owns the typed
-per-task observation and comparison evidence.
+resume. This contract owns the live capability gate for actively requesting
+those values and receiving an authoritative bootstrap result from the assigned
+task; [Task Handoff](task-handoff.md) owns the typed task-owned observation,
+comparison, and controller identity binding.
 
 The same ownership split applies to project identity. This preflight owns
 selection of one exact repository-compatible project from the live application
 project inventory and freezes that identity as the expected destination. Task
-Handoff owns the post-effect observation and bounded comparison against that
-expected identity. A configured project target is not proof that the resulting
-task received that binding.
+Handoff owns the assigned task's post-effect self-observation and bounded
+comparison against that expected identity. A configured project target is not
+proof that the resulting task received that binding.
 
 The `task controller` is the session that creates or resumes one assigned
-application task and then observes that exact task independently. The
-`assigned task` is the planner, orchestrator, Feature Worker, or separately
-instantiated optional role named by the handoff. The task controller's own
-effective model and reasoning are not assignment evidence and must never be
-compared with the assigned role's requested profile. The two profiles may
-differ intentionally.
+application task, independently observes its stable identity and state, and
+binds the task-owned bootstrap result to that exact identity. The `assigned
+task` is the planner, orchestrator, Feature Worker, or separately instantiated
+optional role named by the handoff. The task controller's own effective model
+and reasoning are not assignment evidence and must never be compared with the
+assigned role's requested profile. The two profiles may differ intentionally.
 
 Preflight runs in the task controller before the effect and verifies that the
-runtime can request and later observe the assigned profile. It does not perform
+runtime can request the assigned profile, observe the resulting stable task
+identity, and relay the assigned task's bootstrap result. It does not perform
 the value comparison before the assigned task exists. Task Handoff owns the
-controller's post-effect comparison and the assigned task's bounded bootstrap
-self-check.
+assigned task's authoritative bootstrap comparison and the controller's
+post-effect identity binding.
 
 An explicit invocation of a task-managed Feature or Implement workflow also
 selects the exact required role profiles declared by that workflow. For every
@@ -72,8 +74,8 @@ an undeclared model or reasoning substitution.
 The invoking skill must pass a reference to its complete task profile and the
 roles required by the selected topology. The preflight verifies the live
 runtime for every supplied role; it does not select, rewrite, downgrade, or
-replace a role. For a multi-role profile, every role must be verified before
-the first role starts.
+replace a role. For a multi-role profile, every role's explicit request and
+assigned-task bootstrap path must be supported before the first role starts.
 
 ## Required preflight gates
 
@@ -93,34 +95,36 @@ the requested topology:
 - create or resume a task;
 - inventory the projects currently configured on the intended application
   host;
-- independently observe the task after the effect;
-- independently read back the effective project identity for the exact
-  observed task;
-- independently read back the effective model and reasoning for the exact
-  observed task;
+- independently observe the stable task identity and state after the effect;
+- let the exact assigned task read its authoritative task-scoped execution
+  context and compare its effective project, model, reasoning, repository, and
+  host with the handoff;
+- receive a structured bootstrap result whose evidence task identity can be
+  bound to the independently observed stable task identity;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
 
 An authoritative task-scoped execution context satisfies effective-profile
-readback when it is independently accessible to the task controller and bound
-to the exact observed task identity. The controller must inspect the complete
-current live runtime surface. Absence from one general task-inventory view is
-not by itself evidence that authoritative assigned-task readback is
-unavailable.
+readback when it is accessible to the exact assigned task, identifies that
+same task, and supplies the values used in its structured bootstrap result.
+The controller does not need direct access to that raw source; it must
+independently observe the stable task identity and require the bootstrap
+evidence identity to match it exactly. A generic conversational self-report is
+not a structured bootstrap result.
 
 Documentation, cached metadata, an earlier receipt, or a static validator is
 not evidence that a live capability is available. If creation, observation, or
 monitoring cannot be verified, fail closed before creating or retrying a task.
 
 Before recording a required role as verified, establish that the current
-runtime can both accept an active request for the complete resolved profile
-and expose an authoritative post-effect readback of the effective model and reasoning. A
-request payload, configured default, creation receipt, conversation text, or
-locally inferred value is not effective-profile evidence. `roles_verified:
-true` means every required role is supported and has this readback capability;
-it does not claim that a task has already been created or that its effective
-profile has matched. The handoff supplies that proof after stable task identity
-observation.
+runtime can accept an active request for the complete resolved profile,
+observe the resulting stable task identity, and relay the exact assigned
+task's authoritative bootstrap result. A request payload, configured default,
+creation receipt, unstructured conversation text, or locally inferred value is
+not effective-profile evidence. `roles_verified: true` means every required
+role supports that request and bootstrap path; it does not claim that a task
+has already been created or that its effective profile has matched. The
+handoff supplies that proof after stable task identity observation.
 
 If the runtime can create a task only by inheriting one or both required
 profile values, the fixed-profile capability gate has not passed. Stop before
@@ -129,20 +133,22 @@ received afterward.
 
 Project selection and project readback are also separate capabilities. The
 ability to request a project, an accepted creation effect, or an echoed target
-does not establish the task's effective project binding. The runtime must
-expose a post-effect project observation that can be bound to the stable task
-identity. A missing value discovered only after creation follows the bounded
+does not establish the task's effective project binding. The exact assigned
+task must read the post-effect project value from its authoritative task-scoped
+context and bind it to the stable task identity in the bootstrap result. A
+missing value discovered only after creation follows the bounded
 reconciliation in [Task Handoff](task-handoff.md); it never becomes an inferred
 match.
 
 The profile capability check is equally strict for required roles. If any
-required role is not supported by the live runtime, or its effective profile
-cannot later be read back authoritatively, the preflight result is `blocked`
-with `blocker: unsupported-runtime`. There is no automatic model, reasoning,
-or required-topology fallback. A skill may declare optional roles or optional
+required role is not supported by the live runtime, or the exact assigned task
+cannot later read its effective profile authoritatively and return the bound
+bootstrap evidence, the result is `blocked` with `blocker:
+unsupported-runtime`. There is no automatic model, reasoning, or
+required-topology fallback. A skill may declare optional roles or optional
 capabilities with an explicit parent or serial fallback. Those facts must be
 recorded and must not be reported as delegated work unless a worker was
-actually started and independently observed.
+actually started and its bootstrap identity was verified.
 
 ### Optional runtime capabilities
 
@@ -190,46 +196,50 @@ the ChatGPT/Codex application. Never substitute a neighboring project, create
 an intentionally projectless task, or treat a repository path as project
 identity.
 
-### 4. Independent observation
+### 4. Task identity and assigned-task bootstrap
 
-After creating or resuming a task, read the resulting state independently from
-the authoritative application view. The observation must preserve the exact
-`task_identity`, `project_identity`, `host_identity`, repository destination,
-current `state`, and the task handoff's typed effective-role observation. A
-display title, conversation text, caller-supplied identifier, or echoed request
-profile is not identity or effective-profile evidence.
+After creating or resuming a task, the controller independently observes the
+stable `task_identity` and current `state` from the authoritative application
+view. The assigned task then performs the bootstrap self-check defined by Task
+Handoff and returns its typed effective-role and destination observations
+before beginning role-owned work. A display title, caller-supplied identifier,
+echoed request profile, or unstructured conversational claim is not identity
+or effective-profile evidence.
 
-The task controller owns this independent observation. The assigned task also
-performs the bootstrap self-check defined by Task Handoff before beginning its
-role-owned work, but its message or self-report does not replace the
-controller's direct authoritative readback.
+The task controller owns creation/resume, stable identity observation, and
+binding of the structured bootstrap result. The assigned task owns the
+authoritative read of its own task-scoped execution context and every
+requested-versus-observed comparison. The controller does not duplicate that
+profile or project read.
 
-The observed project identity must be present and exactly equal the frozen
-preflight identity. Do not infer task-project binding from the request, the
-creation receipt, the working directory, a checkout or worktree path, the
-display title, or conversation text. A non-null mismatch is a destination
-mismatch and blocks normal monitoring. A missing or unobservable value must
-complete the handoff's one bounded same-task re-read and refreshed project
-inventory before classification; it is never a match.
+The project identity observed by the assigned task must be present and exactly
+equal the frozen preflight identity. Do not infer task-project binding from the
+request, the creation receipt, the working directory, a checkout or worktree
+path, the display title, or conversation text. A non-null mismatch is a
+destination mismatch and blocks normal monitoring. A missing or unobservable
+value must complete the handoff's one bounded assigned-task re-read and
+refreshed controller project inventory before classification; it is never a
+match.
 
-Compare the assigned task's effective model and reasoning with the
-assignment-specific values resolved from the skill-owned profile. Never
-compare the task controller's own profile with the assigned role. A missing or
-unobservable exact-task observation for a required role is `blocked` with
-`blocker: unsupported-runtime`; an authoritative exact-task observation whose
-effective model or reasoning differs from the request is `blocked` with
-`blocker: effective-profile-mismatch`. Both stop before normal monitoring or
-update relay. Preserve and reconcile the observed task identity; do not create
-a replacement. For an optional role, use only the invoking skill's declared
+The assigned task compares its effective model and reasoning with the
+assignment-specific values resolved from the skill-owned profile and returns
+that typed observation in the bootstrap result. Never compare the task
+controller's own profile with the assigned role. A missing or unobservable
+exact-task observation for a required role is `blocked` with `blocker:
+unsupported-runtime`; an authoritative exact-task observation whose effective
+model or reasoning differs from the request is `blocked` with `blocker:
+effective-profile-mismatch`. Both stop before normal monitoring or update
+relay. Preserve and reconcile the observed task identity; do not create a
+replacement. For an optional role, use only the invoking skill's declared
 parent or serial fallback and do not claim delegated work.
 
 A matching effective readback does not repair a missing explicit profile
 request. Require both the pre-effect request evidence owned by the handoff and
 the post-effect effective-profile observation for the same task.
 
-The same observation boundary applies after a resume, a host change, a
-monitoring gap, or a final update. Do not report a task as running or complete
-from an unverified receipt.
+The same identity-and-bootstrap boundary applies after a resume, a host
+change, a monitoring gap, or a final update. Do not report a task as running
+or complete from an unverified receipt or an unbound bootstrap result.
 
 ### 5. Separate authorization scopes
 
@@ -298,9 +308,10 @@ preflight:
   capabilities:
     create_task: available
     inventory_projects: available
-    observe_task: available
-    observe_task_project_identity: available
-    observe_effective_role_profile: available
+    observe_task_identity: available
+    request_explicit_role_profile: available
+    assigned_task_bootstrap: available
+    receive_bootstrap_result: available
     monitor_task: available
     relay_partial_updates: available
     relay_final_update: available
@@ -333,16 +344,17 @@ status.
 
 ## Fail-closed rule
 
-If the ChatGPT/Codex application, live task creation, independent observation,
-effective required-role readback, or monitoring/relay path is unavailable, the
-outcome is `blocked`. The skill must return the smallest recovery input and
-stop before the affected task effect. It must not claim that a task exists, is
-being monitored, or completed until the required live evidence is available.
+If the ChatGPT/Codex application, live task creation, independent stable task
+identity observation, assigned-task authoritative bootstrap, or
+monitoring/relay path is unavailable, the outcome is `blocked`. The skill must
+return the smallest recovery input and stop before the affected role-owned
+effect. It must not claim that a task is being monitored or completed until
+the required live evidence is available.
 
 For project identity, return setup guidance when the exact expected project is
 absent from the refreshed live inventory. When that project remains present
-but the same task's effective project identity is still missing after the
-bounded readback, block with `blocker: unsupported-runtime`: the current
+but the assigned task's effective project identity is still missing after its
+bounded self-read, block with `blocker: unsupported-runtime`: the current
 runtime cannot prove the requested binding. Preserve the original task in both
 cases. A replacement task is not a readback retry.
 
@@ -351,17 +363,17 @@ cannot be actively requested. Never omit a required profile value to obtain a
 task receipt and never treat a coincidentally matching inherited profile as a
 valid task initialization.
 
-`unsupported-runtime` means that the required request or authoritative
-exact-task readback capability is unavailable, or that the exact task's values
-remain missing or unobservable. It does not describe a successful readback of
-different effective values; that case is `effective-profile-mismatch`. A
-profile readback whose source identity differs from the assigned task is not a
-mismatch observation for that child: discard it and treat the exact child's
-readback as unavailable.
+`unsupported-runtime` means that the required request, stable task identity,
+or authoritative assigned-task bootstrap capability is unavailable, or that
+the exact task's values remain missing or unobservable. It does not describe a
+successful readback of different effective values; that case is
+`effective-profile-mismatch`. A bootstrap profile readback whose evidence
+identity differs from the controller-observed assigned task is invalid for
+that child: discard it and treat the exact child's readback as unavailable.
 
 A difference between the task controller's profile and the assigned role's
-requested profile is not a mismatch. Only the independently observed profile
-of the exact assigned task participates in the comparison.
+requested profile is not a mismatch. Only the exact assigned task's
+authoritatively self-observed profile participates in the comparison.
 
 A missing title-request or title-adjustment capability alone is not a topology
 blocker because a title is display metadata. Continue only after recording the
