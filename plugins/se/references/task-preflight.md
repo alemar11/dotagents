@@ -20,7 +20,8 @@ The contract owns the common gates for task creation and observation:
 - live application capabilities;
 - authoritative effective model and reasoning readback for created or resumed
   task roles;
-- independent identity, project, host, and state observation;
+- inventory-backed project selection plus independent task-project, host, and
+  state observation;
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
 - repository and project destination verification;
@@ -36,6 +37,13 @@ role and resolves any assignment-specific choice before task creation or
 resume. This contract owns the live capability gate for reading those values
 back authoritatively; [Task Handoff](task-handoff.md) owns the typed
 per-task observation and comparison evidence.
+
+The same ownership split applies to project identity. This preflight owns
+selection of one exact repository-compatible project from the live application
+project inventory and freezes that identity as the expected destination. Task
+Handoff owns the post-effect observation and bounded comparison against that
+expected identity. A configured project target is not proof that the resulting
+task received that binding.
 
 An explicit invocation of a task-managed Feature or Implement workflow also
 selects the exact required role profiles declared by that workflow. For every
@@ -69,7 +77,11 @@ effect. The live capability check must establish all capabilities required by
 the requested topology:
 
 - create or resume a task;
+- inventory the projects currently configured on the intended application
+  host;
 - independently observe the task after the effect;
+- independently read back the effective project identity for the exact
+  observed task;
 - independently read back the effective model and reasoning for the exact
   observed task;
 - receive partial updates and a final update;
@@ -93,6 +105,14 @@ If the runtime can create a task only by inheriting one or both required
 profile values, the fixed-profile capability gate has not passed. Stop before
 the task effect instead of creating a task and checking which defaults it
 received afterward.
+
+Project selection and project readback are also separate capabilities. The
+ability to request a project, an accepted creation effect, or an echoed target
+does not establish the task's effective project binding. The runtime must
+expose a post-effect project observation that can be bound to the stable task
+identity. A missing value discovered only after creation follows the bounded
+reconciliation in [Task Handoff](task-handoff.md); it never becomes an inferred
+match.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or its effective profile
@@ -130,13 +150,22 @@ Resolve one exact destination for every task before creation. Independently
 verify:
 
 - `repository_identity` and the repository root or checkout path;
-- `project_identity` and the project binding used for the task;
+- `project_identity` as one exact expected project selected from the current
+  live application project inventory;
 - `host_identity` for the application execution host.
 
 The project binding must be compatible with the intended repository. A project
 that merely mentions a repository, a path copied from the request, or a
 cross-repository project assumption is insufficient. In a multi-repository
 run, verify each repository/project destination separately.
+
+Freeze the exact expected project identity and inventory evidence before the
+task effect. If no repository-compatible project exists in the live inventory,
+the preflight is `blocked` before creation. Return the smallest recovery input:
+ask the user to add or configure that exact repository as a saved project in
+the ChatGPT/Codex application. Never substitute a neighboring project, create
+an intentionally projectless task, or treat a repository path as project
+identity.
 
 ### 4. Independent observation
 
@@ -146,6 +175,14 @@ the authoritative application view. The observation must preserve the exact
 current `state`, and the task handoff's typed effective-role observation. A
 display title, conversation text, caller-supplied identifier, or echoed request
 profile is not identity or effective-profile evidence.
+
+The observed project identity must be present and exactly equal the frozen
+preflight identity. Do not infer task-project binding from the request, the
+creation receipt, the working directory, a checkout or worktree path, the
+display title, or conversation text. A non-null mismatch is a destination
+mismatch and blocks normal monitoring. A missing or unobservable value must
+complete the handoff's one bounded same-task re-read and refreshed project
+inventory before classification; it is never a match.
 
 Compare the effective model and reasoning with the assignment-specific values
 resolved from the skill-owned profile. A missing or mismatched observation for
@@ -228,7 +265,9 @@ preflight:
     roles_verified: true
   capabilities:
     create_task: available
+    inventory_projects: available
     observe_task: available
+    observe_task_project_identity: available
     observe_effective_role_profile: available
     monitor_task: available
     relay_partial_updates: available
@@ -242,7 +281,9 @@ preflight:
     effective_mode: parallel-analysis
   target:
     repository_identity: "<independently observed repository>"
-    project_identity: "<independently observed project>"
+    project_identity: "<inventory-backed expected project>"
+    project_inventory_evidence_ref: "<live inventory observation>"
+    project_repository_compatible: true
     project_root: "<verified repository-compatible path>"
     host_identity: "<independently observed host>"
     independently_verified: true
@@ -265,6 +306,13 @@ effective required-role readback, or monitoring/relay path is unavailable, the
 outcome is `blocked`. The skill must return the smallest recovery input and
 stop before the affected task effect. It must not claim that a task exists, is
 being monitored, or completed until the required live evidence is available.
+
+For project identity, return setup guidance when the exact expected project is
+absent from the refreshed live inventory. When that project remains present
+but the same task's effective project identity is still missing after the
+bounded readback, block with `blocker: unsupported-runtime`: the current
+runtime cannot prove the requested binding. Preserve the original task in both
+cases. A replacement task is not a readback retry.
 
 The same fail-closed rule applies when the exact resolved model and reasoning
 cannot be actively requested. Never omit a required profile value to obtain a

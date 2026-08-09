@@ -13,6 +13,7 @@ authorization decisions.
 - [Title reconciliation](#title-reconciliation)
 - [Role-profile request](#role-profile-request)
 - [Role-profile observation](#role-profile-observation)
+- [Project identity reconciliation](#project-identity-reconciliation)
 - [Observation record](#observation-record)
 - [Update relay](#update-relay)
 - [Failure and recovery evidence](#failure-and-recovery-evidence)
@@ -29,6 +30,8 @@ The handoff must contain, or link to:
 - the explicit user request and bounded objective;
 - the source Feature Plan, source issue, or other durable input references;
 - the exact repository destination and allowed scope;
+- the exact requested project identity selected from the preflight's live
+  inventory, plus its repository-compatibility evidence;
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
 - the exact requested model and reasoning resolved for this assignment;
@@ -186,6 +189,53 @@ sandbox or permission fields here. Repository, project, host, checkout, and
 worktree boundaries remain with their existing owners; a skill that requires
 another execution-boundary fact must define its semantic requirement itself.
 
+## Project identity reconciliation
+
+After the stable task identity is independently observed, read the effective
+project identity from the authoritative application view and compare it with
+the exact project identity frozen by preflight. Project selection evidence and
+task-project observation are distinct: a request payload, creation receipt,
+working directory, checkout or worktree path, display title, or conversation
+text cannot prove the effective binding.
+
+Apply this bounded decision sequence to the same stable task:
+
+1. an exact observed match permits the handoff to continue;
+2. a present but different identity is a destination mismatch and blocks
+   normal monitoring or update relay;
+3. a missing or unobservable identity permits exactly one bounded second
+   authoritative readback of that same task plus one refresh of the live
+   project inventory;
+4. if the second readback matches, continue and retain both observations;
+5. if the expected project is absent or no longer repository-compatible in the
+   refreshed inventory, remain `blocked` and tell the user to add or configure
+   the exact repository as a saved project in the ChatGPT/Codex application;
+6. if the expected project remains present and compatible but the effective
+   identity is still missing, remain `blocked` with
+   `blocker: unsupported-runtime` because the runtime cannot prove the binding;
+7. if the second readback exposes a different identity, remain blocked on the
+   destination mismatch.
+
+The bounded second readback is observation, not task creation recovery. Never
+create a replacement task, repeat the create effect, switch projects, or
+continue projectless to obtain different evidence. Preserve the same task
+identity and report the smallest actionable recovery input.
+
+```yaml
+project_reconciliation:
+  task_identity: "<stable observed task identity>"
+  requested_project_identity: "<inventory-backed preflight project>"
+  initial_observed_project_identity: null
+  bounded_reread_attempted: true
+  final_observed_project_identity: null
+  refreshed_inventory_contains_requested: true
+  project_inventory_evidence_ref: "<refreshed live inventory observation>"
+  task_observation_evidence_refs:
+    - "<initial authoritative task observation>"
+    - "<bounded authoritative task re-read>"
+  independently_observed: true
+```
+
 ## Observation record
 
 After creation or resume, append an authoritative observation with these
@@ -210,7 +260,10 @@ task_observation:
   title_reconciliation_ref: "<bounded reconciliation evidence>"
   task_identity: "<exact observed task identity>"
   repository_identity: "<exact observed repository>"
-  project_identity: "<exact observed project>"
+  requested_project_identity: "<inventory-backed preflight project>"
+  project_identity: "<exact effective project readback or null>"
+  project_identity_evidence_ref: "<authoritative task readback>"
+  project_reconciliation_ref: "<bounded same-task evidence>"
   project_root: "<exact observed repository-compatible path>"
   host_identity: "<exact observed host>"
   state: "<observed operational state>"
@@ -225,12 +278,17 @@ identity, project, host, repository, or state is a blocker until reconciled.
 The task identity and authoritative role readback are execution evidence;
 titles and other display metadata are not.
 
+A null project readback is not an exact match. Complete the project identity
+subprotocol above before selecting its setup-remediation or
+`unsupported-runtime` blocker. Do not infer the result from another field.
+
 ## Update relay
 
-Do not begin normal monitoring or relay a partial update until the required
-role observation matches and title reconciliation has produced either
-`verified`, `title-unverified`, or `title-drift`. The title warning outcomes do
-not suspend otherwise valid work.
+Do not begin normal monitoring or relay a partial update until the effective
+project identity exactly matches the preflight target, the required role
+observation matches, and title reconciliation has produced either `verified`,
+`title-unverified`, or `title-drift`. The title warning outcomes do not suspend
+otherwise valid work.
 
 Relay updates without changing their meaning or presenting a partial update as
 final. Each relayed update must identify the observed task and distinguish its
@@ -273,11 +331,17 @@ Apply the same read-before-retry rule to an ambiguous title adjustment, but do
 not retry that adjustment. Preserve the task and finalize its title status from
 the authoritative evidence that remains available.
 
+The one bounded project re-read defined above never authorizes another create
+or resume effect. Preserve the original task even when the project remains
+unobservable, and report the resulting setup or runtime blocker.
+
 ## Final handoff result
 
 The final relay must preserve the exact task identity and include:
 
 - the final independently observed task, project, host, repository, and state;
+- the requested-versus-observed project identity, refreshed-inventory evidence
+  when used, and the resulting setup or runtime blocker when they do not match;
 - the explicit profile-request evidence and prohibition on ambient
   inheritance;
 - the final typed role observation and authoritative effective-profile

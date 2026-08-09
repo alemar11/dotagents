@@ -11,11 +11,13 @@ surface.
 - .codex-plugin/plugin.json owns SE identity, version, discovery metadata,
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability,
-  effective-role-readback capability, destination, observation, authorization,
-  display-title capability, update-relay, and recovery gates.
+  effective-role-readback capability, inventory-backed project availability,
+  destination, observation, authorization, display-title capability,
+  update-relay, and recovery gates.
 - references/task-handoff.md owns the shared task assignment, typed requested
-  versus effective role observation, partial/final relay, deterministic emoji
-  title grammar, bounded title reconciliation, and terminal-report evidence.
+  versus effective role observation, bounded effective-project reconciliation,
+  partial/final relay, deterministic emoji title grammar, bounded title
+  reconciliation, and terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea hosted shape for SE
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -170,6 +172,15 @@ surface.
   produce matching effective values. Reuse existing workflow outcomes, never
   persist this evidence in the Implement ledger, and never create a replacement
   after a mismatch or unobservable required profile.
+- Keep effective task-project verification shared by every task-managed SE
+  skill. Preflight must select one exact repository-compatible project from the
+  live application inventory and return ChatGPT/Codex project-configuration
+  guidance when none exists. Handoff must require an exact effective-project
+  readback for the stable task. A missing value permits one bounded same-task
+  re-read plus an inventory refresh: absence selects setup remediation, while
+  continued unobservability for a still-present project selects
+  `unsupported-runtime`. Never infer binding from a request, receipt, local
+  path, worktree, title, or conversation, and never create a replacement task.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -274,6 +285,10 @@ surface.
   shared typed effective-role observation and title-reconciliation outcome
   before normal monitoring or update relay, and that resume paths cannot repeat
   an uncertain adjustment or create a replacement after profile mismatch.
+- Validate inventory-backed project selection, exact effective-project
+  comparison, one bounded same-task re-read, missing-project setup guidance,
+  present-but-unobservable `unsupported-runtime`, and the prohibition on
+  path-based inference or replacement-task retries.
 - Validate the canonical bracketed Feature acceptance syntax, monotonic
   high-water marks, plan publication/readback, malformed and legacy-checkbox
   rejection, question-batch completeness, and Implement evidence bound to the

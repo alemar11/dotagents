@@ -22,7 +22,11 @@ Its skills are deliberately separated by responsibility:
   contracts shared by task-managed Feature and Implement runs. They require an
   explicit, complete role-profile request with no ambient inheritance plus an
   authoritative, assignment-specific comparison between requested and
-  effective model/reasoning before normal task monitoring.
+  effective model/reasoning before normal task monitoring. They also freeze one
+  repository-compatible project from the live application inventory and
+  require an exact effective-project readback for the resulting task. A missing
+  configured project returns setup guidance; a still-unobservable binding for
+  a present project fails closed as an unsupported runtime.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
@@ -51,10 +55,12 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
-- task-handoff.md binds a typed effective-role observation to planner,
-  orchestrator, and Feature Worker task identity, then applies the established
-  SE Implement emoji-title grammar with authoritative readback and at most one
-  bounded correction before monitoring; titles remain display metadata.
+- task-handoff.md binds typed effective-role and effective-project observations
+  to planner, orchestrator, and Feature Worker task identity, then applies the
+  established SE Implement emoji-title grammar with authoritative readback and
+  at most one bounded correction before monitoring; titles remain display
+  metadata. Missing project identity gets one bounded same-task re-read and
+  inventory refresh, never a replacement task or a path-based inference.
 - skills/implement/ accepts one or more explicit GitHub parent Feature issue
   references, verifies their authoritative Feature semantic contracts and
   sibling dependency context, records local Macro projections as complete,
