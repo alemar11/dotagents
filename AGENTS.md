@@ -131,9 +131,12 @@ when the package is intended for Codex.
 - Separate selectable options from execution facts, derived state, prose,
   and references. Do not turn caller-owned inputs or result state into durable
   configuration merely because a workflow needs to report them.
-- Build through progressive disclosure: keep selection-critical and safety
-  rules in `SKILL.md`, and route decidable branch detail to one canonical
-  reference with an explicit read condition.
+- Apply progressive disclosure as an exclusive placement rule: if content is
+  not required on first load to select the skill, preserve safety or mutation
+  boundaries, choose the next workflow branch, or satisfy the immediate output
+  contract, it must not live in `SKILL.md`. Move it to one canonical directly
+  routed reference, state an explicit read condition in `SKILL.md`, and do not
+  duplicate or summarize the deferred content there.
 
 ### Testing and Validation
 
