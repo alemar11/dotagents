@@ -12,14 +12,14 @@ surface.
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability,
   explicit-profile request capability, assigned-task authoritative bootstrap
-  capability, inventory-backed project availability, stable task-identity
-  observation, destination, authorization, display-title capability,
-  update-relay, and recovery gates.
+  capability, stable task-identity observation, execution-target verification,
+  destination, authorization, display-title capability, update-relay, and
+  recovery gates.
 - references/task-handoff.md owns the shared task assignment, typed task-owned
   requested-versus-effective role observation, controller identity binding,
-  bounded effective-project reconciliation, flat semantic prompt projection,
-  partial/final relay, deterministic emoji title grammar and first-prompt hint,
-  bounded title reconciliation, and terminal-report evidence.
+  assigned-task execution-target observation, flat semantic prompt projection,
+  partial/final relay, deterministic emoji title grammar and first-prompt
+  hint, bounded title reconciliation, and terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea hosted shape for SE
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -194,17 +194,18 @@ surface.
   Keep `unsupported-runtime` for unavailable or unobservable exact-task
   bootstrap evidence and use `effective-profile-mismatch` when present
   authoritative values for the exact assigned task differ from the request.
-- Keep effective task-project verification shared by every task-managed SE
-  skill. Preflight must select one exact repository-compatible project from the
-  live application inventory and return ChatGPT/Codex project-configuration
-  guidance when none exists. Handoff must require the assigned task to read its
-  exact effective project from authoritative task-scoped context and bind that
-  value to the stable task identity. A missing value permits one bounded
-  assigned-task self-read plus an inventory refresh: absence selects setup
-  remediation, while continued unobservability for a still-present project
-  selects `unsupported-runtime`. Never infer binding from a request, receipt,
-  local path, worktree, title, or conversation, and never create a replacement
-  task.
+  Use `task-identity-mismatch` when present authoritative bootstrap evidence is
+  bound to another task.
+- Keep execution-target verification shared by every task-managed SE skill.
+  Preflight freezes the expected repository, execution mode, remote, and any
+  topology-required checkout or base facts. Handoff requires the assigned
+  task to observe its actual Git execution target and compare it with that
+  request. Missing required runtime observations select `unsupported-runtime`;
+  present differences select `execution-target-mismatch`. Application saved
+  project identity and project-root metadata are optional diagnostics only:
+  their absence never blocks, triggers a second read, or requires project
+  inventory refresh. Never substitute project display metadata for task or Git
+  execution evidence.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
@@ -323,14 +324,16 @@ surface.
   require the assigned task's non-recursive authoritative self-check before
   role-owned work; exclude the controller's own profile from child comparison;
   reject unstructured self-report and profile evidence bound to a different
-  task identity; distinguish `unsupported-runtime` from
-  `effective-profile-mismatch`; and ensure resume paths cannot repeat an
-  uncertain adjustment or create a replacement after profile mismatch.
-- Validate inventory-backed project selection, exact assigned-task
-  effective-project comparison, one bounded assigned-task self-read,
-  missing-project setup guidance, present-but-unobservable
-  `unsupported-runtime`, and the prohibition on path-based inference or
-  replacement-task retries.
+  task identity; distinguish `unsupported-runtime`,
+  `effective-profile-mismatch`, and `task-identity-mismatch`; and ensure resume
+  paths cannot repeat an uncertain adjustment or create a replacement after a
+  mismatch.
+- Validate exact execution-target freezing and assigned-task observation,
+  `execution-target-mismatch` for present Git-target differences, and
+  `unsupported-runtime` for missing required observations. Verify that saved
+  project identity and project-root metadata remain non-blocking diagnostics
+  and never trigger a second read, project inventory refresh, or replacement
+  task.
 - Validate flat prompt projection, best-effort canonical-title prompt hints,
   mandatory title readback/correction, and removal of nested or escaped
   transport envelopes without losing semantic constraints.

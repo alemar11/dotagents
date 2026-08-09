@@ -15,7 +15,7 @@ authorization decisions.
 - [Title reconciliation](#title-reconciliation)
 - [Role-profile request](#role-profile-request)
 - [Role-profile observation](#role-profile-observation)
-- [Project identity reconciliation](#project-identity-reconciliation)
+- [Execution-target observation](#execution-target-observation)
 - [Observation record](#observation-record)
 - [Update relay](#update-relay)
 - [Failure and recovery evidence](#failure-and-recovery-evidence)
@@ -32,8 +32,8 @@ The handoff must contain, or link to:
 - the explicit user request and bounded objective;
 - the source Feature Plan, source issue, or other durable input references;
 - the exact repository destination and allowed scope;
-- the exact requested project identity selected from the preflight's live
-  inventory, plus its repository-compatibility evidence;
+- the frozen Git execution target, including repository, remote, execution
+  mode, and any topology-required checkout or base facts;
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
 - the exact requested model and reasoning resolved for this assignment;
@@ -63,7 +63,7 @@ alter the assignment; retain any needed source message by reference instead of
 embedding its raw envelope.
 
 The projected prompt is internal control-plane content. It is not hosted
-content, task identity, project evidence, or durable plan authority.
+content, task identity, execution evidence, or durable plan authority.
 
 ## Controller observation and assigned-task bootstrap
 
@@ -79,16 +79,17 @@ complementary:
    identity, current state, and title;
 3. before role-owned planning, orchestration, implementation, repository, or
    hosted work, the assigned task reads its own authoritative task-scoped
-   execution context, compares its effective profile and destination with the
-   handoff, and returns the structured bootstrap result defined below;
+   execution context, compares its effective profile with the handoff, observes
+   its actual Git execution target, and returns the structured bootstrap result
+   defined below;
 4. before normal monitoring or update relay, the controller verifies that the
    bootstrap evidence identity exactly equals the stable assigned-task
    identity and completes title reconciliation.
 
 The controller does not duplicate the assigned task's authoritative profile
-or project read. Role-owned work waits for the assigned-task bootstrap, while
-normal controller monitoring and relay wait for exact identity binding and
-title reconciliation.
+read. Role-owned work waits for the assigned-task bootstrap, while normal
+controller monitoring and relay wait for exact identity binding, execution
+target comparison, and title reconciliation.
 
 The controller and assigned task may run under intentionally different model
 or reasoning profiles. Only the assigned task's authoritatively self-observed
@@ -100,10 +101,10 @@ source task identity, requested and observed values, and evidence reference.
 The authoritative source must expose the identity of the task whose effective
 values it reports. That evidence identity must exactly equal the stable
 assigned-task identity observed by the controller. Evidence from a different
-task is discarded as cross-task evidence: the exact assigned task's profile
-remains unobservable and follows `unsupported-runtime`. When exact-task
-evidence is present but its model or reasoning differs from the request, use
-`effective-profile-mismatch` instead.
+task is `task-identity-mismatch`. When exact-task evidence is present but its
+model or reasoning differs from the request, use
+`effective-profile-mismatch` instead. A missing evidence task identity remains
+`unsupported-runtime` because no exact-task comparison is possible.
 
 An assigned planner, orchestrator, Feature Worker, or optional task that has
 already started from a valid handoff does not create or resume another task for
@@ -261,11 +262,13 @@ fabricate or silently omit it.
 For a required role, both effective values must be present and exactly match
 the resolved requested values before role-owned work, normal monitoring, or
 update relay. A missing or unobservable value, an unstructured self-report, or
-evidence bound to another task is `blocked` with `blocker:
+a missing evidence task identity is `blocked` with `blocker:
 unsupported-runtime`. Present authoritative values bound to the exact assigned
 task that differ from the request are `blocked` with `blocker:
-effective-profile-mismatch`. Preserve the observed task identity and reconcile
-the original effect; never create a replacement task merely to seek a matching
+effective-profile-mismatch`. A present evidence task identity that differs
+from the controller-observed task is `blocked` with `blocker:
+task-identity-mismatch`. Preserve the observed task identity and reconcile the
+original effect; never create a replacement task merely to seek a matching
 profile. For an optional role instantiated as its own application task, apply
 the invoking skill's declared fallback and do not claim delegated work unless
 the task identity and structured bootstrap result were both verified.
@@ -278,7 +281,8 @@ controller's identity binding.
 | exact-match | authoritative and identity-matched | present | exact match | exact | continue |
 | observed-profile-differs | authoritative and identity-matched | present | model or reasoning differs | exact | `effective-profile-mismatch` |
 | missing-effective-values | authoritative and identity-matched | missing or unobservable | unavailable | exact | `unsupported-runtime` |
-| wrong-task-identity | absent or bound to another task | any | invalid for this assignment | different or unavailable | `unsupported-runtime` |
+| wrong-task-identity | authoritative but bound to another task | any | invalid for this assignment | different | `task-identity-mismatch` |
+| missing-task-identity | authoritative source omits task identity | any | unavailable | unavailable | `unsupported-runtime` |
 | unstructured-self-report | conversational claim only | any | not authoritative | exact or unavailable | `unsupported-runtime` |
 
 The assigned task records the authoritative comparison in its bootstrap
@@ -290,57 +294,49 @@ readback.
 The role observation is evidence, not a new state machine. Do not add an
 `accepted` or routing-status field: the invoking workflow retains its existing
 `ready`, fallback, `complete`, and `blocked` outcomes. Do not add generic
-sandbox or permission fields here. Repository, project, host, checkout, and
-worktree boundaries remain with their existing owners; a skill that requires
-another execution-boundary fact must define its semantic requirement itself.
+sandbox or permission fields here. Repository, host, checkout, and worktree
+boundaries remain with their existing owners; a skill that requires another
+execution-boundary fact must define its semantic requirement itself.
 
-## Project identity reconciliation
+## Execution-target observation
 
 After the controller independently observes the stable task identity, the
-assigned task reads its effective project identity from the authoritative
-task-scoped runtime view and compares it with the exact project identity frozen
-by preflight. Project selection evidence and task-project observation are
-distinct: a request payload, creation receipt, working directory, checkout or
-worktree path, display title, or conversation text cannot prove the effective
-binding.
+assigned task inspects its actual execution target and compares it with the
+target frozen by preflight. Observe the repository identity, Git root or
+worktree root, remote identity, execution mode, and every checkout, ref,
+base, or HEAD fact required by the skill-owned topology.
 
-Apply this bounded decision sequence to the same stable task:
+The execution-target record describes where work can actually happen. A
+request payload, creation receipt, display title, or application saved-project
+label cannot substitute for Git and filesystem observations. Conversely,
+`project_identity` and application project-root metadata are optional
+diagnostics only. When either is absent, continue without a second read or
+project inventory refresh.
 
-1. an exact observed match permits the handoff to continue;
-2. a present but different identity is a destination mismatch and blocks
-   normal monitoring or update relay;
-3. a missing or unobservable identity permits exactly one bounded second
-   authoritative self-read by that same assigned task plus one controller
-   refresh of the live project inventory;
-4. if the second readback matches, continue and retain both observations;
-5. if the expected project is absent or no longer repository-compatible in the
-   refreshed inventory, remain `blocked` and tell the user to add or configure
-   the exact repository as a saved project in the ChatGPT/Codex application;
-6. if the expected project remains present and compatible but the effective
-   identity is still missing, remain `blocked` with
-   `blocker: unsupported-runtime` because the runtime cannot prove the binding;
-7. if the second readback exposes a different identity, remain blocked on the
-   destination mismatch.
+Apply these outcomes once to the same stable task:
 
-The bounded second self-read is observation, not task creation recovery. Never
-create a replacement task, repeat the create effect, switch projects, or
-continue projectless to obtain different evidence. Preserve the same task
-identity and report the smallest actionable recovery input.
+1. complete matching observations permit the handoff to continue;
+2. a missing required observation is `unsupported-runtime`;
+3. a present repository, remote, checkout, worktree, ref, base, or HEAD
+   difference is `execution-target-mismatch`;
+4. optional project metadata, whether present or absent, has no effect on the
+   outcome.
+
+Preserve the same task identity for every blocked result. Never create a
+replacement task or switch execution targets merely to seek matching evidence.
 
 ```yaml
-project_reconciliation:
-  task_identity: "<stable observed task identity>"
-  requested_project_identity: "<inventory-backed preflight project>"
-  initial_observed_project_identity: null
-  bounded_reread_attempted: true
-  final_observed_project_identity: null
-  refreshed_inventory_contains_requested: true
-  project_inventory_evidence_ref: "<refreshed live inventory observation>"
-  task_observation_evidence_refs:
-    - "<initial authoritative assigned-task self-read>"
-    - "<bounded authoritative assigned-task self-read>"
-  source_read_by: assigned-task
-  controller_identity_bound: true
+execution_target_observation:
+  request_ref: "<frozen preflight target>"
+  repository_identity: "<observed repository>"
+  repository_root: "<observed Git root>"
+  worktree_root: "<observed isolated worktree or null>"
+  remote_identity: "<observed remote>"
+  execution_mode: "<observed local or isolated mode>"
+  base_ref: "<required observed ref or null>"
+  base_sha: "<required observed full SHA or null>"
+  head_sha: "<required observed full SHA or null>"
+  comparison: exact-match
 ```
 
 ## Observation record
@@ -370,13 +366,7 @@ task_observation:
       requested_reasoning: "<assignment-resolved reasoning>"
       observed_model: "<authoritative effective model or null>"
       observed_reasoning: "<authoritative effective reasoning or null>"
-    repository_identity: "<authoritatively self-observed repository>"
-    requested_project_identity: "<inventory-backed preflight project>"
-    project_identity: "<authoritative effective project readback or null>"
-    project_identity_evidence_ref: "<authoritative task-scoped readback>"
-    project_reconciliation_ref: "<bounded same-task evidence>"
-    project_root: "<authoritatively self-observed repository-compatible path>"
-    host_identity: "<authoritatively self-observed host>"
+    execution_target_ref: "<assigned-task target observation>"
   controller_identity_bound: true
 ```
 
@@ -385,25 +375,23 @@ skill-owned profile, and its
 `assigned_task_bootstrap.profile_request_ref` must prove the complete resolved
 profile was actively requested. A missing explicit request, ambient
 inheritance, or a mismatch in effective model, effective reasoning, task
-identity, project, host, repository, or state is a blocker until reconciled.
+identity, execution target, or state is a blocker until reconciled.
 Require `assigned_task_bootstrap.evidence_task_identity` to equal the enclosing
 `task_observation.task_identity`; a different identity is not evidence about
 the assigned task. The independently observed task identity and the assigned
 task's authoritative bootstrap readback are execution evidence; titles and
 other display metadata are not.
 
-A null project readback is not an exact match. Complete the project identity
-subprotocol above before selecting its setup-remediation or
-`unsupported-runtime` blocker. Do not infer the result from another field.
+Null project diagnostics do not affect bootstrap or execution-target success.
+Do not infer those optional values from another field.
 
 ## Update relay
 
 Do not begin normal monitoring or relay a partial update until the assigned
-task bootstrap is bound to the stable task identity, its effective project
-identity exactly matches the preflight target, its required role observation
-matches, and title reconciliation has produced either `verified`,
-`title-unverified`, or `title-drift`. The title warning outcomes do not suspend
-otherwise valid work.
+task bootstrap is bound to the stable task identity, its required role and
+execution-target observations match, and title reconciliation has produced
+either `verified`, `title-unverified`, or `title-drift`. The title warning
+outcomes do not suspend otherwise valid work.
 
 Relay updates without changing their meaning or presenting a partial update as
 final. Each relayed update must identify the observed task and distinguish its
@@ -446,25 +434,19 @@ Apply the same read-before-retry rule to an ambiguous title adjustment, but do
 not retry that adjustment. Preserve the task and finalize its title status from
 the authoritative evidence that remains available.
 
-The one bounded assigned-task project self-read defined above never authorizes
-another create or resume effect. Preserve the original task even when the
-project remains unobservable, and report the resulting setup or runtime
-blocker.
-
 ## Final handoff result
 
 The final relay must preserve the exact task identity and include:
 
 - the final independently observed task identity and state plus the assigned
-  task's authoritative project, host, and repository bootstrap evidence;
-- the requested-versus-observed project identity, refreshed-inventory evidence
-  when used, and the resulting setup or runtime blocker when they do not match;
+  task's authoritative profile and execution-target evidence;
 - the explicit profile-request evidence and prohibition on ambient
   inheritance;
 - the final typed assigned-task bootstrap, role observation, controller
   identity binding, and authoritative effective-profile evidence;
-- the resulting `unsupported-runtime` or `effective-profile-mismatch` blocker
-  when the role-profile gate does not pass;
+- the resulting `unsupported-runtime`, `effective-profile-mismatch`,
+  `task-identity-mismatch`, or `execution-target-mismatch` blocker when a
+  required gate does not pass;
 - the assigned-task bootstrap self-check outcome;
 - the final title-reconciliation status and any display-metadata warning;
 - the Feature Plan outcome and validation evidence;

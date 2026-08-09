@@ -69,10 +69,12 @@ responsibilities. When it is unavailable, the planner performs the same
 analysis serially. Delegation unavailability never changes the plan contract
 and never blocks planning.
 
-The planner must use the invoking session's exact saved local project and
-local environment. It must not create or use a Git worktree, isolated
-checkout, or task fork. If the destination cannot be independently verified,
-stop before creating, resuming, or monitoring the task.
+The planner must use the invoking session's exact local repository checkout
+and local environment. It must not create or use a Git worktree, isolated
+checkout, or task fork. Saved-project identity and project-root metadata are
+optional diagnostics, not bootstrap gates. If the Git execution target cannot
+be independently verified, stop before creating, resuming, or monitoring the
+task.
 
 When goal tools are available, create or adopt one goal for the whole Feature
 Plan run after the task preflight is ready. Keep that goal active while the
@@ -82,16 +84,16 @@ blocked merely because the plan is awaiting user input; the plan run-state
 owns awaiting-user-input separately. If goal tools are unavailable, preserve
 the same objective in the task report and continue.
 
-The shared task preflight must verify required task creation, inventory-backed
-project selection, stable task-identity observation, assigned-task bootstrap,
-monitoring, and relay capabilities. After task identity readback, the shared
-handoff must bind the planner's authoritative self-observed project, model, and
-reasoning to the exact controller-observed task identity before normal
-monitoring. The planner's complete resolved profile must be actively requested
-rather than obtained through ambient inheritance. It records delegation and
-goal capabilities as optional runtime facts. A missing optional capability
-selects the documented fallback; it does not authorize a replacement planner
-task.
+The shared task preflight must verify required task creation, stable
+task-identity observation, assigned-task bootstrap, Git execution-target
+observation, monitoring, and relay capabilities. After task identity readback,
+the shared handoff must bind the planner's authoritative self-observed model and
+reasoning to the exact controller-observed task identity and compare its actual
+local repository target before normal monitoring. The planner's complete
+resolved profile must be actively requested rather than obtained through
+ambient inheritance. It records delegation and goal capabilities as optional
+runtime facts. A missing optional capability selects the documented fallback;
+it does not authorize a replacement planner task.
 
 ## Analysis worker contract
 

@@ -178,10 +178,11 @@ Implement owns the final portable projection; G owns transport and readback.
 
 Before creating, resuming, or monitoring application tasks, load the
 Implement task profile, shared task preflight, and shared task handoff. The
-orchestrator and every Feature Worker are required roles. Inventory-backed
-project selection, stable task-identity observation, authoritative
-assigned-task project/profile bootstrap, and title reconciliation are required
-before normal monitoring or update relay.
+orchestrator and every Feature Worker are required roles. Stable task-identity
+observation, authoritative assigned-task profile bootstrap, Git
+execution-target verification, and title reconciliation are required before
+normal monitoring or update relay. Saved-project identity and project-root
+metadata remain optional diagnostics.
 Actively request each role's complete resolved model and reasoning profile;
 never omit either value or rely on ambient inheritance. Project every
 orchestrator, Feature Worker, and optional support prompt through the shared
@@ -355,14 +356,14 @@ semantic contract, blocks before worker creation. GitHub labels and native
 Issue Types are never read or evaluated. Native issue dependencies may be read
 only as diagnostic projection evidence; mismatch or absence never changes the
 body-backed graph and is non-blocking.
-Runtime-preflight independently verifies every selected repository, project,
-current checkout, required application roles, and the G-owned workflows
-needed for the run. For each repository, it resolves the caller-selected
-`starting_branch` or the authoritative provider default, verifies its upstream
-identity, refreshes the branch state used for isolated worktree creation, and
-freezes the resulting full tip SHA. Current checkout state or a previously
-fetched local ref is never freshness evidence. The detailed refresh,
-drift, and worker-bootstrap rules are owned by
+Runtime-preflight independently verifies every selected repository, remote,
+current checkout or worktree constraint, required application roles, and the
+G-owned workflows needed for the run. For each repository, it resolves the
+caller-selected `starting_branch` or the authoritative provider default,
+verifies its upstream identity, refreshes the branch state used for isolated
+worktree creation, and freezes the resulting full tip SHA. Current checkout
+state or a previously fetched local ref is never freshness evidence. The
+detailed refresh, drift, and worker-bootstrap rules are owned by
 [orchestration.md](references/orchestration.md).
 
 Prepare Run uses the Feature semantic contract and every available verified

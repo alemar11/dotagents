@@ -18,13 +18,11 @@ The contract owns the common gates for task creation and observation:
 
 - explicit invocation;
 - live application capabilities;
-- authoritative assigned-task bootstrap for effective model, reasoning,
-  project, repository, and host readback;
-- inventory-backed project selection plus independent stable task identity and
-  state observation;
+- authoritative assigned-task bootstrap for effective model and reasoning;
+- independent stable task identity and state observation;
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
-- repository and project destination verification;
+- Git execution-target verification;
 - recovery after an ambiguous effect;
 - optional runtime capabilities declared by the invoking skill.
 
@@ -39,12 +37,13 @@ those values and receiving an authoritative bootstrap result from the assigned
 task; [Task Handoff](task-handoff.md) owns the typed task-owned observation,
 comparison, and controller identity binding.
 
-The same ownership split applies to project identity. This preflight owns
-selection of one exact repository-compatible project from the live application
-project inventory and freezes that identity as the expected destination. Task
-Handoff owns the assigned task's post-effect self-observation and bounded
-comparison against that expected identity. A configured project target is not
-proof that the resulting task received that binding.
+The same ownership split applies to the execution target. This preflight owns
+freezing the expected repository, execution mode, remote, and any
+topology-required checkout or base facts. Task Handoff owns the assigned task's
+post-effect observation and comparison against that target. Application saved
+project identity and project-root metadata may be retained as diagnostics when
+the runtime exposes them, but they are not execution evidence or bootstrap
+requirements.
 
 The `task controller` is the session that creates or resumes one assigned
 application task, independently observes its stable identity and state, and
@@ -93,14 +92,12 @@ effect. The live capability check must establish all capabilities required by
 the requested topology:
 
 - create or resume a task;
-- inventory the projects currently configured on the intended application
-  host;
 - independently observe the stable task identity and state after the effect;
 - let the exact assigned task read its authoritative task-scoped execution
-  context and compare its effective project, model, reasoning, repository, and
-  host with the handoff;
+  context and compare its effective model and reasoning with the handoff;
 - receive a structured bootstrap result whose evidence task identity can be
   bound to the independently observed stable task identity;
+- let the assigned task inspect and compare its actual Git execution target;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
 
@@ -131,14 +128,13 @@ profile values, the fixed-profile capability gate has not passed. Stop before
 the task effect instead of creating a task and checking which defaults it
 received afterward.
 
-Project selection and project readback are also separate capabilities. The
-ability to request a project, an accepted creation effect, or an echoed target
-does not establish the task's effective project binding. The exact assigned
-task must read the post-effect project value from its authoritative task-scoped
-context and bind it to the stable task identity in the bootstrap result. A
-missing value discovered only after creation follows the bounded
-reconciliation in [Task Handoff](task-handoff.md); it never becomes an inferred
-match.
+Saved-project routing and execution-target verification are separate concerns.
+The controller may use an application project to route task creation, but the
+resulting `project_identity` or project-root metadata is diagnostic only. The
+assigned task verifies the target that can affect work: repository identity,
+checkout or worktree, remote, and any base facts required by the
+skill-owned topology. Missing project metadata never triggers reconciliation
+or blocks an otherwise verified target.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or the exact assigned task
@@ -178,23 +174,20 @@ initialization available and cannot satisfy title observation or correction.
 Resolve one exact destination for every task before creation. Independently
 verify:
 
-- `repository_identity` and the repository root or checkout path;
-- `project_identity` as one exact expected project selected from the current
-  live application project inventory;
-- `host_identity` for the application execution host.
+- `repository_identity` and `remote_identity`;
+- the required execution mode, such as the exact local checkout or an isolated
+  worktree;
+- any exact checkout, starting ref, base SHA, or path-envelope constraint owned
+  by the invoking topology.
 
-The project binding must be compatible with the intended repository. A project
-that merely mentions a repository, a path copied from the request, or a
-cross-repository project assumption is insufficient. In a multi-repository
-run, verify each repository/project destination separately.
+Freeze these facts before the task effect. In a multi-repository run, verify
+each repository target separately. A repository name copied from the request,
+a display title, or application project metadata alone is insufficient.
 
-Freeze the exact expected project identity and inventory evidence before the
-task effect. If no repository-compatible project exists in the live inventory,
-the preflight is `blocked` before creation. Return the smallest recovery input:
-ask the user to add or configure that exact repository as a saved project in
-the ChatGPT/Codex application. Never substitute a neighboring project, create
-an intentionally projectless task, or treat a repository path as project
-identity.
+The assigned task later observes the corresponding actual Git facts. A present
+difference is `execution-target-mismatch`. If the runtime cannot expose a
+required target fact at all, use `unsupported-runtime`. An absent saved-project
+identity or project-root field has no effect on either classification.
 
 ### 4. Task identity and assigned-task bootstrap
 
@@ -210,16 +203,8 @@ The task controller owns creation/resume, stable identity observation, and
 binding of the structured bootstrap result. The assigned task owns the
 authoritative read of its own task-scoped execution context and every
 requested-versus-observed comparison. The controller does not duplicate that
-profile or project read.
-
-The project identity observed by the assigned task must be present and exactly
-equal the frozen preflight identity. Do not infer task-project binding from the
-request, the creation receipt, the working directory, a checkout or worktree
-path, the display title, or conversation text. A non-null mismatch is a
-destination mismatch and blocks normal monitoring. A missing or unobservable
-value must complete the handoff's one bounded assigned-task re-read and
-refreshed controller project inventory before classification; it is never a
-match.
+profile read. The assigned task also observes the actual Git execution target;
+the controller compares that structured observation with the frozen target.
 
 The assigned task compares its effective model and reasoning with the
 assignment-specific values resolved from the skill-owned profile and returns
@@ -232,6 +217,14 @@ effective-profile-mismatch`. Both stop before normal monitoring or update
 relay. Preserve and reconcile the observed task identity; do not create a
 replacement. For an optional role, use only the invoking skill's declared
 parent or serial fallback and do not claim delegated work.
+
+A missing authoritative evidence task identity is `unsupported-runtime`; a
+present evidence identity that differs from the controller-observed task is
+`task-identity-mismatch`. A missing required execution-target observation is
+`unsupported-runtime`; present repository, remote, checkout, worktree,
+or base values that differ from the frozen target are
+`execution-target-mismatch`. Project metadata never participates in these
+comparisons.
 
 A matching effective readback does not repair a missing explicit profile
 request. Require both the pre-effect request evidence owned by the handoff and
@@ -307,11 +300,11 @@ preflight:
     roles_verified: true
   capabilities:
     create_task: available
-    inventory_projects: available
     observe_task_identity: available
     request_explicit_role_profile: available
     assigned_task_bootstrap: available
     receive_bootstrap_result: available
+    observe_execution_target: available
     monitor_task: available
     relay_partial_updates: available
     relay_final_update: available
@@ -324,11 +317,11 @@ preflight:
     effective_mode: parallel-analysis
   target:
     repository_identity: "<independently observed repository>"
-    project_identity: "<inventory-backed expected project>"
-    project_inventory_evidence_ref: "<live inventory observation>"
-    project_repository_compatible: true
-    project_root: "<verified repository-compatible path>"
-    host_identity: "<independently observed host>"
+    remote_identity: "<independently observed remote>"
+    execution_mode: "<exact-local-checkout or isolated-worktree>"
+    checkout_constraint: "<topology-owned checkout requirement>"
+    starting_ref: "<required ref or null>"
+    base_sha: "<required full SHA or null>"
     independently_verified: true
   authorization:
     task_creation: granted
@@ -351,25 +344,24 @@ return the smallest recovery input and stop before the affected role-owned
 effect. It must not claim that a task is being monitored or completed until
 the required live evidence is available.
 
-For project identity, return setup guidance when the exact expected project is
-absent from the refreshed live inventory. When that project remains present
-but the assigned task's effective project identity is still missing after its
-bounded self-read, block with `blocker: unsupported-runtime`: the current
-runtime cannot prove the requested binding. Preserve the original task in both
-cases. A replacement task is not a readback retry.
-
 The same fail-closed rule applies when the exact resolved model and reasoning
 cannot be actively requested. Never omit a required profile value to obtain a
 task receipt and never treat a coincidentally matching inherited profile as a
 valid task initialization.
 
 `unsupported-runtime` means that the required request, stable task identity,
-or authoritative assigned-task bootstrap capability is unavailable, or that
-the exact task's values remain missing or unobservable. It does not describe a
-successful readback of different effective values; that case is
-`effective-profile-mismatch`. A bootstrap profile readback whose evidence
-identity differs from the controller-observed assigned task is invalid for
-that child: discard it and treat the exact child's readback as unavailable.
+authoritative assigned-task bootstrap capability, or required target
+observation is unavailable, or that the exact task's required values remain
+missing or unobservable. It does not describe a successful readback of
+different effective values; that case is `effective-profile-mismatch`. A
+present bootstrap evidence identity that differs from the controller-observed
+assigned task is `task-identity-mismatch`, and a present execution-target
+difference is `execution-target-mismatch`.
+
+Saved-project identity and project-root metadata are outside the fail-closed
+gate. Record them only as optional diagnostics when present. Their absence does
+not authorize inference, but it also does not require a second read, project
+inventory refresh, replacement task, or blocked outcome.
 
 A difference between the task controller's profile and the assigned role's
 requested profile is not a mismatch. Only the exact assigned task's

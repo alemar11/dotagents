@@ -22,11 +22,11 @@ Its skills are deliberately separated by responsibility:
   contracts shared by task-managed Feature and Implement runs. They require an
   explicit, complete role-profile request with no ambient inheritance plus an
   authoritative, assignment-specific comparison between requested and
-  effective model/reasoning before normal task monitoring. They also freeze one
-  repository-compatible project from the live application inventory and
-  require an exact effective-project readback for the resulting task. A missing
-  configured project returns setup guidance; a still-unobservable binding for
-  a present project fails closed as an unsupported runtime.
+  effective model/reasoning before normal task monitoring. They freeze the
+  expected Git execution target and require the assigned task to verify its
+  actual repository, checkout or worktree, remote, and topology-required base
+  facts. Saved-project identity and project-root metadata are optional
+  diagnostics and never block when absent.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
@@ -56,14 +56,12 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
-- task-handoff.md binds typed effective-role and effective-project observations
+- task-handoff.md binds typed effective-role and execution-target observations
   to planner, orchestrator, and Feature Worker task identity, then applies the
   established SE Implement emoji-title grammar with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
   metadata. Each task receives one flat semantic prompt with a best-effort
   canonical-title hint; raw or escaped delegation envelopes are never nested.
-  Missing project identity gets one bounded same-task re-read and inventory
-  refresh, never a replacement task or a path-based inference.
 - skills/implement/ accepts one or more explicit GitHub parent Feature issue
   references, verifies their authoritative Feature semantic contracts and
   sibling dependency context, records local Macro projections as complete,
@@ -129,9 +127,10 @@ Its skills are deliberately separated by responsibility:
   idea-source handoff for later Feature planning; it never writes project memory
   or starts an application task.
   Invoke it explicitly as `se:idea`.
-- The Feature planner stays in the invoking session's exact saved local
-  project and local environment without a Git worktree; isolated worktrees
-  belong only to the separate Implement workflow.
+- The Feature planner stays in the invoking session's exact local repository
+  checkout and local environment without a Git worktree; isolated worktrees
+  belong only to the separate Implement workflow. Saved-project metadata is
+  optional diagnostic context.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
 - Feature analyzes one or more source issues, runs optional bounded

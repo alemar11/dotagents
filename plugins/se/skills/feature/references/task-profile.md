@@ -59,10 +59,11 @@ planner draft or context-derived requirements during its first pass. It is
 read-only, records evidence and speculation separately, and cannot publish,
 edit the plan, or ask the user directly.
 
-The planner must use the invoking session's exact saved local project and
-local environment. It must not create or use a Git worktree, isolated
-checkout, or task fork. If that destination cannot be independently verified,
-stop before creating, resuming, or monitoring the planner task.
+The planner must use the invoking session's exact local repository checkout
+and local environment. It must not create or use a Git worktree, isolated
+checkout, or task fork. Saved-project identity and project-root metadata are
+optional diagnostics. If the Git execution target cannot be independently
+verified, stop before creating, resuming, or monitoring the planner task.
 
 The title uses the established planner emoji convention. Replace only
 Feature outcome with a short, deterministic outcome. A title is display
@@ -86,13 +87,17 @@ planner identity observed by the controller. A request, creation receipt, or
 unstructured self-report is not proof. A missing or unobservable exact-planner
 value is `unsupported-runtime`; present authoritative exact-planner values
 that differ from the request are `effective-profile-mismatch`. Preserve the
-observed task and do not create a replacement. Apply the same rule to an
-optional role only when it is instantiated as its own application task;
-otherwise the delegation evidence below remains authoritative.
+observed task and do not create a replacement. A present evidence task identity
+that differs from the controller-observed planner is
+`task-identity-mismatch`; a present local repository-target difference is
+`execution-target-mismatch`. Apply the same rule to an optional role only when
+it is instantiated as its own application task; otherwise the delegation
+evidence below remains authoritative.
 
-The planner's authoritative bootstrap is the operational profile and
-destination gate. The invoking controller verifies its identity binding and
-does not duplicate the planner's raw task-scoped profile or project read.
+The planner's authoritative bootstrap is the operational profile gate. The
+planner also observes its actual local Git execution target for comparison with
+the frozen handoff. The invoking controller verifies identity binding and does
+not duplicate the planner's raw task-scoped profile read.
 
 ## Optional goal and delegation facts
 

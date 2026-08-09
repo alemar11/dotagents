@@ -362,7 +362,7 @@ The orchestrator performs read-only final verification. Require:
   ambiguous IDs;
 - authoritative hosted plan coverage and monotonic Feature acceptance
   high-water marks consistent with every current criterion ID;
-- Feature Worker task/project/worktree identity;
+- Feature Worker task/repository/worktree identity;
 - clean implementation worktree and exact current HEAD;
 - a complete acceptance matrix for every F-AC-NN whose evidence is bound to
   the same exact current candidate HEAD;

@@ -60,8 +60,8 @@ units and assignment-scoped T-AC criteria for each Feature. It also owns central
 monitoring, stack-wide parent-drift reconciliation, assignment state, and
 aggregate completion. The Feature Worker owns one complete
 Feature member, its observed Macro projection and available local Task context,
-its derived execution units and T-AC criteria, one verified repository/project
-destination, one isolated worktree, and one PR.
+its derived execution units and T-AC criteria, one verified repository target,
+one isolated worktree, and one PR.
 
 The Feature Worker chooses technical design, implements and validates the
 derived units, binds F-AC and mapped T-AC criteria to the final exact HEAD, and
@@ -99,9 +99,12 @@ stable identity observed by its controller. A request, creation receipt, or
 unstructured self-report is not proof. A missing or unobservable exact-task
 value is `unsupported-runtime`; present authoritative exact-task values that
 differ from the assignment request are `effective-profile-mismatch`. Preserve
-the observed task and do not create a replacement. Apply the same rule to
-optional support only when it is instantiated as its own application task;
-subordinate in-task delegation continues to use the delegation evidence below.
+the observed task and do not create a replacement. A present evidence task
+identity that differs from the controller-observed task is
+`task-identity-mismatch`; a present repository, remote, worktree, or base
+difference is `execution-target-mismatch`. Apply the same rule to optional
+support only when it is instantiated as its own application task; subordinate
+in-task delegation continues to use the delegation evidence below.
 
 There is no model or reasoning fallback for the required orchestrator or
 Feature Worker role. If the live runtime cannot actively request the selected
@@ -112,9 +115,9 @@ role-owned effects or monitoring.
 An Orchestrator or Feature Worker already running from a valid handoff applies
 only the shared assigned-task bootstrap for its own role. It does not rerun the
 controller's creation preflight against itself. Its structured authoritative
-bootstrap is the operational profile and destination gate; its controller
-verifies identity binding and does not duplicate the raw task-scoped profile
-or project read.
+bootstrap is the operational profile gate, and its actual Git execution target
+is compared separately with the frozen handoff. Its controller verifies
+identity binding and does not duplicate the raw task-scoped profile read.
 
 Delegation is an optional capability of the Feature Worker topology. Record
 one effective mode: `delegated-support` when bounded helpers were dispatched

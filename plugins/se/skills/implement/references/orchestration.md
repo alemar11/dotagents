@@ -67,11 +67,15 @@ assignment-specific request.
 An unstructured Worker self-report is not bootstrap evidence. A missing or
 unobservable authoritative child profile follows the shared
 `unsupported-runtime` rules, while a present authoritative exact-Worker
-profile that differs from the request is `effective-profile-mismatch`. Both
-preserve and reconcile the same Worker without replacement. The orchestrator
-verifies the bootstrap identity binding but does not duplicate the Worker's raw
-profile or project read. These bootstrap checks add no ledger state and do not
-change the runtime workflow graph.
+profile that differs from the request is `effective-profile-mismatch`. A
+present evidence identity bound to another task is `task-identity-mismatch`,
+and a present Git execution-target difference is
+`execution-target-mismatch`. All blocked outcomes preserve and reconcile the
+same Worker without replacement. The orchestrator verifies the bootstrap
+identity binding but does not duplicate the Worker's raw profile read. It
+compares the Worker's independently observed Git execution target with the
+frozen handoff. These bootstrap checks add no ledger state and do not change
+the runtime workflow graph.
 
 ## Starting-branch selection and freshness
 
@@ -339,6 +343,6 @@ that a Worker is inactive, that a PR remains current, or that a path envelope
 is free; recover each fact from the application, repository, provider, and
 transient control plane.
 
-On resume, reread the authoritative plan, repository/project destination,
-current base and full HEAD, worker identity, and hosted delivery state before
-another side effect. Ledger text never proves external state.
+On resume, reread the authoritative plan, repository execution target, current
+base and full HEAD, worker identity, and hosted delivery state before another
+side effect. Ledger text never proves external state.
