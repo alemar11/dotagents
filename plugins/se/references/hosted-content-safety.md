@@ -1,10 +1,11 @@
 # Hosted Content Safety
 
-This reference is the canonical SE owner for portable-content projection and
-mandatory local-path correction immediately before every hosted write, plus
-bounded post-write repair. It applies to issue titles and bodies, comments,
-pull-request titles and bodies, review requests, review text, and Feature
-maintenance changelogs produced by Idea, Feature, or Implement.
+This reference is the canonical SE owner for portable-content projection,
+single-line title normalization, and mandatory local-path correction
+immediately before every hosted write, plus bounded post-write repair. It
+applies to issue titles and bodies, comments, pull-request titles and bodies,
+review requests, review text, and Feature maintenance changelogs produced by
+Idea, Feature, or Implement.
 
 The invoking SE skill owns semantic content and must deliver a safe final
 projection. G owns transport, provider mutation, receipts, and readback. G does
@@ -61,6 +62,19 @@ statement of the evidence. Record the omission as internal warning evidence;
 do not stop the enclosing workflow solely because the local representation was
 removed.
 
+## Single-line title projection
+
+Freeze every intended hosted title as one non-empty semantic line before
+creating a transport artifact. The artifact handed to G must contain exactly
+the title's UTF-8 bytes, with no serialization-added trailing carriage return
+or line feed. Remove only those transport-added final line terminators; do not
+silently trim other meaningful title text.
+
+An interior line break is not a valid title artifact. Reconstruct the title
+from the frozen semantic value and inspect it again instead of flattening
+unknown file content. This rule applies only to single-line titles and does not
+strip intentional body, comment, or review formatting.
+
 ## Final pre-write correction
 
 Immediately before each hosted write, inspect the exact final title and body or
@@ -72,6 +86,8 @@ comment/review text that will be handed to G. Require all of the following:
   full SHA rather than `project_root` or worktree path;
 - no internal prompt, host identity, local task identity, or irrelevant
   transcript content remains;
+- every hosted title artifact exactly matches its frozen non-empty single-line
+  title and contains no trailing line terminator;
 - worker- and tool-originated content has passed the same checks;
 - the portable representation preserves the evidence needed by the hosted
   operation.

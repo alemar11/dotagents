@@ -9,6 +9,7 @@ authorization decisions.
 ## Contents
 
 - [Handoff boundary](#handoff-boundary)
+- [Prompt projection](#prompt-projection)
 - [Canonical title metadata](#canonical-title-metadata)
 - [Title reconciliation](#title-reconciliation)
 - [Role-profile request](#role-profile-request)
@@ -45,6 +46,24 @@ Do not copy a task identity into the handoff from conversation text or a
 display title. The application supplies the identity, and the invoking session
 records it only after independent observation.
 
+## Prompt projection
+
+Build every creation or resume prompt from the handoff fields as one flat
+semantic assignment. Preserve the bounded objective, constraints, durable
+source references, destination, requested role profile, validation contract,
+and expected return evidence. Do not paste a parent prompt, conversation
+transcript, or raw task/delegation transport envelope into a child prompt.
+
+When source material arrives inside a transport wrapper, extract its semantic
+payload and stable provenance, then discard the wrapper and any escaped wrapper
+markup. Never nest one handoff envelope inside another or treat transport
+metadata as user intent. This normalization must not drop a user constraint or
+alter the assignment; retain any needed source message by reference instead of
+embedding its raw envelope.
+
+The projected prompt is internal control-plane content. It is not hosted
+content, task identity, project evidence, or durable plan authority.
+
 ## Canonical title metadata
 
 Every task created by SE receives a deterministic display-title request using
@@ -72,10 +91,21 @@ orchestrator, and every Implement Feature Worker:
 - treat the title as display metadata only. It is never task identity,
   authorization, state, claim, branch, or recovery evidence.
 
-Request the canonical title during task creation when the live capability is
-available, then independently read it back after the stable task identity is
-known. Creation acceptance is never title verification. Resolve the title
-reconciliation below before normal monitoring or update relay begins.
+Compute the canonical title before task creation and include this exact
+plain-text line in the projected creation prompt:
+
+```text
+Canonical display title: <canonical display title>
+```
+
+This line is a best-effort first-render hint when the live creation capability
+cannot initialize title metadata. It is never authoritative metadata, identity,
+or verification evidence. Request the canonical title during task creation
+when the live capability supports that effect, then independently read it back
+after the stable task identity is known. Whether or not the prompt hint appears
+to work, creation acceptance is never title verification and the bounded title
+reconciliation below remains mandatory before normal monitoring or update
+relay begins.
 
 ## Title reconciliation
 
@@ -110,6 +140,7 @@ Do not add persistence solely for title metadata.
 ```yaml
 title_reconciliation:
   requested_title: "<canonical display title>"
+  prompt_hint_included: true
   initial_observed_title: null
   adjustment_authorization: granted-for-declared-title
   adjustment_capability: available

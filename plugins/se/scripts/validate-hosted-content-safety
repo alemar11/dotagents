@@ -22,6 +22,9 @@ for phrase in \
   "worker- and tool-originated content" \
   "Returned text is not safe by" \
   "Local-path correction is mandatory" \
+  "single-line title" \
+  "no serialization-added trailing carriage return" \
+  "contains no trailing line terminator" \
   "correct the same rendered content before transport" \
   "does not block the enclosing SE workflow" \
   "Never create a replacement hosted artifact"; do

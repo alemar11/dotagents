@@ -182,7 +182,9 @@ orchestrator and every Feature Worker are required roles. Inventory-backed
 project selection, authoritative effective-project and role observation, and
 title reconciliation are required before normal monitoring or update relay.
 Actively request each role's complete resolved model and reasoning profile;
-never omit either value or rely on ambient inheritance.
+never omit either value or rely on ambient inheritance. Project every
+orchestrator, Feature Worker, and optional support prompt through the shared
+flat prompt projection; never forward a raw parent prompt or transport envelope.
 
 The orchestrator is the sole delivery monitor and aggregate lifecycle owner.
 After a PR reaches `candidate-published`, its Feature Worker becomes inactive

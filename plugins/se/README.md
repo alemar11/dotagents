@@ -31,9 +31,10 @@ Its skills are deliberately separated by responsibility:
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
 - references/hosted-content-safety.md owns mandatory portable-content
-  projection and local-path correction before every SE-hosted issue, comment,
-  PR, or review write, plus one bounded non-blocking repair after readback. SE
-  owns semantics; G owns transport and readback.
+  projection, exact single-line title normalization, and local-path correction
+  before every SE-hosted issue, comment, PR, or review write, plus one bounded
+  non-blocking repair after readback. SE owns semantics; G owns transport and
+  readback.
 - scripts/validate-hosted-content-safety checks the shared owner routes, removed
   Idea duplication, and hosted templates for machine-specific absolute paths.
 - skills/idea/references/idea-source.md owns the typed transient handoff from
@@ -59,8 +60,10 @@ Its skills are deliberately separated by responsibility:
   to planner, orchestrator, and Feature Worker task identity, then applies the
   established SE Implement emoji-title grammar with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
-  metadata. Missing project identity gets one bounded same-task re-read and
-  inventory refresh, never a replacement task or a path-based inference.
+  metadata. Each task receives one flat semantic prompt with a best-effort
+  canonical-title hint; raw or escaped delegation envelopes are never nested.
+  Missing project identity gets one bounded same-task re-read and inventory
+  refresh, never a replacement task or a path-based inference.
 - skills/implement/ accepts one or more explicit GitHub parent Feature issue
   references, verifies their authoritative Feature semantic contracts and
   sibling dependency context, records local Macro projections as complete,
@@ -113,7 +116,9 @@ Its skills are deliberately separated by responsibility:
   SE-authored PR bodies remain concise and durable: outcome summary, compact
   validation command or check names, material operational notes when needed,
   and canonical closing lines, without routine test counts or internal
-  delivery logs.
+  delivery logs. Native review uses the minimal supported base-scoped mode, and
+  publication runs from the reverified Feature Worker worktree rather than an
+  inherited or temporary directory.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
   and side-effect idempotency, with explicit drop-and-recreate instead of
   migrations.

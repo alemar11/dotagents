@@ -158,6 +158,30 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             reference,
         )
 
+    def test_native_review_uses_a_supported_minimal_invocation(self) -> None:
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "Inspect the live review capability's supported invocation modes",
+            "smallest supported base-scoped review mode",
+            "without optional custom instructions or unrelated strict-configuration overrides",
+            "at most one fallback attempt",
+            "A rejected or unavailable review is not a clean result",
+        ):
+            self.assertIn(required, reference)
+
+    def test_publication_uses_the_verified_feature_worker_worktree(self) -> None:
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "Feature Worker's actual implementation worktree",
+            "Use that exact verified worktree as the publication execution context",
+            "An inherited working directory",
+            "temporary title or body artifact",
+            "never retry publication from an alternate temporary directory",
+        ):
+            self.assertIn(required, reference)
+
     def test_stacked_children_link_separately(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")
         orchestration = ORCHESTRATION.read_text(encoding="utf-8")

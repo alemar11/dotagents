@@ -16,8 +16,9 @@ surface.
   update-relay, and recovery gates.
 - references/task-handoff.md owns the shared task assignment, typed requested
   versus effective role observation, bounded effective-project reconciliation,
-  partial/final relay, deterministic emoji title grammar, bounded title
-  reconciliation, and terminal-report evidence.
+  flat semantic prompt projection, partial/final relay, deterministic emoji
+  title grammar and first-prompt hint, bounded title reconciliation, and
+  terminal-report evidence.
 - references/workflow-contract.md owns the semantic Idea hosted shape for SE
   Idea capture.
 - references/workflow-graph.md owns the shared workflow-graph vocabulary,
@@ -26,9 +27,10 @@ surface.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before any SE workflow uses a required G-owned GitHub workflow.
 - references/hosted-content-safety.md owns mandatory portable-content
-  projection and local-path correction before every hosted write produced by
-  Idea, Feature, or Implement, plus one bounded non-blocking repair of the same
-  artifact after readback. G owns transport and readback, not semantic cleanup.
+  projection, exact single-line title-artifact normalization, and local-path
+  correction before every hosted write produced by Idea, Feature, or Implement,
+  plus one bounded non-blocking repair of the same artifact after readback. G
+  owns transport and readback, not semantic cleanup.
 - scripts/validate-hosted-content-safety owns the static owner-routing,
   duplicate-doctrine, and hosted-template path checks for that contract.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
@@ -48,9 +50,10 @@ surface.
 - skills/implement/SKILL.md owns the GitHub-Feature-to-PR workflow registry and
   Mermaid projection. Its references own multi-Feature orchestration,
   execution and delivery topology, orchestrator/worker profiles, optional
-  Feature Worker support delegation, worker-session review, standalone and
-  stacked delivery, stack reconciliation, the minimal durable SE-authored PR
-  body, and the SQLite WAL run-state contract.
+  Feature Worker support delegation, worker-session review using a supported
+  minimal invocation, standalone and stacked delivery from the verified Worker
+  worktree, stack reconciliation, the minimal durable SE-authored PR body, and
+  the SQLite WAL run-state contract.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
@@ -159,10 +162,17 @@ surface.
   the same Worker only for actionable fixes, evidence repair, or rebase, and
   retains sole ledger and aggregate-completion authority.
 - Keep deterministic task-title initialization shared by every task-managed
-  SE skill. After stable identity readback, require one bounded reconciliation
-  outcome before monitoring: exact verification or an explicit
+  SE skill. Compute the title before creation and include it as a best-effort
+  plain-text hint in the flat creation prompt, without treating the hint as
+  metadata or evidence. After stable identity readback, require one bounded
+  reconciliation outcome before monitoring: exact verification or an explicit
   `title-unverified`/`title-drift` warning. Never use a title as identity,
   repeat an adjustment, or create a replacement task for title failure.
+- Keep task prompts as flat semantic handoffs. Preserve bounded intent,
+  constraints, source references, destination, validation, and return evidence,
+  but unwrap raw task/delegation transport envelopes, escaped wrapper markup,
+  parent prompts, and transcripts before creating a child task. Never use a
+  transport wrapper as user intent or durable evidence.
 - Keep effective task-profile verification shared by every task-managed SE
   skill. The invoking skill owns requested role, model, reasoning, and topology;
   the shared preflight owns authoritative-readback capability; and the shared
@@ -195,6 +205,14 @@ surface.
   transport; if readback still exposes one, attempt one bounded update of the
   same artifact and retain a non-blocking warning when repair is unavailable,
   failed, or ambiguous.
+- Keep hosted titles as exact non-empty single-line semantic values. Remove
+  only serialization-added final line terminators before G transport, reject
+  interior line breaks, and leave intentional multiline body content intact.
+- Keep native review and publication on verified execution boundaries. Select
+  the minimal supported base-scoped review mode, avoid unsupported optional
+  combinations and unrelated strict overrides, and run publication only from
+  the independently re-observed Feature Worker worktree rather than an inherited
+  or temporary-artifact directory.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
   hosted Plan Set rehydration through the shared G dependency gate before
   hosted reads, and route default publication through the single publication
@@ -275,12 +293,16 @@ surface.
 - Validate Implement's minimal durable PR-body projection, exclusion of routine
   execution counts, preservation of external template/author content, and
   exact closure-intent readback.
+- Validate native review's minimal supported fallback and publication from the
+  exact re-observed Feature Worker worktree rather than inherited or temporary
+  directories.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's documented
   persisted values exactly match the run-state capability registry.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
   Implement, and their write-owning references route through the one canonical
-  hosted-content owner without duplicate Idea doctrine.
+  hosted-content owner without duplicate Idea doctrine. Include exact
+  single-line title artifacts without serialization-added terminators.
 - Validate that Feature and Implement both route every created task through the
   shared typed effective-role observation and title-reconciliation outcome
   before normal monitoring or update relay, and that resume paths cannot repeat
@@ -289,6 +311,9 @@ surface.
   comparison, one bounded same-task re-read, missing-project setup guidance,
   present-but-unobservable `unsupported-runtime`, and the prohibition on
   path-based inference or replacement-task retries.
+- Validate flat prompt projection, best-effort canonical-title prompt hints,
+  mandatory title readback/correction, and removal of nested or escaped
+  transport envelopes without losing semantic constraints.
 - Validate the canonical bracketed Feature acceptance syntax, monotonic
   high-water marks, plan publication/readback, malformed and legacy-checkbox
   rejection, question-batch completeness, and Implement evidence bound to the

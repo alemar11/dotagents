@@ -121,6 +121,16 @@ against the declared base using its resolved Sol reasoning level. The required
 outcome is an independently reported exact-HEAD finding set or clean result;
 the skill does not encode an application operation or interface.
 
+Inspect the live review capability's supported invocation modes before each
+cycle. Use the smallest supported base-scoped review mode without optional
+custom instructions or unrelated strict-configuration overrides. Combine
+custom guidance with base selection only when the live capability explicitly
+supports that combination. If an optional invocation shape is rejected before
+review begins, retain that failure evidence and make at most one fallback
+attempt with the minimal supported base-scoped mode. A rejected or unavailable
+review is not a clean result and blocks publication until review evidence can
+be obtained.
+
 Bind every finding and clean result to the exact candidate SHA. The Feature
 Worker decides whether a finding is actionable, owns every fix, reruns
 validation, and creates a new candidate. Any new HEAD invalidates the previous
@@ -131,6 +141,15 @@ against the new exact SHA.
 
 Publish only after native review is clean and the exact publication scope is
 resolved from the explicit Implement request.
+
+Immediately before handing publication to G, independently re-observe the
+Feature Worker's actual implementation worktree and verify its repository,
+branch, and current full HEAD against the candidate. Use that exact verified
+worktree as the publication execution context. An inherited working directory,
+the directory containing a temporary title or body artifact, or a guessed
+checkout is not worktree evidence. If the execution context cannot be proven,
+stop before transport and reconcile the same assignment; never retry
+publication from an alternate temporary directory.
 
 ### Minimal durable PR body
 

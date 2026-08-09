@@ -35,7 +35,7 @@ class RunStateTests(unittest.TestCase):
         version = subprocess.run(
             [str(SCRIPT), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "3.6.5")
+        self.assertEqual(version.stdout.strip(), "3.6.6")
         db = self.root / "nested/run-state.sqlite3"
         result = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertEqual(result["database_state"], "absent")

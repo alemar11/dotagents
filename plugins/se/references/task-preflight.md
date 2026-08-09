@@ -143,6 +143,8 @@ attempt evidence to prevent replay after recovery. Record unavailable title
 initialization, correction, or recovery evidence as a display-metadata
 limitation. It does not block an otherwise verifiable task topology, but it
 must not be omitted from the preflight or later reported as verified.
+The handoff's best-effort plain-text title hint does not make title
+initialization available and cannot satisfy title observation or correction.
 
 ### 3. Verifiable destination
 
