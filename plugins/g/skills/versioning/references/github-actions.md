@@ -101,14 +101,69 @@ workflow, add an explicitly authorized `workflow_dispatch` or
 approved GitHub App or personal access token. Keep that project-specific build
 and credential policy outside the portable release-version templates.
 
+### Direct downstream dispatch contract
+
+`workflow_dispatch` starts a workflow directly; it does not pass through the
+workflow's `on.push.tags` event filter. Treat direct dispatch as an invocation
+path, never as proof that the requested tag is final.
+
+For a downstream publish workflow that supports both automatic tag pushes and
+explicit recovery dispatch:
+
+- Keep `on.push.tags` scoped to canonical tag-shaped refs (for example,
+  `v*.*.*`), but treat it as an event selector only; glob patterns may also
+  match RC tags, so the resolver gate remains mandatory.
+- Add a required `workflow_dispatch.inputs.tag` string containing the exact
+  existing final tag, including the `v` prefix.
+- Pass that input to the resolver. Use `github.ref_name` only as the fallback
+  for a tag-push event: `confirmed_tag: ${{ inputs.tag || github.ref_name }}`.
+- Resolve the release context from the exact tag input (for example,
+  `ref_name: ${{ format('release/{0}', inputs.tag || github.ref_name) }}`),
+  and check out `needs.resolve.outputs.tag`, never the manually selected branch
+  or an unvalidated event ref. The checkout contract is:
+
+      ref: ${{ needs.resolve.outputs.tag }}
+
+- Require the publish job to satisfy all of these conditions:
+
+  `needs.resolve.outputs.application_ready == 'true'`,
+  `needs.resolve.outputs.is_final == 'true'`, and
+  `needs.resolve.outputs.tag_state == 'existing-final'`.
+
+The `existing-final` condition is what prevents a manually dispatched publish
+from creating or publishing an absent tag. A release-version apply workflow
+may dispatch the downstream workflow only after it has created the final tag
+and read back that the tag resolves to the selected commit. Pass the exact tag
+and tag ref, for example:
+
+```bash
+gh workflow run <publish-workflow>.yml \
+  --repo "$GITHUB_REPOSITORY" \
+  --ref "$TAG" \
+  --field tag="$TAG"
+```
+
+Grant `actions: write` only to the apply job that performs this optional
+dispatch; it is not a universal permission for the resolver or publish
+workflow. Make the dispatch idempotent: do not repeat it automatically on an
+`existing-final` apply retry unless the project explicitly wants that recovery
+behavior. If the first dispatch fails, the required manual `tag` input is the
+safe recovery path.
+
+The same gates and exact-tag readback apply to `repository_dispatch`; validate
+the payload's tag field as untrusted input and do not use a payload merely as a
+replacement for the resolver.
+
 ## Permissions preflight
 
 Before writing or upgrading the workflows, run the read-only preflight from
 `../github-actions/references/configuration.md`. The repository must allow
 GitHub Actions to create pull requests, and the YAML must still declare the
-job-level permissions above. A blocked or unavailable preflight is advisory:
-write the explicitly requested files, report the missing setting, and do not
-claim that PR creation is functional.
+job-level permissions above. If an apply job will invoke a downstream
+workflow, it must also declare `actions: write`; keep that permission out of
+the resolver and downstream publish jobs. A blocked or unavailable preflight
+is advisory: write the explicitly requested files, report the missing setting,
+and do not claim that PR creation or dispatch is functional.
 
 ## Resolver asset and version lifecycle
 
@@ -164,7 +219,10 @@ divergence explicitly instead of masking it behind the same version.
 7. Add or update focused resolver tests in `.github/scripts/`. At minimum test
    `--version`, stable-baseline increments, same-line continuation, unrelated
    parallel lines, direct final, legacy read-only input, exact confirmation,
-   noncanonical rejection, existing-final reconciliation, and output fields.
+   noncanonical rejection, existing-final reconciliation, output fields, and
+   the downstream dispatch contract: final tag push, RC push, manual final
+   input, manual RC input, absent manual tag, exact-tag checkout, and the
+   apply-to-publish dispatch command.
 8. Validate Python tests, `--help`, `--version`, YAML parsing, every Bash
    `run` block with ShellCheck, and `git diff --check`. Run application tests
    only when repository instructions require them; the workflows themselves
@@ -772,6 +830,7 @@ jobs:
 | compare and exact open-PR query | Avoids empty or duplicate release PRs |
 | PR response readback | Verifies open state, exact base/head, and same-repository ownership |
 | no merge step | Leaves delivery and branch-protection policy outside version creation |
+| direct downstream dispatch | Uses an exact final tag input and a separate `existing-final` gate; it does not rely on `on.push.tags` |
 
 ## Validation and recovery
 
@@ -784,6 +843,8 @@ Runtime writes are intentionally recoverable:
 - a candidate rerun never moves an existing tag or release branch;
 - a final rerun accepts an existing canonical final only at the selected commit
   and continues with PR reconciliation;
+- a downstream publish dispatch receives the exact final tag and checks it out
+  by the resolver output; it does not publish an RC or an absent tag;
 - a changed tag snapshot, branch SHA, default branch, ambiguous PR set, or
   mismatched readback stops the workflow;
 - a PR permission failure leaves the verified final tag intact so the same

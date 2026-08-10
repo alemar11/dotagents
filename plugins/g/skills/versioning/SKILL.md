@@ -1,6 +1,6 @@
 ---
 name: versioning
-description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, and plan safe legacy-tag migrations.
+description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, plan safe legacy-tag migrations, and author stable-only GitHub Actions with explicit downstream dispatch recovery.
 ---
 
 # Versioning
@@ -231,7 +231,10 @@ edit application code, run project build/test commands, create commits, or
 merge the final pull request. Preserve the exact canonical tag gate and the
 separate dry-run/application confirmation boundary. Preserve the resolver's
 `is_final` workflow output so downstream jobs can gate stable-only work without
-reparsing the tag.
+reparsing the tag. If publication is owned by a separate workflow, read the
+direct-dispatch contract in `references/github-actions.md`: an explicit
+`workflow_dispatch` input must be resolved and gated independently of the
+workflow's `on.push.tags` filter.
 
 Examples from the skill directory:
 

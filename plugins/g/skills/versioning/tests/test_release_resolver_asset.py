@@ -11,6 +11,7 @@ from types import ModuleType
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 ASSET = SKILL_ROOT / "assets" / "resolve_release_version.py"
 REFERENCE = SKILL_ROOT / "references" / "github-actions.md"
+SKILL = SKILL_ROOT / "SKILL.md"
 
 
 def load_resolver() -> ModuleType:
@@ -151,6 +152,20 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertIn("needs.resolve.outputs.is_final == 'true'", reference)
         self.assertIn("pull-requests: write", reference)
         self.assertIn("No application source or package metadata", reference)
+
+    def test_reference_defines_direct_downstream_dispatch_contract(self) -> None:
+        reference = REFERENCE.read_text(encoding="utf-8")
+        skill = SKILL.read_text(encoding="utf-8")
+        self.assertIn("### Direct downstream dispatch contract", reference)
+        self.assertIn("workflow_dispatch.inputs.tag", reference)
+        self.assertIn("confirmed_tag: ${{ inputs.tag || github.ref_name }}", reference)
+        self.assertIn("needs.resolve.outputs.tag_state == 'existing-final'", reference)
+        self.assertIn("ref: ${{ needs.resolve.outputs.tag }}", reference)
+        self.assertIn("gh workflow run <publish-workflow>.yml", reference)
+        self.assertIn('"$GITHUB_REPOSITORY"', reference)
+        self.assertIn('--field tag="$TAG"', reference)
+        self.assertIn("actions: write", reference)
+        self.assertIn("direct-dispatch contract", skill)
 
 
 if __name__ == "__main__":
