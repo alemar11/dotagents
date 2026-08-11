@@ -18,17 +18,18 @@ Install three repository-local files:
   `assets/resolve_release_version.py` and invoked only through `python3`.
 
 The dry run calculates one proposal and never creates refs. The apply workflow
-accepts the exact proposed tag, re-resolves current state, and proceeds only
-when the confirmation still matches. A candidate creates an immutable
-`vX.Y.Z-rc.N` tag and its `release/vX.Y.Z` branch. A final creates or verifies
-the immutable `vX.Y.Z` tag, then creates or reuses one open pull request to the
-current default branch only when the release branch is ahead. It never merges
-that pull request.
+shows the same operation choices, calculates the exact proposal in a read-only
+plan job, and passes that exact tag to a second resolver job before mutation.
+A candidate creates an immutable `vX.Y.Z-rc.N` tag and its
+`release/vX.Y.Z` branch. A final creates or verifies the immutable `vX.Y.Z`
+tag, then creates or reuses one open pull request to the current default branch
+only when the release branch is ahead. It never merges that pull request.
 
-No environment or manual approval gate is part of this topology. The explicit
-tag entered into the apply workflow is the confirmation gate. Repository or
-organization policy may add an environment, but that is not part of the
-portable template.
+No environment or manual approval gate is part of this topology. The exact tag
+produced by the apply plan is passed as an internal confirmation to the second
+resolver job; the workflow revalidates it against a fresh tag snapshot and
+branch SHA before mutation. Repository or organization policy may add an
+environment, but that is not part of the portable template.
 
 ## Universal contract
 
@@ -54,6 +55,8 @@ Preserve all of these invariants in every project:
 - Treat branches and tags as immutable: create missing refs, verify exact SHAs,
   and never move, replace, or delete an existing ref.
 - Hash the sorted remote tag-name snapshot and reject stale application state.
+- Calculate the apply proposal in a read-only plan job, then re-resolve it as
+  an exact internal confirmation before any mutation job runs.
 - Check out only the resolver from the verified default-branch commit. Never
   check out, inspect, edit, build, test, or commit application code, and never
   read `package.json` or another package manifest.
@@ -219,10 +222,11 @@ divergence explicitly instead of masking it behind the same version.
 7. Add or update focused resolver tests in `.github/scripts/`. At minimum test
    `--version`, stable-baseline increments, same-line continuation, unrelated
    parallel lines, direct final, legacy read-only input, exact confirmation,
-   noncanonical rejection, existing-final reconciliation, output fields, and
-   the downstream dispatch contract: final tag push, RC push, manual final
-   input, manual RC input, absent manual tag, exact-tag checkout, and the
-   apply-to-publish dispatch command.
+   noncanonical rejection, existing-final reconciliation, output fields, the
+   identical apply/dry-run operation choices, the internal plan-to-confirm
+   handoff, and the downstream dispatch contract: final tag push, RC push,
+   manual final input, manual RC input, absent manual tag, exact-tag checkout,
+   and the apply-to-publish dispatch command.
 8. Validate Python tests, `--help`, `--version`, YAML parsing, every Bash
    `run` block with ShellCheck, and `git diff --check`. Run application tests
    only when repository instructions require them; the workflows themselves
@@ -456,15 +460,21 @@ jobs:
 # g:versioning release workflow template; resolver API 0.2.0
 name: Release version (apply)
 
-run-name: Apply · ${{ inputs.confirmed_tag }} · ${{ github.ref_name }}
+run-name: Apply · ${{ inputs.operation }} · ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
     inputs:
-      confirmed_tag:
-        description: Exact canonical tag shown by Release version (dry run)
+      operation:
+        description: Select the operation that matches the branch chosen above
         required: true
-        type: string
+        type: choice
+        options:
+          - "[patch] Default branch → vX.Y.(Z+1)-rc.1"
+          - "[minor] Default branch → vX.(Y+1).0-rc.1"
+          - "[major] Default branch → v(X+1).0.0-rc.1"
+          - "[candidate] release/vX.Y.Z → vX.Y.Z-rc.N"
+          - "[final] release/vX.Y.Z → vX.Y.Z"
 
 permissions: {}
 
@@ -473,13 +483,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Resolve requested operation
+    uses: ./.github/workflows/release-version-dry-run.yml
+    with:
+      application_mode: false
+      operation: ${{ inputs.operation }}
+      ref_name: ${{ github.ref_name }}
+      target_sha: ${{ github.sha }}
+    permissions:
+      contents: read
+
   resolve:
-    name: Revalidate exact confirmation
+    name: Revalidate calculated tag
+    needs: plan
     uses: ./.github/workflows/release-version-dry-run.yml
     with:
       application_mode: true
-      operation: auto
-      confirmed_tag: ${{ inputs.confirmed_tag }}
+      operation: ${{ inputs.operation }}
+      confirmed_tag: ${{ needs.plan.outputs.tag }}
       ref_name: ${{ github.ref_name }}
       target_sha: ${{ github.sha }}
     permissions:
@@ -820,7 +842,7 @@ jobs:
 
 | YAML surface | Why it is portable |
 | --- | --- |
-| `confirmed_tag` | Human confirmation is exact data, not a boolean approval |
+| apply `plan` and `resolve` jobs | Keep the apply UI identical to dry run while revalidating the calculated exact tag before mutation |
 | apply `concurrency` | Prevents parallel mutations while allowing the current transaction to finish |
 | reusable `resolve` job | Recalculates against current tags and selected SHA immediately before writes |
 | candidate/final conditions | Require both the semantic operation kind and the resolver-derived `is_final` value before either mutation path runs |

@@ -152,6 +152,10 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertIn("needs.resolve.outputs.is_final == 'true'", reference)
         self.assertIn("pull-requests: write", reference)
         self.assertIn("No application source or package metadata", reference)
+        self.assertIn("run-name: Apply · ${{ inputs.operation }} · ${{ github.ref_name }}", reference)
+        self.assertIn("name: Resolve requested operation", reference)
+        self.assertIn("name: Revalidate calculated tag", reference)
+        self.assertIn("confirmed_tag: ${{ needs.plan.outputs.tag }}", reference)
 
     def test_reference_defines_direct_downstream_dispatch_contract(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")

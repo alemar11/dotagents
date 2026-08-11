@@ -185,6 +185,13 @@ already asked generally to “release” or “create the tag”:
    then verify the resulting ref and commit. A final tag and its release are
    separate operations and each must remain within the user's confirmed scope.
 
+The portable GitHub Actions may use the identical operation-choice UI for dry
+run and apply. In that mode, apply must first calculate a read-only proposal,
+pass the exact generated tag to a second resolver job as an internal
+confirmation, and expose the exact tag in the run summary before mutation. Do
+not generalize this same-run confirmation to direct tag commands or workflows
+that accept an unvalidated operation without the second resolver pass.
+
 If the current branch is neither `main` nor `release/vX.Y.Z` and the user did
 not provide a clear version/intent, do not guess. Show read-only context and
 ask which release line or migration the user wants.
@@ -231,7 +238,9 @@ edit application code, run project build/test commands, create commits, or
 merge the final pull request. Preserve the exact canonical tag gate and the
 separate dry-run/application confirmation boundary. Preserve the resolver's
 `is_final` workflow output so downstream jobs can gate stable-only work without
-reparsing the tag. If publication is owned by a separate workflow, read the
+reparsing the tag. The apply template uses the same operation-choice UI as dry
+run and preserves the confirmation boundary through its internal plan-to-
+resolve handoff. If publication is owned by a separate workflow, read the
 direct-dispatch contract in `references/github-actions.md`: an explicit
 `workflow_dispatch` input must be resolved and gated independently of the
 workflow's `on.push.tags` filter.
