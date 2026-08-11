@@ -78,7 +78,8 @@ maintenance request needs to be routed to a concrete task.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 11. `refresh tanstack skills coverage`
    - Compare local `skills/tanstack/` product-level references against the
-     upstream `tanstack-skills/tanstack-skills` plugin tree.
+     upstream `tanstack-skills/tanstack-skills` plugin tree and current
+     TanStack-owned product docs, which may expose new official products first.
    - Ignore upstream bundle aliases such as `tanstack-all`, `tanstack-core`,
      `tanstack-data`, and `tanstack-ui` unless the local reusable-skill packaging
      model intentionally changes.

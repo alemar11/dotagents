@@ -5,6 +5,7 @@ Use this map after `$tanstack` triggers. Open only the smallest reference that m
 ## Product References
 
 - `ai.md`: provider-agnostic streaming, tools, structured output, multimodal messages, workflows, and AG-UI integration.
+- `charts.md`: typed chart definitions, marks, channels, D3 scales and transforms, responsive SVG or Canvas rendering, SSR, interaction, and accessibility.
 - `cli.md`: scaffolding, add-ons, ecosystem discovery, custom add-ons, and machine-readable docs lookup.
 - `config.md`: package build, lint, versioning, publishing, and shared JavaScript or TypeScript configuration.
 - `db.md`: client-first collections, live queries, sync adapters, and optimistic mutations.
