@@ -351,7 +351,7 @@ migration file before touching the real target DB.
 
 ## References
 
-- Env vars: `postgres_env.md`
-- Config schema: `postgres_skill_schema.md`
-- Migration guardrails: `postgres_guardrails.md`
-- Design guidance: `postgres_best_practices/README.md`
+- Env vars: `environment.md`
+- Config schema: `config-schema.md`
+- Migration guardrails: `../workflows/migration-guardrails.md`
+- Design guidance: `../design/README.md`

@@ -12,9 +12,16 @@ references; this file records the shipped-package maintenance boundary.
 - `projects/postgres/` is maintenance-only source for the platform binaries;
   its build and release contract is in `projects/postgres/AGENTS.md`.
 - `assets/` and `references/` are shipped runtime inputs. In particular,
-  `references/options.md` is the canonical compatibility exception for the
-  Postgres option surface and must remain aligned with help, config, and JSON
-  output.
+  `references/runtime/options.md` is the canonical compatibility exception for
+  the Postgres option surface and must remain aligned with help, config, and
+  JSON output.
+- Keep shipped references grouped by concern under `runtime/`, `workflows/`,
+  `sql/`, `design/`, and `extensions/`. Put extension-specific guidance only in
+  `extensions/`.
+- Keep all PostgreSQL-major catalogs as sibling files under `references/sql/`;
+  do not create per-major reference directories.
+- Keep maintenance-only references under `projects/postgres/references/`, not
+  in the shipped runtime reference tree.
 
 ## Maintenance contract
 

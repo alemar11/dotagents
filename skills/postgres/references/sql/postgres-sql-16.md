@@ -13,6 +13,11 @@ Use these patterns only when the oldest target is PostgreSQL 16 or newer.
 - [Cluster I/O diagnostics](#cluster-io-diagnostics)
 - [Independent role-membership options](#independent-role-membership-options)
 - [Custom ICU collation rules](#custom-icu-collation-rules)
+- [Standby logical decoding and parallel apply](#standby-logical-decoding-and-parallel-apply)
+- [Regex and included authentication rules](#regex-and-included-authentication-rules)
+- [Readable numeric literals](#readable-numeric-literals)
+- [COPY throughput changes](#copy-throughput-changes)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-16)
 
 ## SQL/JSON constructors and validation
 
@@ -219,3 +224,65 @@ version drift before rebuilding or migrating.
 normalized sort key maintained by the application.
 
 [Official `CREATE COLLATION` documentation](https://www.postgresql.org/docs/16/sql-createcollation.html)
+
+## Standby logical decoding and parallel apply
+
+**Use when:** decoding should move to a standby or a subscriber must apply a
+large streamed transaction with parallel workers.
+
+PG16 permits logical decoding on standbys; `pg_log_standby_snapshot()` can
+write the snapshot WAL record needed before slot creation. Subscriptions can
+request parallel application with `STREAMING = parallel`, bounded by
+`max_parallel_apply_workers_per_subscription`.
+
+Standby slots still depend on physical WAL retention and invalidation rules.
+Parallel apply changes concurrency and resource use, not commit ordering or the
+need for replica identity and conflict handling.
+
+[Official PostgreSQL 16 logical replication notes](https://www.postgresql.org/docs/16/release-16.html)
+
+## Regex and included authentication rules
+
+**Use when:** large `pg_hba.conf` or `pg_ident.conf` policies need named file
+fragments or pattern-based database and role matching.
+
+PG16 adds leading-slash regular expressions and `include`,
+`include_if_exists`, and `include_dir`. Quote literal names that begin with a
+slash. Validate parsed rules through `pg_hba_file_rules` and
+`pg_ident_file_mappings` before reloading, and preserve first-match ordering
+across included files.
+
+**Fallback below 16:** enumerate explicit names and generate one reviewed,
+deterministically ordered configuration file.
+
+[Official client-authentication documentation](https://www.postgresql.org/docs/16/client-authentication.html)
+
+## Readable numeric literals
+
+**Use when:** bit masks, protocol constants, or large numeric constants are
+clearer in non-decimal notation or with separators.
+
+```sql
+select 0x2a, 0o52, 0b101010, 1_000_000;
+```
+
+Hexadecimal, octal, and binary integer literals and underscores between digits
+arrive in PG16. Keep migration generators and SQL parsers version-aware; these
+forms are less portable than plain decimal literals.
+
+**Fallback below 16:** use ordinary decimal constants or an explicit cast from
+a validated string.
+
+[Official PostgreSQL 16 lexical syntax](https://www.postgresql.org/docs/16/sql-syntax-lexical.html)
+
+## COPY throughput changes
+
+**Use when:** reassessing ingestion sizing after a PG16 upgrade.
+
+PG16 reduces several `COPY FROM` CPU and allocation costs, while foreign-table
+inserts can batch rows through a wrapper-specific `batch_size`. The core speedup
+does not change durability, trigger, constraint, WAL, or error semantics.
+Benchmark the actual format, row width, indexes, and storage path before
+changing batch or concurrency limits.
+
+[Official PostgreSQL 16 release notes](https://www.postgresql.org/docs/16/release-16.html)

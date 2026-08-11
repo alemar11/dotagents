@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, or pgvector patterns.
+description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, or pg_durable patterns.
 ---
 
 # Postgres
@@ -8,9 +8,9 @@ description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migration
 ## Goal
 
 Use this skill to connect to Postgres, run SQL, inspect schemas, review query
-performance, design tables and indexes, work with common PostGIS or pgvector
-patterns, select SQL supported by the target PostgreSQL major, and manage
-migration release flow through the shipped
+performance, design tables and indexes, work with common PostGIS, pgvector, or
+pg_durable patterns, select SQL supported by the target PostgreSQL major, and
+manage migration release flow through the shipped
 `scripts/postgres` launcher in the skill package.
 
 ## Runtime surface
@@ -23,10 +23,10 @@ migration release flow through the shipped
   path first and run `<postgres-skill-root>/scripts/postgres`.
 - `<postgres-skill-root>/scripts/postgres --version` is the runtime version
   check.
-- Runtime model, platform binary, and maintenance implementation details live in
-  `references/postgres_usage.md`.
-- Load `references/options.md` before reading or reporting behavior-affecting
-  config choices.
+- Runtime model, platform binary, and maintenance implementation details live
+  in `references/runtime/usage.md`.
+- Load `references/runtime/options.md` before reading or reporting
+  behavior-affecting config choices.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 - Ordinary runtime commands read and normalize config only in memory. Use
   `profile migrate-config`, `profile bootstrap --save`,
@@ -67,7 +67,7 @@ Minimal happy path:
 
 ## Common workflows
 
-Use `references/common-workflows.md` for copy/paste playbooks:
+Use `references/workflows/common-workflows.md` for copy/paste playbooks:
 
 - enums (find type + values)
 - find table/column/function by name
@@ -79,9 +79,9 @@ Use `references/common-workflows.md` for copy/paste playbooks:
 
 Before proposing syntax whose availability depends on the PostgreSQL major,
 resolve the oldest deployed major and load
-`references/postgres-sql-versions.md`. Select the relevant capability route and
-load only its linked guide sections. Do not load all per-version guides for an
-ordinary SQL task.
+`references/sql/postgres-sql-versions.md`. Select the relevant capability route
+and load only its linked guide sections. Do not load all per-version guides for
+an ordinary SQL task.
 
 Load a complete PostgreSQL 14–19 guide only for an explicit upgrade review,
 broad release comparison, or targeted lookup of a feature omitted from the
@@ -97,7 +97,8 @@ its syntax or behavior.
 
 - Before you run any non-trivial query, confirm the target:
   - `DB_PROJECT_ROOT="$DB_PROJECT_ROOT" DB_PROFILE=local "$POSTGRES_CLI" --json profile resolve`
-  - then run the identity query from `references/common-workflows.md` (“Which DB am I connected to?”).
+  - then run the identity query from
+    `references/workflows/common-workflows.md` (“Which DB am I connected to?”).
 - If the user says “production”, “prod”, “staging”, or “remote DB”:
   - stop and ask for the exact `DB_PROFILE` / `DB_URL` they intend
   - default to `access_mode=read` and require an explicit confirmation before any write/DDL
@@ -108,18 +109,45 @@ its syntax or behavior.
   the existing migration directory.
 - If a `prerelease*.sql` file exists, use it for pending work instead of
   creating a timestamped migration file.
-- Use `references/postgres_guardrails.md` as the canonical migration workflow.
+- Use `references/workflows/migration-guardrails.md` as the canonical migration
+  workflow.
 
 ## References
 
-- Usage + command surface + JSON mode: `references/postgres_usage.md`
-- Canonical option fields and compatibility aliases: `references/options.md`
-- Common workflows playbook: `references/common-workflows.md`
-- Env var contract: `references/postgres_env.md`
-- Config schema: `references/postgres_skill_schema.md`
-- Migration guardrails: `references/postgres_guardrails.md`
-- Local/Docker recovery: `references/postgres_local_recovery.md`
-- Design guidance: `references/postgres_best_practices/README.md`
-- SQL capability router and version-selection rules: `references/postgres-sql-versions.md`
-- Optional PostgreSQL release catalogs: `references/postgres-sql-14.md` through
-  `references/postgres-sql-19.md`
+- Runtime command surface and JSON mode: `references/runtime/usage.md`
+- Runtime option fields and compatibility aliases: `references/runtime/options.md`
+- Runtime environment contract: `references/runtime/environment.md`
+- Runtime config schema: `references/runtime/config-schema.md`
+- Common inspection workflows: `references/workflows/common-workflows.md`
+- Migration guardrails: `references/workflows/migration-guardrails.md`
+- Local and Docker recovery: `references/workflows/local-recovery.md`
+- Broad design or migration review: load `references/design/README.md` for the
+  first-pass checklist and select only the relevant detailed references.
+- Schema and storage design: load `references/design/schema-design.md` for
+  constraints, keys, data types, partitioning, naming, or storage layout.
+- Query and access design: load `references/design/query-performance.md` for
+  indexes and measured plans, and `references/design/data-access-patterns.md`
+  for batching, upserts, pagination, query shape, or write-heavy workloads.
+- Concurrency and connections: load `references/design/concurrency-locking.md`
+  for transactions and locks, or `references/design/connection-management.md`
+  for pooling, session behavior, memory, and connection timeouts.
+- Security and diagnostics: load `references/design/security-rls.md` for roles,
+  grants, or RLS, and `references/design/monitoring-diagnostics.md` for workload,
+  vacuum, lock, activity, logging, or index diagnostics.
+- Advanced built-in features: load `references/design/advanced-features.md`
+  for full-text, JSONB, arrays, trigrams, ranges, generated expressions,
+  PL/pgSQL, triggers, or extension-management tradeoffs.
+- PostGIS guidance: load `references/extensions/postgis.md` only for spatial
+  types, SRIDs, spatial predicates, or spatial-index tasks.
+- pgvector guidance: load `references/extensions/pgvector.md` only for
+  embeddings, vector indexes, similarity search, or retrieval tasks.
+- pg_durable guidance: load `references/extensions/pg-durable.md` only for
+  asynchronous workflow, retry, schedule, signal, or durable-job tasks.
+- SQL capability router and version-selection rules:
+  `references/sql/postgres-sql-versions.md`
+- Foreign tables and FDW version changes: load
+  `references/sql/postgres-fdw-versions.md` only for foreign-table,
+  `postgres_fdw`, `file_fdw`, remote-pushdown, or FDW-backed subscription tasks.
+- Optional PostgreSQL release catalogs: `references/sql/postgres-sql-14.md`
+  through `references/sql/postgres-sql-19.md`; keep all majors in this one
+  category.

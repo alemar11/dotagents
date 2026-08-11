@@ -1,7 +1,7 @@
 # PostgreSQL 19 SQL Additions — Preview
 
 > **Volatile development snapshot:** This guide was verified against
-> **PostgreSQL 19 Beta 2 on 2026-08-09**. Recheck the current release stage,
+> **PostgreSQL 19 Beta 2 on 2026-08-11**. Recheck the current release stage,
 > syntax, and behavior against the exact target build; do not use this guide
 > alone to approve a production migration.
 
@@ -23,6 +23,12 @@ as the current source of truth.
 - [`EXPLAIN (ANALYZE, IO)` (preview)](#explain-analyze-io-preview)
 - [Publication sequences and exclusions (preview)](#publication-sequences-and-exclusions-preview)
 - [Global-object DDL reconstruction (preview)](#global-object-ddl-reconstruction-preview)
+- [Online data checksums (preview)](#online-data-checksums-preview)
+- [AIO workers and parallel autovacuum (preview)](#aio-workers-and-parallel-autovacuum-preview)
+- [New operational statistics views (preview)](#new-operational-statistics-views-preview)
+- [Unsigned `oid8` values (preview)](#unsigned-oid8-values-preview)
+- [Changed JIT, lock, and TOAST defaults (preview)](#changed-jit-lock-and-toast-defaults-preview)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-19-preview)
 
 ## SQL/PGQ property graphs (preview)
 
@@ -357,3 +363,79 @@ or a reason to export secrets through another path.
 or use established dump tooling with explicit secret-handling rules.
 
 [Official system-information documentation](https://www.postgresql.org/docs/19/functions-info.html)
+
+## Online data checksums (preview)
+
+**Use when:** an existing cluster must enable or disable page checksums without
+an offline `pg_checksums` maintenance window.
+
+```sql
+select pg_enable_data_checksums();
+```
+
+Online enablement rewrites cluster pages through a background worker, emits
+WAL, consumes I/O, waits on old transactions and temporary tables, and does not
+resume automatically after interruption. Monitor the cluster-wide checksum
+state and replication lag; throttle and schedule it like a major maintenance
+operation. Disabling checksums removes protection and requires an explicit risk
+decision.
+
+[Official PostgreSQL 19 checksum documentation](https://www.postgresql.org/docs/19/checksums.html)
+
+## AIO workers and parallel autovacuum (preview)
+
+**Use when:** PG18-style asynchronous I/O needs dynamically managed workers or
+large relations benefit from parallel autovacuum processing.
+
+The `worker` I/O method adds `io_min_workers`, `io_max_workers`, idle timeout,
+and launch interval controls. Autovacuum adds cluster and per-table parallel
+worker limits, while scoring weights influence which table is processed next.
+Treat both as resource schedulers: cap CPU and I/O concurrency, observe queue
+age and replica impact, and tune from production-like measurements.
+
+[Official PostgreSQL 19 release notes](https://www.postgresql.org/docs/19/release-19.html)
+
+## New operational statistics views (preview)
+
+**Use when:** diagnosing lock pressure, recovery state, or why autovacuum chose
+a table.
+
+```sql
+select * from pg_stat_lock;
+select * from pg_stat_recovery;
+select * from pg_stat_autovacuum_scores;
+```
+
+These are aggregate or current-state diagnostics, not immutable audit logs.
+Capture samples with timestamps when trend or incident reconstruction matters,
+and check view privileges before embedding them in application diagnostics.
+
+[Official PostgreSQL 19 monitoring statistics](https://www.postgresql.org/docs/19/monitoring-stats.html)
+
+## Unsigned `oid8` values (preview)
+
+**Use when:** PostgreSQL-owned identifiers or interoperability data genuinely
+need the full unsigned 64-bit range.
+
+`oid8` is not a reason to replace ordinary application `bigint` keys. Confirm
+driver encoding, casts, comparison behavior, and downstream type support before
+exposing it through an API. `regdatabase` provides name-to-`oid8` casts for
+database identifiers.
+
+**Fallback through 18:** use `numeric(20, 0)` with explicit range checks when
+the unsigned range is required, or retain `bigint` for signed application IDs.
+
+[Official PostgreSQL 19 data types](https://www.postgresql.org/docs/19/datatype.html)
+
+## Changed JIT, lock, and TOAST defaults (preview)
+
+**Use when:** comparing performance or memory behavior across an upgrade.
+
+PG19 disables JIT by default, changes the default TOAST compression from
+`pglz` to `lz4`, and raises `max_locks_per_transaction` from 64 to 128 while
+changing lock allocation sizing. Existing TOAST values are not rewritten merely
+because the default changed. Explicitly benchmark analytical workloads before
+re-enabling JIT and size shared memory from the new lock semantics rather than
+copying the old numeric setting.
+
+[Official PostgreSQL 19 migration notes](https://www.postgresql.org/docs/19/release-19.html)

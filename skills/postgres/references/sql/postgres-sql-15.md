@@ -14,6 +14,10 @@ particular, do not give PostgreSQL 15 `MERGE` capabilities that arrived in 17.
 - [Column-specific foreign-key delete actions](#column-specific-foreign-key-delete-actions)
 - [Negative and oversized numeric scales](#negative-and-oversized-numeric-scales)
 - [Changing a table access method](#changing-a-table-access-method)
+- [Secure defaults for the `public` schema](#secure-defaults-for-the-public-schema)
+- [Structured JSON server logs](#structured-json-server-logs)
+- [WAL and base-backup compression](#wal-and-base-backup-compression)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-15)
 
 ## Batch synchronization with `MERGE`
 
@@ -222,3 +226,55 @@ using a non-default access method.
 copy and validate data, then perform a controlled cutover.
 
 [Official `ALTER TABLE` documentation](https://www.postgresql.org/docs/15/sql-altertable.html)
+
+## Secure defaults for the `public` schema
+
+**Use when:** creating new PG15 clusters or databases, or auditing an upgrade
+for safe object-creation privileges.
+
+New databases revoke `CREATE` on schema `public` from `PUBLIC` and make the
+database-local `pg_database_owner` role its owner. Upgrades and restored dumps
+preserve existing ownership and grants, so do not infer the new posture from
+the server major alone.
+
+```sql
+select nspowner::regrole, nspacl
+from pg_namespace
+where nspname = 'public';
+```
+
+Review application migrations before revoking legacy access; explicitly grant
+creation only to intended owner or migration roles.
+
+[Official PostgreSQL 15 release notes](https://www.postgresql.org/docs/15/release-15.html)
+
+## Structured JSON server logs
+
+**Use when:** log collectors should ingest stable structured fields instead of
+parsing `stderr` or CSV text.
+
+Set `log_destination = 'jsonlog'` together with a compatible logging collector
+and rotation policy. Treat field names and multiline messages as structured
+records, preserve server timestamps and session identifiers, and test the
+ingestion pipeline before replacing an existing destination.
+
+**Fallback below 15:** use `csvlog` or a consistently configured text prefix
+and parse it at the collector boundary.
+
+[Official PostgreSQL 15 logging documentation](https://www.postgresql.org/docs/15/runtime-config-logging.html)
+
+## WAL and base-backup compression
+
+**Use when:** WAL or base-backup bandwidth and storage are material and CPU
+headroom is available.
+
+PG15 allows LZ4 or Zstandard for full-page WAL compression through
+`wal_compression`. `pg_basebackup` can compress on the server with gzip, LZ4,
+or Zstandard and supports richer client/server compression placement.
+Benchmark write latency, recovery time, CPU cost, and tool build support before
+changing production defaults.
+
+**Fallback below 15:** use the compression methods supported by the exact
+server/client pair or compress only after producing and verifying the backup.
+
+[Official PostgreSQL 15 release notes](https://www.postgresql.org/docs/15/release-15.html)

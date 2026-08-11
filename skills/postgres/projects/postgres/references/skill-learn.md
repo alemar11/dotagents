@@ -1,7 +1,8 @@
-# Postgres Skill Learn
+# Postgres Skill Maintenance Learn
 
-Use this reference when the runtime skill uncovers a repeated pattern that may
-deserve promotion into a durable script, rule, or reference update.
+Use this maintenance-only reference when recurring Postgres usage surfaces a
+pattern that may deserve promotion into a durable script, rule, or reference
+update. Do not route this file from the runtime skill.
 
 ## Promote to a script when
 - The same SQL/inspection workflow is repeated across multiple sessions.
@@ -33,6 +34,6 @@ deserve promotion into a durable script, rule, or reference update.
 - Prefer one focused helper over a large “do everything” script.
 - Prefer extending an existing script only when the new behavior is a natural fit.
 - Keep runtime scripts side-effect-light unless the side effect is the explicit purpose of the command.
-- Document every promoted script in `references/postgres_usage.md`.
-- Document any new env inputs in `references/postgres_env.md`.
+- Document every promoted script in `references/runtime/usage.md`.
+- Document any new env inputs in `references/runtime/environment.md`.
 - Update `SKILL.md` only when the promoted learning changes the runtime decision flow.

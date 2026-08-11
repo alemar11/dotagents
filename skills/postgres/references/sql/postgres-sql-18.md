@@ -14,6 +14,12 @@ Use these patterns only when the oldest target is PostgreSQL 18 or newer.
 - [Logical replication of stored generated columns](#logical-replication-of-stored-generated-columns)
 - [B-tree skip-scan diagnostics](#b-tree-skip-scan-diagnostics)
 - [`CREATE FOREIGN TABLE LIKE`](#create-foreign-table-like)
+- [Asynchronous I/O](#asynchronous-io)
+- [`pg_upgrade` statistics retention](#pg_upgrade-statistics-retention)
+- [OAuth authentication](#oauth-authentication)
+- [Unicode case folding](#unicode-case-folding)
+- [Richer default `EXPLAIN ANALYZE`](#richer-default-explain-analyze)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-18)
 
 ## Explicit `OLD` and `NEW` in DML `RETURNING`
 
@@ -270,3 +276,81 @@ enforcing them, so do not copy constraints that the remote data can violate.
 list or import the remote schema through the foreign-data wrapper.
 
 [Official `CREATE FOREIGN TABLE` documentation](https://www.postgresql.org/docs/18/sql-createforeigntable.html)
+
+## Asynchronous I/O
+
+**Use when:** sequential scans, bitmap heap scans, VACUUM, or other read-heavy
+operations should queue multiple reads instead of waiting on each one.
+
+PG18 introduces the AIO subsystem controlled by `io_method` and related
+concurrency limits. Inspect active handles through `pg_aios` and compare
+`pg_stat_io`, latency, queue depth, and CPU before and after changing the
+method. Availability and best settings depend on the operating system and
+PostgreSQL build.
+
+**Fallback below 18:** tune existing prefetch and concurrency settings and rely
+on OS caching without expecting equivalent queue visibility.
+
+[Official PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
+
+## `pg_upgrade` statistics retention
+
+**Use when:** reducing the post-upgrade period of poor plans caused by missing
+optimizer statistics.
+
+PG18 can preserve per-relation and per-column statistics during `pg_upgrade`.
+Extended statistics are not preserved. Keep post-upgrade `ANALYZE` validation,
+inspect stale or missing statistics, and use `--no-statistics` when the old
+statistics are not trustworthy for the new environment.
+
+Statistics retention shortens recovery of planner quality; it does not prove
+plans remain optimal after data, collation, extension, or server changes.
+
+[Official PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
+
+## OAuth authentication
+
+**Use when:** clients should authenticate with externally issued OAuth tokens
+and the server can load a trusted validator implementation.
+
+PG18 adds the `oauth` HBA method, libpq OAuth parameters, and
+`oauth_validator_libraries`. The server must be built with the required curl
+support. Validate issuer, audience, token lifetime, role mapping, TLS trust, and
+fail-closed behavior; do not treat token validation as authorization inside the
+database.
+
+**Fallback below 18:** terminate OAuth at a trusted proxy that establishes a
+separately authenticated PostgreSQL connection, or use an existing supported
+database authentication method.
+
+[Official PostgreSQL 18 OAuth documentation](https://www.postgresql.org/docs/18/auth-oauth.html)
+
+## Unicode case folding
+
+**Use when:** caseless matching must handle Unicode equivalences that simple
+`lower()` cannot represent.
+
+```sql
+select casefold('Straße') = casefold('STRASSE');
+```
+
+Case folding can change string length and depends on encoding/collation
+behavior. Store the original value, define uniqueness semantics explicitly,
+and verify whether an expression index or maintained normalized key matches the
+application's locale and upgrade requirements.
+
+**Fallback below 18:** use a reviewed normalization strategy, `citext`, or a
+`lower()` expression index only when its weaker semantics are acceptable.
+
+[Official PostgreSQL 18 string functions](https://www.postgresql.org/docs/18/functions-string.html)
+
+## Richer default `EXPLAIN ANALYZE`
+
+**Use when:** comparing execution plans with less diagnostic boilerplate.
+
+PG18 automatically includes buffer statistics in `EXPLAIN ANALYZE`, reports
+index lookup counts, and uses fractional row counts where useful. Existing
+parsers and snapshots may change even when the query plan does not, so update
+tooling before upgrade and compare semantic fields rather than raw text.
+
+[Official PostgreSQL 18 `EXPLAIN` documentation](https://www.postgresql.org/docs/18/sql-explain.html)

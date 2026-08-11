@@ -12,6 +12,11 @@ Use these patterns only when the oldest target is PostgreSQL 17 or newer.
 - [Session-zone conversion with `AT LOCAL`](#session-zone-conversion-with-at-local)
 - [UUID metadata extraction](#uuid-metadata-extraction)
 - [Bounded random values](#bounded-random-values)
+- [Partitioned identity and exclusion constraints](#partitioned-identity-and-exclusion-constraints)
+- [Incremental physical backups](#incremental-physical-backups)
+- [Logical-replication failover](#logical-replication-failover)
+- [Maintenance memory, privilege, and `search_path`](#maintenance-memory-privilege-and-search_path)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-17)
 
 ## `JSON_TABLE` and SQL/JSON query functions
 
@@ -213,3 +218,71 @@ tokens, or cryptographic keys.
 type, accounting for inclusive versus exclusive endpoints.
 
 [Official mathematical-function documentation](https://www.postgresql.org/docs/17/functions-math.html)
+
+## Partitioned identity and exclusion constraints
+
+**Use when:** partitioned data needs parent-owned identity generation or a
+cross-row non-overlap invariant that includes partition keys.
+
+PG17 allows identity columns and exclusion constraints on partitioned tables.
+Every exclusion constraint must compare partition-key columns for equality so
+conflicting rows cannot live in unrelated partitions. Required operator
+classes, such as scalar GiST equality from `btree_gist`, remain extension
+dependencies.
+
+Recheck attach/detach operations and every child definition; partitioning does
+not provide a globally ordered identity sequence or eliminate concurrent
+constraint costs.
+
+[Official PostgreSQL 17 release notes](https://www.postgresql.org/docs/17/release-17.html)
+
+## Incremental physical backups
+
+**Use when:** large clusters need smaller recurring physical backups and can
+retain a verified base backup and WAL summaries.
+
+PG17 adds `pg_basebackup --incremental`, WAL summarization, and
+`pg_combinebackup`. An incremental backup is not independently restorable;
+retain the referenced chain, manifests, and required WAL, then regularly build
+and verify a synthetic full backup.
+
+This is an operator workflow rather than a replacement for logical exports or
+application-level recovery tests.
+
+[Official incremental-backup documentation](https://www.postgresql.org/docs/17/continuous-archiving.html#BACKUP-INCREMENTAL-BACKUP)
+
+## Logical-replication failover
+
+**Use when:** logical subscribers must continue after publisher failover or a
+physical standby should become a logical subscriber.
+
+PG17 adds failover-enabled logical slots, slot synchronization, subscription
+failover controls, `synchronized_standby_slots`, and `pg_createsubscriber`.
+`pg_upgrade` can also preserve valid logical slots and subscription state when
+upgrading from PG17 or newer.
+
+Treat slot synchronization and subscriber visibility as separate checkpoints.
+Monitor retained WAL, invalidation reasons, standby freshness, and duplicate or
+missing apply risk during every failover drill.
+
+[Official PostgreSQL 17 logical-replication notes](https://www.postgresql.org/docs/17/release-17.html)
+
+## Maintenance memory, privilege, and `search_path`
+
+**Use when:** delegating table maintenance or validating maintenance behavior
+after an upgrade.
+
+```sql
+grant maintain on table orders to maintenance_role;
+```
+
+PG17 removes VACUUM's former silent one-gigabyte tuple-reference ceiling and
+adds per-table `MAINTAIN` plus the predefined `pg_maintain` role. It also runs
+maintenance expressions with a safe `search_path`; functions used by
+expression indexes or materialized views must schema-qualify dependencies or
+declare an appropriate function-level path.
+
+Re-size `maintenance_work_mem` and `autovacuum_work_mem` from measurements,
+grant maintenance narrowly, and test affected functions before upgrade.
+
+[Official PostgreSQL 17 release notes](https://www.postgresql.org/docs/17/release-17.html)

@@ -15,6 +15,10 @@ or diagnostics.
 - [Concurrent partition detach](#concurrent-partition-detach)
 - [Extended statistics on expressions](#extended-statistics-on-expressions)
 - [Per-column LZ4 TOAST compression](#per-column-lz4-toast-compression)
+- [Memoized nested-loop joins](#memoized-nested-loop-joins)
+- [libpq pipeline mode](#libpq-pipeline-mode)
+- [COPY, WAL, slot, and memory diagnostics](#copy-wal-slot-and-memory-diagnostics)
+- [Foreign-data changes](postgres-fdw-versions.md#postgresql-14)
 
 ## Recursive CTE search order and cycle detection
 
@@ -241,3 +245,57 @@ server-build compatibility in deployment checks.
 address oversized payloads through schema or storage design.
 
 [Official TOAST documentation](https://www.postgresql.org/docs/14/storage-toast.html)
+
+## Memoized nested-loop joins
+
+**Use when:** a nested-loop join repeatedly probes the same parameter values
+and can benefit from caching the inner result.
+
+PostgreSQL 14 adds the `Memoize` executor node, controlled by
+`enable_memoize`. Confirm its use and hit/eviction behavior with
+`EXPLAIN (ANALYZE, BUFFERS)` rather than forcing the setting globally.
+Memoization consumes memory and may not help when probe values are mostly
+unique or the cached result is large.
+
+**Fallback below 14:** improve join indexes and statistics, rewrite the query
+only when measurement supports it, or materialize a deliberately bounded
+intermediate result.
+
+[Official PostgreSQL 14 release notes](https://www.postgresql.org/docs/14/release-14.html)
+
+## libpq pipeline mode
+
+**Use when:** a libpq-based client needs to reduce network round trips by
+sending multiple independent commands before waiting for their results.
+
+Pipeline mode is a client protocol capability, not parallel SQL execution and
+not one transaction per command. Preserve result ordering, insert explicit
+sync points, drain every result after an error, and keep transaction boundaries
+visible in the command stream.
+
+**Fallback below 14:** use prepared statements, multi-row DML, or sequential
+round trips; do not emulate pipelining with unsafe SQL concatenation.
+
+[Official libpq pipeline documentation](https://www.postgresql.org/docs/14/libpq-pipeline-mode.html)
+
+## COPY, WAL, slot, and memory diagnostics
+
+**Use when:** diagnosing a long import, WAL growth, replication-slot retention,
+or backend memory pressure.
+
+```sql
+select * from pg_stat_progress_copy;
+select * from pg_stat_wal;
+select * from pg_stat_replication_slots;
+select * from pg_backend_memory_contexts;
+```
+
+`pg_stat_progress_copy` describes active work, while WAL and slot views expose
+cumulative or retained state. `pg_backend_memory_contexts` reports only the
+current session; use `pg_log_backend_memory_contexts(pid)` for another backend
+only with the required privilege and an explicit log-handling plan.
+
+**Fallback below 14:** combine older statistics views, server logs, replication
+slot metadata, and OS telemetry without assuming equivalent granularity.
+
+[Official PostgreSQL 14 monitoring statistics](https://www.postgresql.org/docs/14/monitoring-stats.html)

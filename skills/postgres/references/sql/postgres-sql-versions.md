@@ -60,6 +60,7 @@ functions in the release catalogs.
   views, exclusion/custom constraints, and transactional range splitting. Load
   [PG15 integrity](postgres-sql-15.md#unique-null-values-with-nulls-not-distinct),
   [PG17 generated expressions](postgres-sql-17.md#changing-a-generated-column-expression),
+  [PG17 partitioned integrity](postgres-sql-17.md#partitioned-identity-and-exclusion-constraints),
   [PG18 generated columns](postgres-sql-18.md#virtual-generated-columns),
   [PG18 temporal integrity](postgres-sql-18.md#temporal-keys-and-foreign-keys), or
   [PG19 temporal DML](postgres-sql-19.md#for-portion-of-temporal-dml-preview).
@@ -84,12 +85,15 @@ functions in the release catalogs.
 - **Planner, indexes, and diagnostics — 14/16/17/18/19 development.** Combine
   older `EXPLAIN`, statistics views, and OS telemetry; observed plans are not
   permanent guarantees. Load
+  [PG14 memoization](postgres-sql-14.md#memoized-nested-loop-joins),
   [PG14 expression statistics](postgres-sql-14.md#extended-statistics-on-expressions),
   [PG16 generic plans](postgres-sql-16.md#generic-prepared-statement-plans),
   [PG16 I/O statistics](postgres-sql-16.md#cluster-io-diagnostics),
   [PG17 planning diagnostics](postgres-sql-17.md#explain-planner-memory-and-output-serialization),
+  [PG18 asynchronous I/O](postgres-sql-18.md#asynchronous-io),
   [PG18 skip scan](postgres-sql-18.md#b-tree-skip-scan-diagnostics), or
-  [PG19 request diagnostics](postgres-sql-19.md#explain-analyze-io-preview).
+  [PG19 request diagnostics](postgres-sql-19.md#explain-analyze-io-preview) and
+  [operational views](postgres-sql-19.md#new-operational-statistics-views-preview).
 
 - **Replication, privileges, and read consistency — 15/16/18/19 development.**
   Older targets may need broader publications, explicit role separation,
@@ -97,6 +101,8 @@ functions in the release catalogs.
   failover. Load [PG15 publications](postgres-sql-15.md#filtered-logical-publications),
   [PG15 invoker views](postgres-sql-15.md#security-invoker-views),
   [PG16 roles](postgres-sql-16.md#independent-role-membership-options),
+  [PG16 decoding/apply](postgres-sql-16.md#standby-logical-decoding-and-parallel-apply),
+  [PG17 failover](postgres-sql-17.md#logical-replication-failover),
   [PG18 generated-column replication](postgres-sql-18.md#logical-replication-of-stored-generated-columns),
   [PG19 replica waits](postgres-sql-19.md#wait-for-lsn-preview), or
   [PG19 publications](postgres-sql-19.md#publication-sequences-and-exclusions-preview).
@@ -107,6 +113,26 @@ functions in the release catalogs.
   [PG14 multiranges](postgres-sql-14.md#multirange-types),
   [PG14 time buckets](postgres-sql-14.md#arbitrary-time-buckets-with-date_bin), or
   [PG18 UUIDv7](postgres-sql-18.md#core-uuidv7-generation).
+
+- **Authentication and secure defaults — 15/16/18.** Keep authentication,
+  object creation, and authorization as separate controls. Validate effective
+  rules after reload and preserve least privilege. Load
+  [PG15 `public` defaults](postgres-sql-15.md#secure-defaults-for-the-public-schema),
+  [PG16 HBA patterns](postgres-sql-16.md#regex-and-included-authentication-rules), or
+  [PG18 OAuth](postgres-sql-18.md#oauth-authentication).
+
+- **Backup, upgrade, and server operations — 15/17/18/19 development.** Test
+  restore and failover outcomes, not only command success. Budget CPU, I/O,
+  WAL, disk, and replica lag before changing operational policy. Load
+  [PG15 compression](postgres-sql-15.md#wal-and-base-backup-compression),
+  [PG17 incremental backups](postgres-sql-17.md#incremental-physical-backups),
+  [PG18 statistics retention](postgres-sql-18.md#pg_upgrade-statistics-retention), or
+  [PG19 online checksums](postgres-sql-19.md#online-data-checksums-preview).
+
+- **Foreign data and remote pushdown — 14–19 development.** Wrapper and remote
+  versions are independent from the local major. Verify actual pushdown,
+  remote transaction units, credentials, timeouts, and statistics. Load the
+  canonical [FDW version guide](postgres-fdw-versions.md).
 
 ## Release catalogs
 
