@@ -387,8 +387,12 @@ Feature.
 Schedule independent Features across safe waves, respecting Feature-level
 `blocked_by` context. A same-repository dependent becomes worker-runnable when
 one immediate parent has verified `candidate-published` evidence and its exact
-branch and full SHA form the child's frozen integration base; parent delivery
-readiness is not a development gate. If several same-repository parents exist,
+branch and full SHA form the child's frozen integration base, and no applicable
+CI check on that current parent HEAD is confirmed failing. Pending CI does not
+block development. A confirmed failure blocks the child unless G-owned
+diagnosis verifies it as exclusively infrastructure or flaky and unrelated to
+candidate correctness; parent delivery readiness is not a development gate. If
+several same-repository parents exist,
 select one immediate parent only when its candidate contains every other
 required prerequisite HEAD, otherwise block for explicit plan reconciliation.
 Within one Feature, the Feature Worker owns the derived units in deterministic
@@ -478,8 +482,12 @@ capacity permit. Every same-repository Feature-level `blocked_by` relation is
 mandatory stack intent independently of otherwise serial or parallel
 execution. A stacked child requires one immediate parent with verified
 `candidate-published` evidence and the parent branch and exact SHA as its
-integration base; it does not wait for parent delivery readiness to begin
-development. Cross-repository relations, unrelated work, and capacity-only
+integration base. Before bootstrap, require no confirmed failing applicable CI
+check on that parent HEAD; pending CI remains non-blocking, and only a G-owned
+diagnosis that verifies an exclusively infrastructure or flaky failure
+unrelated to candidate correctness may exempt a confirmed failure. The child
+does not wait for parent delivery readiness to begin development.
+Cross-repository relations, unrelated work, and capacity-only
 ordering remain standalone.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,

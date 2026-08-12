@@ -129,9 +129,12 @@ surface.
   independently of whether implementation otherwise runs serially or in
   parallel. Cross-repository edges remain scheduling-only. A stacked child may
   start from a verified `candidate-published` parent branch and exact HEAD
-  before that parent is delivery-ready; multi-parent work remains blocked until
-  one immediate parent candidate contains every required same-repository
-  prerequisite HEAD. G owns publication and pairwise stack linking. Parent
+  before that parent is delivery-ready only when no applicable current-head CI
+  check is confirmed failing. Pending CI is non-blocking; bypass a confirmed
+  failure only when G-owned diagnosis verifies it as exclusively infrastructure
+  or flaky and unrelated to candidate correctness. Multi-parent work remains
+  blocked until one immediate parent candidate contains every required
+  same-repository prerequisite HEAD. G owns publication and pairwise stack linking. Parent
   drift invalidates descendant evidence, and each worker owns its own
   bottom-to-top rebase and review cycle.
 - Keep Feature Worker support delegation subordinate to the parent Worker.
@@ -151,8 +154,11 @@ surface.
   cross-repository edge to scheduling-only context; it never treats capacity,
   path overlap, or preferred order as stack authority. A downstream stacked
   candidate must contain every exact same-repository prerequisite HEAD through
-  one verified immediate-parent ancestry chain. `candidate-published`, not PR
-  readiness, is the development-unblock boundary. Macro Task `blocked_by`
+  one verified immediate-parent ancestry chain. `candidate-published` plus the
+  absence of a confirmed applicable current-head CI failure, not PR readiness,
+  is the development-unblock boundary. Pending CI remains non-blocking, with
+  only verified infrastructure or flaky failures unrelated to candidate
+  correctness exempt from the failure gate. Macro Task `blocked_by`
   relations remain planning context: Implement may combine, reorder, or
   internalize them only while preserving every available Macro Task outcome
   and every Feature acceptance criterion.

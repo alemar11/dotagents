@@ -87,7 +87,10 @@ Its skills are deliberately separated by responsibility:
   Every same-repository Feature dependency is mandatory stack intent, while a
   cross-repository dependency remains scheduling-only and standalone. A
   stacked child may begin from its parent's verified `candidate-published`
-  exact HEAD before that parent is delivery-ready. The orchestrator centrally
+  exact HEAD before that parent is delivery-ready when no applicable
+  current-head CI check is confirmed failing. Pending CI is allowed; only a
+  G-diagnosed infrastructure or flaky failure unrelated to candidate
+  correctness may bypass a confirmed failure. The orchestrator centrally
   monitors hosted review, CI, delivery status, and stack drift while published
   Feature Workers remain inactive but resumable.
   G owns PR publication and pairwise stack linking, while Send remains agnostic

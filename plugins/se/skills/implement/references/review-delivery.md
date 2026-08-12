@@ -308,8 +308,12 @@ The orchestrator then checkpoints `status=delivery-pending` and
 and returns to scheduling. The Feature Worker emits one bounded exact-HEAD
 handoff and becomes inactive but resumable. This checkpoint unlocks a
 same-repository dependent Feature whose frozen base is this exact branch and
-SHA; it does not assert hosted review, CI, provider readiness, mergeability, or
-Feature completion.
+SHA only when no applicable CI check on that current parent HEAD is confirmed
+failing. Pending CI remains non-blocking. A confirmed failure blocks child
+bootstrap unless G-owned diagnosis binds it to the current check run and
+verifies it as exclusively infrastructure or flaky and unrelated to candidate
+correctness. The checkpoint itself still does not assert hosted review, CI,
+provider readiness, mergeability, or Feature completion.
 
 ## Hosted review monitoring
 

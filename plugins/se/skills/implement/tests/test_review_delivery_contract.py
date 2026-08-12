@@ -214,6 +214,28 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertNotIn("Task-only", normalized)
         self.assertIn("this parent Feature and every verified existing associated local Macro Task", normalized)
 
+    def test_stacked_child_blocks_on_confirmed_parent_ci_failure(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+        contract = " ".join((skill, orchestration, reference, states))
+
+        for required in (
+            "no applicable CI check on that current parent HEAD is confirmed failing",
+            "Pending CI remains non-blocking",
+            "confirmed failure blocks the child",
+            "G-owned diagnosis",
+            "exclusively infrastructure or flaky and unrelated to candidate correctness",
+            "binds the failure to that check run",
+        ):
+            self.assertIn(required, contract)
+
+        self.assertIn(
+            "parent delivery readiness is not a worker-bootstrap gate",
+            orchestration,
+        )
+
     def test_starting_branch_is_selectable_refreshed_and_frozen_before_bootstrap(self) -> None:
         skill = " ".join(SKILL.read_text(encoding="utf-8").split())
         orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())

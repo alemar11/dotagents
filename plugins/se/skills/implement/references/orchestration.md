@@ -31,10 +31,13 @@ Run independent Features concurrently when their repositories, derived path
 envelopes, real cross-Feature code dependencies, Feature-level `blocked_by`
 context, and observed runtime capacity are safe. A same-repository dependent
 may enter a later execution wave as soon as its immediate parent is
-`candidate-published`; parent delivery readiness is not a worker-bootstrap
-gate. Serialize unsafe overlap and cross-repository outcome dependencies. Do
-not create synthetic dependencies, impose a fixed worker cap, or stop
-independent Features because one assignment is blocked, deferred, or
+`candidate-published` and no applicable CI check on that exact parent HEAD is
+confirmed failing. Pending CI remains non-blocking. A confirmed failure blocks
+the child unless G-owned diagnosis verifies it as exclusively infrastructure or
+flaky and unrelated to candidate correctness; parent delivery readiness is not
+a worker-bootstrap gate. Serialize unsafe overlap and cross-repository outcome
+dependencies. Do not create synthetic dependencies, impose a fixed worker cap,
+or stop independent Features because one assignment is blocked, deferred, or
 delivery-pending.
 
 Before any Feature Worker starts, claim the complete sorted Feature set in one
@@ -180,9 +183,11 @@ If an upstream Feature named by `blocked_by` is missing, unverified, or outside
 the selected implementation scope, keep the dependent assignment blocked or
 deferred; never silently implement it as if the relation were absent. A
 same-repository dependent becomes worker-runnable only from a verified
-`candidate-published` parent branch and exact HEAD. A cross-repository
-dependent remains ordered by the verified upstream outcome and keeps a
-standalone PR.
+`candidate-published` parent branch and exact HEAD whose applicable current-head
+CI has no confirmed failure, except for a failure verified by G-owned diagnosis
+as exclusively infrastructure or flaky and unrelated to candidate correctness.
+CI that is still pending does not block the child. A cross-repository dependent
+remains ordered by the verified upstream outcome and keeps a standalone PR.
 
 Each derived unit must have:
 
@@ -255,8 +260,12 @@ Set reconciliation; never invent an ordering edge or silently choose a base.
 
 Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
 `candidate-published` checkpoint, publication readback, and stack capability.
-The parent may remain `delivery-pending`; a stale or ambiguous candidate keeps
-only that child out of the runnable wave. Never silently degrade to standalone.
+Observe applicable CI on that exact parent HEAD. A confirmed failing check keeps
+the child out of the runnable wave unless G-owned diagnosis binds the failure to
+that check run and verifies it as exclusively infrastructure or flaky and
+unrelated to candidate correctness. Pending CI is allowed. The parent may remain
+`delivery-pending`; a stale or ambiguous candidate keeps only that child out of
+the runnable wave. Never silently degrade to standalone.
 
 If a parent changes after a child starts, invalidate the descendant's
 integration, review, CI, and readiness evidence. Return the parent to its
@@ -275,7 +284,10 @@ establishes `candidate-published`.
 Checkpoint the assignment as `status=delivery-pending` and
 `checkpoint=candidate-published`, release its transient active path claim, and
 mark the Feature Worker inactive but resumable. This checkpoint is the only
-same-repository child-development trigger; it is not delivery completion.
+same-repository child-development checkpoint, but a confirmed applicable
+current-head CI failure still blocks child bootstrap unless it has the bounded
+G-owned infrastructure-or-flaky diagnosis described above. Pending CI remains
+non-blocking. This is not delivery completion.
 
 Return to `schedule` after every candidate publication. The scheduler may
 bootstrap newly unblocked Features and interleave bounded observations of all

@@ -501,7 +501,10 @@ outcome. A T-AC may specialize an F-AC but never replace, weaken, or change it.
 It creates one Feature Worker and one PR per
 implementation-eligible Feature member. A same-repository child may start from
 its parent's verified `candidate-published` exact HEAD before that parent is
-delivery-ready. Technical interpretation remains in Implement. A product-level
+delivery-ready only when no applicable current-head CI check is confirmed
+failing; pending CI remains non-blocking, and Implement may exempt only a
+G-verified infrastructure or flaky failure unrelated to candidate correctness.
+Technical interpretation remains in Implement. A product-level
 contradiction that cannot be resolved without changing outcome, scope, F-AC,
 or Feature dependencies is reported to the user as a bounded plan question;
 missing task decomposition, technical ambiguity, and acceptance specificity

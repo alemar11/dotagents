@@ -159,6 +159,10 @@ outcomes for the current invocation but remain resumable run statuses.
 | `delivery-ready @ final-verify` | The exact final HEAD satisfies the complete Implement delivery contract. |
 
 `candidate-published` is also the same-repository child-development trigger. It
+unlocks child bootstrap only when no applicable CI check on that exact parent
+HEAD is confirmed failing. Pending CI remains non-blocking; a confirmed failure
+may be exempt only by G-owned diagnosis that verifies it as exclusively
+infrastructure or flaky and unrelated to candidate correctness. The checkpoint
 does not assert hosted review, CI, mergeability, provider readiness, Feature
 completion, or merge. Any relevant HEAD, base, or stack-link drift invalidates
 the dependent evidence and requires live reconciliation.
