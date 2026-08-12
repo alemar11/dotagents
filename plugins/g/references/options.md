@@ -16,7 +16,7 @@ lower-kebab.
 | `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by Git Commit. |
 | `commit_kind` | `regular`, `fixup`, `amend-fixup` | `regular` | The commit form for a commit-producing operation. Non-regular kinds require an exact `target_commit`. |
 | `review_operation` | `inspect`, `check`, `wait`, `ready-check`, `ready-wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation being requested. `ready-check` and `ready-wait` observe the provider review caused by one typed ready transition; they never post a request. |
-| `release_operation` | `inspect`, `create-tag`, `draft`, `publish`, `upload-asset`, `delete` | `inspect` | The requested tag or GitHub Release lifecycle operation. |
+| `release_operation` | `inspect`, `create-tag`, `draft`, `publish`, `update-notes`, `upload-asset`, `delete` | `inspect` | The requested tag or GitHub Release lifecycle operation. `publish` also covers an explicitly requested direct create-and-publish operation. |
 
 Keep an operation separate from its issue, PR, release, label, or relationship
 reference.
@@ -36,8 +36,11 @@ for `commit_kind=regular` and `commit_operation=push-only`.
 | `fixup and push <commit>` | `commit_operation=commit-and-push`, `commit_kind=fixup`, and exact `target_commit` |
 | `amend fixup <commit>` | Commit-producing operation plus `commit_kind=amend-fixup` and exact `target_commit` |
 | Pure inspection, check, wait, or other read | Omit `mutation_mode` |
-| `dry run`, `draft only`, `local only`, or `do not mutate` for a write-shaped request | `mutation_mode=dry-run` |
-| Explicit create, edit, publish, post, close, or reopen instruction for an exact target | `mutation_mode=apply` plus the matching operation |
+| `create a release` or `create a draft release` without direct publication language | `release_operation=draft`, `mutation_mode=dry-run` for the exact notes preview; after approval, repeat with `mutation_mode=apply` |
+| `create and publish the release` for one resolvable existing tag | `release_operation=publish`, `mutation_mode=apply`; skip the notes preview and draft stage |
+| `improve the release description` | `release_operation=update-notes`, `mutation_mode=dry-run` for the exact replacement or diff; after approval, repeat with `mutation_mode=apply` |
+| `dry run`, `preview only`, `local only`, or `do not mutate` for a write-shaped request | `mutation_mode=dry-run` |
+| Other explicit create, edit, publish, post, close, or reopen instruction for an exact target | `mutation_mode=apply` plus the matching operation |
 
 Resolve natural-language instructions to canonical values. Structured callers
 must use only the applicable registry fields; reject unknown fields or values.

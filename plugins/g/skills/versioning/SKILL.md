@@ -1,6 +1,6 @@
 ---
 name: versioning
-description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
+description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, select existing tags for GitHub Releases, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
 ---
 
 # Versioning
@@ -197,6 +197,48 @@ If the current branch is neither `main` nor `release/vX.Y.Z` and the user did
 not provide a clear version/intent, do not guess. Show read-only context and
 ask which release line or migration the user wants.
 
+## GitHub Release selection and handoff
+
+A GitHub Release and its Git tag are separate objects. For a request to create
+or improve a GitHub Release, first verify the provider-owned tags and releases.
+Do not create a tag merely because a release was requested.
+
+When the user omits the release tag, select the highest existing canonical
+stable tag by SemVer precedence. Do not select by tag timestamp, release date,
+current branch, or the newest RC. If no canonical stable tag exists, stop and
+route the required tag through the normal preview and exact-tag confirmation
+gate before returning to release creation.
+
+An explicitly selected existing canonical tag may target an older release. A
+stable `vX.Y.Z` creates a normal release; an RC `vX.Y.Z-rc.N` creates a
+prerelease. An older stable release must not replace the repository's current
+latest release. Existing legacy or otherwise noncanonical tags remain outside
+this skill's release-mutation path; inspect them or use `$g:github-releases`
+directly rather than weakening the canonical tag gate.
+
+For generated notes, use the previous relevant canonical tag as the comparison
+start: the previous stable tag for a stable release, or the previous same-line
+RC when one exists for a prerelease. Verify both refs and the comparison before
+using it. When no unambiguous predecessor exists, report that fact instead of
+guessing; the user may select an explicit existing start tag.
+
+After resolving the exact existing tag and comparison range, delegate the
+release lifecycle to `$g:github-releases`:
+
+- `create a release` means generate and curate an exact notes preview, obtain
+  approval, and create a draft by default;
+- `create and publish the release` is explicit authority to skip the notes
+  preview and draft stage and create one published release directly;
+- `improve the release description` means read the current notes, prepare and
+  show an exact replacement or diff, obtain approval, update only the requested
+  title or notes, and verify the provider readback.
+
+Direct publication never skips repository, tag, range, permission, duplicate,
+or final readback checks. It also does not authorize tag creation: if the tag
+does not already exist, the separate exact-tag confirmation gate still applies.
+If the selected tag already has a release, never create a duplicate; inspect it
+and route a requested description refinement to `release_operation=update-notes`.
+
 ## Runtime workflow
 
 1. Refresh or otherwise verify the local tag view when remote state may be
@@ -270,5 +312,6 @@ application tag violates the canonical format.
 
 - [SemVer and tag format](references/semver.md)
 - [Suggestion states](references/states.md)
+- [GitHub Release lifecycle and notes](../github-releases/references/workflows.md)
 - [GitHub Actions release workflow authoring](references/github-actions.md)
 - [GitHub Actions configuration preflight](../github-actions/references/configuration.md)

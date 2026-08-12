@@ -246,6 +246,24 @@ idempotency boundary is:
   object after any write;
 - grant only the permissions required by that repository's publication steps.
 
+When the repository publisher also creates a GitHub Release, preserve the
+interactive G release contract while authoring it:
+
+- use only the exact verified final tag and source SHA supplied by the
+  controller;
+- generate notes from the previous canonical stable tag and honor the
+  repository's `.github/release.yml` categories when present;
+- default a newly requested publisher to a draft GitHub Release unless the user
+  explicitly asks the authored workflow to publish releases directly;
+- treat direct publication as an explicit repository policy captured during
+  workflow authoring, not as an inference from the publisher display name;
+- keep creation idempotent, update no existing notes implicitly, and verify the
+  resulting release identity and state.
+
+Interactive creation and improvement outside Actions remain owned by
+`$g:github-releases`. The reusable publisher must not become a general release
+editor or historical backfill workflow.
+
 The exact checkout contract is:
 
 ```yaml
@@ -275,6 +293,7 @@ manually dispatch the publisher with an existing final tag for recovery.
 | Required reviewers | `release-approval` environment is named in YAML | Reviewer list and wait timer are configured remotely |
 | Automatic merge | Disabled | A separate explicitly authorized delivery workflow may own merge policy |
 | Initial version | Established before these Actions | Never inferred from application files |
+| GitHub Release state | Exact verified final tag; idempotent creation and readback | Draft by default, or direct publication when explicitly selected while authoring the publisher |
 
 ## Permissions preflight
 

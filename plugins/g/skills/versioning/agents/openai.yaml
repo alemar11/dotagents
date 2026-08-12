@@ -1,5 +1,5 @@
 interface:
   display_name: "Versioning"
-  short_description: "Plan SemVer tags and approval-gated release Actions"
+  short_description: "Plan SemVer tags, releases, and guarded Actions"
   brand_color: "#0F766E"
-  default_prompt: "Use $g:versioning to validate the shared vX.Y.Z convention, calculate context-aware release suggestions, bootstrap tag-less repositories, plan stable legacy-tag aliases, or install the approval-gated GitHub Actions release controller, reusable stable publisher interface, and versioned resolver asset; keep the universal controller application-code blind, allow project-specific build and test work only in the publisher, never apply a noncanonical tag even when requested or confirmed, and require approval of the exact canonical tag before mutation."
+  default_prompt: "Use $g:versioning to validate canonical SemVer tags, select existing tags for drafted or directly published GitHub Releases, plan legacy aliases, or author guarded release Actions while preserving exact-tag approval."
