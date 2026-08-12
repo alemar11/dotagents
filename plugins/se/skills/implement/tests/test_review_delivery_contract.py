@@ -189,6 +189,61 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         for process_detail in ("PID", "PGID", "stdout", "stderr"):
             self.assertNotIn(process_detail, reference)
 
+    def test_review_authority_hands_off_once_from_native_to_hosted(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        profile = " ".join(TASK_PROFILE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "candidate -->|first publication| native-review",
+            "candidate -->|published repair| publish-pr",
+            "Native review is only the first-publication gate",
+            "Exact readback of the first published PR identity and HEAD transfers independent-review authority permanently",
+            "without native review",
+            "hosted review remains authoritative",
+            "repairs hosted findings and republishes without running native review again",
+            "published repair candidate after focused validation of the affected invariant",
+            "mark complete Feature validation pending",
+            "cannot proceed to `final-verify` until complete Feature validation passes",
+        ):
+            self.assertIn(required, skill + " " + reference + " " + orchestration + " " + profile)
+
+        for obsolete in (
+            "candidate, repeats native review, and publishes",
+            "A new candidate repeats native review",
+            "Any candidate HEAD change repeats validation, native review",
+            "current-head validation and native review evidence",
+            "reruns the complete validation and review cycle",
+        ):
+            self.assertNotIn(obsolete, skill + " " + reference + " " + orchestration)
+
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+        self.assertIn(
+            "a hosted finding repair is active at checkpoint `candidate-published`",
+            states,
+        )
+
+    def test_hosted_repairs_invalidate_only_dependent_evidence(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+        contract = skill + " " + reference + " " + states
+
+        for required in (
+            "repairs the violated invariant",
+            "Repair every equivalent path that the same invariant governs",
+            "a PR-body-only update invalidates only body and closure-intent readback",
+            "preserves the same request and review lineage",
+            "an ambiguous external effect invalidates only that effect",
+            "complete Feature validation on the exact published HEAD",
+            "a clean hosted result for the older SHA cannot carry forward",
+            "complete validation is required on the exact final HEAD",
+            "implement-validate -->|published HEAD unchanged after complete validation| final-verify",
+            "do not republish, request another review, or invalidate the clean hosted result",
+        ):
+            self.assertIn(required, contract)
+
     def test_publication_uses_the_verified_feature_worker_worktree(self) -> None:
         reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
 
@@ -213,6 +268,10 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("The parent may remain `delivery-pending`", orchestration_normalized)
         self.assertNotIn("Task-only", normalized)
         self.assertIn("this parent Feature and every verified existing associated local Macro Task", normalized)
+        self.assertIn("child PR head must equal the exact published candidate HEAD", normalized)
+        self.assertIn("Track native or hosted review evidence separately", normalized)
+        self.assertIn("reaches `candidate-published` before its hosted re-review", normalized)
+        self.assertNotIn("child head must equal the reviewed candidate", normalized)
 
     def test_stacked_child_blocks_on_confirmed_parent_ci_failure(self) -> None:
         skill = " ".join(SKILL.read_text(encoding="utf-8").split())
@@ -407,12 +466,14 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         profile = TASK_PROFILE.read_text(encoding="utf-8")
         run_state = RUN_STATE.read_text(encoding="utf-8")
+        states = STATES.read_text(encoding="utf-8")
 
         normalized_reference = " ".join(reference.split())
         normalized_orchestration = " ".join(orchestration.split())
         normalized_skill = " ".join(skill.split())
         normalized_profile = " ".join(profile.split())
         normalized_run_state = " ".join(run_state.split())
+        normalized_states = " ".join(states.split())
 
         self.assertIn("The orchestrator is the sole delivery monitor", normalized_skill)
         self.assertIn("becomes inactive but resumable", normalized_skill)
@@ -422,6 +483,25 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("checkpoint=candidate-published", normalized_reference)
         self.assertIn("releases the transient active path claim", normalized_reference)
         self.assertIn("Before any repair or rebase resumption, reacquire", normalized_run_state)
+        self.assertIn("`action=first-pr-publication`", normalized_run_state)
+        self.assertIn("`subject_id=<canonical Feature ref>`", normalized_run_state)
+        self.assertIn("stable first-publication recovery key", normalized_run_state)
+        self.assertIn("candidate SHA changes before publication do not create another reservation", normalized_run_state)
+        self.assertIn("later PR updates never reuse it", normalized_run_state)
+        self.assertIn("Reusing an existing draft PR follows the same reservation and proof", normalized_run_state)
+        self.assertIn("represents obtaining the eventual first PR, not one transport attempt", normalized_run_state)
+        self.assertIn("leave the operation `pending`", normalized_run_state)
+        self.assertIn("Do not finish that retryable outcome as `not-applied`", normalized_run_state)
+        self.assertIn("is terminal for that exact run and prohibits a later publication retry", normalized_run_state)
+        self.assertIn("An ambiguous attempt becomes `unknown`", normalized_run_state)
+        self.assertIn("reconcile a pending or `unknown` first-publication reservation", normalized_run_state)
+        self.assertIn("immutable `applied` receipt and readback", normalized_run_state)
+        self.assertIn("Never infer the handoff from a PR URL alone", normalized_run_state)
+        self.assertIn("evaluates the first-publication operation before the assignment checkpoint", normalized_run_state)
+        self.assertIn("`active @ native-review` may remain the coarse last durable pair", normalized_run_state)
+        self.assertIn("routes the assignment to stack reconciliation under hosted authority", normalized_run_state)
+        self.assertIn("resume at `stack-reconcile`, never at native review", normalized_reference)
+        self.assertIn("this pair is only the coarse pre-stack durable checkpoint", normalized_states)
         self.assertIn("parent delivery readiness is not a worker-bootstrap gate", normalized_orchestration)
         self.assertIn("Do not wait for hosted review, CI, or provider readiness", normalized_reference)
         self.assertIn("candidate-published --> schedule", skill)

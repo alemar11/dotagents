@@ -168,6 +168,15 @@ surface.
   PR heads, hosted review, CI, and parent drift. It contacts
   the same Worker only for actionable fixes, evidence repair, or rebase, and
   retains sole ledger and aggregate-completion authority.
+- Keep review authority one-way. Native review is the exact-HEAD gate before
+  the first PR publication. Once first-PR publication readback verifies its
+  identity and HEAD, hosted review is authoritative for every later SHA:
+  repair, validate, update the same PR, and request hosted re-review without
+  invoking native review again.
+  Invalidate only evidence that depends on the changed HEAD, body, base,
+  topology, monitor lineage, or external effect; preserve unrelated durable
+  identities and resolved receipts. Require complete validation and clean
+  hosted review on the same final exact HEAD.
 - Keep deterministic task-title initialization shared by every task-managed
   SE skill. Compute the title before creation and include it as a best-effort
   plain-text hint in the flat creation prompt, without treating the hint as
@@ -236,7 +245,7 @@ surface.
 - Keep hosted titles as exact non-empty single-line semantic values. Remove
   only serialization-added final line terminators before G transport, reject
   interior line breaks, and leave intentional multiline body content intact.
-- Keep native review and publication on verified execution boundaries. Select
+- Keep pre-publication native review and publication on verified execution boundaries. Select
   the minimal supported base-scoped review mode, avoid unsupported optional
   combinations and unrelated strict overrides. Reconcile a disconnected or
   interrupted delivery stream against the same review lineage and exact
@@ -329,6 +338,10 @@ surface.
   reconciliation against the same exact candidate without duplicate review,
   and publication from the exact re-observed Feature Worker worktree rather
   than inherited or temporary directories.
+- Validate the one-way native-to-hosted review handoff: published repair and
+  rebase candidates must bypass native review, preserve the existing PR and
+  hosted lineage, selectively invalidate dependent evidence, and recover
+  complete validation plus clean hosted review on the same final HEAD.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's documented
   persisted values exactly match the run-state capability registry.

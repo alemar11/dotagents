@@ -268,14 +268,16 @@ unrelated to candidate correctness. Pending CI is allowed. The parent may remain
 the runnable wave. Never silently degrade to standalone.
 
 If a parent changes after a child starts, invalidate the descendant's
-integration, review, CI, and readiness evidence. Return the parent to its
-worker, then rebase and revalidate descendants bottom to top. The
+integration, hosted review, CI, and readiness evidence. Return the parent to its
+worker, then rebase, revalidate, republish, and hosted-review descendants bottom
+to top without restarting native review. The
 orchestrator coordinates this sequence but never edits or rebases worker code.
 
 ## Candidate publication and central delivery monitoring
 
-After native review and publication, the orchestrator verifies repository, PR,
-branch, full candidate HEAD, draft state, the minimal durable SE-owned PR body,
+After pre-publication native review and first publication, or after a hosted
+repair updates the existing PR without native review, the orchestrator verifies
+repository, PR, branch, full candidate HEAD, draft state, the minimal durable SE-owned PR body,
 registry-derived closure intent in that body, and any required stack link. If
 available, it records GitHub's
 `closingIssuesReferences` as optional provider diagnostics; that field never
@@ -294,20 +296,29 @@ bootstrap newly unblocked Features and interleave bounded observations of all
 delivery-pending PRs. The orchestrator owns those observations and combines
 G-normalized review, CI, exact-head, and parent/base evidence. It does not ask
 inactive Workers to poll. A still-pending observation returns to `schedule`; a
-clean review and CI observation enters final verification.
+clean review and CI observation enters final verification when complete
+validation is already current. When a published repair has only focused
+validation, resume the same Worker through `implement-validate` for complete
+validation on that exact HEAD. An unchanged result proceeds directly to
+`final-verify`; a changed candidate returns through publication and hosted
+review.
 
 For an actionable finding, evidence mismatch, or parent drift, preserve the
 exact PR, head, provider artifact, and observation fingerprint. Reacquire the
 Worker's path envelope before resumption, then contact the same Worker with
 only that bounded evidence. If the path claim is unavailable, keep the repair
-pending without permitting overlapping writes. A new candidate repeats native
-review, publication readback, `candidate-published`, and central monitoring.
+pending without permitting overlapping writes. Because the verified PR already
+exists, hosted review remains authoritative: a new candidate repeats affected
+validation, publication readback, `candidate-published`, and central monitoring
+without native review. Preserve unaffected Feature, Worker, PR, operation, and
+topology evidence instead of restarting the assignment globally.
 
 ## Optional Feature Worker support
 
 The Feature Worker is the parent owner of one Feature member, its observed
 Macro projection state and available local Task context, worktree, integration branch, candidate HEAD,
-acceptance matrix, native review, and PR. Macro Tasks are planning
+acceptance matrix, pre-publication native review, hosted-finding repairs, and
+PR. Macro Tasks are planning
 projections, not worker or PR boundaries.
 Optional support assignments are subordinate to that lifecycle and are not
 additional Feature assignments. The parent may select these bounded
@@ -327,8 +338,10 @@ Feature Plan, never access the SQLite ledger, never mutate GitHub, never create
 Feature Workers or planner tasks, and never own final delivery evidence. An
 execution assistant may write only within an exclusive envelope or isolated
 helper context. The
-Feature Worker integrates the result, reruns complete validation and native
-review, and owns the final candidate commit.
+Feature Worker integrates the result and owns the final candidate commit.
+Before first publication it reruns complete validation and native review. After
+`candidate-published` it follows the hosted repair loop: focused validation,
+publication, hosted re-review, then complete validation on the exact final HEAD.
 
 Do not run overlapping writes in the same worktree. Record delegation as
 `delegated-support` only after a helper task and result are independently
@@ -350,7 +363,8 @@ The orchestrator may exchange only bounded control-plane messages:
 
 It must not prescribe code, files, commands, tests, review fixes, or design.
 The Feature Worker owns implementation semantics, conflict resolution,
-validation, candidate evidence, exact-HEAD review, and fixes.
+validation, candidate evidence, pre-publication native review, hosted-finding
+repairs, and fixes.
 
 The orchestrator is the only creator of implementation assignments and
 Feature Worker tasks. A Feature Worker never creates another Feature Worker or

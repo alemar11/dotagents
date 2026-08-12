@@ -1,20 +1,29 @@
 # Implement Review And Delivery
 
-This reference owns exact-HEAD Feature Worker-session review, PR publication,
-the `candidate-published` handoff, orchestrator-owned CI and review monitoring,
-and final exact-HEAD evidence.
+This reference owns pre-publication exact-HEAD Feature Worker-session review,
+PR publication, the one-way handoff to hosted review at verified first-PR
+publication readback, orchestrator-owned CI and review monitoring, and final
+exact-HEAD evidence.
 Use [states.md](states.md) for the canonical distinction between workflow
 nodes, assignment statuses, checkpoints, provider dispositions, runtime-only
 modes, and output labels.
 
 ## Candidate boundary
 
-The Feature Worker operates only in its application-managed worktree. After it
-implements every derived execution unit for one Feature member, validates
-the complete outcome, and commits, freeze one candidate with exact repository,
-base branch, base SHA, head branch, and full head SHA. The worktree must be
-clean and pinned to that candidate before review. Do not create a reviewer task
-or a second review worktree.
+The Feature Worker operates only in its application-managed worktree. Before
+first publication, after it implements every derived execution unit for one
+Feature member, validates the complete outcome, and commits, freeze one
+candidate with exact repository, base branch, base SHA, head branch, and full
+head SHA. The worktree must be clean and pinned to that candidate before native
+review. Do not create a reviewer task or a second review worktree.
+
+After verified first-PR publication readback, a hosted finding, CI repair,
+evidence repair, rebase, or parent drift may produce a published repair
+candidate after focused validation of the affected invariant. Bind that
+focused evidence and every still-current unaffected result to its exact SHA,
+but mark complete Feature validation pending. Such a candidate may proceed to
+PR update and hosted review; it cannot proceed to `final-verify` until complete
+Feature validation passes on that same exact HEAD.
 
 The authoritative requirements remain the current published Feature Plan Set,
 the selected parent Feature semantic contract, and its stable F-AC-NN
@@ -63,6 +72,10 @@ between those durable pairs. After every assignment reaches
 then `complete @ complete`. Optional provider-policy dispositions such as
 `ready` and `ready-with-manual-action` may be recorded as diagnostics, but they
 are not required by final verification and are not assignment statuses.
+For a stacked assignment whose first PR is read back but whose link is not yet
+verified, `active @ native-review` remains the coarse checkpoint while the
+applied first-publication operation makes hosted review authoritative; resume at
+`stack-reconcile`, never at native review.
 
 Implement terminates with a PR published and verified on its exact HEAD. The PR
 may remain open; merge, the effective closure of the Feature and its Macro
@@ -112,7 +125,7 @@ implementation, but it may not bypass the owner boundary. A successful
 publication and an unverified relation are separate effects and must be
 reconciled independently.
 
-## Native review loop
+## Pre-publication native review loop
 
 Before review, independently verify Feature Worker/worktree identity, candidate
 cleanliness, base and prerequisite ancestry, and exact full SHA. The Feature
@@ -160,16 +173,35 @@ transport status, or partial output. A terminal artifact cannot override a
 mismatched candidate binding, and conflicting terminal artifacts are
 unavailable review evidence until reconciled.
 
-Bind every finding and clean result to the exact candidate SHA. The Feature
-Worker decides whether a finding is actionable, owns every fix, reruns
-validation, and creates a new candidate. Any new HEAD invalidates the previous
-review evidence; run a new review cycle in the same Feature Worker session
-against the new exact SHA.
+Bind every finding and clean result to the exact candidate SHA. Before the
+first PR is published, the Feature Worker decides whether a finding is
+actionable, owns every fix, reruns validation, and creates a new candidate. Any
+new pre-publication HEAD invalidates the previous native-review evidence; run a
+new native review cycle in the same Feature Worker session against the new
+exact SHA.
+
+Native review is only the first-publication gate. Exact readback of the first
+published PR identity and HEAD transfers independent-review authority permanently
+to the hosted review lineage for that assignment, even when later stack
+reconciliation has not yet established `candidate-published`. After that
+boundary, never invoke native review for a hosted finding, CI repair, evidence
+repair, rebase, parent drift, or any later candidate SHA. A policy outside this
+skill may require both transports, but the normal Implement contract does not.
 
 ## PR publication
 
-Publish only after native review is clean and the exact publication scope is
-resolved from the explicit Implement request.
+For the first publication, publish only after native review is clean and the
+exact publication scope is resolved from the explicit Implement request.
+Before invoking G, reserve the assignment's canonical first-publication
+operation defined in [run-state.md](run-state.md). Finish it as applied only
+after authoritative PR identity and exact-HEAD readback; if transport is
+interrupted or ambiguous, reconcile that same reservation before deciding
+which review authority applies. A conclusively unapplied but retryable attempt
+leaves that reservation pending and reuses it under the run-state contract. For
+every later candidate, require a verified existing PR identity and the
+authoritative hosted finding, CI failure, evidence mismatch, rebase, or parent
+drift that resumed the same Worker; update that PR directly without another
+native review.
 
 Immediately before handing publication to G, independently re-observe the
 Feature Worker's actual implementation worktree and verify its repository,
@@ -260,8 +292,9 @@ Independently read back repository, base, branch, full PR HEAD, URL, minimal
 durable body/closure intent, and draft state. Optionally record GitHub
 `closingIssuesReferences` as provider diagnostics; an empty, partial, or
 unavailable value is non-blocking. Verify the PR body carries the exact
-source-derived closure intent. The PR HEAD must equal the reviewed candidate
-HEAD.
+source-derived closure intent. On first publication, the PR HEAD must equal the
+native-reviewed candidate HEAD. On later updates, it must equal the repaired
+candidate HEAD that will be reviewed by the hosted lineage.
 
 For a stacked candidate, supply the verified parent head branch as the explicit
 PR base. Use the G-owned single-PR publication workflow to publish only the
@@ -274,8 +307,8 @@ implicitly.
 
 Do not wait for hosted review, CI, or provider readiness before establishing
 `candidate-published`. The draft PR and exact publication readback are the
-handoff boundary; a draft review is consultative and never satisfies the ready
-cycle.
+one-way review-authority handoff; a draft review is consultative and never
+satisfies the ready cycle.
 
 ## Stack reconciliation
 
@@ -284,7 +317,10 @@ independently verifies the exact repository, parent and child PR identities,
 unchanged draft states, child base, both full heads, immediate parent
 relationship, stack order, and link receipt. The child base must equal the
 parent head branch, the live parent head must equal the frozen base_sha, and
-the child head must equal the reviewed candidate.
+the child PR head must equal the exact published candidate HEAD. Track native
+or hosted review evidence separately: first publication already has native
+review, while a later repair or rebase reaches `candidate-published` before its
+hosted re-review.
 
 Treat a confirmed child PR and an unverified stack link as separate effects.
 Preserve successful publication evidence, record an ambiguous link as unknown,
@@ -299,8 +335,9 @@ For a standalone PR, complete publication readback establishes
 `candidate-published`. For a stacked PR, require both publication readback and
 successful stack reconciliation first. Record the exact repository, PR, base
 and head branches, candidate full SHA, minimal durable PR-body readback,
-source-derived closure intent, and any parent PR, parent full SHA, stack
-position, and link receipt. A provider `closingIssuesReferences` observation
+source-derived closure intent, the pre-publication native-review gate, and any
+parent PR, parent full SHA, stack position, and link receipt. A provider
+`closingIssuesReferences` observation
 may be retained as diagnostic evidence but is not required for this checkpoint.
 
 The orchestrator then checkpoints `status=delivery-pending` and
@@ -339,12 +376,44 @@ lineages. Keep them separate:
    clean outcome; actionable inline or terminal findings return the assignment
    to the same Feature Worker. Absence of comments, zero unresolved threads,
    zero CI checks, or a generic not-requested observation is not a clean result.
-3. After findings, the Feature Worker fixes and validates, creates a new
-   candidate, repeats native review, and publishes the new exact HEAD to the
-   existing PR. Only then invoke the G-owned request operation with a new
-   request key, persist its exact request receipt, and invoke wait against that
-   same full SHA. Repeat this fix, publish, explicit-request, and wait cycle
-   until the current full PR HEAD has a clean terminal result.
+3. After findings, the Feature Worker repairs the violated invariant, runs
+   focused validation for the affected behavior, creates a new candidate, and
+   publishes the new exact HEAD to the existing PR without native review. Only
+   then invoke the G-owned request operation with a new request key, persist its
+   exact request receipt, and invoke wait against that same full SHA. Repeat
+   this hosted fix, publish, explicit-request, and wait cycle until the current
+   full PR HEAD has a clean terminal result.
+
+Treat the hosted finding as evidence of a violated invariant, not merely a
+line-edit instruction. Repair every equivalent path that the same invariant
+governs, keep the change inside the Feature contract, and add or update focused
+regression evidence. Do not broaden scope speculatively or implement unrelated
+suggestions.
+
+Invalidate evidence selectively during this loop:
+
+- a code HEAD change invalidates prior code-bound acceptance, validation,
+  hosted-review, CI, and publication-head evidence, but preserves Feature
+  selection, Worker and PR identity, resolved side-effect receipts, and
+  unaffected stack identity;
+- a PR-body-only update invalidates only body and closure-intent readback;
+- a base, parent HEAD, ancestry, or stack-link change invalidates the affected
+  integration and descendant evidence, even when a child code HEAD is
+  unchanged;
+- a disconnected or interrupted hosted monitor preserves the same request and
+  review lineage and resumes observation without posting a duplicate request;
+- an ambiguous external effect invalidates only that effect until its receipt
+  and authoritative readback are reconciled.
+
+Focused validation accelerates intermediate hosted repair candidates; it does
+not replace complete candidate validation. Before `final-verify`, require the
+Feature Worker to run the complete Feature validation on the exact published
+HEAD. If that validation requires a code change, publish the new SHA and return
+it to hosted review; a clean hosted result for the older SHA cannot carry
+forward.
+When complete validation passes without changing the published HEAD,
+`implement-validate` may proceed directly to `final-verify`; do not republish,
+request another review, or invalidate the clean hosted result for that same SHA.
 
 Monitor current-head CI and actionable review threads alongside that
 provider-review cycle. CI is terminal only when every applicable check has
@@ -356,10 +425,18 @@ monitoring remains authorized, the orchestrator returns to schedule and
 resumes through later bounded waits without posting a duplicate request or
 resetting the existing lineage.
 
+When hosted review and CI are clean but complete current-head validation is
+missing or stale, resume the same Feature Worker through `implement-validate`
+only for that validation. Reacquire its path envelope even when no write is
+expected. An unchanged, fully validated HEAD proceeds directly to
+`final-verify`; any resulting code change follows the published-candidate path
+and requires hosted re-review.
+
 For a stacked child, also monitor the immediate parent PR and base relationship.
-A parent HEAD, base, or link change invalidates the child's ancestry, review,
-CI, and readiness evidence even when the child head itself did not move; return
-the same child Feature Worker for rebase and its complete candidate cycle. A
+A parent HEAD, base, or link change invalidates the child's ancestry, hosted
+review, CI, and readiness evidence even when the child head itself did not move;
+return the same child Feature Worker for rebase, focused integration validation,
+publication, and hosted re-review without native review. A
 parent readiness change without topology or HEAD drift affects bottom-to-top
 finalization only and does not invalidate child implementation evidence.
 
@@ -403,7 +480,9 @@ The orchestrator performs read-only final verification. Require:
   evidence without replacing or weakening any F-AC;
 - available Macro Task contextual coverage evidence bound to the same exact
   current candidate HEAD;
-- current-head validation and native review evidence;
+- complete current-head validation evidence plus clean current-head hosted
+  review evidence; retain native review as the historical first-publication
+  gate, not as current-head evidence after a repair push;
 - current-head CI evidence with no failing or pending applicable checks;
 - evidence that final verification started from
   `delivery-pending @ candidate-published`, plus the exact Worker handoff and

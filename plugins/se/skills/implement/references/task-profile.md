@@ -65,7 +65,9 @@ one isolated worktree, and one PR.
 
 The Feature Worker chooses technical design, implements and validates the
 derived units, binds F-AC and mapped T-AC criteria to the final exact HEAD, and
-runs native review in the same task and worktree. Review is a phase of the
+runs native review in the same task and worktree before first publication.
+After exact readback of the first published PR, it repairs hosted findings and
+republishes without running native review again. Review remains a phase of the
 Feature Worker lifecycle, not another role or task.
 
 After verified `delivery-pending @ candidate-published`, the Feature Worker

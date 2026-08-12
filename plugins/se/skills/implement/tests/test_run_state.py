@@ -35,7 +35,7 @@ class RunStateTests(unittest.TestCase):
         version = subprocess.run(
             [str(SCRIPT), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "3.6.13")
+        self.assertEqual(version.stdout.strip(), "3.7.0")
         db = self.root / "nested/run-state.sqlite3"
         result = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertEqual(result["database_state"], "absent")
@@ -399,6 +399,25 @@ class RunStateTests(unittest.TestCase):
         self.invoke(db, "state", "prepare")
         ready = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertTrue(ready["artifact_matches"])
+
+    def test_rejects_ledger_from_pre_handoff_runtime_contract(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        with sqlite3.connect(db) as connection:
+            connection.execute(
+                "UPDATE runtime_metadata SET runtime_contract_version='3.1.1'"
+            )
+        rejected = self.invoke(db, "doctor", check=False)
+        self.assertEqual(
+            self.payload(rejected)["error"]["code"],
+            "incompatible-runtime-contract",
+        )
+        self.invoke(
+            db, "state", "reset", "--confirm", "drop-and-recreate"
+        )
+        prepared = self.payload(self.invoke(db, "state", "prepare"))["result"]
+        self.assertEqual(prepared["schema_version"], 3)
+        self.assertTrue(self.payload(self.invoke(db, "doctor"))["result"]["ready"])
 
     def test_feature_claim_is_atomic_and_excludes_another_orchestrator(self) -> None:
         db = self.root / "run-state.sqlite3"

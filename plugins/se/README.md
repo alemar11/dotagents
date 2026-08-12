@@ -82,8 +82,11 @@ Its skills are deliberately separated by responsibility:
   default. The orchestrator refreshes and freezes the selected branch's exact
   upstream tip before each root worker wave and verifies every isolated
   worktree against that base before implementation begins. The Worker performs
-  exact-HEAD in-session review and the workflow handles stack reconciliation
-  and final exact-HEAD evidence.
+  exact-HEAD in-session review before first publication; after exact readback
+  of the first published PR, hosted review becomes authoritative and later fixes
+  update the same PR without rerunning native review. The workflow selectively
+  invalidates dependent evidence, handles stack reconciliation, and requires
+  complete validation plus clean hosted review on the same final exact HEAD.
   Every same-repository Feature dependency is mandatory stack intent, while a
   cross-repository dependency remains scheduling-only and standalone. A
   stacked child may begin from its parent's verified `candidate-published`
@@ -117,7 +120,8 @@ Its skills are deliberately separated by responsibility:
   SE-authored PR bodies remain concise and durable: outcome summary, compact
   validation command or check names, material operational notes when needed,
   and canonical closing lines, without routine test counts or internal
-  delivery logs. Native review uses the minimal supported base-scoped mode, and
+  delivery logs. Pre-publication native review uses the minimal supported
+  base-scoped mode, while later candidates stay in the hosted review lineage;
   publication runs from the reverified Feature Worker worktree rather than an
   inherited or temporary directory.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,

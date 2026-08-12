@@ -55,9 +55,10 @@ The bounded alternate paths are:
 - `active @ candidate-published` while the same Worker is resumed to repair or
   rebase a previously published candidate.
 
-Do not use `reviewing` or `plan-question` as assignment statuses. Review is an
-active assignment at checkpoint `native-review`; a plan question is a deferred
-assignment at checkpoint `plan-question`.
+Do not use `reviewing` or `plan-question` as assignment statuses. Pre-publication
+native review is an active assignment at checkpoint `native-review`; a hosted
+finding repair is active at checkpoint `candidate-published`; a plan question
+is a deferred assignment at checkpoint `plan-question`.
 
 ## Workflow nodes
 
@@ -73,15 +74,15 @@ the whole run, one assignment, or the current invocation.
 | `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
 | `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
 | `worker-bootstrap` | Assignment | Create or resume the Feature Worker, accept an initial detached or attached checkout at the verified exact base, then establish and bind its Feature branch before content writes. |
-| `implement-validate` | Assignment | Derive technical units and T-AC, then implement and validate the complete Feature semantic contract. |
+| `implement-validate` | Assignment | Derive technical units and T-AC, implement and validate the Feature, or run complete final validation for a published repair; an unchanged published HEAD may proceed directly to final verification. |
 | `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
-| `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence. |
-| `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker. |
-| `review-decision` | Assignment | Send a clean candidate to publication or return actionable findings for repair. |
-| `publish-pr` | Assignment | Push the exact candidate and create or update its draft pull request. |
+| `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence; route an unpublished candidate to native review and a published repair directly to PR update. |
+| `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker before first PR publication. |
+| `review-decision` | Assignment | Before first publication, send a native-clean candidate to publication or return native findings for repair. |
+| `publish-pr` | Assignment | Push the exact candidate; create the draft PR after native review, or update the verified existing PR directly for a hosted repair. |
 | `stack-reconcile` | Assignment | Verify the immediate parent, base, ancestry, stack order, and link for a stacked PR. |
 | `candidate-published` | Assignment | Verify that PR publication and any required stack link match the exact candidate HEAD. |
-| `delivery-monitor` | Run | Observe ready transition, hosted review, CI, and stack drift for published assignments. |
+| `delivery-monitor` | Run | Observe ready transition, authoritative hosted review, CI, and stack drift for published assignments. |
 | `final-verify` | Assignment | Verify exact-HEAD F-AC/T-AC, review, CI, topology, Macro projection reporting, and source-derived closure-intent evidence. |
 | `assignment-blocked` | Assignment | Record a non-authority blocker while independent assignments continue. |
 | `assignment-deferred` | Assignment | Record a user-authority wait while independent assignments continue. |
@@ -141,7 +142,7 @@ outcomes for the current invocation but remain resumable run statuses.
 | Checkpoint | Description |
 | --- | --- |
 | `worker-bootstrap` | Worker identity, destination, worktree, established Feature branch, refreshed base branch, and exact base SHA are the last durable recovery boundary; the earlier task bootstrap may observe detached HEAD at that SHA. |
-| `native-review` | A committed candidate exists and exact-HEAD native review is the last durable recovery boundary. |
+| `native-review` | A committed candidate exists and pre-publication exact-HEAD native review is the last durable checkpoint; an applied `first-pr-publication` operation overrides its review-transport meaning while stack reconciliation is still pending. |
 | `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
 | `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |
 | `final-verify` | Acceptance, review, CI, topology, minimal durable PR-body content, and registry-derived closure intent passed for the exact final HEAD; `closingIssuesReferences` is diagnostic only. |
@@ -151,8 +152,8 @@ outcomes for the current invocation but remain resumable run statuses.
 | Pair | Meaning |
 | --- | --- |
 | `active @ worker-bootstrap` | The Worker owns implementation and validation. |
-| `active @ native-review` | The Worker owns review, review repair, or publication preparation. |
-| `active @ candidate-published` | A repair or rebase resumed from the last published boundary after reacquiring the path claim. |
+| `active @ native-review` | Before first publication, the Worker owns native review, native-finding repair, or publication preparation. If `first-pr-publication` is already `applied`, this pair is only the coarse pre-stack durable checkpoint: hosted review is authoritative and native review must not restart. |
+| `active @ candidate-published` | A hosted finding repair or rebase resumed from the last published boundary after reacquiring the path claim; native review does not restart. |
 | `deferred @ plan-question` | The user owns the next product decision. |
 | `blocked @ <last-durable-checkpoint>` | A non-user blocker prevents progress; preserve the last trustworthy recovery boundary. |
 | `delivery-pending @ candidate-published` | Publication is verified; the orchestrator owns monitoring and the Worker does not poll. |
@@ -245,9 +246,18 @@ statuses and never imply merge or post-merge closure.
 - Reacquire the exact path envelope before resuming Worker writes.
 - Preserve `delivery-pending @ candidate-published` while monitoring remains
   clean and the exact publication evidence is current.
-- Any candidate HEAD change repeats validation, native review, publication
-  readback, `delivery-pending @ candidate-published`, monitoring, and final
-  verification.
+- Before verified first-PR publication readback, a candidate HEAD change
+  repeats validation and native review. Once the assignment-bound
+  `first-pr-publication` operation for the canonical Feature ref is `applied`
+  with a receipt and authoritative PR identity/HEAD readback, every later candidate
+  repeats affected validation, publication readback, hosted review, CI, and
+  final verification without native review, even when stack reconciliation has
+  not yet established `candidate-published`; complete validation is required
+  on the exact final HEAD.
+- A PR-body-only change invalidates only body readback. A base, parent, or
+  stack-link change invalidates only the affected integration and descendant
+  evidence. An interrupted hosted monitor resumes the same review lineage
+  without a duplicate request.
 - Persist `delivery-ready @ final-verify` only after all final requirements pass
   for the same exact HEAD.
 - Retain Feature claims for deferred or blocked runs; release them only on the

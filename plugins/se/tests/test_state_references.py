@@ -83,7 +83,7 @@ class StateReferenceTests(unittest.TestCase):
         ).stdout)
 
         self.assertEqual(manifest["version"], version)
-        self.assertEqual(capabilities["runtime_contract_version"], "3.1.1")
+        self.assertEqual(capabilities["runtime_contract_version"], "3.2.0")
 
 
 if __name__ == "__main__":

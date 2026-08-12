@@ -19,8 +19,8 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.6.12` |
-| Runtime contract | `3.1.1` |
+| CLI | `3.7.0` |
+| Runtime contract | `3.2.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
 
@@ -164,6 +164,46 @@ current, monitoring continues, or a child base is still valid. A later Worker
 repair replaces the candidate through the ordinary assignment checkpoint and
 must return through `candidate-published` again.
 
+The one-way native-to-hosted review handoff does not add a status, checkpoint,
+field, or table. Before the first G-owned PR create-or-reuse attempt, reserve
+exactly one assignment-bound operation with `action=first-pr-publication` and
+`subject_id=<canonical Feature ref>`. This pair is the stable first-publication
+recovery key for the whole run; candidate SHA changes before publication do not
+create another reservation, and later PR updates never reuse it. Finish it as
+`applied` only when the G receipt and authoritative readback prove the exact
+repository, PR identity, head branch, and published full HEAD. Reusing an
+existing draft PR follows the same reservation and proof; a PR URL or
+pre-existing assignment field alone is insufficient. Never infer the handoff
+from a PR URL alone.
+
+This reservation represents obtaining the eventual first PR, not one transport
+attempt. When authoritative readback proves that one attempt had no effect but
+its cause is recoverable, retain the bounded attempt evidence in the delivery
+record, leave the operation `pending`, and reuse the same reservation only after
+the prerequisite is corrected and readback still proves non-application. Do
+not finish that retryable outcome as `not-applied`. A first-publication
+`not-applied` or `blocked` result is terminal for that exact run and prohibits a
+later publication retry; use it only when publication has become definitively
+abandoned or inapplicable. An ambiguous attempt becomes `unknown` and must be
+reconciled before any retry.
+
+On resume, reconcile a pending or `unknown` first-publication reservation before
+selecting a review transport. Its immutable `applied` receipt and readback
+transfer authority to hosted review even when a stacked assignment has not yet
+reached `candidate-published` because its separate stack-link operation is
+pending, unknown, or interrupted. Without that proof, preserve the
+pre-publication boundary and fail closed rather than inferring either review
+authority. Never restart native review after the verified publication
+operation.
+
+Review-transport recovery therefore evaluates the first-publication operation
+before the assignment checkpoint. During the stacked publication-to-link
+window, `active @ native-review` may remain the coarse last durable pair; an
+applied first-publication reservation overrides only that pair's transport
+meaning and routes the assignment to stack reconciliation under hosted
+authority. It does not establish `candidate-published`, release the path claim,
+or start hosted monitoring before the stack link is verified.
+
 `run checkpoint` and `assignment checkpoint` accept only documented,
 allowlisted fields and one expected revision. The CLI rejects every status and
 checkpoint pair outside the canonical registry defined in
@@ -216,8 +256,11 @@ runtime-contract, envelope, or CLI-version change.
 
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
-explicit state registry and capability readback remain runtime-contract
-version `3.1.1`; the shipped CLI version is `3.6.12`. The orchestrator remains
+explicit state registry and capability readback use runtime-contract version
+`3.2.0`; the shipped CLI version is `3.7.0`. The contract bump intentionally
+rejects older active ledgers that cannot prove the new first-publication
+authority handoff; reset is required rather than reconstructing that evidence.
+The orchestrator remains
 the only ledger client and the only owner of delivery monitoring, Worker
 resumption, and aggregate completion.
 

@@ -248,12 +248,12 @@ workflow transitions.
 | schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified | candidate, plan-question, assignment-blocked, blocked | durable, hosted | none |
+| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified | candidate, final-verify, plan-question, assignment-blocked, blocked | durable, hosted | none |
 | plan-question | decision | a semantic conflict requires user authority because no contract-preserving implementation exists | schedule, assignment-deferred, blocked | none | none |
-| candidate | validation | Feature Worker reports a committed candidate HEAD with plan criteria evidence | native-review, assignment-blocked, blocked | read, durable | none |
+| candidate | validation | Feature Worker reports a committed candidate HEAD with the required initial or published-repair evidence | native-review, publish-pr, assignment-blocked, blocked | read, durable | none |
 | native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
 | review-decision | decision | in-session review result is bound to the current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
-| publish-pr | action | review is clean and publication scope is resolved | stack-reconcile, candidate-published, assignment-blocked, blocked | hosted, durable | none |
+| publish-pr | action | pre-publication native review is clean, or a verified existing PR makes hosted review authoritative for this repair candidate | stack-reconcile, candidate-published, assignment-blocked, blocked | hosted, durable | none |
 | stack-reconcile | validation | a stacked PR was published or its parent/base/link/exact-HEAD evidence drifted | candidate-published, implement-validate, assignment-blocked, blocked | read, durable | none |
 | candidate-published | validation | PR identity, branch, exact candidate HEAD, closing set, and any required stack link are verified | schedule, assignment-blocked, blocked | read, durable | none |
 | delivery-monitor | action | one or more published assignments are delivery-pending on a verified exact PR HEAD | schedule, implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
@@ -288,13 +288,15 @@ flowchart TD
     worker-bootstrap --> assignment-blocked
     worker-bootstrap --> blocked
     implement-validate --> candidate
+    implement-validate -->|published HEAD unchanged after complete validation| final-verify
     implement-validate --> plan-question
     implement-validate --> assignment-blocked
     implement-validate --> blocked
     plan-question --> schedule
     plan-question --> assignment-deferred
     plan-question --> blocked
-    candidate --> native-review
+    candidate -->|first publication| native-review
+    candidate -->|published repair| publish-pr
     candidate --> assignment-blocked
     candidate --> blocked
     native-review --> review-decision
@@ -309,7 +311,7 @@ flowchart TD
     publish-pr --> assignment-blocked
     publish-pr --> blocked
     stack-reconcile --> candidate-published
-    stack-reconcile --> implement-validate
+    stack-reconcile -->|published drift| implement-validate
     stack-reconcile --> assignment-blocked
     stack-reconcile --> blocked
     candidate-published --> schedule
@@ -421,7 +423,7 @@ Each Feature Worker owns one authoritative Feature member, its observed Macro
 projection state and available local Task context, one verified implementation
 worktree, one branch, and one
 eventual PR. It owns technical design, code, tests, validation, candidate
-evidence, exact-HEAD native review, and fixes. It binds every Feature
+evidence, pre-publication exact-HEAD native review, and fixes. It binds every Feature
 acceptance criterion and every derived T-AC to evidence on the same candidate
 SHA, and maps available local Macro Task outcomes as contextual coverage. It
 never owns a sibling Feature or its Tasks.
@@ -429,10 +431,14 @@ Macro Tasks are not worker or PR boundaries. Derived T-AC and execution-unit
 criteria are assignment-scoped worker evidence, not durable Feature or Macro
 Task requirements, and may only specialize the published F-AC contract.
 
-Any HEAD change invalidates prior acceptance, validation, and review evidence.
-The worker repeats the required checks and review at the new exact HEAD. The
-orchestrator receives evidence and coordinates delivery; it never edits,
-rebases, or judges worker code.
+Review authority changes once, when first-PR publication readback verifies the
+exact PR identity and HEAD. Before that PR exists, candidate changes invalidate
+native-review evidence and the Worker repeats the native review gate. After
+that readback, hosted review is the only independent review transport: a
+resumed Worker repairs the exact hosted finding or drift, validates the changed
+behavior, and republishes the new candidate without invoking native review
+again. The orchestrator receives evidence and coordinates delivery; it never
+edits, rebases, or judges worker code.
 
 After the orchestrator verifies `delivery-pending @ candidate-published`, the
 Worker returns a bounded exact-HEAD handoff and becomes inactive but resumable.
@@ -445,9 +451,10 @@ polls its own PR while inactive.
 ### Optional Feature Worker support
 
 The Feature Worker remains the sole owner of the Feature member, worktree,
-integration branch, candidate commit, acceptance matrix, native review, and
-eventual PR. When delegation is available and useful, it may dispatch bounded
-support assignments with one of these responsibilities:
+integration branch, candidate commit, acceptance matrix, pre-publication native
+review, hosted-finding repairs, and eventual PR. When delegation is available
+and useful, it may dispatch bounded support assignments with one of these
+responsibilities:
 
 - `code-analyst`: read-only repository, impact, and dependency analysis;
 - `execution-assistant`: implementation of one explicitly bounded execution
@@ -463,8 +470,8 @@ evidence or a scoped change proposal to the Feature Worker. Support
 assignments never edit or publish the Feature Plan, never access the SQLite
 ledger, never publish or mutate GitHub, never create Feature Workers or
 planner tasks, and never become the source of final delivery evidence. The
-parent integrates any useful change, reruns the complete validation and review
-cycle, and owns the final candidate HEAD.
+parent integrates any useful change, follows the current review-delivery branch,
+and owns the final candidate HEAD.
 
 Never run concurrent writes against overlapping worktree paths. A helper may
 edit only an exclusive declared envelope or an isolated helper context, and
