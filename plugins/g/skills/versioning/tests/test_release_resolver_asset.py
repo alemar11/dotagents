@@ -154,7 +154,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             reference,
         )
         self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.2"', reference)
-        self.assertIn("name: release-approval", reference)
+        self.assertIn("name: release-tag-approval", reference)
         self.assertIn("deployment: false", reference)
         self.assertIn("Approve ${{ needs.plan.outputs.tag }}", reference)
         self.assertIn("final mutation job separately exposes", reference)

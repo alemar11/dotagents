@@ -21,13 +21,13 @@ The release controller has one manual operation-choice UI and four phases:
 
 1. `plan` calculates one exact proposal without creating refs;
 2. `approval` displays that proposal and enters the protected
-   `release-approval` environment;
+   `release-tag-approval` environment;
 3. `resolve` refreshes tags and branch SHAs, then revalidates the exact approved
    proposal;
 4. `candidate` or `final` performs the immutable ref and PR mutations.
 
 The approval environment is part of the portable topology. Configure required
-reviewers for `release-approval` in repository or organization settings. Use
+reviewers for `release-tag-approval` in repository or organization settings. Use
 `deployment: false` so the gate does not create a deployment record. The
 workflow file can name the environment, but it cannot configure its reviewers
 or wait timer. Report that remote configuration separately from local YAML
@@ -143,7 +143,7 @@ approval:
   permissions:
     contents: read
   environment:
-    name: release-approval
+    name: release-tag-approval
     deployment: false
   runs-on: ubuntu-latest
   steps:
@@ -290,7 +290,7 @@ manually dispatch the publisher with an existing final tag for recovery.
 | Publisher name and filename | Display name `Publish tagged release`; local reusable workflow with `tag` and `source_sha` inputs | Filename and publication implementation |
 | Runner | Must provide the commands used by the selected jobs | Hosted or self-hosted runner |
 | Parallel release lines | Allowed when lines differ | A stricter repository policy may serialize them |
-| Required reviewers | `release-approval` environment is named in YAML | Reviewer list and wait timer are configured remotely |
+| Required reviewers | `release-tag-approval` environment is named in YAML | Reviewer list and wait timer are configured remotely |
 | Automatic merge | Disabled | A separate explicitly authorized delivery workflow may own merge policy |
 | Initial version | Established before these Actions | Never inferred from application files |
 | GitHub Release state | Exact verified final tag; idempotent creation and readback | Draft by default, or direct publication when explicitly selected while authoring the publisher |
@@ -299,7 +299,7 @@ manually dispatch the publisher with an existing final tag for recovery.
 
 Before writing or upgrading the workflows, run the read-only preflight from
 `../github-actions/references/configuration.md`. The repository must allow
-GitHub Actions to create pull requests, and `release-approval` must exist with
+GitHub Actions to create pull requests, and `release-tag-approval` must exist with
 the intended required reviewers. A blocked or unavailable preflight is
 advisory: write the explicitly requested files, report the missing remote
 configuration, and do not claim the workflow is operationally ready.

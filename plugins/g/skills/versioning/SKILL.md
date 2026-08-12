@@ -187,7 +187,7 @@ already asked generally to “release” or “create the tag”:
 
 The portable GitHub Action uses one operation-choice UI. It first calculates a
 read-only proposal, displays the exact tag and source SHA, pauses at the
-protected `release-approval` environment, and then re-resolves that exact
+protected `release-tag-approval` environment, and then re-resolves that exact
 proposal against fresh provider state before mutation. Environment approval is
 the explicit application gate; the internal handoff alone is not approval.
 Do not generalize this same-run gate to direct tag commands or workflows that
@@ -279,7 +279,7 @@ The portable release controller may read only provider-owned repository
 metadata, tags, branches, commits, and pull requests. It must not read package
 manifests, inspect or edit application code, run project build/test commands,
 create commits, or merge the final pull request. Preserve the exact canonical
-tag gate, protected `release-approval` environment, fresh post-approval
+tag gate, protected `release-tag-approval` environment, fresh post-approval
 revalidation, and resolver `is_final` output. Stable publication belongs to a
 repository-specific reusable workflow called with the exact verified `tag` and
 `source_sha`. That publisher may build and test application code. Its
