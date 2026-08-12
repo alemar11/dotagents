@@ -1,6 +1,6 @@
 ---
 name: versioning
-description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, select existing tags for GitHub Releases, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
+description: Distinguish versions and Git tags from GitHub Releases, apply the shared SemVer and release-line convention, select existing release tags, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
 ---
 
 # Versioning
@@ -17,6 +17,29 @@ explicit confirmation after the exact proposal has been shown. Creating a new
 canonical alias is a remote mutation and requires the same confirmation; the
 skill must verify the source and target commits before and after the create
 operation.
+
+## Release terms and routing
+
+Use these terms distinctly:
+
+- a **version** is a SemVer value such as `2.4.0` or `2.4.0-rc.1`;
+- a **Git tag** is the repository ref for that version, such as `v2.4.0`;
+- a **GitHub Release** is provider metadata associated with one existing Git
+  tag, including its title, description, assets, and draft or published state.
+
+A release candidate is a prerelease version and tag; it is not itself a GitHub
+Release. Route requests for the next patch, minor, major, candidate, final tag,
+or release line through the version and tag workflow. Route requests that name
+a GitHub Release, associate a release with an existing tag, or ask for release
+notes, a description, or assets through existing-tag selection and then
+`$g:github-releases`; those requests do not authorize a new version or tag.
+
+Treat the unqualified word “release” as ambiguous when neither branch is clear.
+An explicit version increment, candidate, final tag, or release branch selects
+the version and tag workflow. An explicit existing tag, GitHub Release,
+description, notes, or assets selects the GitHub Release workflow. If neither
+signal exists, ask whether the user wants a new version/tag or a GitHub Release
+for an existing tag before proposing or mutating anything.
 
 ## Canonical convention
 
