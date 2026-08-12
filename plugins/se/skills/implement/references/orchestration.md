@@ -217,8 +217,10 @@ ambiguity remains inside Implement and never becomes a Feature question.
 
 For every Feature member, bootstrap exactly one Feature Worker. The worker
 executes its derived units in deterministic prerequisite order inside one
-isolated worktree. It may use optional bounded support assignments when live
-delegation and usable worker capacity are observed; otherwise it continues
+isolated worktree. During implementation, commit frequently at coherent
+unit-of-work boundaries. It may use optional bounded support assignments when
+live delegation and usable worker capacity are observed; otherwise it
+continues
 serially. Parallelism is only between Features whose paths, repositories,
 dependencies, Feature-level scheduling context, and live capacity are safe.
 
