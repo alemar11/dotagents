@@ -1,6 +1,6 @@
 ---
 name: versioning
-description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, plan safe legacy-tag migrations, and author stable-only GitHub Actions with explicit downstream dispatch recovery.
+description: Apply the shared SemVer tag and release-line convention, calculate context-aware suggestions, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
 ---
 
 # Versioning
@@ -185,12 +185,13 @@ already asked generally to “release” or “create the tag”:
    then verify the resulting ref and commit. A final tag and its release are
    separate operations and each must remain within the user's confirmed scope.
 
-The portable GitHub Actions may use the identical operation-choice UI for dry
-run and apply. In that mode, apply must first calculate a read-only proposal,
-pass the exact generated tag to a second resolver job as an internal
-confirmation, and expose the exact tag in the run summary before mutation. Do
-not generalize this same-run confirmation to direct tag commands or workflows
-that accept an unvalidated operation without the second resolver pass.
+The portable GitHub Action uses one operation-choice UI. It first calculates a
+read-only proposal, displays the exact tag and source SHA, pauses at the
+protected `release-approval` environment, and then re-resolves that exact
+proposal against fresh provider state before mutation. Environment approval is
+the explicit application gate; the internal handoff alone is not approval.
+Do not generalize this same-run gate to direct tag commands or workflows that
+accept an unvalidated tag.
 
 If the current branch is neither `main` nor `release/vX.Y.Z` and the user did
 not provide a clear version/intent, do not guess. Show read-only context and
@@ -204,7 +205,7 @@ ask which release line or migration the user wants.
    read-only Actions permissions preflight from
    `../github-actions/references/configuration.md`, then read
    `references/github-actions.md` before creating or upgrading the workflow.
-   That reference owns the complete workflow templates, universal versus
+   That reference owns the workflow topology and interfaces, universal versus
    repository-specific rules, resolver-version comparison, installation,
    validation, and recovery contract. If the preflight is blocked, warn that
    the generated Action will not complete its PR operation until the repository
@@ -232,18 +233,18 @@ independent version through `--version`; compare it with any project copy
 before writing. Never downgrade a newer project resolver, silently overwrite
 an unversioned resolver, or replace same-version divergent bytes.
 
-The Actions may read only provider-owned repository metadata, tags, branches,
-commits, and pull requests. They must not read package manifests, inspect or
-edit application code, run project build/test commands, create commits, or
-merge the final pull request. Preserve the exact canonical tag gate and the
-separate dry-run/application confirmation boundary. Preserve the resolver's
-`is_final` workflow output so downstream jobs can gate stable-only work without
-reparsing the tag. The apply template uses the same operation-choice UI as dry
-run and preserves the confirmation boundary through its internal plan-to-
-resolve handoff. If publication is owned by a separate workflow, read the
-direct-dispatch contract in `references/github-actions.md`: an explicit
-`workflow_dispatch` input must be resolved and gated independently of the
-workflow's `on.push.tags` filter.
+The portable release controller may read only provider-owned repository
+metadata, tags, branches, commits, and pull requests. It must not read package
+manifests, inspect or edit application code, run project build/test commands,
+create commits, or merge the final pull request. Preserve the exact canonical
+tag gate, protected `release-approval` environment, fresh post-approval
+revalidation, and resolver `is_final` output. Stable publication belongs to a
+repository-specific reusable workflow called with the exact verified `tag` and
+`source_sha`. That publisher may build and test application code. Its
+`workflow_dispatch` entry exists only to recover publication for an already
+existing final tag; do not add `on.push.tags`, `gh workflow run`, or
+`actions: write` to bridge the workflows. Read the reusable-publisher and
+manual-recovery contracts in `references/github-actions.md`.
 
 Examples from the skill directory:
 
