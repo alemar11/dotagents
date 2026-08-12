@@ -131,6 +131,35 @@ attempt with the minimal supported base-scoped mode. A rejected or unavailable
 review is not a clean result and blocks publication until review evidence can
 be obtained.
 
+Treat the native review result and its delivery or monitoring stream as
+separate evidence. Retain the same stable review lineage when the live
+capability exposes one, together with the verified Worker, repository,
+worktree, base SHA, candidate SHA, and resolved review profile. A timeout,
+disconnected stream, interrupted execution status, missing relay, or failed
+parent Worker does not prove that the review failed or that no terminal result
+exists.
+
+After any such interruption, independently re-observe the same review lineage
+and exact candidate before resuming implementation or starting another review:
+
+- accept a usable terminal finding set or clean result when its repository,
+  base, candidate, and review profile match the retained launch binding; that
+  exact-HEAD terminal content takes precedence over generic interrupted
+  transport or execution metadata;
+- when the same review is still active, preserve it as pending and observe it
+  again later without starting a duplicate;
+- when authoritative observation proves that the prior review is terminal and
+  has no usable result, retain that failure and make at most one replacement
+  minimal review in the same Worker against the unchanged exact candidate;
+- when the prior effect, review identity, terminal content, or exact-HEAD
+  binding remains unknown, conflicting, inaccessible, or stale, fail closed
+  without a replacement review.
+
+Never infer a clean result from process exit, silence, missing findings,
+transport status, or partial output. A terminal artifact cannot override a
+mismatched candidate binding, and conflicting terminal artifacts are
+unavailable review evidence until reconciled.
+
 Bind every finding and clean result to the exact candidate SHA. The Feature
 Worker decides whether a finding is actionable, owns every fix, reruns
 validation, and creates a new candidate. Any new HEAD invalidates the previous

@@ -170,6 +170,25 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         ):
             self.assertIn(required, reference)
 
+    def test_native_review_reconciles_interrupted_delivery_before_retry(self) -> None:
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "native review result and its delivery or monitoring stream as separate evidence",
+            "does not prove that the review failed",
+            "independently re-observe the same review lineage",
+            "terminal content takes precedence over generic interrupted transport or execution metadata",
+            "preserve it as pending and observe it again later without starting a duplicate",
+            "at most one replacement minimal review",
+            "same Worker against the unchanged exact candidate",
+            "fail closed without a replacement review",
+            "conflicting terminal artifacts are unavailable review evidence",
+        ):
+            self.assertIn(required, reference)
+
+        for process_detail in ("PID", "PGID", "stdout", "stderr"):
+            self.assertNotIn(process_detail, reference)
+
     def test_publication_uses_the_verified_feature_worker_worktree(self) -> None:
         reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
 

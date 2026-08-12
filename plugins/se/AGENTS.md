@@ -232,9 +232,13 @@ surface.
   interior line breaks, and leave intentional multiline body content intact.
 - Keep native review and publication on verified execution boundaries. Select
   the minimal supported base-scoped review mode, avoid unsupported optional
-  combinations and unrelated strict overrides, and run publication only from
-  the independently re-observed Feature Worker worktree rather than an inherited
-  or temporary-artifact directory.
+  combinations and unrelated strict overrides. Reconcile a disconnected or
+  interrupted delivery stream against the same review lineage and exact
+  candidate before retry: accept matching terminal content independently of
+  generic transport status, wait when the review remains active, and fail
+  closed when identity, result, or binding is ambiguous. Run publication only
+  from the independently re-observed Feature Worker worktree rather than an
+  inherited or temporary-artifact directory.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
   hosted Plan Set rehydration through the shared G dependency gate before
   hosted reads, and route default publication through the single publication
@@ -315,9 +319,10 @@ surface.
 - Validate Implement's minimal durable PR-body projection, exclusion of routine
   execution counts, preservation of external template/author content, and
   exact closure-intent readback.
-- Validate native review's minimal supported fallback and publication from the
-  exact re-observed Feature Worker worktree rather than inherited or temporary
-  directories.
+- Validate native review's minimal supported fallback, interrupted-stream
+  reconciliation against the same exact candidate without duplicate review,
+  and publication from the exact re-observed Feature Worker worktree rather
+  than inherited or temporary directories.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's documented
   persisted values exactly match the run-state capability registry.
