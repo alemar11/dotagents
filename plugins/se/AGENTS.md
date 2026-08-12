@@ -206,6 +206,13 @@ surface.
   their absence never blocks, triggers a second read, or requires project
   inventory refresh. Never substitute project display metadata for task or Git
   execution evidence.
+- For Implement Feature Workers, distinguish the selected integration
+  `base_branch` from the worker-owned `head_branch`. An application-managed
+  worktree may bootstrap detached at the exact frozen base SHA. Require the
+  worker to establish and read back its Feature branch only after the
+  assigned-task bootstrap and before the durable `worker-bootstrap`
+  checkpoint or repository content writes. Apply the same rule when a stacked
+  child starts from its parent's exact candidate SHA.
 - Keep Idea capture independent from Feature Plan and Implement semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is

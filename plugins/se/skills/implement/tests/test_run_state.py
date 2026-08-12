@@ -342,6 +342,8 @@ class RunStateTests(unittest.TestCase):
         self.invoke(db, "state", "prepare")
         with sqlite3.connect(db) as connection:
             self.assertEqual(connection.execute("PRAGMA journal_mode=DELETE").fetchone()[0], "delete")
+        Path(f"{db}-wal").unlink(missing_ok=True)
+        Path(f"{db}-shm").unlink(missing_ok=True)
         doctor = self.invoke(db, "doctor", check=False)
         self.assertEqual(self.payload(doctor)["error"]["code"], "invalid-state-journal")
         with sqlite3.connect(db) as connection:

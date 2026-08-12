@@ -72,7 +72,7 @@ the whole run, one assignment, or the current invocation.
 | `prepare-run` | Run | Derive assignments, refreshed base snapshots, execution units, path envelopes, dependencies, and delivery topology. |
 | `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
 | `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
-| `worker-bootstrap` | Assignment | Create or resume the Feature Worker and bind its destination, worktree, branch, and verified exact base. |
+| `worker-bootstrap` | Assignment | Create or resume the Feature Worker, accept an initial detached or attached checkout at the verified exact base, then establish and bind its Feature branch before content writes. |
 | `implement-validate` | Assignment | Derive technical units and T-AC, then implement and validate the complete Feature semantic contract. |
 | `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
 | `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence. |
@@ -140,7 +140,7 @@ outcomes for the current invocation but remain resumable run statuses.
 
 | Checkpoint | Description |
 | --- | --- |
-| `worker-bootstrap` | Worker identity, destination, worktree, branch, refreshed base branch, and exact base SHA are the last durable recovery boundary. |
+| `worker-bootstrap` | Worker identity, destination, worktree, established Feature branch, refreshed base branch, and exact base SHA are the last durable recovery boundary; the earlier task bootstrap may observe detached HEAD at that SHA. |
 | `native-review` | A committed candidate exists and exact-HEAD native review is the last durable recovery boundary. |
 | `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
 | `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |

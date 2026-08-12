@@ -59,7 +59,7 @@ Feature Worker. It freezes each Worker request, creates or resumes the Worker,
 independently observes the stable Worker identity, and binds the Worker's
 structured bootstrap result to it before accepting normal updates. The Feature
 Worker reads its own authoritative task-scoped context and performs its
-bootstrap self-check before implementation or worktree writes. It does not
+bootstrap self-check before implementation or worktree content writes. It does not
 create or resume another Feature Worker. A Worker's profile may intentionally
 differ from the orchestrator's; compare the Worker only with its
 assignment-specific request.
@@ -90,8 +90,8 @@ current checkout, or another local branch after the caller supplied a value.
 
 Before every standalone or root Feature Worker bootstrap wave, refresh the
 selected branch from its authoritative upstream through the G-owned branch
-transport and read back its full remote tip SHA. The branch or ref used as the
-application-managed worktree starting state must equal that tip. A fetch-only
+transport and read back its full remote tip SHA. The source ref supplied for
+the application-managed worktree starting state must resolve to that tip. A fetch-only
 receipt, stale remote-tracking ref, current checkout HEAD, or branch name
 without exact-SHA readback is insufficient. Updating the caller's active
 checkout is not required. Any local branch update used for bootstrap must be
@@ -106,9 +106,25 @@ start from that exact snapshot. Re-read the authoritative branch tip
 immediately before each worktree creation. If it changed, stop the remaining
 bootstraps, refresh the snapshot, and recompute the unstarted wave; never mix
 two starting SHAs inside one bootstrap wave. After worktree creation, verify
-that its initial base resolves to the frozen `base_sha` before the Worker may
-write. A mismatch blocks that assignment without treating the task or
-worktree receipt as implementation progress.
+that its initial HEAD resolves to the frozen `base_sha` before the Worker may
+write repository content. The initial checkout may be detached or attached;
+detached HEAD at the exact frozen SHA is the normal valid state for an
+application-managed isolated worktree. Do not require the selected
+`base_branch` to be checked out, and do not require a Feature `head_branch` to
+exist during the assigned-task bootstrap. A repository, remote, worktree, or
+SHA mismatch blocks that assignment without treating the task or worktree
+receipt as implementation progress.
+
+After the assigned-task identity, profile, and initial execution target match,
+the Feature Worker creates or checks out its deterministic `head_branch`
+through the G-owned branch workflow from the unchanged `base_sha`. It then
+reads back the branch and exact HEAD before any repository content write. Only
+that post-bootstrap branch readback may establish the durable
+`active @ worker-bootstrap` assignment checkpoint. On recovery from that
+checkpoint, the recorded `head_branch` is required and a detached or different
+checkout is drift that must be reconciled. Apply the same sequence to a
+stacked child: its initial detached HEAD may equal the verified immediate
+parent candidate SHA, after which the child creates its own `head_branch`.
 
 The selected starting branch applies to standalone assignments and the root
 of every same-repository stack. A stacked child instead starts from its

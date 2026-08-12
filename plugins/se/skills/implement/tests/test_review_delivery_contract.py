@@ -209,12 +209,31 @@ class ReviewDeliveryContractTests(unittest.TestCase):
         self.assertIn("refresh the selected branch from its authoritative upstream", orchestration)
         self.assertIn("must be fast-forward-only", orchestration)
         self.assertIn("never mix two starting SHAs inside one bootstrap wave", orchestration)
-        self.assertIn("initial base resolves to the frozen `base_sha`", orchestration)
+        self.assertIn("initial HEAD resolves to the frozen `base_sha`", orchestration)
+        self.assertIn(
+            "detached HEAD at the exact frozen SHA is the normal valid state",
+            orchestration,
+        )
+        self.assertIn(
+            "do not require a Feature `head_branch` to exist during the assigned-task bootstrap",
+            orchestration,
+        )
+        self.assertIn(
+            "Only that post-bootstrap branch readback may establish the durable",
+            orchestration,
+        )
+        self.assertIn("the recorded `head_branch` is required", orchestration)
+        self.assertIn(
+            "initial detached HEAD may equal the verified immediate parent candidate SHA",
+            orchestration,
+        )
         self.assertIn("stacked child instead starts from its verified immediate parent's", orchestration)
         self.assertIn("existing assignment `base_branch` and `base_sha` fields", run_state)
         self.assertIn("requires no table, schema, runtime-contract, envelope, or CLI-behavior change", run_state)
         self.assertIn("selected starting branch", reference)
         self.assertIn("verified exact base", states)
+        self.assertIn("initial detached or attached checkout", states)
+        self.assertIn("earlier task bootstrap may observe detached HEAD", states)
 
     def test_feature_plan_set_scheduling_and_per_feature_closure_are_explicit(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
