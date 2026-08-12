@@ -1,5 +1,5 @@
 interface:
   display_name: "Versioning"
-  short_description: "Plan SemVer tags, releases, and guarded Actions"
+  short_description: "Plan and apply SemVer tags with guarded Actions"
   brand_color: "#0F766E"
-  default_prompt: "Use $g:versioning to validate canonical SemVer tags, select existing tags for drafted or directly published GitHub Releases, plan legacy aliases, or author guarded release Actions while preserving exact-tag approval."
+  default_prompt: "Use $g:versioning to validate canonical SemVer tags, operate or author guarded release Actions, select existing tags for drafted or directly published GitHub Releases, and preserve exact-tag approval."

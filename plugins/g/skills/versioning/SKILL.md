@@ -1,14 +1,14 @@
 ---
 name: versioning
-description: Distinguish versions and Git tags from GitHub Releases, apply the shared SemVer and release-line convention, select existing release tags, plan safe legacy-tag migrations, and author approval-gated GitHub Actions with reusable stable publication and manual recovery.
+description: Distinguish versions and Git tags from GitHub Releases, apply the shared SemVer and release-line convention, operate or author approval-gated release-tag Actions, select existing release tags, and plan safe legacy-tag migrations.
 ---
 
 # Versioning
 
 Use this skill when a project needs a release version, a Git tag, a release
 branch, the next candidate suggestions for a release workflow, or the guarded
-GitHub Actions that implement this convention without touching application
-code.
+GitHub Actions that operate or implement this convention without touching
+application code.
 
 This skill owns the convention, read-only calculation, and explicit migration
 of stable legacy tags. It never moves or deletes a tag. The helper only creates
@@ -203,16 +203,23 @@ already asked generally to “release” or “create the tag”:
    move, delete, or push a tag before that confirmation.
 6. Re-run the exact application-tag validation immediately before delegation.
    If the result is not `canonical-format`, stop without performing a write.
-7. After confirmation and successful revalidation, use `$g:github-releases`
-   for the tag/release mutation,
-   then verify the resulting ref and commit. A final tag and its release are
-   separate operations and each must remain within the user's confirmed scope.
+7. After confirmation and successful revalidation, prefer a compatible
+   installed approval-gated release controller for the tag mutation; read
+   `references/controller-dispatch.md` before dispatching it. When no
+   compatible controller exists, use the direct tag workflow owned by
+   `$g:github-releases`. Then verify the resulting ref and commit. A final tag
+   and its GitHub Release are separate operations and each must remain within
+   the user's confirmed scope.
 
 The portable GitHub Action uses one operation-choice UI. It first calculates a
 read-only proposal, displays the exact tag and source SHA, pauses at the
 protected `release-tag-approval` environment, and then re-resolves that exact
 proposal against fresh provider state before mutation. Environment approval is
 the explicit application gate; the internal handoff alone is not approval.
+Dispatching this controller after exact confirmation is an authorized way to
+apply the tag proposal; it never authorizes approving the environment on the
+user's behalf. The prohibition on manually dispatching a publisher does not
+apply to this approval-gated controller.
 Do not generalize this same-run gate to direct tag commands or workflows that
 accept an unvalidated tag.
 
@@ -266,7 +273,12 @@ and route a requested description refinement to `release_operation=update-notes`
 
 1. Refresh or otherwise verify the local tag view when remote state may be
    stale. The helper does not fetch or write remote state implicitly.
-2. If the release flow will be implemented in GitHub Actions, run the
+2. If the user asks to apply a tag and the repository already has a compatible
+   approval-gated release controller, read
+   `references/controller-dispatch.md`, select the semantic operation from
+   branch, tags, and explicit intent, and use the controller as the normal tag
+   mutation path.
+3. If the release flow will be implemented in GitHub Actions, run the
    read-only Actions permissions preflight from
    `../github-actions/references/configuration.md`, then read
    `references/github-actions.md` before creating or upgrading the workflow.
@@ -276,16 +288,16 @@ and route a requested description refinement to `release_operation=update-notes`
    the generated Action will not complete its PR operation until the repository
    setting is enabled; continue writing the explicitly requested workflow and
    keep its status pending configuration.
-3. Run the helper in the correct mode and inspect its resolved `latest_tag`,
+4. Run the helper in the correct mode and inspect its resolved `latest_tag`,
    `suggestions`, `migrations`, and status values.
-4. Validate the exact tag selected for application. A
+5. Validate the exact tag selected for application. A
    `blocked-noncanonical` result is terminal for that request and must never be
    handed to a mutation workflow.
-5. For migration, re-read the source and target refs immediately before the
+6. For migration, re-read the source and target refs immediately before the
    authorized create operation and require the target to be absent.
-6. For release publication, re-read the relevant branch and tags immediately
+7. For release publication, re-read the relevant branch and tags immediately
    before the authorized operation.
-7. Preserve exact tag and branch SHAs; reject an existing tag or a finalized
+8. Preserve exact tag and branch SHAs; reject an existing tag or a finalized
    release line.
 
 ## GitHub Actions authoring boundary
@@ -335,6 +347,7 @@ application tag violates the canonical format.
 
 - [SemVer and tag format](references/semver.md)
 - [Suggestion states](references/states.md)
+- [Existing release-controller dispatch](references/controller-dispatch.md)
 - [GitHub Release lifecycle and notes](../github-releases/references/workflows.md)
 - [GitHub Actions release workflow authoring](references/github-actions.md)
 - [GitHub Actions configuration preflight](../github-actions/references/configuration.md)

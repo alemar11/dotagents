@@ -28,13 +28,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "2.15.2")
+        self.assertEqual(output.strip(), "2.15.3")
 
     def test_json_doctor_shape(self) -> None:
         doctor_payload = {
             "ok": True,
             "provider_ready": True,
-            "version": "2.15.2",
+            "version": "2.15.3",
             "checks": {
                 "connector": {"cli_access": False},
                 "gh_stack": {"status": "missing"},
@@ -44,7 +44,7 @@ class CliContractTests(unittest.TestCase):
             code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "2.15.2")
+        self.assertEqual(payload["version"], "2.15.3")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
         self.assertIn("gh_stack", payload["checks"])
 

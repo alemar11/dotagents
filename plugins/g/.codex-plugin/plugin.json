@@ -1,6 +1,6 @@
 {
   "name": "g",
-  "version": "2.15.2",
+  "version": "2.15.3",
   "description": "Manage Git and GitHub work from commits, evidence-backed issue classification, and read-only taxonomy proposals through delivery status, reviewed pull-request delivery, active-session audits, and consistent SemVer versioning.",
   "author": {
     "name": "alemar11",
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "G",
     "shortDescription": "Manage Git and GitHub work from issues to reviewed pull requests.",
-    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle and exact native blocked-by dependencies, evidence-backed selection of existing issue labels and native types, explicit read-only proposals for missing repository labels and organization issue types, repository triage, investigations, Actions failures and permissions preflights, exact-head delivery-status inspection, review threads, drafted or directly published releases with curated notes and description improvements, stars, stacked pull requests, draft pull-request delivery, consistent SemVer versioning suggestions, guarded project-agnostic release Action authoring, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
+    "longDescription": "G bundles focused Git and GitHub workflows for commits, issue lifecycle and exact native blocked-by dependencies, evidence-backed selection of existing issue labels and native types, explicit read-only proposals for missing repository labels and organization issue types, repository triage, investigations, Actions failures and permissions preflights, exact-head delivery-status inspection, review threads, drafted or directly published releases with curated notes and description improvements, stars, stacked pull requests, draft pull-request delivery, consistent SemVer versioning suggestions, guarded release-controller operation and authoring, and read-only active-session audits. It uses direct Git for local work, the GitHub connector for supported remote operations, and gh only for connector gaps and the explicit gh-stack wrapper.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -26,7 +26,7 @@
       "Analyze this repository and its issues to propose only the missing labels and organization issue types without changing GitHub.",
       "Diagnose and fix the failing GitHub Actions checks.",
       "Publish these local changes as a safe draft pull request.",
-      "Preview context-aware SemVer tags, draft or directly publish a verified tagged release with curated notes, improve an existing release description, or install guarded release Actions with a versioned resolver.",
+      "Preview context-aware SemVer tags, operate or install guarded release Actions, draft or directly publish a verified tagged release with curated notes, or improve an existing release description.",
       "Audit active Codex tasks using G skills and prioritize feedback, bugs, and improvements."
     ],
     "brandColor": "#DE4C36",
