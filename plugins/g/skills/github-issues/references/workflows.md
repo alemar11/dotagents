@@ -101,6 +101,85 @@ gh issue edit <number-or-url> --body-file "$body_file"
 rm -rf "$tmpdir"
 ```
 
+## Attachments
+
+Treat an issue-body or comment attachment as two linked mutations: upload the
+exact file to the exact target repository, then include the returned stable URL
+in the authorized create, edit, or comment Markdown. Do not upload during a dry
+run. Return a redacted command preview and the intended Markdown placement
+instead.
+
+GitHub documents the supported attachment types, size limits, repository
+visibility behavior, and H.264 compatibility recommendation in
+[Attaching files](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/attaching-files).
+The browser-backed upload capability is not a documented public REST API, so
+treat it as a capability that may change. The shipped CLI validates the
+repository's numeric provider identity, keeps the token out of arguments and
+output, sends the binary body without shell interpolation, accepts only one
+stable `https://github.com/user-attachments/assets/...` URL, and fails closed
+on any other result.
+
+Before upload:
+
+1. Require `mutation_mode=apply` for the owning create, edit, or comment
+   operation.
+2. Resolve the exact target repository.
+3. Require the exact caller-selected regular file and, when inference is
+   unavailable or an override is needed, its filename or MIME type.
+4. Check the current GitHub-supported type and size limits. Do not rename an
+   unsupported file to disguise its type.
+5. Complete the direct-`gh` preflight and keep shell tracing disabled.
+
+Resolve `<plugin-root>` as two directories above the directory containing the
+owning `SKILL.md`. Preview the validated local file and Markdown placement
+without network access or upload by adding `--dry-run`:
+
+```bash
+<plugin-root>/scripts/g --json attachment upload \
+  --repo <owner/repo> \
+  --file <absolute-file-path> \
+  --dry-run
+```
+
+For an authorized apply operation, omit `--dry-run`. Override the published
+filename or inferred MIME type only when needed:
+
+```bash
+<plugin-root>/scripts/g --json attachment upload \
+  --repo <owner/repo> \
+  --file <absolute-file-path> \
+  --name <filename-with-extension> \
+  --content-type <supported-mime-type>
+```
+
+The successful JSON envelope contains the repository's numeric ID, a
+byte-count and SHA-256 file proof, and the stable URL. Treat that URL as an
+upload receipt, not publication proof. Place it in the exact issue body or
+comment and read that target back. Use:
+
+- `![descriptive alt text](<attachment-url>)` for images;
+- `[descriptive filename](<attachment-url>)` for non-media files;
+- the bare `<attachment-url>` on its own line for video so GitHub renders a
+  player. Image syntax does not render the video player.
+
+Playwright commonly records WebM. When broad playback compatibility matters,
+transcode it before upload:
+
+```bash
+ffmpeg -i in.webm -c:v libx264 -pix_fmt yuv420p out.mp4
+```
+
+After publication, verify the raw Markdown contains the exact stable URL. When
+the rendered interface is available, also confirm that the image or video
+loads. Private repositories may resolve the stable URL to an expiring signed
+delivery URL; never store or report that resolved URL.
+
+Report a definite rejected response as a failure. Report a missing capability,
+authentication failure, access failure, unsupported type, or invalid repository
+ID as unavailable. When the upload may have succeeded but the response is
+missing, malformed, or inconclusive, report the uncertainty and do not retry
+blindly; an automatic retry can create an orphaned duplicate attachment.
+
 ## Issue Types
 
 Use native GitHub Issue Types when the repo supports them and the user or

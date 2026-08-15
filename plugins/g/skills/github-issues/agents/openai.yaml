@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub Issues"
-  short_description: "Manage individual GitHub issues and relationships"
+  short_description: "Manage GitHub issues, attachments, and relationships"
   brand_color: "#1D4ED8"
-  default_prompt: "Use $g:github-issues to inspect or manage specific GitHub issues, including metadata, comments, closure, exact native blocked-by dependencies, relationships, and dry-runs."
+  default_prompt: "Use $g:github-issues to inspect or manage specific GitHub issues, including attachments, metadata, comments, closure, exact native blocked-by dependencies, relationships, and dry-runs."

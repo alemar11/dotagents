@@ -12,6 +12,10 @@ package and its shared artifact.
 - `scripts/g` is the shipped shared artifact. Its maintenance source,
   tests, build, and version-alignment rules live in
   `projects/g/AGENTS.md`.
+- The shared artifact's `attachment upload` command owns the plugin's single
+  binary transport to GitHub's user-attachment upload host. The
+  `github-issues` skill owns authorization, Markdown placement, publication,
+  and readback policy around that primitive.
 - `references/options.md` owns shared canonical invocation fields;
   `references/network-execution.md` owns shell network and authentication
   handling.
@@ -55,8 +59,10 @@ unversioned, or belongs to another repository.
   operations. One operation owns one directed blocked-issue/blocker edge,
   supports cross-repository blockers by URL, and verifies both `blockedBy` and
   reciprocal `blocking` readback. Composing planners own why the edge exists.
-- Do not add a second Git/GitHub transport or move publication policy into the
-  shared helper. Preserve explicit authority for every GitHub mutation.
+- Do not duplicate the attachment upload transport in a skill or add another
+  Git/GitHub transport. Do not move issue or pull-request publication policy
+  into the shared helper. Preserve explicit authority for every GitHub
+  mutation.
 - Treat plugin caches as verification surfaces, never editable sources.
 
 ## Validation

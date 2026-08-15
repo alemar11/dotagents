@@ -6,6 +6,10 @@ This project is maintenance-only source for the plugin-shared `scripts/g` artifa
 
 - Requires Python 3.11 or newer and uses only the standard library.
 - Uses direct `git` for local repository state and `gh` for GitHub operations unavailable through the model-facing connector.
+- The `attachment upload` domain is the single narrow exception that sends
+  opaque binary data directly to GitHub's upload host. It resolves repository
+  identity and authentication through `gh`, returns only the stable attachment
+  URL and file proof, and never publishes or edits issue or pull-request text.
 - The `stack` domain wraps only the official `github/gh-stack` CLI extension;
   `stack ensure --install` is the sole explicit extension-install path and
   never installs an agent skill.

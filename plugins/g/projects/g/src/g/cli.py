@@ -6,7 +6,7 @@ import sys
 from typing import Any
 
 from . import __version__
-from . import ci, portfolio, reviews, stack, stars
+from . import attachment, ci, portfolio, reviews, stack, stars
 from .common import GError, envelope, error_envelope, resolve_pr, resolve_repo
 from .delivery_status import inspect_delivery_status
 from .health import doctor, doctor_text
@@ -34,6 +34,20 @@ def parser() -> Parser:
     repo_resolve = repo_sub.add_parser("resolve", help="Resolve owner/repo from an argument or origin.")
     repo_resolve.add_argument("--repo")
     repo_snapshot = repo_sub.add_parser("snapshot", help="Fingerprint the current Git HEAD and porcelain worktree state.")
+    attachment_parser = commands.add_parser(
+        "attachment",
+        help="Upload files for publication in GitHub issue or pull request content.",
+    )
+    attachment_sub = attachment_parser.add_subparsers(dest="verb", required=True)
+    attachment_upload = attachment_sub.add_parser(
+        "upload",
+        help="Upload one local file and return its stable GitHub attachment URL.",
+    )
+    attachment_upload.add_argument("--repo", required=True)
+    attachment_upload.add_argument("--file", required=True)
+    attachment_upload.add_argument("--name")
+    attachment_upload.add_argument("--content-type")
+    attachment_upload.add_argument("--dry-run", action="store_true")
     pr = commands.add_parser("pr", help="Resolve pull request context.")
     pr_sub = pr.add_subparsers(dest="verb", required=True)
     pr_resolve = pr_sub.add_parser("resolve", help="Resolve a PR number/URL or current-branch PR.")
@@ -158,6 +172,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.domain == "repo":
             data = resolve_repo(args.repo) if args.verb == "resolve" else worktree_snapshot()
             _emit(data, ["repo", args.verb], args.json)
+            return 0
+        if args.domain == "attachment":
+            data = attachment.upload(
+                repo=args.repo,
+                file=args.file,
+                name=args.name,
+                content_type=args.content_type,
+                dry_run=args.dry_run,
+            )
+            _emit(data, ["attachment", args.verb], args.json)
             return 0
         if args.domain == "pr":
             if args.verb == "resolve":

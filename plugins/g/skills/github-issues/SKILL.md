@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Manage individual GitHub issues and their lifecycle. Use when the exact content, label, type, comment, state, native dependency, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
+description: Manage individual GitHub issues and their lifecycle. Use when the exact content, attachment, label, type, comment, state, native dependency, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
 ---
 
 # GitHub Issues
@@ -11,10 +11,11 @@ Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported. A
+Prefer the required GitHub connector for supported remote reads and writes.
+Use `gh` or the shipped attachment uploader for connector gaps. An authorized
+connector write may fall back automatically only when the operation and
+repository are identical, `gh` authentication and access succeed, and the
+transport switch is reported. A
 connector gap is safe for direct `gh` when the operation contains only exact
 provider identities, as with native issue dependencies, or when every
 free-form provider field is genuinely file-backed. Otherwise fail closed.
@@ -23,6 +24,14 @@ When a connector gap requires direct `gh`, load
 immediately before that fallback. Connector-only operations do not require the
 CLI gate.
 
+Resolve `<plugin-root>` as two directories above the directory containing this
+`SKILL.md`. For every attachment upload, use only:
+
+```bash
+<plugin-root>/scripts/g --json attachment upload \
+  --repo <owner/repo> \
+  --file <absolute-file>
+```
 
 ## Role
 
@@ -40,7 +49,8 @@ handles GitHub Issues lifecycle mechanics.
 
 - Prefer connector issue tools for supported operations. Use direct `gh` only
   for a connector gap whose free-form provider text is genuinely file-backed;
-  otherwise fail closed. This skill has no dedicated CLI command family.
+  otherwise fail closed. Use the shipped `attachment upload` command as the
+  only attachment transport; never reproduce its token or HTTP logic.
 - Confirm repository context before mutation, using the current checkout or an
   explicit `--repo <owner>/<repo>`.
 - Send issue titles and other free-form fields through the structured GitHub
@@ -53,6 +63,16 @@ handles GitHub Issues lifecycle mechanics.
   generated Markdown body text, this skill creates the transient body files,
   writes them with a non-interpolating method, runs `gh --body-file`, verifies
   state, and cleans up.
+- Treat issue attachments as part of one authorized create, edit, or comment
+  operation. Upload only the exact caller-selected files to the exact target
+  repository, place each returned stable attachment URL in that operation's
+  Markdown, and verify the raw body contains the same URL. Never infer or
+  upload additional local files.
+- Do not upload attachments during a dry run. Return the planned upload and
+  Markdown placement without creating a remote asset.
+- Keep attachment credentials and private delivery URLs secret. Never print
+  `gh auth token`, enable shell tracing around an upload, or report the
+  expiring signed URL that GitHub may use to render a private attachment.
 - Never embed generated Markdown bodies in shell command strings, `echo`,
   unquoted heredocs, command substitutions, or other interpolating shell input.
   Markdown bodies commonly contain backticks, `$...`, and fenced code.
@@ -103,8 +123,9 @@ handles GitHub Issues lifecycle mechanics.
 4. If the evidence requires a user decision before publishing, ask, then store
    the answer as `mutation_mode=apply|dry-run` rather than branching on prose.
 5. Read the relevant issue or label state before mutation.
-6. For create, edit, or comment operations with generated Markdown, prepare
-   safe body files using the pattern in `references/workflows.md`.
+6. For create, edit, or comment operations with generated Markdown or
+   attachments, prepare safe body files and upload only authorized attachment
+   files using the patterns in `references/workflows.md`.
 7. Apply the smallest GitHub issue operation needed:
    - create issues with the requested title, body, type, labels, or parent,
    - set issue type,
@@ -119,10 +140,13 @@ handles GitHub Issues lifecycle mechanics.
    missing or incorrect issue operations. A native dependency invocation owns
    one edge only: make one bounded readback after failure or ambiguity, return
    its terminal result, and never replay the mutation blindly.
-9. Verify the changed issue or queue state after mutation.
-10. Report the issue URL/number, commands run or drafted, any skipped mutation,
-    and, for a dependency operation, its terminal result plus every available
-    exact `blockedBy`/`blocking` readback.
+9. Verify the changed issue or queue state after mutation. For attachments,
+   require the exact stable upload URL in raw Markdown and, when the rendered
+   interface is available, confirm that the media loads.
+10. Report the issue URL/number, stable attachment URLs, commands run or
+    drafted, any skipped mutation, and, for a dependency operation, its
+    terminal result plus every available exact `blockedBy`/`blocking`
+    readback. Never report a token or expiring private delivery URL.
 
 ## Routing
 
@@ -140,6 +164,7 @@ handles GitHub Issues lifecycle mechanics.
 
 ## References
 
-- `references/workflows.md`: direct `gh` issue lifecycle commands and dry-run
-  conventions.
+- `references/workflows.md`: direct `gh` issue lifecycle commands, attachment
+  uploads, and dry-run conventions. Read its attachment section before
+  publishing a file in an issue body or comment.
 - `../../references/options.md`: shared canonical G options.

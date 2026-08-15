@@ -29,7 +29,7 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
 | `g:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
 | `g:github-tagger` | Classify one issue against existing metadata or explicitly analyze a repository and its issues to propose minimal new labels and organization issue types without mutation. |
-| `g:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
+| `g:github-issues` | Manage GitHub issue lifecycle, attachments, metadata, relationships, and dry-runs. |
 | `g:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
 | `g:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
 | `g:github-delivery-status` | Inspect exact-head pull-request delivery readiness, merge policy, rulesets, checks, queue, and automation state without mutating GitHub. |
