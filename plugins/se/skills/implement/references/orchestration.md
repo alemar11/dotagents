@@ -50,22 +50,36 @@ terminal reconciliation.
 Apply the shared
 [task handoff](../../../references/task-handoff.md) at both levels of the
 Implement hierarchy. The invoking task controller creates or resumes the one
-orchestrator, independently observes its stable task identity, state, and
-title, and verifies that the orchestrator's structured bootstrap result is
-bound to that identity. The orchestrator's first turn is assigned-task
-bootstrap: it self-checks authoritative task-scoped execution evidence before
-ledger, repository, Worker, or hosted effects and never creates another
-orchestrator for the same run.
+orchestrator in the invoking ChatGPT application project, independently
+observes its project-visible stable task identity, state, and title, and
+verifies that the orchestrator's structured bootstrap result is bound to that
+identity. The orchestrator's first turn is assigned-task bootstrap: it
+self-checks authoritative task-scoped execution evidence before ledger,
+repository, Worker, or hosted effects and never creates another orchestrator
+for the same run.
+
+Creation and resume are mutually exclusive per role identity. A fresh run
+creates one new orchestrator and one new Worker per selected Feature. A
+validated resume reuses only the exact previously bound project-visible task.
+Create a not-yet-created role only after authoritative evidence proves no prior
+creation effect was applied. If a retained role identity is missing or cannot
+be verified, stop with `unsupported-runtime` and do not create a replacement.
 
 After that bootstrap, the orchestrator becomes the task controller for every
-Feature Worker. It freezes each Worker request, creates or resumes the Worker,
-independently observes the stable Worker identity, and binds the Worker's
+Feature Worker. It freezes each Worker request, creates or resumes the Worker
+in the application project for that Worker's target repository, independently
+observes the project-visible stable Worker identity, and binds the Worker's
 structured bootstrap result to it before accepting normal updates. The Feature
 Worker reads its own authoritative task-scoped context and performs its
-bootstrap self-check before implementation or worktree content writes. It does not
-create or resume another Feature Worker. A Worker's profile may intentionally
-differ from the orchestrator's; compare the Worker only with its
+bootstrap self-check before implementation or worktree content writes. It does
+not create or resume another Feature Worker. A Worker's profile may
+intentionally differ from the orchestrator's; compare the Worker only with its
 assignment-specific request.
+
+Both controller edges are required application-task handoffs, not subordinate
+delegation. Failure to establish either project-visible edge follows the shared
+`unsupported-runtime` fail-closed path. Optional support may begin only below a
+verified Feature Worker and can never be promoted into either required role.
 
 An unstructured Worker self-report is not bootstrap evidence. A missing or
 unobservable authoritative child profile follows the shared
@@ -291,17 +305,18 @@ current-head CI failure still blocks child bootstrap unless it has the bounded
 G-owned infrastructure-or-flaky diagnosis described above. Pending CI remains
 non-blocking. This is not delivery completion.
 
-Return to `schedule` after every candidate publication. The scheduler may
-bootstrap newly unblocked Features and interleave bounded observations of all
-delivery-pending PRs. The orchestrator owns those observations and combines
-G-normalized review, CI, exact-head, and parent/base evidence. It does not ask
-inactive Workers to poll. A still-pending observation returns to `schedule`; a
-clean review and CI observation enters final verification when complete
-validation is already current. When a published repair has only focused
-validation, resume the same Worker through `implement-validate` for complete
-validation on that exact HEAD. An unchanged result proceeds directly to
-`final-verify`; a changed candidate returns through publication and hosted
-review.
+Return to `schedule` after every candidate publication. Run the scheduler
+immediately only for runnable work or materially new evidence; when all work is
+pending, retain the current observations under the shared change-driven
+monitoring policy. Interleave delivery-pending PR lineages fairly. The
+orchestrator combines G-normalized review, CI, exact-head, and parent/base
+evidence and never asks inactive Workers to poll. An unchanged pending
+observation does not trigger a no-work scheduling cycle. A clean review and CI
+observation enters final verification when complete validation is already
+current. When a published repair has only focused validation, resume the same
+Worker through `implement-validate` for complete validation on that exact
+HEAD. An unchanged result proceeds directly to `final-verify`; a changed
+candidate returns through publication and hosted review.
 
 For an actionable finding, evidence mismatch, or parent drift, preserve the
 exact PR, head, provider artifact, and observation fingerprint. Reacquire the
@@ -360,6 +375,12 @@ The orchestrator may exchange only bounded control-plane messages:
 - actionable hosted-review or parent-drift resumption request;
 - plan-question decision request;
 - terminal-state request.
+
+Every message is edge-triggered by a new bootstrap result, state transition,
+actionable evidence fingerprint, authority decision, exact-HEAD or topology
+change, or missing terminal report. Do not repeat a milestone, terminal,
+status-only, heartbeat, or "continue" request without a material intervening
+change and reconciliation of the prior message effect.
 
 It must not prescribe code, files, commands, tests, review fixes, or design.
 The Feature Worker owns implementation semantics, conflict resolution,

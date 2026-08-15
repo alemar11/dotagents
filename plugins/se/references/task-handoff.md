@@ -27,6 +27,11 @@ Create one handoff for one logical task assignment. It must point to the
 validated preflight record and carry the invoking skill's own task profile and
 topology. Do not invent a common profile or topology here.
 
+For a required application-task role, create the handoff only for the
+user-owned task independently visible in the frozen application project. A
+subordinate delegation, optional support assignment, or other execution
+envelope cannot receive, satisfy, or later inherit that required handoff.
+
 The handoff must contain, or link to:
 
 - the explicit user request and bounded objective;
@@ -84,7 +89,8 @@ complementary:
    defined below;
 4. before normal monitoring or update relay, the controller verifies that the
    bootstrap evidence identity exactly equals the stable assigned-task
-   identity and completes title reconciliation.
+   identity, independently confirms that the task is visible in the frozen
+   application project, and completes title reconciliation.
 
 The controller does not duplicate the assigned task's authoritative profile
 read. Role-owned work waits for the assigned-task bootstrap, while normal
@@ -97,6 +103,12 @@ values are compared with the handoff request. A generic child message such as
 "my profile matches" is not sufficient. The accepted bootstrap is a typed
 result derived from the authoritative task-scoped source and includes the
 source task identity, requested and observed values, and evidence reference.
+
+For a required role, bootstrap binding is valid only for the independently
+observed project-visible application-task identity created or resumed under the
+declared topology. An identity or result from subordinate delegation, optional
+support, or another execution envelope is invalid and cannot be promoted into
+the required handoff.
 
 The authoritative source must expose the identity of the task whose effective
 values it reports. That evidence identity must exactly equal the stable
@@ -346,6 +358,8 @@ minimum fields:
 
 ```yaml
 task_observation:
+  application_project_ref: "<controller-observed project>"
+  visible_in_application_project: true
   requested_title: "<canonical display title>"
   observed_title: "<final read-back display title or null>"
   title_status: verified
@@ -411,6 +425,22 @@ state and the final report contains the evidence required by the invoking
 skill. A missing, stale, or unverified final update leaves the handoff
 `blocked`; it is not a successful completion.
 
+Monitoring is change-driven. Retain one observation lineage per stable task.
+A timeout, silence, or observation identical to the last accepted identity,
+state, and evidence fingerprint remains pending evidence; it must not produce
+a heartbeat, status-only or "continue" message, duplicate request, task
+resumption, overlapping observation, or immediate no-work cycle. Prefer
+event-driven observation. When repeated observation is the only supported
+mechanism, lengthen the interval after unchanged results within the caller's
+authority and deadline, reset it after a material change, and fairly
+interleave independent lineages.
+
+Relay once for a new bootstrap result, state transition, actionable evidence
+fingerprint, authority decision, execution-target change, or terminal report.
+Coalesce facts observed together for the same task. One identity-bound request
+for a missing terminal report is allowed; reconcile its effect before any
+repeat. This policy adds no persisted state or runtime mode.
+
 ## Failure and recovery evidence
 
 When a create, resume, or monitoring operation times out or errors, retain the
@@ -429,6 +459,9 @@ The allowed `prior_effect` values are `applied`, `not-applied`, and `unknown`.
 The allowed `retry_decision` values are `allowed`, `forbidden`, and `blocked`.
 An `unknown` effect can never justify a retry. If the application or monitor
 cannot provide reconciliation, report `retry_decision: blocked` and stop.
+Reconciliation may repeat only the original application-task effect after
+authoritative `not-applied` evidence. It never authorizes a different execution
+topology or promotion of an optional assignment into the required role.
 
 Apply the same read-before-retry rule to an ambiguous title adjustment, but do
 not retry that adjustment. Preserve the task and finalize its title status from

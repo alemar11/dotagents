@@ -93,15 +93,18 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             "validation-assistant",
             "critic-reviewer",
         ):
-            self.assertIn(responsibility, normalized_skill)
             self.assertIn(responsibility, normalized_orchestration)
 
         for mode in ("delegated-support", "serial-fallback", "unavailable", "unknown"):
             self.assertIn(mode, profile)
 
-        self.assertIn("Delegation is not a required topology gate", normalized_skill)
-        self.assertIn("never access the SQLite ledger", normalized_skill)
-        self.assertIn("owns the final candidate HEAD", normalized_skill)
+        self.assertIn("dispatching optional support", normalized_skill)
+        self.assertIn("never access the SQLite ledger", normalized_orchestration)
+        self.assertIn("owns the final candidate commit", normalized_orchestration)
+        self.assertIn(
+            "these conditions do not block the Feature Worker",
+            normalized_orchestration,
+        )
         self.assertIn(
             "never creates another Feature Worker or planner task",
             normalized_orchestration,

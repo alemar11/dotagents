@@ -19,11 +19,14 @@ Its skills are deliberately separated by responsibility:
   table that distinguishes workflow nodes from domain values, persisted
   statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
-  contracts shared by task-managed Feature and Implement runs. They require an
-  explicit, complete role-profile request with no ambient inheritance plus an
-  authoritative, assignment-specific comparison between requested and
-  effective model/reasoning before normal task monitoring. They freeze the
-  expected Git execution target and require the assigned task to verify its
+  contracts shared by task-managed Feature and Implement runs. Explicit
+  invocation authorizes exactly the required user-owned tasks without a second
+  prompt, routes them through the intended ChatGPT application project, and
+  rejects subordinate delegation as a required-role substitute. The contracts
+  also require an explicit, complete role-profile request with no ambient
+  inheritance plus an authoritative, assignment-specific comparison between
+  requested and effective model/reasoning before normal task monitoring. They
+  freeze the expected Git execution target and require the assigned task to verify its
   actual repository, checkout or worktree, remote, and topology-required base
   facts. Saved-project identity and project-root metadata are optional
   diagnostics and never block when absent.
@@ -69,8 +72,11 @@ Its skills are deliberately separated by responsibility:
   verified standalone or stacked PR topology. Its graph owns Feature-level
   scheduling, derives technical execution units and assignment-scoped T-AC
   criteria from each parent Feature plus available Macro context, creates one
-  isolated Sol Feature Worker and one PR per
-  implementation-eligible Feature, and may use bounded delegated support
+  visible orchestrator task in the invoking ChatGPT application project, then
+  one visible isolated Sol Feature Worker task and one PR per
+  implementation-eligible Feature. Fresh runs create those tasks; validated
+  resumes reuse only their exact retained project-visible identities. Implement
+  may use bounded delegated support
   assignments for code analysis, execution-unit assistance, validation, or
   critique when delegation and capacity are observed; otherwise the parent
   Worker continues serially. Implement selects exactly the parent Feature
@@ -94,15 +100,17 @@ Its skills are deliberately separated by responsibility:
   current-head CI check is confirmed failing. Pending CI is allowed; only a
   G-diagnosed infrastructure or flaky failure unrelated to candidate
   correctness may bypass a confirmed failure. The orchestrator centrally
-  monitors hosted review, CI, delivery status, and stack drift while published
-  Feature Workers remain inactive but resumable.
+  monitors hosted review, CI, exact-head state, and stack drift through
+  change-driven observations while published Feature Workers remain inactive
+  but resumable. Required Orchestrator and Worker roles never fall back to
+  subordinate in-task delegation.
   G owns PR publication and pairwise stack linking, while Send remains agnostic
   about whether an explicit PR base participates in a stack. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
-  Final provider readiness comes from the exact-head
-  `g:github-delivery-status` contract; `ready` and
-  `ready-with-manual-action` are accepted without granting Implement any merge,
-  auto-merge, bypass, or queue authority.
+  Final verification uses the focused exact-head publication, CI, review, and
+  stack evidence owned by the workflow. Provider-policy observations remain
+  optional diagnostics and never grant Implement merge, auto-merge, bypass, or
+  queue authority.
   Feature acceptance criteria use stable bracketed IDs rather than Markdown
   checkbox state; Feature Workers may derive T-AC criteria that specialize but
   never replace or weaken F-AC, and bind both to the same final candidate HEAD.
@@ -168,9 +176,11 @@ Its skills are deliberately separated by responsibility:
   indication, and republishes the revised projections when requested. It does
   not rehydrate or repair Implement execution units.
 - task-managed Feature and Implement runs pass their skill-owned profiles to
-  the shared preflight; task creation scope and GitHub mutation scope remain
-  independent. Feature delegation is optional and falls back to serial
-  planner analysis, while the principal planner role remains required.
+  the shared preflight. Explicit invocation authorizes exactly their declared
+  project-visible task topology without a second prompt; task creation scope
+  and GitHub mutation scope remain independent. Feature delegation is optional
+  and falls back to serial planner analysis, while every principal task role
+  remains required.
 - Idea, Feature, and Implement keep local control-plane records separate from
   hosted artifacts and apply one shared portable-content gate immediately
   before each hosted write, including content returned by workers and tools.

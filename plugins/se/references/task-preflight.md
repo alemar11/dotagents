@@ -40,10 +40,12 @@ comparison, and controller identity binding.
 The same ownership split applies to the execution target. This preflight owns
 freezing the expected repository, execution mode, remote, and any
 topology-required checkout or base facts. Task Handoff owns the assigned task's
-post-effect observation and comparison against that target. Application saved
-project identity and project-root metadata may be retained as diagnostics when
-the runtime exposes them, but they are not execution evidence or bootstrap
-requirements.
+post-effect observation and comparison against that target. When the invoking
+topology requires a project-visible task, preflight also freezes the exact
+application project used for routing and requires the resulting task to be
+independently visible in that project. Project identity or project-root
+metadata exposed inside the assigned task remains diagnostic rather than Git
+execution evidence or bootstrap evidence.
 
 The `task controller` is the session that creates or resumes one assigned
 application task, independently observes its stable identity and state, and
@@ -60,15 +62,18 @@ the value comparison before the assigned task exists. Task Handoff owns the
 assigned task's authoritative bootstrap comparison and the controller's
 post-effect identity binding.
 
-An explicit invocation of a task-managed Feature or Implement workflow also
-selects the exact required role profiles declared by that workflow. For every
+An explicit invocation of a task-managed Feature or Implement workflow is the
+user's explicit request for the required user-owned application tasks declared
+by that workflow. It grants `task_creation_authorization` for exactly those
+roles without a second permission prompt unless the user explicitly forbids
+task creation. It also selects the exact required role profiles. For every
 required role, and for every optional role instantiated as its own application
 task, the task controller must actively request the resolved model and
 reasoning on creation and resume. Omitting either value and relying on an
 ambient, inherited, configured, or provider-default profile is prohibited,
 even when the resulting effective values happen to match. This selection
-authorizes only the profiles declared by the invoked skill; it does not permit
-an undeclared model or reasoning substitution.
+authorizes only the roles and profiles declared by the invoked skill; it does
+not permit another task, model, reasoning value, or execution topology.
 
 The invoking skill must pass a reference to its complete task profile and the
 roles required by the selected topology. The preflight verifies the live
@@ -85,6 +90,12 @@ Do not infer permission from a feature description, a title, a previous task,
 or the fact that the current session can access the application. An implicit or
 ambiguous request is `blocked` before any task effect.
 
+For a task-managed Feature or Implement workflow, its explicit invocation is
+that request. Record task creation as `granted` for only the required roles in
+the declared topology and do not ask for a second confirmation. An explicit
+user prohibition overrides the workflow request and blocks the required
+topology.
+
 ### 2. Live application capabilities
 
 Verify the current application runtime immediately before the first task
@@ -100,6 +111,12 @@ the requested topology:
 - let the assigned task inspect and compare its actual Git execution target;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
+
+Only an independently observable user-owned application task associated with
+the frozen application project can satisfy a required application-task role.
+A subordinate in-task delegation, optional support assignment, or other
+non-application execution envelope is not project-visible task evidence and
+never satisfies or substitutes for a required role.
 
 An authoritative task-scoped execution context satisfies effective-profile
 readback when it is accessible to the exact assigned task, identifies that
@@ -128,13 +145,14 @@ profile values, the fixed-profile capability gate has not passed. Stop before
 the task effect instead of creating a task and checking which defaults it
 received afterward.
 
-Saved-project routing and execution-target verification are separate concerns.
-The controller may use an application project to route task creation, but the
-resulting `project_identity` or project-root metadata is diagnostic only. The
-assigned task verifies the target that can affect work: repository identity,
-checkout or worktree, remote, and any base facts required by the
-skill-owned topology. Missing project metadata never triggers reconciliation
-or blocks an otherwise verified target.
+Application-project routing, task visibility, and Git execution-target
+verification are separate concerns. When project-visible tasks are required,
+the controller must route creation through the frozen application project and
+independently observe the resulting task in that project. The assigned task
+then verifies the target that can affect work: repository identity, checkout
+or worktree, remote, and any base facts required by the skill-owned topology.
+Missing project metadata inside the assigned task never substitutes for or
+invalidates independently observed project routing and task visibility.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or the exact assigned task
@@ -247,13 +265,13 @@ Record these decisions independently:
   explicit invoking SE request. These writes are implicitly authorized by the
   invocation; no second confirmation is required.
 
-Task creation and GitHub scope remain separate. A task permission does not
-broaden the GitHub mutation scope, and the GitHub mutation scope does not
-authorize creating or monitoring an application task. The explicit SE
-invocation supplies the in-scope GitHub write authority; the workflow must
-still verify exact repository, operation, identity, and read-after-write
-evidence. Keep bounded title-adjustment authority separately visible as
-described below.
+Task creation and GitHub mutation remain separate scopes even when the same
+explicit invocation independently grants both. Task authority never broadens
+GitHub mutation scope, and GitHub authority never supplies task authority. The
+invoking skill's declared topology bounds task authority; the selected issues
+and delivery contract bound GitHub authority. The workflow must still verify
+exact repository, operation, identity, and read-after-write evidence. Keep
+bounded title-adjustment authority separately visible as described below.
 
 When an explicit invocation authorizes creation of a task whose skill-owned
 profile declares a canonical title, the bounded correction of that same title
@@ -316,6 +334,8 @@ preflight:
     goals: available
     effective_mode: parallel-analysis
   target:
+    application_project_ref: "<controller-observed project>"
+    project_task_visibility: required
     repository_identity: "<independently observed repository>"
     remote_identity: "<independently observed remote>"
     execution_mode: "<exact-local-checkout or isolated-worktree>"
@@ -344,6 +364,14 @@ return the smallest recovery input and stop before the affected role-owned
 effect. It must not claim that a task is being monitored or completed until
 the required live evidence is available.
 
+If a required project-visible application task cannot be created, resumed,
+independently observed in its project, or monitored, use `blocker:
+unsupported-runtime`. Do not launch, continue, relabel, or promote a
+subordinate delegation, optional support assignment, or other execution
+envelope as the missing role. Reconciliation may retry only the original
+application-task effect after authoritative `not-applied` evidence; it never
+authorizes another execution topology.
+
 The same fail-closed rule applies when the exact resolved model and reasoning
 cannot be actively requested. Never omit a required profile value to obtain a
 task receipt and never treat a coincidentally matching inherited profile as a
@@ -358,10 +386,12 @@ present bootstrap evidence identity that differs from the controller-observed
 assigned task is `task-identity-mismatch`, and a present execution-target
 difference is `execution-target-mismatch`.
 
-Saved-project identity and project-root metadata are outside the fail-closed
-gate. Record them only as optional diagnostics when present. Their absence does
-not authorize inference, but it also does not require a second read, project
-inventory refresh, replacement task, or blocked outcome.
+Saved-project identity and project-root metadata exposed inside the assigned
+task are outside the fail-closed gate. Record them only as optional diagnostics
+when present. Their absence does not weaken the controller's required project
+routing and visibility evidence, authorize inference, or require a second
+task-local read, project inventory refresh, replacement task, or blocked
+outcome.
 
 A difference between the task controller's profile and the assigned role's
 requested profile is not a mismatch. Only the exact assigned task's

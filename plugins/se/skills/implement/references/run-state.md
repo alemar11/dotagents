@@ -19,7 +19,7 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.7.0` |
+| CLI | `3.7.1` |
 | Runtime contract | `3.2.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
@@ -257,7 +257,7 @@ runtime-contract, envelope, or CLI-version change.
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
 explicit state registry and capability readback use runtime-contract version
-`3.2.0`; the shipped CLI version is `3.7.0`. The contract bump intentionally
+`3.2.0`; the shipped CLI version is `3.7.1`. The contract bump intentionally
 rejects older active ledgers that cannot prove the new first-publication
 authority handoff; reset is required rather than reconstructing that evidence.
 The orchestrator remains

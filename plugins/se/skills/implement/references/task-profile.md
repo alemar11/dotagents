@@ -34,24 +34,41 @@ assignment state and live Feature Worker or path-claim modes.
         topology: bounded-feature-worker-support
     topology: orchestrator-with-feature-workers-and-optional-support
 
-The explicit se:implement invocation selects these role profiles as required
-runtime inputs. Actively request both the resolved model and reasoning for the
-orchestrator, every Feature Worker, and any optional support role instantiated
-as its own application task. Never omit either value or rely on the invoking
-session, application, project, host, or provider default. The orchestrator is
-always requested as `gpt-5.6-sol` with `medium` reasoning; each Feature
-Worker uses the assignment-specific reasoning resolved below.
+The explicit se:implement invocation requests and authorizes the required
+user-owned application-task hierarchy without a second permission prompt. The
+orchestrator and every Feature Worker must be separate tasks independently
+visible in the ChatGPT application project: associate the orchestrator with the
+invoking project and each Worker with the project for its target repository.
+Subordinate in-task delegation and optional support never satisfy either
+required role. Project metadata inside an assigned task remains diagnostic;
+the controller-observed project association and actual Git target provide the
+required routing and execution evidence.
 
-The invoking task controller creates or resumes the orchestrator,
-independently observes that exact task's stable identity, and verifies the
-orchestrator's bootstrap identity binding. The orchestrator first reads its own
-authoritative task-scoped execution context, performs the shared assigned-task
-bootstrap self-check, and never creates or resumes another orchestrator for
-the same run. After bootstrap, the orchestrator becomes the task controller
-for every Feature Worker: it requests each Worker profile, independently
-observes the stable Worker identity, and verifies the Worker's authoritative
-self-bootstrap before implementation. A controller's own profile is never
-compared with the assigned child profile.
+For a fresh run, create exactly one new orchestrator and one new Feature Worker
+per selected Feature. A validated resume reuses only the exact previously
+bound project-visible identities. Create a not-yet-created role only after
+authoritative evidence proves no prior creation effect was applied. A missing
+or unverifiable retained identity is `unsupported-runtime`; never create a
+replacement role task.
+
+The invocation also selects these role profiles as required runtime inputs.
+Actively request both the resolved model and reasoning for the orchestrator,
+every Feature Worker, and any optional support role instantiated as its own
+application task. Never omit either value or rely on the invoking session,
+application, project, host, or provider default. The orchestrator is always
+requested as `gpt-5.6-sol` with `medium` reasoning; each Feature Worker uses
+the assignment-specific reasoning resolved below.
+
+The invoking task controller creates the fresh-run orchestrator or resumes the
+exact retained orchestrator identity, independently observes that task's stable
+identity, and verifies its bootstrap identity binding. The orchestrator first
+reads its own authoritative task-scoped execution context, performs the shared
+assigned-task bootstrap self-check, and never creates or resumes another
+orchestrator for the same run. After bootstrap, the orchestrator becomes the
+task controller for every Feature Worker: it requests each Worker profile,
+independently observes the stable Worker identity, and verifies the Worker's
+authoritative self-bootstrap before implementation. A controller's own profile
+is never compared with the assigned child profile.
 
 The orchestrator coordinates one or more authoritative parent Feature semantic
 contracts and their verified sibling context, records each Macro projection as
@@ -108,11 +125,13 @@ difference is `execution-target-mismatch`. Apply the same rule to optional
 support only when it is instantiated as its own application task; subordinate
 in-task delegation continues to use the delegation evidence below.
 
-There is no model or reasoning fallback for the required orchestrator or
-Feature Worker role. If the live runtime cannot actively request the selected
-profile, observe the stable assigned-task identity, or receive the task's
-authoritative bootstrap result, stop with unsupported-runtime before
-role-owned effects or monitoring.
+There is no model, reasoning, or required execution-topology fallback for the
+orchestrator or Feature Worker role. If the live runtime cannot create or
+resume the project-visible task, actively request the selected profile,
+observe the stable assigned-task identity, or receive the task's authoritative
+bootstrap result, stop with `unsupported-runtime` before role-owned effects or
+monitoring. Optional Feature Worker support remains subordinate and cannot be
+promoted into either required role.
 
 An Orchestrator or Feature Worker already running from a valid handoff applies
 only the shared assigned-task bootstrap for its own role. It does not rerun the

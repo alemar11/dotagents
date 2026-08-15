@@ -359,6 +359,16 @@ uses bounded G-owned observations and never asks an inactive Feature Worker to
 poll provider state. A pending observation returns to scheduling so newly
 unblocked Feature Workers and other PR observations can progress.
 
+Retain one delivery lineage per PR, exact HEAD, and hosted-review request.
+Monitoring is change-driven: a timeout, silence, or observation with the same
+provider identity, state, and evidence fingerprint remains pending and does
+not cause a duplicate request, status message, Worker resumption, overlapping
+observation, or immediate no-work scheduling cycle. Prefer event-driven
+observation; when only repeated observation is supported, lengthen its interval
+after unchanged results, reset after material change, and fairly interleave
+independent PR lineages. Coalesce facts observed together for the same PR and
+HEAD.
+
 After `candidate-published`, when local validation and the published body are
 stable, mark the PR ready through the G-owned workflow and independently
 observe the transition. Hosted CI and provider review may remain pending and
@@ -421,9 +431,10 @@ passed, or the repository reports that no checks are configured; pending,
 failing, stale, ambiguous, or incomplete CI evidence is not terminal. Bind
 review and CI observations to the exact published full HEAD. One bounded wait
 may return a pending state at its caller-owned deadline; when continued
-monitoring remains authorized, the orchestrator returns to schedule and
-resumes through later bounded waits without posting a duplicate request or
-resetting the existing lineage.
+monitoring remains authorized, the orchestrator returns to schedule only when
+runnable work or materially new evidence exists. Otherwise it retains the
+existing lineage and resumes observation later without posting a duplicate
+request, resetting the lineage, or producing a status-only control message.
 
 When hosted review and CI are clean but complete current-head validation is
 missing or stale, resume the same Feature Worker through `implement-validate`

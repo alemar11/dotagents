@@ -142,7 +142,13 @@ surface.
   unavailable, unknown, or capacityless. Support assignments may return
   bounded evidence or scoped changes, but never own a Feature member, final
   candidate, PR, Feature Plan Set, GitHub mutation, or ledger state. Do not run
-  overlapping writes in one worktree.
+  overlapping writes in one worktree. Preserve the separate required-role
+  topology: explicit Implement invocation authorizes the required hierarchy
+  without a second prompt. A fresh run creates one project-visible user-owned
+  application-task orchestrator and one project-visible Worker per Feature; a
+  validated resume reuses only exact retained identities. Optional or
+  subordinate delegation can never replace either required role; unavailable
+  or unverifiable required tasks fail closed before role-owned effects.
 - Keep the Implement ledger a minimal recovery index, not a second workflow
   engine. Preserve five tables, including exclusive active Feature claims,
   SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
