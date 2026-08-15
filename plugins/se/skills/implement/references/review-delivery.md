@@ -11,11 +11,16 @@ modes, and output labels.
 ## Candidate boundary
 
 The Feature Worker operates only in its application-managed worktree. Before
-first publication, after it implements every derived execution unit for one
-Feature member, validates the complete outcome, and commits, freeze one
-candidate with exact repository, base branch, base SHA, head branch, and full
-head SHA. The worktree must be clean and pinned to that candidate before native
-review. Do not create a reviewer task or a second review worktree.
+first publication, the orchestration-owned pre-candidate convergence integrates
+writes, resolves its conditional advisory critic pass, and crosses the stable
+base/prerequisite barrier. Commit and freeze that coherent tree with exact
+repository, base branch, base SHA, head branch, and full head SHA, then run
+complete Feature validation while the worktree remains clean and pinned to
+that candidate. Enter this boundary only after binding the complete validation
+evidence to that unchanged SHA. A source, base, prerequisite, or topology
+change invalidates that binding and returns the Worker to
+`implement-validate`. Do not create a reviewer task or a second review
+worktree.
 
 After verified first-PR publication readback, a hosted finding, CI repair,
 evidence repair, rebase, or parent drift may produce a published repair
@@ -134,6 +139,11 @@ against the declared base using its resolved Sol reasoning level. The required
 outcome is an independently reported exact-HEAD finding set or clean result;
 the skill does not encode an application operation or interface.
 
+The earlier advisory critic and every cheap, focused, gap-driven, or parallel
+pre-candidate check are implementation evidence only. They never satisfy,
+replace, narrow, or authorize this native-review gate, and they do not alter its
+exact-HEAD launch, interruption recovery, or terminal-result rules.
+
 Inspect the live review capability's supported invocation modes before each
 cycle. Use the smallest supported base-scoped review mode without optional
 custom instructions or unrelated strict-configuration overrides. Combine
@@ -175,10 +185,10 @@ unavailable review evidence until reconciled.
 
 Bind every finding and clean result to the exact candidate SHA. Before the
 first PR is published, the Feature Worker decides whether a finding is
-actionable, owns every fix, reruns validation, and creates a new candidate. Any
-new pre-publication HEAD invalidates the previous native-review evidence; run a
-new native review cycle in the same Feature Worker session against the new
-exact SHA.
+actionable, owns every fix, reruns complete candidate-bound validation, and
+creates a new candidate. Any new pre-publication HEAD invalidates the previous
+validation and native-review evidence; run a new native review cycle in the
+same Feature Worker session against the new exact SHA.
 
 Native review is only the first-publication gate. Exact readback of the first
 published PR identity and HEAD transfers independent-review authority permanently

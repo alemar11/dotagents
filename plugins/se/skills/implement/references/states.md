@@ -74,7 +74,7 @@ the whole run, one assignment, or the current invocation.
 | `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
 | `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
 | `worker-bootstrap` | Assignment | Create or resume the Feature Worker, accept an initial detached or attached checkout at the verified exact base, then establish and bind its Feature branch before content writes. |
-| `implement-validate` | Assignment | Derive technical units and T-AC, implement and validate the Feature, or run complete final validation for a published repair; an unchanged published HEAD may proceed directly to final verification. |
+| `implement-validate` | Assignment | Derive technical units and T-AC; implement and stabilize the first unpublished draft through cheap checks, conditional advisory critique, integrated repair, and complete candidate-bound validation; or run complete final validation for a published repair. An unchanged published HEAD may proceed directly to final verification. |
 | `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
 | `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence; route an unpublished candidate to native review and a published repair directly to PR update. |
 | `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker before first PR publication. |
@@ -219,10 +219,10 @@ not stored as ledger statuses.
 | Feature Worker | inactive but resumable | The Worker is preserved after candidate publication, performs no writes, and never polls its PR. |
 | Path claim | held | The assignment exclusively owns its normalized write envelope. |
 | Path claim | released | The assignment has no write authority; reacquire before repair or rebase. |
-| Delegation | `delegated-support` | A bounded helper task and usable result were independently observed. |
-| Delegation | `serial-fallback` | The Feature Worker performed the same support work itself. |
-| Delegation | `unavailable` | The runtime could not provide optional delegation. |
-| Delegation | `unknown` | Delegation evidence was insufficient and no helper was claimed. |
+| Delegation | `delegated-support` | At least one bounded helper task and usable result were independently observed and integrated. |
+| Delegation | `serial-fallback` | No helper result was integrated and the Feature Worker performed a selected support responsibility itself. |
+| Delegation | `unavailable` | The runtime could not provide optional delegation, and no support responsibility was selected or performed. |
+| Delegation | `unknown` | Delegation evidence was insufficient, no helper was claimed, and no support responsibility was selected or performed. |
 
 ## Output labels
 

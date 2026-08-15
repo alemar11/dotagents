@@ -87,10 +87,14 @@ Its skills are deliberately separated by responsibility:
   target repository; otherwise Implement uses that repository's provider
   default. The orchestrator refreshes and freezes the selected branch's exact
   upstream tip before each root worker wave and verifies every isolated
-  worktree against that base before implementation begins. The Worker performs
-  exact-HEAD in-session review before first publication; after exact readback
-  of the first published PR, hosted review becomes authoritative and later fixes
-  update the same PR without rerunning native review. The workflow selectively
+  worktree against that base before implementation begins. Before its first
+  candidate, the Worker uses cheap changed-surface checks and a conditional
+  read-only invariant critic for materially risky drafts, consolidates that
+  pass before repairing it coherently, and defers complete validation until the
+  source and prerequisite HEADs are stable. The Worker then performs exact-HEAD
+  in-session review before first publication; after exact readback of the first
+  published PR, hosted review becomes authoritative and later fixes update the
+  same PR without rerunning native review. The workflow selectively
   invalidates dependent evidence, handles stack reconciliation, and requires
   complete validation plus clean hosted review on the same final exact HEAD.
   Every same-repository Feature dependency is mandatory stack intent, while a

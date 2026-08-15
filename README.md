@@ -115,9 +115,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   reuses only those exact task identities. Subordinate in-task delegation never
   substitutes for either required role. Implement tolerates and
   reports partial or absent Macro Task projections, derives T-AC criteria without
-  weakening F-AC, refreshes exact starting-branch tips, and delivers one reviewed
-  PR per Feature. Same-repository Feature dependencies become stacked PR intent;
-  cross-repository dependencies remain scheduling-only. The orchestrator uses
+  weakening F-AC, conditionally consolidates material pre-candidate risks before
+  complete validation, refreshes exact starting-branch tips, and delivers one
+  reviewed PR per Feature. Same-repository Feature dependencies become stacked
+  PR intent; cross-repository dependencies remain scheduling-only. The orchestrator uses
   change-driven observations for exact-head publication, CI, hosted review, and
   stack evidence, while published Workers remain inactive but resumable. Provider
   policy is diagnostic only, and merge, auto-merge, bypass, queue, release, and

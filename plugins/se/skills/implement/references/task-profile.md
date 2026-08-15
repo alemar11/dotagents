@@ -141,9 +141,17 @@ is compared separately with the frozen handoff. Its controller verifies
 identity binding and does not duplicate the raw task-scoped profile read.
 
 Delegation is an optional capability of the Feature Worker topology. Record
-one effective mode: `delegated-support` when bounded helpers were dispatched
-and observed, `serial-fallback` when the parent performed the same support
-work, `unavailable` when the runtime could not provide delegation, or `unknown`
-when capability evidence was insufficient and no helper was claimed. A
-missing optional capability never blocks the required orchestrator or Feature
-Worker; the parent continues serially.
+exactly one effective mode using the first matching condition:
+
+- `delegated-support` when at least one bounded helper task and usable result
+  were independently observed and integrated;
+- `serial-fallback` when no helper result was integrated and the parent
+  performed a selected support responsibility itself, including after zero
+  capacity or a launched helper without a usable result;
+- `unavailable` when the runtime could not provide delegation and no support
+  responsibility was selected or performed;
+- `unknown` when capability evidence was insufficient, no helper was claimed,
+  and no support responsibility was selected or performed.
+
+A missing optional capability never blocks the required orchestrator or
+Feature Worker; the parent continues serially.

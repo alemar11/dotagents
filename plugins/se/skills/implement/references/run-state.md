@@ -19,7 +19,7 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.7.1` |
+| CLI | `3.8.0` |
 | Runtime contract | `3.2.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
@@ -84,6 +84,9 @@ Keep only five tables:
 
 Do not store plan bodies, prompts, messages, findings, logs, arbitrary
 JSON, model/reasoning profiles, code state, or Feature Worker technical state.
+The pre-candidate risk decision, critic pass and findings, cheap or gap-driven
+checks, and convergence barrier remain transient Worker technical state under
+`active @ worker-bootstrap`; they add no ledger field or checkpoint.
 
 The caller's optional `starting_branch` is transient invocation input scoped
 to one repository, not a new run field or durable configuration value. For a
@@ -257,7 +260,7 @@ runtime-contract, envelope, or CLI-version change.
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
 explicit state registry and capability readback use runtime-contract version
-`3.2.0`; the shipped CLI version is `3.7.1`. The contract bump intentionally
+`3.2.0`; the shipped CLI version is `3.8.0`. The contract bump intentionally
 rejects older active ledgers that cannot prove the new first-publication
 authority handoff; reset is required rather than reconstructing that evidence.
 The orchestrator remains

@@ -10,6 +10,7 @@ TASK_PROFILE = Path(__file__).resolve().parents[1] / "references/task-profile.md
 TASK_HANDOFF = Path(__file__).resolve().parents[3] / "references/task-handoff.md"
 RUN_STATE = Path(__file__).resolve().parents[1] / "references/run-state.md"
 STATES = Path(__file__).resolve().parents[1] / "references/states.md"
+OPENAI = Path(__file__).resolve().parents[1] / "agents/openai.yaml"
 
 
 class ReviewDeliveryContractTests(unittest.TestCase):
@@ -110,6 +111,112 @@ class ReviewDeliveryContractTests(unittest.TestCase):
             normalized_orchestration,
         )
         self.assertIn("outside the implementation ledger", normalized_orchestration)
+
+    def test_pre_candidate_convergence_batches_risk_without_weakening_review(self) -> None:
+        skill = " ".join(SKILL.read_text(encoding="utf-8").split())
+        orchestration = " ".join(ORCHESTRATION.read_text(encoding="utf-8").split())
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        run_state = " ".join(RUN_STATE.read_text(encoding="utf-8").split())
+        states = " ".join(STATES.read_text(encoding="utf-8").split())
+        openai = " ".join(OPENAI.read_text(encoding="utf-8").split())
+        task_profile = " ".join(TASK_PROFILE.read_text(encoding="utf-8").split())
+
+        for required in (
+            "converging a first unpublished candidate",
+            "implement-validate, plan-question",
+        ):
+            self.assertIn(required, skill)
+
+        for required in (
+            "Pre-candidate convergence",
+            "transient Worker behavior under the existing `active @ worker-bootstrap` pair",
+            "adds no workflow node, checkpoint, ledger field, task role, or review authority",
+            "does not run for a verified published repair governed by hosted review",
+            "cheapest deterministic static or focused checks",
+            "do not replace complete Feature validation",
+            "Do not trigger the pass from Worker reasoning level, diff size, or available helper capacity alone",
+            "skip the critic rather than adding a redundant review",
+            "existing F-AC/T-AC matrix as the invariant checklist",
+            "keep it read-only and advisory",
+            "Prefer the existing `critic-reviewer` support responsibility",
+            "completed bounded finding set for that pass",
+            "not a claim of exhaustive findings",
+            "Partial helper relays do not trigger piecemeal repairs",
+            "serial challenge without blocking the assignment",
+            "triages the whole consolidated set before repairing",
+            "focused gap-driven checks",
+            "When an actually launched helper produces no usable result, the Feature Worker performs the equivalent support work",
+            "never use `unavailable` or `unknown` to reconcile that attempt",
+            "mixed helper set remains `delegated-support` when any usable result was integrated",
+            "`serial-fallback` applies only when none was integrated and the Feature Worker performed a selected support responsibility",
+            "unconsumed current or future helper result is irrevocably outside the candidate",
+            "worktree readback that accounts for every residual write",
+            "isolated from the candidate worktree and every validation-relevant output, cache, lock, device, database, and external state",
+            "assignment's frozen base and prerequisite HEAD vector",
+            "bootstrap snapshot for a standalone or stack-root assignment",
+            "commit and freeze the coherent source tree",
+            "One complete pass is the normal target, not a limit",
+            "same frozen candidate and uses isolated outputs, caches, locks, and external state",
+        ):
+            self.assertIn(required, orchestration)
+
+        for required in (
+            "Commit and freeze that coherent tree",
+            "complete Feature validation while the worktree remains clean and pinned to that candidate",
+            "never satisfy, replace, narrow, or authorize this native-review gate",
+            "Any new pre-publication HEAD invalidates the previous validation and native-review evidence",
+            "run a new native review cycle in the same Feature Worker session against the new exact SHA",
+        ):
+            self.assertIn(required, reference)
+
+        self.assertIn(
+            "conditional advisory critique, integrated repair, and complete candidate-bound validation",
+            states,
+        )
+        self.assertIn(
+            "pre-candidate risk decision, critic pass and findings, cheap or gap-driven checks, and convergence barrier remain transient Worker technical state",
+            run_state,
+        )
+        self.assertIn("risk-gated pre-candidate convergence", openai)
+        self.assertIn("integrate actionable findings", openai)
+        self.assertIn(
+            "bind complete validation and native review to its exact SHA",
+            openai,
+        )
+        self.assertIn(
+            "`delegated-support` when at least one bounded helper task and usable result were independently observed and integrated",
+            task_profile,
+        )
+        self.assertIn(
+            "`serial-fallback` when no helper result was integrated and the parent performed a selected support responsibility itself",
+            task_profile,
+        )
+        self.assertIn(
+            "`unavailable` when the runtime could not provide delegation and no support responsibility was selected or performed",
+            task_profile,
+        )
+        self.assertIn(
+            "`unknown` when capability evidence was insufficient, no helper was claimed, and no support responsibility was selected or performed",
+            task_profile,
+        )
+        self.assertIn(
+            "At least one bounded helper task and usable result were independently observed and integrated",
+            states,
+        )
+        self.assertIn(
+            "record exactly one effective mode using the task-profile precedence",
+            orchestration,
+        )
+        self.assertIn(
+            "`delegated-support` when any usable helper result was integrated, otherwise `serial-fallback` when the Feature Worker performed the selected support",
+            orchestration,
+        )
+        prompt_value = next(
+            line.partition(": ")[2].strip().strip('"')
+            for line in OPENAI.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("default_prompt: ")
+        )
+        self.assertLessEqual(len(prompt_value), 1024)
 
     def test_pr_delivery_derives_closure_from_verified_existing_projections(self) -> None:
         reference = REFERENCE.read_text(encoding="utf-8")

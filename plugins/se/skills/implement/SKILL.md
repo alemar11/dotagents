@@ -188,10 +188,11 @@ and uses change-driven observation. After its bounded handoff, each Worker
 becomes inactive but resumable; contact it only for new actionable evidence.
 
 Load orchestration when interpreting plans, deriving execution units,
-scheduling workers, resolving plan questions, dispatching optional support, or
-calculating delivery topology. Load review-delivery at candidate review,
-publication, or hosted monitoring. Load run-state before preparing, resuming,
-checkpointing, or resetting the ledger.
+scheduling workers, resolving plan questions, converging a first unpublished
+candidate, dispatching optional support, or calculating delivery topology.
+Load review-delivery at candidate review, publication, or hosted monitoring.
+Load run-state before preparing, resuming, checkpointing, or resetting the
+ledger.
 Use [states.md](references/states.md) as the canonical human-readable meaning
 of every state namespace and persisted pair.
 
@@ -200,7 +201,7 @@ of every state namespace and persisted pair.
 | Source nodes | Canonical condition owner |
 | --- | --- |
 | intake, source-preflight, runtime-preflight, prepare-run | This skill's input invariant and shared contracts |
-| schedule, delivery-gate, worker-bootstrap, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
+| schedule, delivery-gate, worker-bootstrap, implement-validate, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
 | candidate, native-review, review-decision, publish-pr, stack-reconcile, candidate-published, delivery-monitor, final-verify | review-delivery.md |
 | deferred, complete, blocked | This skill's terminal definitions |
 
@@ -219,7 +220,7 @@ workflow transitions.
 | schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
 | delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
 | worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified | candidate, final-verify, plan-question, assignment-blocked, blocked | durable, hosted | none |
+| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified; implementation and validation converge under Worker ownership | candidate, final-verify, plan-question, assignment-blocked, blocked | durable, hosted | none |
 | plan-question | decision | a semantic conflict requires user authority because no contract-preserving implementation exists | schedule, assignment-deferred, blocked | none | none |
 | candidate | validation | Feature Worker reports a committed candidate HEAD with the required initial or published-repair evidence | native-review, publish-pr, assignment-blocked, blocked | read, durable | none |
 | native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |

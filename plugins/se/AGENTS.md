@@ -340,6 +340,12 @@ surface.
 - Validate Implement's minimal durable PR-body projection, exclusion of routine
   execution counts, preservation of external template/author content, and
   exact closure-intent readback.
+- Validate pre-candidate convergence inside `implement-validate`: risk-based
+  critic selection, optional serial fallback, one completed consolidated set
+  per pass, coherent repair, gap-driven checks, frozen-base reconciliation,
+  isolated parallel validation, and complete candidate-bound validation. Keep
+  the critic advisory, add no workflow or ledger state, and never weaken the
+  mandatory exact-HEAD native-review gate or its invalidation rules.
 - Validate native review's minimal supported fallback, interrupted-stream
   reconciliation against the same exact candidate without duplicate review,
   and publication from the exact re-observed Feature Worker worktree rather
