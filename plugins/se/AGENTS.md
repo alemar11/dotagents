@@ -308,6 +308,11 @@ surface.
 
 ## Validation
 
+- Follow the repository testing rule: Python tests must exercise executable
+  behavior or structured always-loaded metadata. Never assert Markdown wording,
+  heading names, table layout, section placement, or moved prose. Use a bounded
+  forward-model check when semantic workflow behavior cannot be established by
+  executable tests or structured validation.
 - Parse the plugin manifest as JSON.
 - Validate the Idea skill front matter and UI metadata, canonical references,
   explicit-only invocation, and independent hosted-output boundary.
