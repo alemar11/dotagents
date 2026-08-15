@@ -38,6 +38,7 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `g:send` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
+| `g:versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
 | `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 
 SE is the repository's software-delivery workflow plugin. It turns ideas into
@@ -68,6 +69,7 @@ knowledge, and audits active work:
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, or pg_durable patterns. |
+| `plugins-reload` | Explicitly refresh the repo-local G and SE plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
@@ -209,7 +211,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -246,6 +248,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill focus \
   --skill study \
   --skill postgres \
+  --skill plugins-reload \
   --skill skill-audit \
   --skill swift-api-design \
   --skill swift-docc

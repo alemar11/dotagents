@@ -1,0 +1,8 @@
+interface:
+  display_name: "Plugins Reload"
+  short_description: "Refresh local G and SE plugin caches"
+  brand_color: "#0D9488"
+  default_prompt: "Use $plugins-reload to refresh the repo-local G and SE plugins after validating source changes."
+
+policy:
+  allow_implicit_invocation: false
