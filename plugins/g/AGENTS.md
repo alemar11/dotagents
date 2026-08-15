@@ -70,6 +70,9 @@ unversioned, or belongs to another repository.
 
 ## Validation
 
+- Do not test Markdown wording, headings, table shape, section placement, or
+  moved prose. Python tests protect executable provider behavior; validate
+  bundled-skill metadata with the canonical metadata validator.
 - Use the project-scoped guide for tests and artifact rebuilds; do not execute
   maintenance source as the normal runtime.
 - For bundled-skill changes, validate the narrow workflow contract and use

@@ -10,8 +10,6 @@ from types import ModuleType
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 ASSET = SKILL_ROOT / "assets" / "resolve_release_version.py"
-REFERENCE = SKILL_ROOT / "references" / "github-actions.md"
-SKILL = SKILL_ROOT / "SKILL.md"
 
 
 def load_resolver() -> ModuleType:
@@ -141,47 +139,6 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         source = ASSET.read_text(encoding="utf-8")
         self.assertIn("Review the exact resolved tag above", source)
         self.assertNotIn("Run **Release version", source)
-
-    def test_reference_defines_one_approval_gated_controller(self) -> None:
-        reference = REFERENCE.read_text(encoding="utf-8")
-        self.assertIn("`.github/workflows/release-version.yml`", reference)
-        self.assertNotIn("release-version-dry-run.yml", reference)
-        self.assertNotIn("release-version-apply.yml", reference)
-        self.assertIn("name: Create release tag", reference)
-        self.assertIn("resolver API 0.2.2", reference)
-        self.assertIn(
-            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-            reference,
-        )
-        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.2"', reference)
-        self.assertIn("name: release-tag-approval", reference)
-        self.assertIn("deployment: false", reference)
-        self.assertIn("Approve ${{ needs.plan.outputs.tag }}", reference)
-        self.assertIn("final mutation job separately exposes", reference)
-        self.assertIn("pull-requests: write", reference)
-        self.assertIn("controller is application-code blind", reference)
-        self.assertIn("fresh provider state", reference)
-
-    def test_reference_defines_reusable_publisher_and_manual_recovery(self) -> None:
-        reference = REFERENCE.read_text(encoding="utf-8")
-        skill = SKILL.read_text(encoding="utf-8")
-        self.assertIn("## Reusable publisher contract", reference)
-        self.assertIn("workflow_call:", reference)
-        self.assertIn("workflow_dispatch:", reference)
-        self.assertIn("tag:", reference)
-        self.assertIn("source_sha:", reference)
-        self.assertIn("uses: ./.github/workflows/release.yml", reference)
-        self.assertIn("source_sha: ${{ needs.final.outputs.source_sha }}", reference)
-        self.assertIn("name: Publish tagged release", reference)
-        self.assertIn("ref: ${{ needs.resolve.outputs.tag }}", reference)
-        self.assertIn("existing-final", reference)
-        self.assertIn("Do not add `on.push.tags`", reference)
-        self.assertIn("Do not invoke the publisher with `gh workflow run`", reference)
-        self.assertIn("Do not grant `actions: write`", reference)
-        self.assertNotIn("gh workflow run <publish-workflow>.yml", reference)
-        self.assertIn("reusable-publisher and", skill)
-        self.assertIn("manual-recovery contracts", skill)
-
 
 if __name__ == "__main__":
     unittest.main()
