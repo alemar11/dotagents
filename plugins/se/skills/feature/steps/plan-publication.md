@@ -42,7 +42,8 @@ publish. Preview is valid only when explicitly requested.
 For preview, freeze the complete Feature Plan Set, its Feature registry, every
 local Macro Task registry, and all proposed parent/child projections as local
 report data and do not inspect hosted state for a new source. For publish,
-load the shared G dependency preflight and apply
+load the shared
+[G dependency preflight](../../../references/codex-dependency-preflight.md) and apply
 [hosted-content-safety.md](../../../references/hosted-content-safety.md)
 immediately before every hosted write.
 

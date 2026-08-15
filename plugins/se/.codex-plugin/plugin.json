@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "description": "Turn ideas into clear Feature plans, deliver them through reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -21,8 +21,8 @@
     "websiteURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $se:learn to maintain durable repository knowledge, or $se:idea to save a proposal for later planning.",
-      "Use $se:feature to turn related requests into clear Feature issues and Macro Tasks, always attempt their native GitHub dependency projections without making provider failure a semantic gate, then delegate minimal optional issue labels and type without writing code.",
-      "Use $se:implement to create or resume its exact required visible project tasks and deliver planned Features through reviewed pull requests, or $se:audit to observe active SE work without changing it."
+      "Use $se:feature to turn related requests into Feature issues and Macro Tasks without writing code.",
+      "Use $se:implement to deliver a planned Feature through visible project tasks and reviewed pull requests."
     ],
     "brandColor": "#BE185D"
   }

@@ -47,83 +47,24 @@ projections.
 
 ## Application task, delegation, and goal
 
-For a task-managed run, load the skill-owned task profile, shared task
-preflight, and shared task handoff before creating, resuming, or monitoring the
-planner task. The application task is an execution envelope for the current
-planning run; it is not a Feature graph node.
+For a task-managed run, read
+[task-profile.md](references/task-profile.md), the shared
+[task preflight](../../references/task-preflight.md), and the shared
+[task handoff](../../references/task-handoff.md) before creating, resuming, or
+monitoring the planner.
+The task profile owns the required planner and optional analyst roles, their
+model/reasoning profiles, and topology selection. The shared task preflight and
+handoff own capability and recovery gates plus typed bootstrap, identity, and
+execution-target verification. Apply all three contracts in full; never rely
+on ambient profile inheritance or create a replacement after an identity,
+profile, or execution-target mismatch.
 
-The invoking task controller creates or resumes exactly one planner,
-independently observes its stable task identity, and binds the planner's
-structured bootstrap result to that identity. A planner already started from
-that handoff reads its own authoritative task-scoped execution context and
-performs the shared assigned-task bootstrap self-check before Feature analysis
-or publication. It does not create or resume another planner task. The
-controller's own model or reasoning may differ from the planner's; only the
-exact planner task's self-observed values are compared with the planner
-profile.
-
-The planner is required. Read-only analysis-worker and critic-analyst roles
-are optional capability-conditioned roles. When delegation is available, the
-planner may dispatch bounded workers with non-overlapping analytical
-responsibilities. When it is unavailable, the planner performs the same
-analysis serially. Delegation unavailability never changes the plan contract
-and never blocks planning.
-
-The planner must use the invoking session's exact local repository checkout
-and local environment. It must not create or use a Git worktree, isolated
-checkout, or task fork. Saved-project identity and project-root metadata are
-optional diagnostics, not bootstrap gates. If the Git execution target cannot
-be independently verified, stop before creating, resuming, or monitoring the
-task.
-
-When goal tools are available, create or adopt one goal for the whole Feature
-Plan run after the task preflight is ready. Keep that goal active while the
-task waits for the user's question batch. Complete it only after the plan is
-published or an explicitly requested preview is complete. Do not mark the goal
-blocked merely because the plan is awaiting user input; the plan run-state
-owns awaiting-user-input separately. If goal tools are unavailable, preserve
-the same objective in the task report and continue.
-
-The shared task preflight must verify required task creation, stable
-task-identity observation, assigned-task bootstrap, Git execution-target
-observation, monitoring, and relay capabilities. After task identity readback,
-the shared handoff must bind the planner's authoritative self-observed model and
-reasoning to the exact controller-observed task identity and compare its actual
-local repository target before normal monitoring. The planner's complete
-resolved profile must be actively requested rather than obtained through
-ambient inheritance. It records delegation and goal capabilities as optional
-runtime facts. A missing optional capability selects the documented fallback;
-it does not authorize a replacement planner task.
-
-## Analysis worker contract
-
-The planner is the sole reducer and owner of the canonical plan. Workers
-return evidence and proposals only; they do not edit the plan, create hosted
-issues, ask the user directly, publish, or invoke se:implement.
-
-The optional analytical roles are:
-
-- intent-analyst: normalize source issues and identify the requested outcome;
-- context-analyst: inspect repository instructions, code, documentation, and
-  ownership facts needed for a grounded plan;
-- boundary-analyst: compare related issues and test whether outcomes should be
-  consolidated or separated;
-- question-analyst: collect missing decisions, assumptions, risks, and
-  acceptance gaps;
-- critic-analyst: study the original problem independently and challenge
-  anchoring, unnecessary constraints, missing outcomes, and context conflicts.
-
-All workers receive the same immutable user intent and source set. The
-critic-analyst receives no preliminary planner plan and no context-derived
-requirements during its first pass. It may later inspect repository
-instructions as evidence of a possible conflict, but independence is not an
-authority bypass: global safety rules and read-only behavior still apply.
-
-The parent must preserve worker provenance, separate evidence from
-speculation, deduplicate questions, and reconcile conflicting analyses before
-plan composition. Worker count is selected from available capacity and useful
-analytical partitions; configured capacity is not evidence that a worker
-started.
+The planner is the sole reducer and owner of the canonical plan. Optional
+workers return bounded read-only evidence and proposals only; they never edit
+or publish the plan, ask the user directly, or invoke se:implement. When those
+roles cannot be instantiated, the planner runs the same analytical lenses
+serially. The application task and workers are execution envelopes, not
+Feature graph nodes.
 
 ## Repository context and source routes
 
@@ -321,9 +262,10 @@ Feature dependency, or Macro Task to the registry.
 ## Workflow graph
 
 The graph contains planning milestones and one publication adapter. Its
-publication node loads the shared G dependency and hosted-content contracts
-internally; transport and read-after-write safeguards remain mandatory but do
-not become planning nodes.
+publication node loads the shared
+[G dependency preflight](../../references/codex-dependency-preflight.md) and
+hosted-content contracts internally; transport and read-after-write safeguards
+remain mandatory but do not become planning nodes.
 
 Read [states.md](references/states.md) for the human-readable meaning of every
 workflow node and for the separate plan, report, domain, and external state
@@ -377,109 +319,17 @@ inside clarification, not a separate node for each question.
 
 ## Workflow rules
 
-### Intake and maintenance
-
-Normalize the explicit source issue set, preserve the original intent, and
-resolve repository identities without inventing scope. Maintenance rehydrates
-the existing Feature Plan Set, including every Feature identity, parent issue,
-Feature dependency, Macro Task identity, and child issue. It carries only the
-explicit semantic change into the same analysis and convergence flow. It
-never creates a second set identity or starts an implementation worker.
-
-### Analysis
-
-Run the bounded analyst roles when delegation is available and otherwise run
-their assignments serially in the planner. Freeze the input context for the
-run. Collect repository facts, outcome alternatives, boundary evidence,
-critic challenges, assumptions, and the complete question candidate set.
-
-### Convergence
-
-Resolve one or more repository-owned Feature members from the evidence.
-Preserve source provenance and explain every consolidation or separation. Do
-not manufacture distinctions merely to preserve issue counts. A Plan Set is
-ready for composition only when each Feature has a coherent outcome, a clear
-ownership boundary, and any Feature-level dependency is explicit and
-acyclic.
-
-### Plan composition and validation
-
-Write the narrative plan from confirmed evidence, accepted assumptions, and
-answered questions. First compose the Feature Plan Set and its distinct
-Feature members; then compose one closed Macro Task registry per Feature.
-Keep each Macro Task useful to Implement without turning it into a technical
-execution unit or prescribing code design.
-
-Validate only the Plan Set and macro-planning contract: set identity and
-revision, distinct Feature boundaries, outcome, scope, non-goals, repository
-identity, acceptance criteria, source mapping, context evidence, assumptions,
-risks, validation intent, question status, critic reconciliation, Feature
-dependency coverage, Macro Task coverage, Macro Task identity, local macro
-dependency validity, and Implement handoff clarity. Do not validate technical
-execution graphs, worker scheduling, current Git HEADs, or implementation
-readiness here.
-
-### Plan publication
-
-Resolve run_mode once after plan validation. Omitted run_mode means publish;
-preview is accepted only when explicitly requested. Preview retains the
-complete Feature Plan Set, Feature registry, local Macro Task registries, and
-proposed parent/child projections as local report data and performs no hosted
-reads for a new source.
-
-Publish loads the G dependency preflight and hosted-content-safety contract
-immediately before every hosted write. For each Feature member, publish one
-parent Feature issue through the G-owned hosted issue workflow. Do not create
-a Feature Plan Set container or integration issue. Then publish one child
-Task issue per Macro Task, link each child to its own parent Feature issue,
-and project Feature-level and Macro-level planning `blocked_by` values into
-the set manifest, parent Feature bodies, and child Task bodies. After every
-parent and child identity is known, invoke the G-owned native issue-dependency
-workflow once per canonical edge: parent Feature issue to parent Feature issue
-for every Feature dependency, and child Task issue to child Task issue for
-every same-parent Macro dependency. Update every parent Feature projection with
-the final set membership, authoritative parent issue refs, local child issue
-refs, and registry after all identities are known.
-
-For each edge, normalize the G handoff to `mutation_mode=apply` and
-`issue_operation=add-blocked-by`, with the dependent issue as exact target and
-the blocking issue as exact dependency. Use repository-qualified identities
-and exact URLs for cross-repository Feature edges. Attempt both the dependent
-issue's native `blockedBy` readback and the blocker's reciprocal `blocking`
-readback. An already-correct edge is a verified no-op. A failed mutation,
-unsupported capability, inaccessible relation, or indeterminate readback is a
-non-blocking publication warning after its exact outcome and evidence are
-recorded; never hide the failure or retry it blindly.
-
-The set registry remains the canonical mapping from `feature_id` to parent
-Feature issue and from `(parent_feature_id, macro_task_id)` to child Task
-issue. The hosted projections must all report the same set identity and
-revision. A Feature-level edge may cross repositories; a Macro Task edge may
-not cross parent Features even in one repository. Publication is complete
-only when every parent registry, child issue, parent/child relation, and
-registry `blocked_by` value passes authoritative read-after-write verification,
-and every semantic edge has one recorded native GitHub dependency attempt and
-terminal result.
-Then invoke `$g:github-tagger` once for every exact parent and child issue with
-`mutation_mode=apply` and both classification dimensions. Do not supply label
-names or type values. Record its reconciled result, including the final
-read-back assignments when a mutation was attempted. Zero selected labels,
-zero selected types, unchanged values, unavailable catalogs, no confident
-match, or a reconciled partial or failed optional metadata write do not turn
-into semantic plan failure. An absent result or indeterminate mutation remains
-a publication blocker because final provider state has not been reconciled.
-
-Each parent Feature plus every associated Macro Task issue forms one closed
-implementation issue set. A Feature's set never includes a sibling Feature or
-the sibling's Macro Tasks. A hosted failure does not silently fall back to
-preview; retain the calculated Plan Set and report the blocker.
-
-When one exact hosted Idea was the source and the complete Feature Plan Set,
-every sibling Feature, every child Task, all relations, and their
-authoritative semantic readbacks, native dependency attempt results, and tagger
-results reconcile, close that source Idea as completed. A failed native
-dependency projection alone does not keep the Idea open. Preview and ambiguous
-source identity never close an Idea.
+Before executing a node, read its registered `steps/<node-id>.md` contract.
+Those files own node-specific inputs, stop conditions, detailed behavior,
+side effects, and transitions. Follow the graph and registry above as the
+canonical order; do not skip `plan-validation`, enter `plan-publication`
+early, or infer a transition from prose. In particular, the publication step
+owns preview selection, the G dependency handoff, hosted-content projection,
+native dependency attempts, optional tagging, readback, and recovery. Do not
+create a Feature Plan Set container. When one exact hosted Idea is the source,
+close that source Idea as completed only after the complete Plan Set and all
+required publication results reconcile; preview and ambiguous identity never
+close it.
 
 ### Implement handoff
 
