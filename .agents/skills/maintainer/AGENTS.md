@@ -28,6 +28,9 @@ in `SKILL.md` and routed references; this file governs package maintenance.
 
 ## Validation
 
+- Do not test Markdown wording, headings, table shape, section placement, or
+  moved prose. Python tests in this package protect refresh-script behavior;
+  validate skill metadata with the canonical metadata validator.
 - Select validation from `references/validation-matrix.md`.
 - Plugin and CLI maintenance must verify shipped artifacts and installed/cache
   state where applicable; composed workflows require focused contract tests and

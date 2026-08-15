@@ -32,19 +32,6 @@ class MaintainerRefreshScriptTests(unittest.TestCase):
         cls.docc = load_script("swift_docc_refresh")
         cls.okf = load_script("okf_spec_refresh")
 
-    def test_maintainer_is_explicit_only(self) -> None:
-        skill = (REPO_ROOT / ".agents/skills/maintainer/SKILL.md").read_text(
-            encoding="utf-8"
-        )
-        metadata = (REPO_ROOT / ".agents/skills/maintainer/agents/openai.yaml").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("This skill is manual-only", skill)
-        self.assertRegex(
-            metadata,
-            r"(?m)^  allow_implicit_invocation:\s*false\s*$",
-        )
-
     def test_staleness_can_be_a_strict_gate(self) -> None:
         for module in (self.api, self.docc, self.okf):
             self.assertEqual(module.stale_exit_code([], True), 0)
