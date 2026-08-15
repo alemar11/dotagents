@@ -105,9 +105,8 @@ Five is an absolute, non-bypassable worker cap for the entire Study run:
 These count rules have precedence over the general efficiency heuristic. A
 creation failure may lower the actual created count, but never changes the
 planned count or permits a replacement beyond its reserved slot.
-Set `full_capacity_mode=yes` whenever `planned_worker_count=5`, whether the
-source was an exact request, a capped request, or an orchestrator-selected
-unspecified count. Record that source separately as `full_capacity_source`.
+Classify the resulting capacity mode and source with
+[references/states.md](references/states.md).
 
 ### Default worker-count heuristic
 
@@ -142,6 +141,9 @@ Use these routing terms consistently:
 - `owning user`: the human authorized to answer approvals or input requests.
 
 ## Study App task contract
+
+Load [references/states.md](references/states.md) before interpreting setup,
+title, settings, task, archival, capacity, or final outcome state.
 
 The parent and orchestrator interact with Codex App directly through current
 live capabilities for creation, observation, monitoring, messaging, titles,
@@ -185,8 +187,8 @@ Choose one visual `run_tag` before the orchestrator is created:
   capabilities support that outcome. Do not treat the creation receipt or a
   title embedded in the prompt as visible-title evidence.
 - After a stable task identity exists, independently observe the task. If
-  the observed title exactly matches the requested title, record
-  `title-verified` and keep the creation-time result. If the title is missing,
+  the observed title exactly matches the requested title, classify it with the
+  canonical title state and keep the creation-time result. If the title is missing,
   unavailable, or different, apply the requested title at most once when title
   mutation is available. Independently observe the task again and record
   the creation receipt, any fallback receipt, observed title, evidence source,
@@ -257,6 +259,9 @@ Choose one visual `run_tag` before the orchestrator is created:
    cannot be verified for the orchestrator, stop before creating workers and
    report the exact setup failure. A title warning alone does not stop Study;
    preserve the real task ID and continue without creating a replacement.
+   When a real orchestrator exists but project, host, local execution, or state
+   verification fails, record `structural-verification-failed`; keep settings
+   mismatch and unavailable settings in their dedicated states.
 6. Keep the parent turn open after creation. Monitor the exact orchestrator
    with bounded waits and relay meaningful progress to the user as it arrives.
    Do not claim the analysis is complete until the orchestrator returns a
@@ -309,6 +314,9 @@ The orchestrator must execute the following protocol from its initial prompt:
    the prompt as title evidence. Compare active model and reasoning telemetry
    when exposed; record `settings-drift` for any mismatch and do not create a
    replacement. A title warning does not prevent the worker from starting.
+   A real worker whose project, host, local execution, or operational state
+   cannot be verified is `structural-verification-failed`; preserve its
+   identity, create no replacement, and stop later creation.
 
    Do not use a generic subagent mechanism, CLI process, worktree, or different
    project as a substitute for a visible worker task.
@@ -353,90 +361,15 @@ original worker number and title, reconcile the App state, and keep the run
 within the five-worker cap. Do not create a replacement with a changing title
 or silently restart a task that may already exist.
 
-## Monitoring and recovery state machine
+## Monitoring and recovery
 
-Track each planned worker slot separately from any task it creates. Slot states
-are `not-started`, `pending-setup`, `created`, `creation-failed`,
-`settings-drift`, and `unresolved-setup`:
-
-- Reserve the slot before creating a task; never renumber, free, or
-  reuse it during the run.
-- A definitive creation error proving no task exists sets `creation-failed`.
-  Continue with later planned slots but never retry that slot.
-- A timeout, transport error, or response with neither ID and uncertain server
-  state sets `pending-setup`, stops later creation, and follows the same bounded
-  reconciliation as any other provisional setup result.
-- A provisional setup identity stays separate from stable task identity and
-  must not count as a created worker. Use up to three bounded authoritative
-  snapshots and correlate only through explicit identity evidence, never title,
-  prompt preview, or timing.
-- A real task whose title cannot be initialized or independently verified keeps
-  the `created` slot state. Record `title-unverified` or `title-drift` beside
-  the real ID and evidence, do not retry or create a replacement, and continue
-  the worker flow. Only an explicit exact-title request may turn that warning
-  into a setup failure.
-- A real task whose observed model or reasoning differs from the requested
-  creation settings sets `settings-drift`. Preserve its real ID and evidence,
-  do not retry or create a replacement, and report the run as partial unless
-  the orchestrator itself failed settings verification before any worker was
-  created.
-- If reconciliation fails, set `unresolved-setup`; leave every later planned
-  slot `not-started` with reason `creation halted after uncertain slot`, and
-  report a partial run. Never create replacements.
-- A stable task identity sets `created`. Before turn telemetry appears, track the
-  task workflow state as `created-awaiting-turn`; bounded empty snapshots do not
-  imply failure or justify replacement.
-
-Track every real task in exactly one workflow state:
-
-- `created-awaiting-turn`: a real ID exists but no turn status is observable.
-- `active`: the latest turn is in progress.
-- `completed`: the latest turn completed without error and the task is idle.
-- `needs-attention`: structured task telemetry reports an explicit actionable
-  request. Preserve the observed reason and never infer this state from prose
-  alone. Notify the parent session; the owning user must answer through the App.
-- `monitoring-unavailable`: neither wait nor read telemetry can establish the
-  current task state. Preserve the last known state and raw tool errors, notify
-  the parent session, and pause. This is infrastructure observability, never a
-  user-action `needs-attention` state.
-- `failed`: the latest turn ended with an error. Record the raw error and
-  preserve the task identity.
-- `abandoned`: recovery is proven unavailable, or the owning user explicitly
-  abandons a `needs-attention` task. Record the exact reason.
-
-Maintain separate progress and inspection positions per real task according to
-the live capabilities that produced them; never interchange them. An incoming
-parent message may interrupt a wait without invalidating the last confirmed
-progress position. Deduplicate evidence by stable revisions or event identity,
-not by prose. If one monitoring path fails, independently inspect the exact
-task; if monitoring remains unavailable, mark `monitoring-unavailable` and
-notify the parent. Never turn missing telemetry into a success claim. Resume
-only when authoritative observation recovers; if recovery is proven impossible,
-the owning user may explicitly direct abandonment.
-
-Track archival separately from slot and task state. Request archival only for
-`completed`, `failed`, or explicitly `abandoned` workers after terminal
-evidence is captured. For a failed or abandoned worker, structured final state,
-reason, error, and last telemetry substitute for a missing memo. Record the
-archival request receipt as `accepted`, `failed`, or `unavailable`.
-Because archival is asynchronous, record bounded post-request verification only
-when authoritative archival state is observable; omission from a recent-task
-view is not independent proof. Keep the orchestrator unarchived.
-
-Use these final outcome definitions:
-
-- `completed`: every planned slot produced a completed worker and every final
-  memo was captured; archival acceptance or verification is reported
-  separately.
-- `partial`: the orchestrator returned a usable synthesis, but a planned slot
-  is failed, abandoned, settings-drift, unresolved, or missing, or terminal
-  evidence could not be captured. Title warnings alone do not make the run
-  partial.
-- `failed`: the orchestrator could not return a usable synthesis. This takes
-  precedence over `partial` even when some worker results exist.
-
-`needs-attention` and `monitoring-unavailable` are interim, nonterminal states.
-Never present either as the authoritative final report.
+Apply the canonical state machine in
+[references/states.md](references/states.md). Track each reserved worker slot
+separately from any real task, never renumber or reuse a slot, stop later
+creation after uncertain setup, and never create a replacement without
+authoritative proof that no task exists. Preserve separate task-monitoring
+positions, capture terminal evidence before requesting worker archival, and
+derive the overall outcome only after every planned slot is reconciled.
 
 ## Worker protocol
 
@@ -479,6 +412,7 @@ authoritative for completion. Use the structure in
 - the immutable orchestrator title and worker titles;
 - the shared visual `run_tag` and whether every requested title used it;
 - requested and observed orchestrator and worker titles;
+- canonical orchestrator setup state and its reconciliation evidence;
 - original requested, planned, and actually created worker counts, whether the
   hard cap was applied, whether the parent was notified, and the terminal state
   and reason for each worker;

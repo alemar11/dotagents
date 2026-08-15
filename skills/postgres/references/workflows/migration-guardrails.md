@@ -1,6 +1,8 @@
 # Postgres Migration Guardrails
 
 Use this reference when the task touches schema changes or migration release.
+Use [../states.md](../states.md) for the canonical pending/released lifecycle
+and derived migration outcome values.
 
 ## Core rules
 

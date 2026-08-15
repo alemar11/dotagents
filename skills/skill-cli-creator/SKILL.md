@@ -21,7 +21,8 @@ create the equivalent host before continuing.
 
 Resolve these values before editing:
 
-- Host mode: `skill` or `plugin`
+- Host mode: load [references/states.md](references/states.md) and record its
+  canonical `host_mode` value
 - Owner root: the skill directory, one bundled skill, or a plugin-shared root
 - CLI/tool name: the runtime noun that owns `scripts/<tool>` and, when needed,
   `projects/<tool>/`
@@ -96,6 +97,9 @@ the implementation workflow.
   source of truth, and semver bump policy.
 
 ## References
+
+- [references/states.md](references/states.md): canonical host mode and its
+  persistence boundary.
 
 - [references/embedded-cli-layout.md](references/embedded-cli-layout.md):
   owner roots, artifact placement, naming, config namespaces, runtime cache,

@@ -13,8 +13,9 @@ references; this file records the shipped-package maintenance boundary.
   its build and release contract is in `projects/postgres/AGENTS.md`.
 - `assets/` and `references/` are shipped runtime inputs. In particular,
   `references/runtime/options.md` is the canonical compatibility exception for
-  the Postgres option surface and must remain aligned with help, config, and
-  JSON output.
+  the Postgres option surface, while `references/states.md` owns migration file
+  lifecycle and derived migration outcomes. Keep both aligned with help,
+  config, and JSON output.
 - Keep shipped references grouped by concern under `runtime/`, `workflows/`,
   `sql/`, `design/`, and `extensions/`. Put extension-specific guidance only in
   `extensions/`.

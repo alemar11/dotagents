@@ -68,8 +68,8 @@ changing Git history.
 
 ## Final Report
 
-- `result`: `pass` or `fail`
-- `change_state`: `changed` or `no-change`
+- `result`: `<canonical value from states.md>`
+- `change_state`: `<canonical value from states.md>`
 - Scope: `<packages and workflow covered>`
 - Validation lanes: `<selected lanes>`
 - Commands run: `<key commands in order>`

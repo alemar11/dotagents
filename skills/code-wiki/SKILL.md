@@ -187,7 +187,7 @@ scripts/code-wiki validate --wiki <wiki-out> --strict
 Use `references/wiki-html-contract.md` to interpret validation failures and
 warnings. Fix structural errors, weak evidence, thin pages, broken links,
 missing deterministic diagrams, unsupported polished-image claims, and generic
-filler before reporting the wiki complete. Load `references/options.md` and
+filler before reporting the wiki complete. Load `references/states.md` and
 report the exact canonical `validation_status` emitted by the validator. The
 uppercase validation line is display text only.
 
@@ -209,7 +209,7 @@ only file layout, and validation passes.
 
 ## References
 
-- Canonical validation result option: `references/options.md`
+- Canonical validation state: `references/states.md`
 - `references/repo-study-playbook.md`: source-study slices and claim quality.
 - `references/wiki-html-contract.md`: required HTML output, page contract,
   diagrams, evidence links, and validation expectations.

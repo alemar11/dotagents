@@ -13,6 +13,7 @@ requirements remain in `SKILL.md` and its references.
 - `references/wiki-html-contract.md`, `references/repo-study-playbook.md`,
   and `references/image-guidance.md` own output and study contracts; do not
   duplicate their detailed rules here.
+- `references/states.md` owns the derived validator result state.
 - `tests/` protects the launcher, validation reports, HTML contract, and
   evidence/link behavior.
 

@@ -42,19 +42,11 @@ scripts/portfolio-health --json scan --inventory-source filesystem --root ~/.cod
 - `budget`: prompt-inventory pressure. Treat this as a prioritization signal,
   not a deletion trigger by itself.
 - `entrypoint_policy`: the estimator and diagnostic thresholds used for each
-  activated `SKILL.md`. The estimator is `ceil(UTF-8 bytes / 4)` and is not a
+  activated `SKILL.md`. The estimator and canonical `entrypoint_size_band`
+  values are owned by `references/states.md`; the estimate is not a
   tokenizer-exact measurement.
 - `entrypoint_candidates`: activated entrypoints outside the `normal` band.
-  Interpret the bands as follows:
-
-  | Band | Entrypoint signal |
-  | --- | --- |
-  | `normal` | At most 2,500 estimated tokens and fewer than 500 lines. |
-  | `review` | 2,501-4,000 estimated tokens. |
-  | `high-density` | 4,001-5,000 estimated tokens. |
-  | `over-guideline` | More than 5,000 estimated tokens or at least 500 lines. |
-
-  Size alone is diagnostic and never makes a skill fail health checks. Use
+  Interpret its band through `references/states.md`. Use
   `references/writing-style-review.md` to identify duplicated, stale,
   branch-specific, or misplaced content before recommending a change.
 - `description_candidates`: long descriptions that may be worth tightening
@@ -66,9 +58,8 @@ scripts/portfolio-health --json scan --inventory-source filesystem --root ~/.cod
   repeated trigger branches from useful shared vocabulary.
 - `unused_candidates`: no recent heuristic evidence in scanned logs. Inspect at
   least one representative surface before claiming a skill is low-value.
-- `usage_scan.status`: `completed` when usage evidence was scanned and
-  `skipped` when `--no-logs` was selected. A skipped scan emits no unused
-  candidates.
+- `usage_scan.status`: use the canonical helper status from
+  `references/states.md`. A skipped scan emits no unused candidates.
 - `requested_roots`: explicit roots supplied by the caller, or an empty list
   when the command used discovery defaults.
 - `effective_roots`: filesystem roots actually scanned, or live skill-root

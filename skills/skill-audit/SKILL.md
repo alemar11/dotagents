@@ -44,6 +44,10 @@ cache copies are evidence only.
 
 ## Canonical Audit DAG
 
+Load [references/states.md](references/states.md) before selecting the audit
+mode, classifying a target, assigning `evidence_state`, or updating a live
+annotation.
+
 Follow this directed acyclic workflow. References add branch-specific rules;
 they do not replace or reorder these nodes.
 
@@ -69,7 +73,8 @@ they do not replace or reorder these nodes.
      `references/portfolio-hygiene.md`;
    - trigger clarity or instruction-density review:
      `references/writing-style-review.md`.
-7. Classify each finding by evidence strength and owning fix surface.
+7. Classify each finding by the canonical `evidence_state` and owning fix
+   surface from `references/states.md`.
 8. Return the historical or live branch from `references/output-format.md`.
 
 Named targets remain the primary and normally exclusive scope. An unnamed

@@ -27,6 +27,8 @@ manage migration release flow through the shipped
   in `references/runtime/usage.md`.
 - Load `references/runtime/options.md` before reading or reporting
   behavior-affecting config choices.
+- Load `references/states.md` before interpreting migration lifecycle or
+  derived command outcomes.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 - Ordinary runtime commands read and normalize config only in memory. Use
   `profile migrate-config`, `profile bootstrap --save`,
@@ -103,19 +105,16 @@ its syntax or behavior.
   - stop and ask for the exact `DB_PROFILE` / `DB_URL` they intend
   - default to `access_mode=read` and require an explicit confirmation before any write/DDL
 - Always ask for approval before DDL changes.
-- Keep schema changes in a pending migration file; do not edit released files.
-- Before editing migrations, resolve the repo's exact `migrations_path` and
-  pending migration filename by inspecting `.skills/postgres/config.toml` and
-  the existing migration directory.
-- If a `prerelease*.sql` file exists, use it for pending work instead of
-  creating a timestamped migration file.
-- Use `references/workflows/migration-guardrails.md` as the canonical migration
-  workflow.
+- Before editing or releasing a migration, load
+  `references/workflows/migration-guardrails.md`; it owns pending-file
+  selection, released-file immutability, release authorization, and
+  verification.
 
 ## References
 
 - Runtime command surface and JSON mode: `references/runtime/usage.md`
 - Runtime option fields and compatibility aliases: `references/runtime/options.md`
+- Migration lifecycle and derived outcomes: `references/states.md`
 - Runtime environment contract: `references/runtime/environment.md`
 - Runtime config schema: `references/runtime/config-schema.md`
 - Common inspection workflows: `references/workflows/common-workflows.md`

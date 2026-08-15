@@ -5,6 +5,10 @@ invokes `$maintainer`, asks to run Maintainer, or an explicitly invoked parent
 workflow routes here. Ordinary skill, plugin, metadata, docs, or repository
 requests must not auto-select this skill.
 
+Load [states.md](states.md) before route selection. The first column below is a
+projection of its canonical route modes; this file owns matching, ordering, and
+playbook dispatch rather than a second value registry.
+
 ## Route Table
 
 | Request type | Match | Playbook |
@@ -77,6 +81,6 @@ App tasks still requires the applicable explicit permission.
 
 ## Common Closeout
 
-Load `options.md`, select every applicable lane from `validation-matrix.md`, and
+Load `states.md`, select every applicable lane from `validation-matrix.md`, and
 finish with `release-checklist.md`. Branch playbooks add only their unique
 evidence; the release checklist owns common reporting and publication authority.

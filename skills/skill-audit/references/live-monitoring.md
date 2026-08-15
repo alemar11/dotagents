@@ -8,8 +8,12 @@ monitor, not an implementation controller or a session-archive scan.
 
 Live monitoring requires Codex App task discovery and authoritative task reads.
 Bounded waits are optional accelerators. If discovery or reads are unavailable,
-report `current evidence unavailable` and stop the live claim. Do not replace
-current evidence with memory, session JSONL, task age, or silence.
+report `evidence_state=current-evidence-unavailable` and stop the live claim.
+Do not replace current evidence with memory, session JSONL, task age, or silence.
+
+Use [states.md](states.md) for canonical annotation status, severity, target
+kind, fix-surface, evidence, and transition values. App task lifecycle state is
+external and must be reported exactly as authoritatively observed.
 
 ## Select Tasks
 
@@ -100,29 +104,18 @@ one annotation per root cause and update it instead of duplicating it.
 Each annotation contains:
 
 - `id`
-- `status`: `provisional`, `confirmed`, `resolved`, or `withdrawn`
-- `severity`: `high`, `medium`, or `low`
+- canonical `status` and `severity` from `states.md`
+- canonical `evidence_state` from `states.md`
 - target name and kind
-- target kind: `standalone-skill`, `plugin-package`, or `bundled-plugin-skill`
-- owning fix surface: `standalone-skill`, `bundled-plugin-skill`,
-  `plugin-package`, `docs`, or `external-runtime`
+- canonical target kind and owning fix surface from `states.md`
 - concise defect statement and impact
 - expected contract file, fingerprint, and relevant section
 - observed `thread_id`, turn or item identity, and evidence summary
 - first-seen and last-seen task frontier
 - confidence and the smallest useful remediation
 
-Use `provisional` while evidence is incomplete. Promote to `confirmed` only
-after a fresh task read shows a concrete contradiction with the active
-contract. Use `resolved` when the same task later demonstrates recovery without
-erasing the original evidence. Use `withdrawn` when later evidence disproves
-the annotation. Evidence unavailability is a monitor limitation, not a defect.
-
-The only valid transitions are:
-
-- `provisional -> confirmed -> resolved`
-- `provisional -> withdrawn`
-- `confirmed -> withdrawn`
+Apply the meanings and only the transitions defined in `states.md`. Evidence
+unavailability is a monitor limitation, not a defect.
 
 After every material annotation change and before terminal assessment, emit the
 complete canonical annotation registry in the audit task. Do not persist it to

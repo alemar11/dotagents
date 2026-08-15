@@ -21,6 +21,9 @@ title with one relevant leading emoji, and leave the calling task unchanged.
 
 ## Workflow
 
+Load [references/states.md](references/states.md) before interpreting creation
+receipts, title telemetry, or terminal outcomes.
+
 1. Infer the current focus from the conversation already available. Prefer, in
    order:
    - the latest unresolved objective;
@@ -53,7 +56,8 @@ title with one relevant leading emoji, and leave the calling task unchanged.
      saved project only when the current live capabilities support that
      outcome.
    - If repository-backed work has no unique saved-project match, stop and
-     report the mismatch. Do not substitute another destination.
+     report outcome `failed` with the mismatch. Do not substitute another
+     destination.
 6. Before mutation, require live capabilities that can create the requested
    task and independently establish its identity, destination, execution mode,
    and operational state. Title initialization and title verification are
@@ -66,7 +70,8 @@ title with one relevant leading emoji, and leave the calling task unchanged.
    proof. A pending setup identity is not a stable task identity.
 8. After a stable task identity exists, independently observe the created task
    and verify its exact project and host, direct local execution, and
-   operational state. Compare the observed title separately. If it is missing
+   operational state. Compare the observed title separately and record
+   `title-verified` when it matches. If it is missing
    or different and title mutation is available, apply the chosen title at
    most once and verify it again. Otherwise retain the structurally verified
    task and record `title-unverified`. Never rename the calling task and never
@@ -81,6 +86,9 @@ title with one relevant leading emoji, and leave the calling task unchanged.
    Preserve the real task and return the warning, observed title, and App's
    native created-task link or card. Require an exact title only when the user
    explicitly requested one; otherwise title warnings must not block completion.
+   If authoritative reconciliation proves that no task exists and the allowed
+   creation attempt cannot succeed, report outcome `failed` rather than
+   `partial` or `unsupported-runtime`.
 
 If several topics remain active, choose the most recently discussed unresolved
 outcome. Do not copy the full conversation, browse, inspect repository files,
@@ -95,7 +103,15 @@ or ask a clarifying question before creation.
 - Do not send a second follow-up message to the new task after creation.
 - Treat the title as display metadata only. Never use it as task identity,
   durable state, a branch name, or a recovery key.
-- If structural creation or independent identity verification fails, report
-  the partial result accurately and do not claim the task is ready. Title
-  initialization and title readback are best-effort metadata: retain the
-  warning in the result without blocking the structurally verified task.
+- If creation may have occurred but independent identity verification remains
+  uncertain, report `partial` and do not claim the task is ready. If the
+  required structural capability was unavailable before creation, report
+  `unsupported-runtime`; if authoritative reconciliation proves that no task
+  exists after the allowed attempt, report `failed`. Title initialization and
+  title readback are best-effort metadata: retain the warning in the result
+  without blocking the structurally verified task.
+
+## References
+
+- [references/states.md](references/states.md): creation identity, title
+  telemetry, and terminal outcome states.

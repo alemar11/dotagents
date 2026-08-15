@@ -20,16 +20,16 @@ workers to a live task, or update unrelated skills.
 
 ## Workflow
 
-1. Inspect the currently exposed tool surface before editing:
-   - search the available tool registry for `spawn_agent`, `wait_agent`,
-     `send_message`, `followup_task`, `interrupt_agent`, `list_agents`,
-     `create_thread`, `list_projects`, `read_thread`, `wait_threads`,
-     `send_message_to_thread`, `set_thread_title`, `set_thread_archived`,
-     `handoff_thread`, `get_handoff_status`, `fork_thread`, `list_threads`,
-     and `set_thread_pinned`;
-   - record the exact callable namespaces and names;
-   - note whether each surface is a subagent surface, visible Codex App task
-     surface, or unavailable in the current runtime.
+1. Inspect the currently exposed capability surface before editing:
+   - discover internal subagent creation, observation, waiting, messaging,
+     follow-up, interruption, and listing capabilities;
+   - discover visible Codex App project and task creation, observation,
+     waiting, messaging, title, archive, handoff, fork, pin, and listing
+     capabilities;
+   - record exact live callable names only as time-bound maintenance evidence,
+     never as runtime-skill instructions;
+   - note whether each capability belongs to internal subagents, visible Codex
+     App tasks, or is unavailable in the current runtime.
 2. Compare the discovered surface against:
    - `plugins/se/skills/implement/SKILL.md`;
    - `plugins/se/skills/implement/references/orchestration.md`;
@@ -45,10 +45,10 @@ workers to a live task, or update unrelated skills.
    - What should happen when a logical tool name is unavailable or renamed?
    - Does the skill remain confined to visible App tasks and App-managed
      worktrees?
-4. Update the App contract when the live tool surface materially
-   differs from the documented contract. Material differences include renamed
-   tools, changed arguments, new required lifecycle calls, new visibility
-   behavior, removed capabilities, or newly exposed safer primitives.
+4. Update the App contract when the live capability surface materially differs
+   from the documented semantic contract. Material differences include changed
+   lifecycle outcomes, authorization or visibility behavior, missing required
+   capabilities, or newly available safer primitives.
 5. If no material drift exists, return `result=pass` and
    `change_state=no-change`, and include the discovered
    current callable names in the report.
@@ -58,8 +58,9 @@ workers to a live task, or update unrelated skills.
 
 - Treat Codex tool availability as runtime-dependent. Do not claim a tool is
   globally unavailable just because it is missing in one thread.
-- Prefer logical operation names in runtime skills, but record actual callable
-  names when they differ.
+- Describe Codex interactions in runtime skills only through required outcomes,
+  topology, authorization, lifecycle, verification, and recovery. Record
+  actual callable names only in the maintenance report as live evidence.
 - Keep visible Codex App tasks distinct from subagents unless the current
   runtime explicitly exposes the same surface as both.
 - Do not create visible Codex App threads merely to inspect the tool schema.

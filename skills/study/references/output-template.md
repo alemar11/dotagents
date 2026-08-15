@@ -9,11 +9,12 @@
 - **Title creation/fallback receipt:** `<creation-time title observation and, if used, title-fallback receipt>`
 - **Title evidence source:** `<authoritative observation/unavailable>`
 - **Title status/warning:** `<title-verified/title-unverified/title-drift or not-applicable>`
-- **Orchestrator stable identity:** `<stable task identity>`
+- **Orchestrator stable identity:** `<stable task identity or unavailable>`
 - **Host/project/execution:** `<host identity / project identity and path / local>`
 - **Requested model/reasoning:** `gpt-5.6-sol / medium`
-- **Settings evidence source:** `<creation receipt or independent telemetry>`
-- **Orchestrator state:** `<completed/failed>`
+- **Orchestrator setup state:** `<not-started/ready/creation-failed/structural-verification-failed/settings-drift/settings-unavailable/unresolved-setup>`
+- **Settings evidence source:** `<independent task telemetry or unavailable>`
+- **Orchestrator task state:** `<authoritatively observed external state or not-applicable>`
 - **Orchestrator state reason:** `<reason>`
 - **Original requested worker count:** `<count or unspecified>`
 - **Planned worker count after cap:** `<0-5>`
@@ -23,8 +24,8 @@
 - **Full-capacity mode:** `<yes/no>`
 - **Full-capacity source:** `<exact-request/capped-request/orchestrator-selected/not-applicable>`
 - **Overall outcome:** `<completed/partial/failed>`
-- **Worker archival requests:** `<accepted/partial/failed/unavailable>`
-- **Independent archival verification:** `<confirmed/unavailable/failed>`
+- **Worker archival requests:** `<accepted/partial/failed/unavailable/not-applicable>`
+- **Independent archival verification:** `<confirmed/unavailable/failed/not-applicable>`
 - **Orchestrator remains unarchived:** `<yes/no>`
 - **Changes made:** None — Study never writes code or project files
 
@@ -73,9 +74,9 @@ code.
 | --- | --- | --- | --- | --- | --- | --- |
 | Worker N |  |  |  |  |  |  |
 
-List all planned slots, including `not-started`, `creation-failed`, and
-`unresolved-setup` slots. Never correlate an unresolved provisional identity by title or
-preview.
+List all planned slots, including `not-started`, `creation-failed`,
+`structural-verification-failed`, `settings-drift`, and `unresolved-setup`
+slots. Never correlate an unresolved provisional identity by title or preview.
 
 ## Task telemetry ledger
 

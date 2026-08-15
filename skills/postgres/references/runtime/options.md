@@ -9,7 +9,9 @@ It is the canonical registry for behavior-affecting option fields.
 | --- | --- | --- | --- |
 | `ssl_mode` | `disable`, `require` | `disable` | Local runtime TLS choice. It does not model PostgreSQL `verify-ca` or `verify-full` semantics. |
 | `access_mode` | `read`, `write`, `read-write` | `read-write` | Local CLI safety guard; server roles and grants remain authoritative. |
-| `migration_outcome` | `migrated`, `no-change` | Derived | Emitted by `profile migrate-config`; backup paths and schema versions remain separate data. |
+
+Derived migration results are execution facts, not selectable options. Read
+[`../states.md`](../states.md) before interpreting them.
 
 ## Compatibility Boundary
 

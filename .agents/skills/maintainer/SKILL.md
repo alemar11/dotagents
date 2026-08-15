@@ -58,7 +58,7 @@ only the branch references whose conditions match the routed request:
 | Codex worker/thread tool-surface refresh | [codex-tool-surface-refresh.md](references/codex-tool-surface-refresh.md) |
 | OKF official-spec refresh | [okf-spec-refresh.md](references/okf-spec-refresh.md) and [okf-spec-runbook.md](references/okf-spec-runbook.md) |
 
-Before closeout, load [options.md](references/options.md), select every
+Before closeout, load [states.md](references/states.md), select every
 applicable lane from [validation-matrix.md](references/validation-matrix.md),
 and finish with [release-checklist.md](references/release-checklist.md). Emit
 canonical `result` and `change_state` values and actionable findings.
