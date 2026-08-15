@@ -1,5 +1,9 @@
 # reviews Script Contract
 
+This file mirrors the shipped command and JSON schema surface. Canonical state
+values, meanings, terminality, and legal reconciliation pairs are owned by
+[states.md](states.md).
+
 ## Commands
 
 ```bash
@@ -62,8 +66,8 @@ The script does not write configuration files.
 
 Managed orchestration uses the closed operations `request`, `wait`,
 `ready-check`, `ready-wait`, `warning`, `reply`, `resolve`,
-`reconcile-mutation`, and `reconcile-terminal`. G
-8.1.4 owns the complete `g-review-operation-request:v1` and
+`reconcile-mutation`, and `reconcile-terminal`. The current G review contract
+owns the complete `g-review-operation-request:v1` and
 `g-review-operation-result:v1` schemas. `prepare` and both validators are
 read-only. `execute` revalidates the exact controller envelope and atomically
 writes a `g-review-operation-start:v1` receipt to G's own journal
@@ -101,13 +105,9 @@ Both `check` and `wait` return `data.provider`, `data.request_binding`,
 terminal-comment, and selected terminal evidence. An identity-bound check
 returns the saved request receipt unchanged; a receipt-less diagnostic uses a
 `kind=observed-request` metadata object and never returns a persistable receipt.
-Acknowledgment flags are in `data.request_observation`. Request bindings are
-`absent`, `recognized`, `unbound`, `invalid`, `unknown`, or `ambiguous`.
-Review states are orthogonal: `not-requested`, `acknowledged`, `pending`,
-`clean`, `findings`, `stale`, and `error`. `error` is terminal provider-authored failure
-evidence for the requested head, distinct from a G API/configuration
-error envelope. `review_state` is factual CLI result state, not an invocation
-option. Terminal evidence may be a formal review, an
+Acknowledgment flags are in `data.request_observation`. Request bindings and
+review states use the closed registries in `states.md`. `review_state` is
+factual CLI result state, not an invocation option. Terminal evidence may be a formal review, an
 authenticated provider-authored top-level comment posted after the matching
 request and naming the reviewed head, or a clean provider reaction. Conflicting
 terminal outcomes return `ambiguous_review_evidence` with exit code `4`.
@@ -115,10 +115,9 @@ Missing binding or acknowledgment is also exit `4`, never `stale` and never
 timeout-eligible. `stale` is reserved for actual PR-head drift or mismatched
 provider terminal evidence.
 
-Exit codes are stable: `0` for clean, `1` for findings, `2` for
-not-requested/acknowledged/pending, `3` for stale review evidence, `4` for a
-terminal provider error or API/configuration failure, `64` for invalid arguments, and `124` when
-`wait` times out. JSON envelopes remain valid for nonzero review-state exits.
+Review-state exit mappings are defined in `states.md`. Exit `64` remains
+invalid arguments and `124` remains a bounded-wait timeout. JSON envelopes
+remain valid for nonzero review-state exits.
 
 `wait` accepts `--timeout`, `--interval`, and `--max-interval` durations using
 seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
@@ -184,12 +183,12 @@ repository, PR, head, thread, author, URL, timestamp, and fingerprint identity.
 `resolve` accepts only that complete receipt, discovers the unique thread by
 the exact finding GraphQL node id with full pagination, re-proves both REST
 comments and thread membership, and returns a
-`g-review-thread-resolution:v1` receipt. Stable success statuses are
-`resolved`, `recovered`, and `already-resolved`; dry-run is `planned`.
-Every mutation attempt gets one independent exact read-back. Proven
-`resolved` and `recovered` results set `mutation_attempted=true` and
-`mutation_may_have_applied=false`; dry-run and `already-resolved` set both to
-false.
+`g-review-thread-resolution:v1` receipt. Resolution statuses use the canonical
+registry in `states.md`.
+Every mutation attempt gets one independent exact read-back. Resolution flags
+use the canonical per-path rules in `states.md`; in particular, recovery of a
+previously consumed reservation preserves that the prior mutation may have
+applied. Dry-run and `already-resolved` set both mutation flags to false.
 
 Wrong repository, PR, head, finding, reply, thread, body, author, or timestamp;
 missing or duplicate thread matches; missing evidence; and unsupported thread

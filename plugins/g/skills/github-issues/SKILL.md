@@ -86,12 +86,9 @@ handles GitHub Issues lifecycle mechanics.
 - Native dependency state is provider projection, not planning authority. Add
   or remove only the exact caller-authorized edge. Never infer an edge from
   issue order, titles, labels, types, parent/sub-issue hierarchy, or prose.
-- Return exactly one native dependency result per invocation: `verified` after
-  a successful mutation and reciprocal readback, `no-op` when pre-read already
-  proves the requested state, `failed` for a definite rejected mutation,
-  `unavailable` when the operation cannot be attempted, or `unknown` when an
-  attempted mutation or readback is inconclusive. The caller owns whether a
-  non-success result is a workflow gate.
+- Return exactly one canonical native dependency result from
+  [references/states.md](references/states.md) per invocation. The caller owns
+  whether a non-success result is a workflow gate.
 - When verifying native GitHub Issue Types with `gh issue view --json`, request
   `issueType`; do not request `type`, which is not a valid issue JSON field.
 - Do not create labels, close issues, or mutate issue relationships unless the
@@ -167,4 +164,5 @@ handles GitHub Issues lifecycle mechanics.
 - `references/workflows.md`: direct `gh` issue lifecycle commands, attachment
   uploads, and dry-run conventions. Read its attachment section before
   publishing a file in an issue body or comment.
+- `references/states.md`: canonical native dependency result states.
 - `../../references/options.md`: shared canonical G options.

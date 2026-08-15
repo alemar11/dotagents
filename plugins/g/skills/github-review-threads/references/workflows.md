@@ -1,5 +1,8 @@
 # GitHub Review Workflows
 
+Use [states.md](states.md) for canonical feedback, request-binding, review,
+recovery, operation-result, reconciliation, and resolution states.
+
 ## Check Or Wait For Automated Review
 
 ### Initial automatic review
@@ -36,14 +39,14 @@ versioned G marker and request fingerprint. Callers cannot provide or
 assemble request text. The operation reuses only one exact matching comment;
 plain, markerless, malformed, conflicting, or duplicate requests fail closed.
 
-In G 8.1.4, `prepare` and `validate` remain read-only packet creation and
-inspection surfaces. Provider mutations require the exact G reservation;
-G itself owns its atomic one-use consumption and recovery state and has
-no runtime dependency on an orchestrator skill or its ledger.
+In the current G review contract, `prepare` and `validate` remain read-only
+packet creation and inspection surfaces. Provider mutations require the exact
+G reservation; G itself owns its atomic one-use consumption and recovery state
+and has no runtime dependency on an orchestrator skill or its ledger.
 After the one-use marker is consumed, a replay performs one read-only lookup:
 only one exact marker/target/body/thread/actor artifact may return a recovered
-receipt. Missing or ambiguous evidence returns `recovery=needs-owner` and never
-posts or resolves again.
+receipt. Missing or ambiguous evidence returns the owner-recovery disposition
+from `states.md` and never posts or resolves again.
 
 Use the returned receipt for the one-shot read or bounded wait:
 

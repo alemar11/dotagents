@@ -254,16 +254,8 @@ Require the blocked issue's `blockedBy` set and the blocker's reciprocal
 `blocking` set to contain or omit the exact opposite URL as requested. A
 one-sided, missing, ambiguous, inaccessible, or stale readback is not success.
 
-Return exactly one terminal result for the edge:
-
-- `verified` after the mutation and both reciprocal reads prove the requested
-  state;
-- `no-op` when both pre-reads already prove the requested state;
-- `failed` when GitHub definitively rejects the mutation;
-- `unavailable` when capability, authentication, or access prevents an
-  operation attempt;
-- `unknown` when the mutation may have happened or reciprocal readback remains
-  inconclusive after one bounded reread.
+Return exactly one terminal result for the edge using the canonical meanings
+in [states.md](states.md).
 
 A composing workflow invokes and records each deterministic edge separately
 and owns whether a non-success result blocks its wider operation. This skill

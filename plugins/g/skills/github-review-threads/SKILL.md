@@ -14,6 +14,8 @@ Connector calls and local-only commands do not use shell escalation.
 Own the feedback-to-code workflow for pull-request reviews: preserve thread
 context, identify actionable feedback, implement only selected fixes, validate
 them, and draft or publish dispositions with explicit authority.
+Load [references/states.md](references/states.md) before classifying feedback,
+review observations, reconciliation, or resolution results.
 
 ## Transport and CLI
 
@@ -52,9 +54,9 @@ It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
-G 8.1.4 is self-contained. The four provider mutation commands
-(`request`, timeout-warning `comment`, `reply`, and `resolve`) require an exact
-immutable G reservation packet. G atomically consumes that packet
+The current G review contract is self-contained. The four provider mutation
+commands (`request`, timeout-warning `comment`, `reply`, and `resolve`) require
+an exact immutable G reservation packet. G atomically consumes that packet
 before transport and owns the durable one-use marker and recovery readback; it
 does not locate, load, or execute another skill to authorize the mutation.
 Use JSON `reviews address` as the typed source for a review thread's current
@@ -95,8 +97,8 @@ sufficient proof of success.
    Use `reviews terminal-evidence` only to independently verify one exact typed
    explicit-request lineage after a caller has recorded a correlation failure.
    It is a read-only proof operation, never a replacement request or waiter.
-2. Group duplicates and classify feedback as actionable, already addressed,
-   informational, obsolete, or requiring a user decision.
+2. Group duplicates and classify feedback with the canonical disposition from
+   `references/states.md`.
 3. Present or honor the selected actionable set. Do not silently implement
    every comment when the request selects only some.
 4. Inspect adjacent code and tests, implement the selected changes locally, and
@@ -141,5 +143,7 @@ interpreting them here.
 ## References
 
 - `references/workflows.md`: feedback, reply, resolution, and fallback flows.
+- `references/states.md`: feedback, review, reconciliation, and resolution
+  states.
 - `references/script-summary.md`: shared `g reviews` contract.
 - `../../references/options.md`: shared canonical G options and caller handoffs.

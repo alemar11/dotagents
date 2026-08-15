@@ -21,6 +21,9 @@ package and its shared artifact.
   handling.
 - `skills/audit/` owns explicit, read-only Codex App monitoring of active tasks
   that use G skills; it does not own Git/GitHub transport.
+- Each skill that defines workflow or result states owns one
+  `references/states.md`; procedure and schema references route to that file
+  instead of defining a second semantic registry.
 - `skills/github-tagger/` owns evidence-backed selection from current
   repository-owned labels and enabled native issue types, plus explicitly
   requested read-only proposals for missing labels and organization issue

@@ -30,7 +30,7 @@ scripts/g --json pr delivery-status \
 Require `--expected-head` when a composing workflow binds evidence to one
 candidate commit. It is optional for general inspection. Read
 [workflows.md](references/workflows.md) for the complete read and recovery
-sequence and [status-model.md](references/status-model.md) for fields and
+sequence and [states.md](references/states.md) for fields and
 classification semantics.
 
 ## Output contract
@@ -47,10 +47,9 @@ Require the stable JSON envelope and inspect:
   warnings;
 - `completeness` and every unavailable provider surface.
 
-The canonical dispositions are `ready`, `ready-with-manual-action`, `pending`,
-`blocked`, `conflicting`, and `unknown`. Treat `unknown` and incomplete
-evidence as non-terminal unless the composing workflow explicitly owns a
-narrower evidence rule.
+Use the canonical dispositions and completeness rules from `states.md`.
+Treat `unknown` and incomplete evidence as non-terminal unless the composing
+workflow explicitly owns a narrower evidence rule.
 
 Auto-merge capability, an existing PR auto-merge request, or a merge-queue
 entry are observations, not authorization and not blockers by themselves.

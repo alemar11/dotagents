@@ -124,7 +124,8 @@ For bug or regression reviews, include a compact provenance answer when feasible
 - Separate original author, committer/merger, and current PR author when they
   differ.
 - Phrase as `introduced by`, `made visible by`, or `carried forward by`.
-- Include confidence: `clear`, `likely`, or `unknown`.
+- Include the canonical provenance confidence from
+  [references/states.md](references/states.md).
 - For features, docs, refactors, or untraceable issues, write `N/A` or say what
   evidence is missing.
 
@@ -165,7 +166,7 @@ Bug: <one or two sentences>
 Cause: <code path + confidence>
 Provenance: <introduced/made visible/carried forward by commit/PR/date, or N/A/unknown>
 Best fix: <what should change and why>
-refactor_disposition: <required|optional|not-required>
+refactor_disposition: <canonical value from references/states.md>
 refactor_shape: <specific shape|not-applicable>
 Proof: <tests/live/CI/source/dependency docs>
 Risk: <remaining uncertainty>
@@ -176,3 +177,8 @@ routed G operations. `refactor_disposition` is a judgment returned by
 this skill, not an invocation option: derive it from the review evidence and do
 not ask the user to select it. Keep the explanation of why a refactor is or is
 not warranted in the surrounding prose.
+
+## References
+
+- `references/states.md`: provenance confidence and refactor disposition.
+- `../../references/options.md`: caller-selectable G invocation fields.

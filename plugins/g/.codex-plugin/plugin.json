@@ -1,6 +1,6 @@
 {
   "name": "g",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "description": "Manage Git and GitHub work from commits, evidence-backed issue classification, and read-only taxonomy proposals through delivery status, reviewed pull-request delivery, active-session audits, and consistent SemVer versioning.",
   "author": {
     "name": "alemar11",
@@ -21,13 +21,9 @@
     "capabilities": ["Interactive", "Read", "Write"],
     "websiteURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
-      "Triage this repository's open issues and pull requests.",
-      "Classify an existing issue with the smallest relevant label set, including none, and at most one native issue type.",
-      "Analyze this repository and its issues to propose only the missing labels and organization issue types without changing GitHub.",
-      "Diagnose and fix the failing GitHub Actions checks.",
-      "Publish these local changes as a safe draft pull request.",
-      "Preview context-aware SemVer tags, operate or install guarded release Actions, draft or directly publish a verified tagged release with curated notes, or improve an existing release description.",
-      "Audit active Codex tasks using G skills and prioritize feedback, bugs, and improvements."
+      "Triage this repository's GitHub issues, pull requests, checks, releases, and delivery risks.",
+      "Investigate and fix a GitHub issue, review thread, or failing GitHub Actions check.",
+      "Commit and safely send local changes to GitHub, then verify the pull request's delivery state."
     ],
     "brandColor": "#DE4C36",
     "composerIcon": "./assets/git-small.svg",

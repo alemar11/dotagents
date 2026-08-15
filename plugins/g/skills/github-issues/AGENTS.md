@@ -17,6 +17,8 @@ canonical option ownership in the plugin-level references.
   and readback only.
 - Keep free-form provider text file-backed and secret-safe; direct `gh` paths
   must remain explicit, dry-run capable, and independently verified.
+- Keep native dependency result meanings in `references/states.md`; workflow
+  references may route to them but must not define a second registry.
 - Validate shared CLI changes through `projects/g/AGENTS.md`; validate
   issue workflow edits with read-only or dry-run fixtures before any authorized
   remote write.

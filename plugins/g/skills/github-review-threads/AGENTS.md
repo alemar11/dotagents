@@ -10,6 +10,8 @@ reply, and resolution workflow. Keep runtime behavior in `SKILL.md` and
   envelopes exposed by the shared `scripts/g` artifact. Update it with
   any shared review command or schema change; do not make it a second source of
   executable behavior.
+- `references/states.md` owns feedback, review, reconciliation, and resolution
+  state meanings; schema mirrors must route to it instead of redefining them.
 - Shared provider journaling, reservation, recovery, and terminal-evidence
   logic belongs to `projects/g/` and its project-scoped maintenance
   guide.
