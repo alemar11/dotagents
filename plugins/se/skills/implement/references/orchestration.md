@@ -1,7 +1,10 @@
 # Implement Orchestration
 
 This reference owns Feature Plan Set scheduling, textual-plan interpretation,
-Feature Worker dialogue, user plan questions, and delivery-topology routing.
+application-task control, user plan questions, actionable-frontier selection,
+and delivery-topology routing. Worker implementation belongs to
+[worker-execution.md](worker-execution.md); publication and monitoring are
+routed to their phase owners below.
 Use [states.md](states.md) for the canonical meaning of workflow nodes,
 persisted status/checkpoint pairs, runtime-only modes, and terminal invocation
 outcomes.
@@ -12,474 +15,240 @@ contract to the exact final content. G owns transport and readback.
 
 ## Control plane
 
-The orchestrator coordinates one run containing one or more caller-supplied
-GitHub parent Feature issue refs and the authoritative Feature Plan Sets and
-Macro projections resolved from them. Each selected Feature member retains its
-Feature ID, repository binding, one Feature
-assignment, one observed Macro projection state, one Feature Worker, and one PR
-output. The orchestrator derives technical execution units and T-AC criteria
-from the Feature semantic contract plus any available verified Macro context
-before scheduling; the Plan Set does not contain the runtime execution graph.
+The orchestrator coordinates the exact caller-selected Features. Each retains
+its Feature and repository identity, Macro projection state, one assignment,
+one Feature Worker, and one PR output. The orchestrator derives execution units
+and T-AC criteria before scheduling, owns all ledger and aggregate state, and is
+the sole monitor after publication.
 
-PR delivery readiness is established from exact PR publication, current CI,
-hosted review feedback, and stack evidence. The orchestrator is the sole
-delivery-monitoring and aggregate lifecycle owner. Feature Workers never poll
-their own PRs while inactive. Branch protection and rulesets are outside the
-Implement completion contract.
-
-Run independent Features concurrently when their repositories, derived path
-envelopes, real cross-Feature code dependencies, Feature-level `blocked_by`
-context, and observed runtime capacity are safe. A same-repository dependent
-may enter a later execution wave as soon as its immediate parent is
-`candidate-published` and no applicable CI check on that exact parent HEAD is
-confirmed failing. Pending CI remains non-blocking. A confirmed failure blocks
-the child unless G-owned diagnosis verifies it as exclusively infrastructure or
-flaky and unrelated to candidate correctness; parent delivery readiness is not
-a worker-bootstrap gate. Serialize unsafe overlap and cross-repository outcome
-dependencies. Do not create synthetic dependencies, impose a fixed worker cap,
-or stop independent Features because one assignment is blocked, deferred, or
+Run independent Features concurrently only when repository, path envelope,
+implementation prerequisites, Feature dependency context, and observed capacity
+are safe. A same-repository child may start from its verified
+`candidate-published` parent HEAD when no applicable current-head CI check is
+confirmed failing. Pending CI is allowed; bypass a confirmed failure only after
+G-owned diagnosis proves it exclusively infrastructure or flaky and unrelated
+to candidate correctness. Serialize unsafe overlap and cross-repository outcome
+dependencies. Never invent dependencies, impose a fixed Worker cap, or stop
+independent work because another assignment is blocked, deferred, or
 delivery-pending.
 
-Before any Feature Worker starts, claim the complete sorted Feature set in one
-ledger transaction. A conflicting active claim blocks startup without partial
-claims or a competing orchestrator. Release all claims atomically after
-terminal reconciliation.
+Before any Worker starts, claim the complete sorted Feature set atomically. A
+conflicting active claim blocks startup without partial claims or a competing
+orchestrator. Release the complete claim set only after terminal
+reconciliation.
+
+## Actionable frontier and handoff discipline
+
+At every scheduling point, derive the set of effects that are currently
+dependency-ready, capacity-safe, authorized, and unambiguous. When exactly one
+effect is eligible, perform it directly and reconcile its immediate result
+before emitting another scheduling report. When several effects are eligible,
+retain normal dependency, safety, capacity, and fairness arbitration. When no
+effect is eligible, preserve the current observation lineages and wait for a
+material change or close with the applicable terminal outcome.
+
+Direct execution never crosses a pending Worker or provider effect, a required
+operation reservation or readback, ambiguous identity or authority, a user
+decision, multiple eligible effects, or an exact-HEAD or recovery
+reconciliation boundary. The actionable frontier is derived transient control
+logic, not a field, status, checkpoint, runtime mode, or ledger value.
+
+Before creating or resuming a Feature Worker, freeze one complete but compact
+handoff. It contains or canonically references the run and Feature identities,
+repository/project destination, exact base and intended branch ownership,
+`feature_plan_set_id` and revision, current `runtime_contract_version`,
+publication stop boundary, requested Worker profile and bootstrap-result
+contract, phase references, and the result expected at an existing workflow
+node. The Plan Set revision and runtime contract version are the stable source
+and runtime contract generation; do not invent another field. Project source
+contracts and shared doctrine by reference; never paste this skill, a parent
+prompt, prior bootstrap result, or transcript into the Worker prompt.
+
+The shared [task handoff](../../../references/task-handoff.md) owns
+change-driven observation and relay. For control-plane reconciliation between
+assigned tasks, a material delta is a new workflow node or persisted pair,
+candidate/provider HEAD or evidence fingerprint, claim/reservation/authority
+decision, review finding or disposition, blocker or user decision,
+execution-target change, or terminal result. Relay only the new facts and the
+identifiers needed to bind them to the existing assignment.
+
+A control-plane delta is not automatically a user-facing update. The outer
+controller coalesces internal node, checkpoint, and milestone changes and
+reports them only when they introduce or resolve a blocker, require a user
+decision, materially change mutation authority or delivery evidence, or reach a
+terminal result. It does not mirror every orchestrator transition or unchanged
+observation. The orchestrator likewise does not send a generic `continue`
+message while [worker execution](worker-execution.md) still owns an eligible
+local action.
 
 ## Application-task control hierarchy
 
-Apply the shared
-[task handoff](../../../references/task-handoff.md) at both levels of the
-Implement hierarchy. The invoking task controller creates or resumes the one
-orchestrator in the invoking ChatGPT application project, independently
-observes its project-visible stable task identity, state, and title, and
-verifies that the orchestrator's structured bootstrap result is bound to that
-identity. The orchestrator's first turn is assigned-task bootstrap: it
-self-checks authoritative task-scoped execution evidence before ledger,
-repository, Worker, or hosted effects and never creates another orchestrator
-for the same run.
+Apply the shared [task handoff](../../../references/task-handoff.md) to both
+required controller edges. The invoking controller creates or resumes the one
+orchestrator in the invoking application project, independently observes its
+stable identity, project visibility, state, and title, and binds the
+orchestrator's assigned-task bootstrap before normal relay. The orchestrator's
+first turn performs that authoritative self-check before ledger, repository,
+Worker, or hosted effects.
 
-Creation and resume are mutually exclusive per role identity. A fresh run
-creates one new orchestrator and one new Worker per selected Feature. A
-validated resume reuses only the exact previously bound project-visible task.
-Create a not-yet-created role only after authoritative evidence proves no prior
-creation effect was applied. If a retained role identity is missing or cannot
-be verified, stop with `unsupported-runtime` and do not create a replacement.
+That controller-to-orchestrator bootstrap is the invocation envelope outside
+the Implement node registry. The verified orchestrator enters the graph at
+`intake`. A `source-preflight` failure creates no Feature Worker, ledger,
+worktree, branch, publication, or other downstream effect; retain only the
+orchestrator bootstrap and authoritative source-read evidence needed to report
+the failure.
 
-After that bootstrap, the orchestrator becomes the task controller for every
-Feature Worker. It freezes each Worker request, creates or resumes the Worker
-in the application project for that Worker's target repository, independently
-observes the project-visible stable Worker identity, and binds the Worker's
-structured bootstrap result to it before accepting normal updates. The Feature
-Worker reads its own authoritative task-scoped context and performs its
-bootstrap self-check before implementation or worktree content writes. It does
-not create or resume another Feature Worker. A Worker's profile may
-intentionally differ from the orchestrator's; compare the Worker only with its
-assignment-specific request.
+A fresh run creates new required roles; a validated resume reuses only the exact
+retained project-visible identities. Create a missing role only after
+authoritative evidence proves no prior creation effect was applied. Missing or
+unverifiable retained identity is `unsupported-runtime`, never authority for a
+replacement.
 
-Both controller edges are required application-task handoffs, not subordinate
-delegation. Failure to establish either project-visible edge follows the shared
-`unsupported-runtime` fail-closed path. Optional support may begin only below a
-verified Feature Worker and can never be promoted into either required role.
+After bootstrap, the orchestrator becomes controller for every Feature Worker.
+It freezes the assignment-specific request, creates or resumes the Worker in
+the target repository's application project, independently observes the stable
+identity and project visibility, and binds the Worker's authoritative bootstrap
+and actual Git target before accepting role work. The Worker performs this
+self-check before content writes, never creates another Feature Worker, and may
+have a profile intentionally different from the orchestrator.
 
-An unstructured Worker self-report is not bootstrap evidence. A missing or
-unobservable authoritative child profile follows the shared
-`unsupported-runtime` rules, while a present authoritative exact-Worker
-profile that differs from the request is `effective-profile-mismatch`. A
-present evidence identity bound to another task is `task-identity-mismatch`,
-and a present Git execution-target difference is
-`execution-target-mismatch`. All blocked outcomes preserve and reconcile the
-same Worker without replacement. The orchestrator verifies the bootstrap
-identity binding but does not duplicate the Worker's raw profile read. It
-compares the Worker's independently observed Git execution target with the
-frozen handoff. These bootstrap checks add no ledger state and do not change
-the runtime workflow graph.
+Both edges are required project-visible application tasks; subordinate
+delegation cannot satisfy either. Optional support may start only below a
+verified Worker. Preserve the same task after `unsupported-runtime`,
+`effective-profile-mismatch`, `task-identity-mismatch`, or
+`execution-target-mismatch` and follow the shared reconciliation path. These
+checks add no ledger state.
 
 ## Starting-branch selection and freshness
 
-Treat `starting_branch` as an optional caller-owned selection scoped to one
-target repository. One unqualified selection is valid only for a
-single-repository run. For multiple repositories, require repository-qualified
-selections for every override; a repository without an override uses its own
-authoritative provider default branch. Resolve the selection during
-runtime-preflight and reject a missing, ambiguous, inaccessible, or
-wrong-repository branch. Never fall back silently to the provider default,
-current checkout, or another local branch after the caller supplied a value.
+Treat `starting_branch` as caller-owned input scoped to one repository.
+Require repository-qualified overrides for multi-repository runs and use the
+authoritative provider default only where no override exists. Reject a missing,
+ambiguous, inaccessible, or wrong-repository selection without fallback.
 
-Before every standalone or root Feature Worker bootstrap wave, refresh the
-selected branch from its authoritative upstream through the G-owned branch
-transport and read back its full remote tip SHA. The source ref supplied for
-the application-managed worktree starting state must resolve to that tip. A fetch-only
-receipt, stale remote-tracking ref, current checkout HEAD, or branch name
-without exact-SHA readback is insufficient. Updating the caller's active
-checkout is not required. Any local branch update used for bootstrap must be
-fast-forward-only and preserve unrelated or dirty checkout state; never merge,
-rebase, force-update, discard user changes, or change branches to manufacture
-freshness. When an exact refreshed starting ref cannot be established safely,
-block before creating a Feature Worker.
+Before each standalone or stack-root bootstrap wave, use G-owned branch
+transport to refresh the selected upstream and read its full remote tip SHA.
+Do not rely on a fetch receipt, stale tracking ref, current checkout, or branch
+name alone. Any local update used for bootstrap must be fast-forward-only and
+preserve unrelated or dirty checkout state; otherwise use an isolated ref or
+block.
 
-Freeze the refreshed branch as the wave's `base_branch` and full `base_sha`.
-Every standalone or root assignment for the same repository in that wave must
-start from that exact snapshot. Re-read the authoritative branch tip
-immediately before each worktree creation. If it changed, stop the remaining
-bootstraps, refresh the snapshot, and recompute the unstarted wave; never mix
-two starting SHAs inside one bootstrap wave. After worktree creation, verify
-that its initial HEAD resolves to the frozen `base_sha` before the Worker may
-write repository content. The initial checkout may be detached or attached;
-detached HEAD at the exact frozen SHA is the normal valid state for an
-application-managed isolated worktree. Do not require the selected
-`base_branch` to be checked out, and do not require a Feature `head_branch` to
-exist during the assigned-task bootstrap. A repository, remote, worktree, or
-SHA mismatch blocks that assignment without treating the task or worktree
-receipt as implementation progress.
+Freeze that tip as the wave's `base_branch` and `base_sha`. Reread it before
+each worktree creation. If it changes, stop unstarted bootstraps, refresh, and
+recompute that remainder so one wave never mixes base SHAs. Verify every new
+worktree starts at the frozen SHA; attached or detached HEAD is valid. Project
+metadata is not Git evidence.
 
-After the assigned-task identity, profile, and initial execution target match,
-the Feature Worker creates or checks out its deterministic `head_branch`
-through the G-owned branch workflow from the unchanged `base_sha`. It then
-reads back the branch and exact HEAD before any repository content write. Only
-that post-bootstrap branch readback may establish the durable
-`active @ worker-bootstrap` assignment checkpoint. On recovery from that
-checkpoint, the recorded `head_branch` is required and a detached or different
-checkout is drift that must be reconciled. Apply the same sequence to a
-stacked child: its initial detached HEAD may equal the verified immediate
-parent candidate SHA, after which the child creates its own `head_branch`.
+After task identity, profile, and initial target match, the Worker establishes
+its deterministic `head_branch` from the unchanged base through G-owned branch
+transport and reads back branch and HEAD before content writes. Only then record
+`active @ worker-bootstrap`. On recovery, the recorded head branch is required.
 
-The selected starting branch applies to standalone assignments and the root
-of every same-repository stack. A stacked child instead starts from its
-verified immediate parent's `candidate-published` branch and exact candidate
-SHA. That parent base overrides the repository selection only for the child;
-it does not change the selected landing branch at the root of the stack.
+A stacked child instead starts at its verified immediate parent's
+`candidate-published` branch and exact candidate SHA, then creates its own
+head branch. The repository selection still governs the stack root and landing
+branch.
 
 ## Macro plan interpretation and execution units
 
-The orchestrator resolves only the exact caller-supplied parent issue refs,
-then reads the authoritative Feature Plan Set manifest, hosted sibling
-registry, each selected parent Feature semantic contract, and any reachable
-local Macro Task children before deriving a transient technical execution unit
-set. It verifies set identity/revision, Feature membership, outcome, scope,
-non-goals, F-AC identities and high-water evidence, and Feature-level
-`blocked_by`. Sibling entries provide consistency and dependency evidence but
-never expand the selected implementation set. Record Macro projection
-availability as `complete`, `partial`, or `absent`. Validate every reachable
-local child and quarantine missing, extra, duplicate, cross-parent, cyclic, or
-mismatched Task projections from execution and closure intent. Those defects
-do not block a worker when the parent Feature semantic contract is sufficient;
-they block only when they also make that contract or Feature-level dependency
-topology ambiguous. Never create or repair hosted Task projections. GitHub
-labels and native Issue Types are outside this workflow and must not be read,
-searched, inferred, validated, mutated, or used as gates.
+Resolve only the caller-supplied parent issues. Verify their Plan Set identity,
+revision, sibling membership, Feature contract, F-AC set, high-water evidence,
+and Feature-level `blocked_by`; siblings never expand the selection. Classify
+local Macro projections as `complete`, `partial`, or `absent`, use verified
+children as context, and quarantine invalid projections. Continue when the
+parent contract remains sufficient, and never create or repair a hosted Task.
 
-When native GitHub issue dependencies are observable, compare `blockedBy` and
-reciprocal `blocking` with the body-backed Feature and Macro graphs. Treat the
-native relation as diagnostic projection evidence only. A missing, failed,
-unavailable, unknown, extra, or stale provider edge is reported without
-blocking or changing scheduling, stack intent, execution units, or closure.
-Never infer a semantic edge from provider metadata and never repair a native
-dependency during Implement.
+`source-preflight` blocks the invocation when a selected parent contract or the
+identity and direction of its semantic dependency relation is unreadable or
+ambiguous. An edge to an unselected Feature does not expand the selection:
+observe only the upstream identity and fulfillment evidence needed to interpret
+the selected contract. Missing or negative fulfillment evidence is then an
+assignment-local dependency condition under `delivery-gate` or `plan-question`,
+so independent selected Features continue; it is not a whole-run source failure
+when the relation itself is authoritative.
 
-Feature-level `blocked_by` relations are planning-owned hard outcome
-dependencies and may cross repositories. Repository identity controls their
-deterministic delivery projection: every same-repository edge is mandatory
-stack intent and every cross-repository edge is scheduling-only. Neither form
-creates technical execution-unit edges; the orchestrator still derives real
-implementation prerequisites independently. Macro `blocked_by` relations are
-planning context within one parent Feature and never create worker or PR
-boundaries. The orchestrator may combine, reorder, or internalize them while
-preserving every available Macro Task outcome and Feature criterion.
+GitHub labels and native Issue Types are outside this workflow. Native
+`blockedBy` and `blocking` are diagnostic only and never create, remove,
+repair, or gate a semantic edge. Same-repository Feature edges create stack
+intent; cross-repository edges create scheduling order; Macro edges remain
+same-parent planning context. None automatically becomes a technical
+execution-unit edge.
 
-Derive deterministic `T-AC-NN` criteria for the assignment and preserve their
-identities across candidate revisions. Every T-AC must map to one or more
-current F-AC identities and may only make their technical proof more specific.
-It cannot replace, weaken, delete, or reinterpret an F-AC or change outcome,
-scope, non-goals, or Feature dependencies. Every F-AC needs direct exact-HEAD
-evidence or at least one mapped T-AC; every T-AC needs exact-HEAD evidence.
+Derive stable assignment-scoped `T-AC-NN` criteria and map each to current
+F-AC identities without changing outcome, scope, non-goals, or dependency
+topology. Every F-AC needs direct exact-HEAD evidence or mapped T-AC coverage,
+and every T-AC needs exact-HEAD evidence. Preserve their identities across
+candidate revisions.
 
-If an upstream Feature named by `blocked_by` is missing, unverified, or outside
-the selected implementation scope, keep the dependent assignment blocked or
-deferred; never silently implement it as if the relation were absent. A
-same-repository dependent becomes worker-runnable only from a verified
-`candidate-published` parent branch and exact HEAD whose applicable current-head
-CI has no confirmed failure, except for a failure verified by G-owned diagnosis
-as exclusively infrastructure or flaky and unrelated to candidate correctness.
-CI that is still pending does not block the child. A cross-repository dependent
-remains ordered by the verified upstream outcome and keeps a standalone PR.
+An upstream Feature outside the selected and fulfilled scope blocks or defers
+its dependent assignment. A same-repository dependent becomes runnable only
+from a verified `candidate-published` ancestor vector satisfying the current
+CI rule; a cross-repository dependent remains ordered and standalone.
 
-Each derived unit must have:
-
-- one observable technical outcome;
-- repository and path scope;
-- implementation and validation intent;
-- Feature-criterion mapping;
-- deterministic T-AC criteria and their F-AC mapping;
-- real implementation prerequisites;
-- evidence needed from the Feature Worker.
-
-Use the smallest useful technical vertical units. Keep implementation and validation
-layers together when they serve one outcome. Do not split a unit merely by
-database, API, UI, test, documentation, or tracker layer unless that layer is
-independently valuable.
-
-Dependency edges mean real implementation prerequisites. Path overlap,
-capacity, preferred order, Feature-level delivery projection, and
-cross-repository prerequisites remain separate scheduling or topology facts
-and never become technical execution-unit edges automatically.
-
-The orchestrator owns this translation and may ask the Feature Worker to
-refine technical units and T-AC criteria during implementation. It must
-preserve every F-AC and every available Macro Task outcome, but it may derive
-missing execution coverage directly from the parent Feature contract. It must
-not rewrite or publish the Feature Plan or its Macro Task registry.
+Each derived unit records one observable technical outcome, repository/path
+scope, implementation and validation intent, F-AC/T-AC mapping, real
+prerequisites, and expected Worker evidence. Use small technical vertical
+units. Path overlap, capacity, preferred order, and delivery topology remain
+separate scheduling facts rather than invented prerequisites. The Worker may
+refine technical units and T-AC details while preserving the Feature contract;
+Implement never rewrites the Plan Set or Macro registry.
 
 ## User plan questions
 
-Implement resolves missing execution decomposition, ordinary technical
-ambiguity, and acceptance specificity autonomously. Enter `plan-question` for
-the affected assignment only when no semantic-preserving implementation is
-possible: F-AC contradict each other or the outcome, satisfying the contract
-requires changing outcome or scope, Feature dependencies are contradictory or
-cyclic, or a selected Feature is blocked by an unselected or unfulfilled
-Feature. Present the bounded conflict to the user with its evidence and impact.
-Persist `deferred @ plan-question` without claiming that the ledger stores the
-question body or a separate plan-question identity. Keep independent Features
-moving.
+Resolve ordinary decomposition, implementation, and acceptance detail inside
+Implement. Enter `plan-question` only when no contract-preserving result is
+possible because criteria conflict with each other or the outcome, scope must
+change, dependencies are contradictory or cyclic, or an unselected or
+unfulfilled Feature blocks the assignment. Persist `deferred @ plan-question`
+without storing the question body, and keep independent Features moving.
 
-Do not create a separate Feature planner task automatically. If the user's
-answer requires changing the published Feature Plan Set, report an explicit
-se:feature maintenance request as the recovery action and preserve the
-worker's useful implementation evidence where safe. Technical implementation
-ambiguity remains inside Implement and never becomes a Feature question.
+Do not create a planner task. If the answer requires a published Plan Set
+change, report the required se:feature maintenance and preserve safe Worker
+evidence.
 
 ## Execution and delivery topology
 
-For every Feature member, bootstrap exactly one Feature Worker. The worker
-executes its derived units in deterministic prerequisite order inside one
-isolated worktree. During implementation, commit frequently at coherent
-unit-of-work boundaries. It may use optional bounded support assignments when
-live delegation and usable worker capacity are observed; otherwise it
-continues
-serially. Parallelism is only between Features whose paths, repositories,
-dependencies, Feature-level scheduling context, and live capacity are safe.
+Bootstrap exactly one Feature Worker per selected Feature. It executes derived
+units in prerequisite order inside one isolated worktree, commits coherent
+units of work, and may use bounded optional support only under
+[worker-execution.md](worker-execution.md).
 
-Derive standalone or stacked delivery separately from execution order:
+Delivery topology is independent of execution order. A Feature is standalone
+when it has no same-repository Feature parent; otherwise it is stacked on one
+verified immediate parent branch and exact `candidate-published` HEAD.
+Serialization caused by overlap, capacity, or preference stays standalone. For
+fan-in, select one immediate parent only when its candidate contains every
+required prerequisite HEAD; otherwise require Plan Set reconciliation.
 
-- standalone: no same-repository Feature-level `blocked_by` parent exists;
-- stacked: one same-repository immediate parent is selected from the hosted
-  relation set and its verified `candidate-published` branch and exact HEAD are
-  the integration base.
+Before stacked-child bootstrap, reread parent PR, branch, full HEAD,
+publication checkpoint, stack capability, and applicable current-head CI.
+Stale or ambiguous evidence blocks only that child and never degrades it to
+standalone. Parent HEAD drift returns affected descendants to their same
+Workers for bottom-to-top rebase, validation, publication, and hosted review;
+native review does not restart after verified first publication.
 
-Serialization caused only by path overlap, capacity, or preferred order
-remains standalone. For same-repository fan-in, select one immediate parent
-only when its candidate already contains every other required same-repository
-prerequisite HEAD. Otherwise block the dependent assignment for explicit Plan
-Set reconciliation; never invent an ordering edge or silently choose a base.
+## Worker execution routing
 
-Before bootstrapping a stacked child, reread the parent PR, branch, full HEAD,
-`candidate-published` checkpoint, publication readback, and stack capability.
-Observe applicable CI on that exact parent HEAD. A confirmed failing check keeps
-the child out of the runnable wave unless G-owned diagnosis binds the failure to
-that check run and verifies it as exclusively infrastructure or flaky and
-unrelated to candidate correctness. Pending CI is allowed. The parent may remain
-`delivery-pending`; a stale or ambiguous candidate keeps only that child out of
-the runnable wave. Never silently degrade to standalone.
+The Feature Worker owns implementation, optional support, pre-candidate
+convergence, complete candidate-bound validation, hosted-finding repair, and
+valid existing-node exits under
+[worker-execution.md](worker-execution.md). The orchestrator supplies the
+verified handoff, accepts only those bounded outcomes, and never prescribes
+code, files, commands, tests, review fixes, or design.
 
-If a parent changes after a child starts, invalidate the descendant's
-integration, hosted review, CI, and readiness evidence. Return the parent to its
-worker, then rebase, revalidate, republish, and hosted-review descendants bottom
-to top without restarting native review. The
-orchestrator coordinates this sequence but never edits or rebases worker code.
+## Publication and monitoring handoff
 
-## Pre-candidate convergence
+Publication, stack reconciliation, and the verified `candidate-published`
+boundary belong to [review-delivery.md](review-delivery.md). Hosted review, CI,
+provider observation, repair resumption, and final verification belong to
+[delivery-monitoring.md](delivery-monitoring.md).
 
-Before first publication, keep the initial implementation inside
-`implement-validate` until the Feature Worker has stabilized one coherent
-pre-candidate draft. This is transient Worker behavior under the existing
-`active @ worker-bootstrap` pair. It adds no workflow node, checkpoint, ledger
-field, task role, or review authority, and it does not run for a verified
-published repair governed by hosted review.
-
-First integrate all planned writes and write-capable support results, then hold
-the source tree stable while inspecting it. Run the cheapest deterministic
-static or focused checks that exercise the changed surface and can expose an
-obvious implementation, configuration, or test-harness failure. These checks
-provide early feedback; they do not replace complete Feature validation.
-
-Derive the need for an early critic from the current F-AC/T-AC mapping and
-observable change risk. Use one bounded early challenge pass when the draft
-materially involves parser, protocol, schema, arbitrary-input, aggregate-bound,
-authorization, privacy, security, credential, lifecycle, retry, recovery,
-idempotency, cancellation, concurrency, distributed-state, migration,
-compatibility, cross-runtime, Unicode, platform, destination, packaging, or
-linkage behavior, or when one invariant governs several equivalent paths. Do
-not trigger the pass from Worker reasoning level, diff size, or available
-helper capacity alone. When none of these risks applies, skip the critic rather
-than adding a redundant review. Reuse the assignment's existing F-AC/T-AC
-matrix as the invariant checklist; do not create another checklist registry or
-persist critic state.
-
-When the pass applies, keep it read-only and advisory. Prefer the existing
-`critic-reviewer` support responsibility when optional delegation and usable
-capacity are observed; otherwise the Feature Worker performs the same challenge
-serially. Supply the stable draft, Feature contract, F-AC/T-AC mapping,
-applicable risks, equivalent paths, and current check evidence. Require one
-completed bounded finding set for that pass, consolidated and deduplicated by
-violated invariant, affected equivalent paths, and missing regression evidence.
-The result is not a claim of exhaustive findings and is not native-review or
-candidate evidence. Partial helper relays do not trigger piecemeal repairs. If
-no usable completed helper result is observed, fall back to the Worker's serial
-challenge without blocking the assignment.
-
-The Feature Worker triages the whole consolidated set before repairing every
-actionable instance coherently, then runs focused gap-driven checks for the
-repaired invariants and equivalent paths. Do not reflexively
-start another critic for every repair; reassess only when the repair materially
-changes the design or introduces a different risk class.
-
-Before complete validation, reconcile every support attempt against observed
-reality. For every helper independently observed as dispatched, either consume
-one usable completed result or reject its output. When an actually launched
-helper produces no usable result, the Feature Worker performs the equivalent
-support work; never use `unavailable` or `unknown` to reconcile that attempt.
-After all attempts are reconciled, record the single effective mode using the
-task-profile precedence. A mixed helper set remains `delegated-support` when
-any usable result was integrated; `serial-fallback` applies only when none was
-integrated and the Feature Worker performed a selected support responsibility.
-A rejected read-only attempt cannot block the Worker. Every unconsumed current
-or future helper result is irrevocably outside the candidate; choosing to
-integrate it later returns to `implement-validate`, creates a new HEAD, and
-invalidates candidate-bound evidence. A write-capable attempt may cross the
-stable barrier only after independently observed completion or cancellation
-and worktree readback that accounts for every residual write. An
-attempt that remains active may be disregarded only after proving that it is
-isolated from the candidate worktree and every validation-relevant output,
-cache, lock, device, database, and external state. Finish every source write,
-then re-observe the assignment's frozen base and prerequisite HEAD vector. A
-mismatched prerequisite or actual parent, base, or topology drift that has
-superseded the Worker's ancestry must follow the existing reconciliation path
-before spending the complete validation or native-review cycle. An advance of
-the selected starting branch after the bootstrap snapshot for a standalone or
-stack-root assignment, or pending hosted review or CI without concrete
-assignment drift, is not itself a reason to wait.
-
-After that stable barrier, commit and freeze the coherent source tree, verify
-the worktree is clean and pinned to its full SHA, then run complete Feature
-validation against that unchanged candidate. One complete pass is the normal
-target, not a limit: a failed check, source change, or actual base,
-prerequisite, or topology drift invalidates the affected evidence and requires
-repair, a new commit, and a new complete pass before first publication.
-Validation work may run concurrently only when every participant observes the
-same frozen candidate and uses isolated outputs, caches, locks, and external
-state. Otherwise serialize it. Bind the complete validation evidence to that
-full candidate SHA before entering `candidate`.
-
-## Candidate publication and central delivery monitoring
-
-After pre-publication native review and first publication, or after a hosted
-repair updates the existing PR without native review, the orchestrator verifies
-repository, PR, branch, full candidate HEAD, draft state, the minimal durable SE-owned PR body,
-registry-derived closure intent in that body, and any required stack link. If
-available, it records GitHub's
-`closingIssuesReferences` as optional provider diagnostics; that field never
-blocks publication. Only the remaining exact-head and topology readback
-establishes `candidate-published`.
-Checkpoint the assignment as `status=delivery-pending` and
-`checkpoint=candidate-published`, release its transient active path claim, and
-mark the Feature Worker inactive but resumable. This checkpoint is the only
-same-repository child-development checkpoint, but a confirmed applicable
-current-head CI failure still blocks child bootstrap unless it has the bounded
-G-owned infrastructure-or-flaky diagnosis described above. Pending CI remains
-non-blocking. This is not delivery completion.
-
-Return to `schedule` after every candidate publication. Run the scheduler
-immediately only for runnable work or materially new evidence; when all work is
-pending, retain the current observations under the shared change-driven
-monitoring policy. Interleave delivery-pending PR lineages fairly. The
-orchestrator combines G-normalized review, CI, exact-head, and parent/base
-evidence and never asks inactive Workers to poll. An unchanged pending
-observation does not trigger a no-work scheduling cycle. A clean review and CI
-observation enters final verification when complete validation is already
-current. When a published repair has only focused validation, resume the same
-Worker through `implement-validate` for complete validation on that exact
-HEAD. An unchanged result proceeds directly to `final-verify`; a changed
-candidate returns through publication and hosted review.
-
-For an actionable finding, evidence mismatch, or parent drift, preserve the
-exact PR, head, provider artifact, and observation fingerprint. Reacquire the
-Worker's path envelope before resumption, then contact the same Worker with
-only that bounded evidence. If the path claim is unavailable, keep the repair
-pending without permitting overlapping writes. Because the verified PR already
-exists, hosted review remains authoritative: a new candidate repeats affected
-validation, publication readback, `candidate-published`, and central monitoring
-without native review. Preserve unaffected Feature, Worker, PR, operation, and
-topology evidence instead of restarting the assignment globally.
-
-## Optional Feature Worker support
-
-The Feature Worker is the parent owner of one Feature member, its observed
-Macro projection state and available local Task context, worktree, integration branch, candidate HEAD,
-acceptance matrix, pre-publication native review, hosted-finding repairs, and
-PR. Macro Tasks are planning
-projections, not worker or PR boundaries.
-Optional support assignments are subordinate to that lifecycle and are not
-additional Feature assignments. The parent may select these bounded
-responsibilities:
-
-- `code-analyst` for read-only repository, impact, and dependency analysis;
-- `execution-assistant` for one explicitly bounded execution unit;
-- `validation-assistant` for focused checks and validation evidence;
-- `critic-reviewer` for the conditional read-only pre-candidate challenge and
-  later independent design or regression challenges when applicable.
-
-The parent supplies each helper with the current Feature ID, Plan Set revision,
-available local Macro Task context, execution-unit scope, exclusive path
-envelope, and validation intent. Helpers
-return evidence or a scoped change proposal; they never edit or publish the
-Feature Plan, never access the SQLite ledger, never mutate GitHub, never create
-Feature Workers or planner tasks, and never own final delivery evidence. An
-execution assistant may write only within an exclusive envelope or isolated
-helper context. The
-Feature Worker integrates the result and owns the final candidate commit.
-Before first publication it follows pre-candidate convergence, complete
-candidate-bound validation, and mandatory native review. After
-`candidate-published` it follows the hosted repair loop: focused validation,
-publication, hosted re-review, then complete validation on the exact final HEAD.
-
-Do not run overlapping writes in the same worktree. When a selected support
-responsibility cannot use delegation because it is unavailable, unknown, or
-has zero capacity, the Feature Worker performs that responsibility; these
-conditions do not block the Feature Worker. After reconciling every selected
-responsibility, record exactly one effective mode using the task-profile
-precedence: `delegated-support` when any usable helper result was integrated,
-otherwise `serial-fallback` when the Feature Worker performed the selected
-support, and otherwise the applicable no-support `unavailable` or `unknown`
-mode. The orchestrator reports that mode but does not treat configured
-delegation or capacity as proof that a helper started.
-
-## Feature Worker dialogue
-
-The orchestrator may exchange only bounded control-plane messages:
-
-- verified bootstrap and plan revision;
-- execution-unit or coarse milestone request;
-- evidence-only mismatch or reconciliation request;
-- actionable hosted-review or parent-drift resumption request;
-- plan-question decision request;
-- terminal-state request.
-
-Every message is edge-triggered by a new bootstrap result, state transition,
-actionable evidence fingerprint, authority decision, exact-HEAD or topology
-change, or missing terminal report. Do not repeat a milestone, terminal,
-status-only, heartbeat, or "continue" request without a material intervening
-change and reconciliation of the prior message effect.
-
-It must not prescribe code, files, commands, tests, review fixes, or design.
-The Feature Worker owns implementation semantics, conflict resolution,
-validation, candidate evidence, pre-publication native review, hosted-finding
-repairs, and fixes.
-
-The orchestrator is the only creator of implementation assignments and
-Feature Worker tasks. A Feature Worker never creates another Feature Worker or
-planner task. It may create subordinate support assignments only when the
-optional delegation preflight is available; those assignments remain outside
-the implementation ledger and never replace the parent Feature Worker.
+After a verified publication handoff, return to `schedule`. An unchanged
+pending observation adds no eligible effect to the actionable frontier. New
+actionable evidence resumes the same Feature Worker only after its path
+envelope is reacquired, and the resumption contains only the new evidence plus
+the identifiers needed to bind it to the retained assignment. Independent
+runnable assignments and delivery lineages continue fairly.
 
 ## Ledger boundary
 

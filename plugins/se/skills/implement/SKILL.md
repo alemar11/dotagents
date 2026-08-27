@@ -5,204 +5,148 @@ description: "Implement or resume only the published Features named by caller-su
 
 # Implement Feature Plan Sets
 
-## Input and output invariant
+## Scope and result
 
 Use this skill only for an explicit request to implement or resume one or more
-published SE Features identified by caller-supplied GitHub parent issue
-references. The caller must provide one or more exact issue URLs or
-repository-qualified issue IDs; an unqualified numeric issue ID is valid only
-when one target repository is already unambiguous. The selected implementation
-set is exactly those parent issues. Never discover or auto-add a Feature from a
-Plan Set ID, sibling registry, title, search result, GitHub label, or native
-Issue Type, and never enlarge the selected implementation set.
+published SE parent Features identified by caller-supplied GitHub issue
+references. The selected set is exactly those parent issues. Never discover or
+add Features from a Plan Set ID, sibling registry, title, search, label, native
+Issue Type, or dependency edge. An unqualified issue number is valid only when
+one target repository is unambiguous.
 
-Each supplied parent issue must resolve to one complete, authoritative sibling
-Feature registry. The selected parent Feature issue is the required semantic
-contract, and every selected Feature member must have:
+Each selected parent issue must resolve to one complete authoritative sibling
+registry and the exact supplied parent reference. Require
+`feature_plan_set_id`, revision, stable `feature_id`, repository identity and
+complete hosted readback; observable outcome, scope, non-goals, landing state,
+ownership boundary, and delivery reason; stable F-AC-NN criteria and monotonic
+high-water evidence; resolved material questions, explicit assumptions, risks,
+and validation intent; Feature-level `blocked_by`, set-membership and dependency
+readback; a complete textual handoff ready for technical interpretation; and
+publication readiness. Sibling entries are consistency and dependency evidence
+only.
 
-- `feature_plan_set_id`, revision, stable `feature_id`, repository identity,
-  and complete hosted readback;
-- the exact authoritative parent issue reference supplied by the caller;
-- an observable outcome, scope, and non-goals;
-- a usable landing state, ownership boundary, and delivery reason;
-- stable Feature acceptance criteria using F-AC-NN identities;
-- monotonic Feature acceptance high-water evidence;
-- resolved material questions, explicit assumptions, risks, and validation
-  intent;
-- Feature-level `blocked_by` readback to Feature IDs in the same set;
-- authoritative set-membership and Feature dependency readback;
-- available native GitHub dependency attempt/readback evidence as diagnostic
-  provider projection only;
-- a complete textual handoff that is ready for technical interpretation;
-- publication and readiness evidence.
+Classify the optional local Macro Task registry and hosted child projections as
+`complete`, `partial`, or `absent`. Use every verified unambiguous child as
+planning context and closure intent. Quarantine missing, extra, duplicate,
+cross-set, cross-parent, cyclic, or mismatched projections and continue when the
+parent Feature contract is still sufficient. Never invent, repair, or publish a
+Task projection during Implement.
 
-The local Macro Task registry and hosted child Task issues are optional
-planning projections for Implement. Classify their observed availability as
-`complete`, `partial`, or `absent`. Validate and use every unambiguous local
-projection that exists, but a missing registry entry, missing child issue, or
-unreadable child projection does not block implementation when the parent
-Feature semantic contract is sufficient. Quarantine an extra, duplicate,
-cross-set, cross-parent, cyclic, or mismatched Task projection from execution
-and closure intent, record the exact degradation, and continue from the parent
-Feature contract unless that defect also makes Feature outcome, scope, F-AC,
-or Feature-level dependencies ambiguous. Never invent, repair, or publish a
-Task issue automatically.
+The caller may select one optional `starting_branch` per repository. Require
+repository-qualified overrides for a multi-repository run; otherwise use that
+repository's authoritative provider default. Reject a supplied branch that is
+missing, ambiguous, inaccessible, or belongs to another repository. Refresh
+and freeze the exact selected upstream tip before root Worker bootstrap; never
+silently substitute the current checkout or another branch.
 
-The caller may provide one optional `starting_branch` selection per target
-repository. This is a selectable invocation input, not Feature Plan content or
-durable configuration. An unqualified value is valid only when every selected
-Feature targets one repository; a multi-repository run requires each override
-to be repository-qualified. When an override is omitted, resolve that
-repository's authoritative provider default branch. A supplied branch must
-exist in the declared target repository; never silently substitute the default
-branch, another local branch, or the current checkout.
+Feature-level `blocked_by` is semantic authority and may cross repositories.
+Every same-repository edge is mandatory stack intent; every cross-repository
+edge is scheduling-only. Native GitHub dependency relations are diagnostic and
+never add, remove, repair, or gate an edge. Macro dependencies remain
+same-parent planning context and never define a Worker or PR boundary.
 
-The hosted Feature Plan Set and selected parent Feature semantic contract are
-required input. Local Macro Task projections are useful planning context, not
-an implementation gate or a technical execution graph. Read sibling registry
-entries only to validate set consistency and dependency context; do not expand
-the implementation selection beyond the caller-supplied parent issue refs.
-Feature-level `blocked_by` relations express hard outcome dependencies and may
-cross repositories. Every same-repository edge is mandatory stack intent;
-Implement projects every cross-repository edge as scheduling-only. Macro Task
-dependencies are same-parent-only.
-Read native `blockedBy`/`blocking` relations when available and compare them to
-the body-backed graph, but never use them as semantic authority or a gate. A
-missing, failed, unavailable, unknown, extra, or stale native projection is
-reported as provider drift and does not erase, add, or alter a Plan Set edge.
-Implement never repairs native issue dependencies automatically.
-Macro `blocked_by` relations are local to one `parent_feature_id` and remain
-eligible for technical internalization when their projections are available.
-An authoritative technical Task dependency graph, published T-AC identifiers,
-or automatic plan-repair result is not required input.
-Implement derives internal execution units, implementation dependencies, safe
-path envelopes, and runtime waves from the set and each Feature registry
-during Prepare Run. Those units belong to the Implement control plane and are
-not silently sent back to Feature for ordinary technical clarification.
+During Prepare Run, derive transient technical execution units, safe path
+envelopes, real implementation prerequisites, and stable assignment-scoped
+`T-AC-NN` criteria. Every T-AC specializes one or more current F-AC criteria
+without replacing, weakening, or reinterpreting them, and both evidence sets
+bind to the current exact HEAD. Resolve ordinary technical ambiguity inside
+Implement. Enter `plan-question` only when no semantic-preserving
+implementation exists because criteria or outcome conflict, scope must change,
+Feature dependencies are contradictory or cyclic, or an unselected or
+unfulfilled Feature blocks the selection.
 
-Implement also derives deterministic `T-AC-NN` technical criteria for the
-assignment. Each T-AC maps to one or more current F-AC identities and may only
-specialize how those Feature criteria are demonstrated. A T-AC must never
-replace, weaken, delete, or reinterpret an F-AC, or change the Feature outcome,
-scope, non-goals, or dependency topology. Preserve T-AC identities across
-candidate revisions in the assignment and bind their evidence to the current
-exact HEAD. Every F-AC must have direct exact-HEAD evidence or coverage through
-one or more mapped T-AC criteria.
+The result is exactly one verified PR output per implementation-eligible
+Feature, standalone or stacked as derived above. Its source-derived closing set
+contains only that parent Feature and every verified existing associated local
+Macro Task. A Feature with no exclusive implementation delta receives no empty
+commit, cosmetic change, artificial proof, or empty PR; report the product
+question and stop that assignment.
 
-Do not start from an isolated Macro Task, an isolated technical Task, local
-draft, Idea, unbounded request, or preview-only plan. Implement resolves
-ordinary technical ambiguity, missing execution decomposition, and acceptance
-specificity autonomously. Pause the affected assignment at `plan-question` and
-report the exact conflict only when no semantic-preserving implementation is
-possible: F-AC contradict each other or the outcome, satisfying them requires
-changing outcome or scope, Feature dependencies are contradictory or cyclic,
-or a selected Feature is blocked by an unselected or unfulfilled Feature. Keep
-independent Features moving. Do not create a hidden planner task or
-automatically invoke se:feature.
+GitHub is mandatory end to end. Implement never merges, deploys, releases,
+changes provider policy, performs post-merge closure, or substitutes a local
+result. Complete requires one current exact-HEAD PR topology with complete
+F-AC/T-AC validation, hosted review, CI, body/closure-intent, base, and stack
+readback for every eligible Feature.
 
-The terminal output is one verified pull-request topology with exactly one PR
-output per implementation-eligible selected Feature. Map its branch, exact
-HEAD, PR, topology, Macro context, derived units, and F-AC/T-AC evidence as
-specified in the terminal report; never rewrite the hosted planning artifacts.
+## Non-negotiable runtime invariants
 
-Complete requires current exact-HEAD acceptance, PR/base/stack readback, CI,
-and hosted-review evidence for every eligible Feature. Provider policy and
-`closingIssuesReferences` remain optional diagnostics; the source-derived
-closing intent stays in the PR body. A Feature with no exclusive implementation
-delta must not receive an empty commit, empty PR, cosmetic change, or
-artificial proof; report the zero-delta product question and stop that
-assignment.
+A fresh run creates one project-visible orchestrator task in the invoking
+ChatGPT application project and exactly one project-visible Feature Worker in
+the target project for each selected Feature. A validated resume reuses only
+the exact retained identities. Subordinate delegation and optional support
+never replace either required role, and an unavailable or unverifiable required
+task fails closed without a replacement.
 
-Keep SE-authored PR bodies reviewer-facing and durable. Exclude routine counts,
-raw output, internal evidence, and mutable diagnostics; use the exact contract
-in [review-delivery.md](references/review-delivery.md).
+Before any task effect, load [task-profile.md](references/task-profile.md), the
+shared [task preflight](../../references/task-preflight.md), and the shared
+[task handoff](../../references/task-handoff.md). Actively request each
+role's complete model and reasoning profile, bind its authoritative assigned
+task bootstrap and Git execution target to the independently observed stable
+task identity, and reconcile its deterministic title once. The explicit
+Implement invocation authorizes only this required hierarchy and its declared
+delivery effects.
 
-GitHub interaction is mandatory end to end. This skill never merges, deploys,
-releases, or performs post-merge closure; local Git is not an alternative
-terminal result. The delivery lifecycle ends at a published PR verified on its
-exact HEAD. Its merge, effective closure, and later activity remain outside the
-workflow; [review-delivery.md](references/review-delivery.md) owns the details.
+The orchestrator alone owns the SQLite ledger, Feature claims, path-claim
+coordination, side-effect reservations, delivery monitoring, and aggregate
+completion. A Worker owns one Feature's implementation, validation, candidate
+and repair semantics; it never accesses the ledger or polls its inactive PR.
 
-## Shared contracts and dependencies
+Before first publication, complete validation and native review bind to the
+same exact candidate HEAD in the same Worker. Any pre-publication HEAD change
+invalidates both and repeats that gate. Exact first-PR publication readback
+permanently transfers review authority to the hosted lineage; later repairs,
+rebases, or parent drift update the same PR and never restart native review.
+Complete validation and clean hosted review must converge on the same final
+exact HEAD.
 
-Read the shared workflow-graph contract before using this registry. The
-registry is the structural source of truth and Mermaid is its projection.
-Read the canonical human-readable [state model](references/states.md) before
-interpreting a workflow node, persisted status/checkpoint pair, operation
-result, provider disposition, runtime-only mode, or output label.
+Before the first required GitHub read or write, load the shared
+[G dependency preflight](../../references/codex-dependency-preflight.md).
+Route every Git and GitHub operation through its G-owned workflow and apply the
+shared [hosted-content-safety.md](../../references/hosted-content-safety.md)
+contract immediately before every hosted write. Branch protection, rulesets,
+merge queue, auto-merge, and the general delivery-status workflow are not
+completion gates.
 
-Before the mandatory first GitHub Feature Plan, issue, PR, review, or relation
-read or write, load the shared G dependency preflight. All GitHub
-transport, hosted mutation safety, publication, and read-after-write
-verification belong to G-owned workflows. The explicit Implement request
-implicitly authorizes only the exact selected plan and delivery writes.
+The role about to make each G handoff owns that handoff's dependency gate. A
+prior pass never substitutes for the next required handoff gate.
 
-GitHub labels and native Issue Types are outside the Implement input and state
-model. Do not read, search, infer, validate, mutate, or gate on them. Semantic
-Feature identity comes only from each caller-supplied parent issue reference
-plus its structured body, Plan Set registry, and verified parent/child
-relations.
+## Phase routing
 
-Do not require or invoke $g:github-delivery-status as an Implement completion
-gate. Use the focused G-owned PR publication, CI, review, and stack workflows
-for the exact-head evidence this skill owns. Branch protection and rulesets
-are outside this workflow; if an outer coordinator supplies provider-policy
-observations, preserve them as optional provider diagnostics and never block
-completion
-on their availability or disposition. Automation observations never authorize
-Implement to merge or change hosted policy.
-Implement never merges, bypasses protections, enables or disables auto-merge, or
-enqueues or dequeues a PR.
+Read the shared [workflow-graph contract](../../references/workflow-graph.md)
+before using this registry, and read
+[states.md](references/states.md) before interpreting any workflow node,
+persisted pair, provider disposition, runtime-only mode, or output label. Load
+only the current role and phase owner:
 
-Before every hosted write, load the shared
-[hosted-content-safety.md](../../references/hosted-content-safety.md) contract.
-Implement owns the final portable projection; G owns transport and readback.
+| Role or phase | Canonical reference |
+| --- | --- |
+| Controller and orchestrator bootstrap, plan interpretation, scheduling, topology, plan questions, and aggregate control | [orchestration.md](references/orchestration.md) |
+| Feature Worker implementation, optional support, pre-candidate convergence, complete validation, and phase exits | [worker-execution.md](references/worker-execution.md) |
+| Candidate boundary, native review, first publication or PR update, stack reconciliation, and candidate-published handoff | [review-delivery.md](references/review-delivery.md) |
+| Ready transition, hosted review and CI, repair monitoring, provider diagnostics, and final verification | [delivery-monitoring.md](references/delivery-monitoring.md) |
+| Ledger preparation, checkpointing, reservation, reset, or recovery | [run-state.md](references/run-state.md) |
 
-Before creating, resuming, or monitoring tasks, load the Implement task
-profile, shared task preflight, and shared task handoff. An explicit
-`se:implement` invocation is the user's request and bounded authority for the
-required hierarchy; do not ask for a second task-permission confirmation. For
-a fresh run, create exactly one new user-owned orchestrator task in the
-invoking ChatGPT application project and one new Feature Worker task per
-selected Feature in that Feature's assigned target project. A validated resume
-reuses only each exact previously bound project-visible task identity. Create a
-not-yet-created role only after authoritative evidence proves no prior creation
-effect was applied; a missing or unverifiable retained identity blocks without
-a replacement. Independently observe every required task in its project and
-bind its authoritative bootstrap before role-owned effects.
+The orchestrator loads monitoring guidance only after a verified publication
+handoff. The Worker loads review-delivery only after candidate-bound validation
+reaches `candidate`; it never loads ledger or aggregate-monitoring doctrine.
+Project stable source facts and shared contracts by canonical reference rather
+than copying them into task prompts.
 
-The orchestrator and every Feature Worker are required application-task roles.
-Subordinate in-task delegation, optional support, or another execution
-envelope never satisfies or substitutes for either role. If the live
-application cannot create, resume, expose, bootstrap, or monitor this
-project-visible hierarchy, stop with `unsupported-runtime` and do not switch
-topology. Project association and visibility are required routing evidence;
-project metadata inside the task remains diagnostic, while the task's actual
-Git target remains authoritative execution evidence.
-
-Actively request each role's complete resolved model and reasoning profile;
-never omit either value or rely on ambient inheritance. Project every task
-prompt through the shared flat prompt projection; never forward a raw parent
-prompt or transport envelope. The orchestrator is the sole delivery monitor
-and uses change-driven observation. After its bounded handoff, each Worker
-becomes inactive but resumable; contact it only for new actionable evidence.
-
-Load orchestration when interpreting plans, deriving execution units,
-scheduling workers, resolving plan questions, converging a first unpublished
-candidate, dispatching optional support, or calculating delivery topology.
-Load review-delivery at candidate review, publication, or hosted monitoring.
-Load run-state before preparing, resuming, checkpointing, or resetting the
-ledger.
-Use [states.md](references/states.md) as the canonical human-readable meaning
-of every state namespace and persisted pair.
+The shared handoff owns change-driven relay. Implement specializes material
+deltas and actionable-frontier scheduling in orchestration, while
+worker-execution owns autonomous progress to existing-node phase boundaries.
+These refinements add no mode, state, checkpoint, ledger field, or alternate
+topology.
 
 ## Transition-condition ownership
 
 | Source nodes | Canonical condition owner |
 | --- | --- |
-| intake, source-preflight, runtime-preflight, prepare-run | This skill's input invariant and shared contracts |
-| schedule, delivery-gate, worker-bootstrap, implement-validate, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
-| candidate, native-review, review-decision, publish-pr, stack-reconcile, candidate-published, delivery-monitor, final-verify | review-delivery.md |
+| intake, source-preflight, runtime-preflight, prepare-run | This skill's scope, invariants, and shared contracts |
+| schedule, delivery-gate, worker-bootstrap, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
+| implement-validate | worker-execution.md |
+| candidate, native-review, review-decision, publish-pr, stack-reconcile, candidate-published | review-delivery.md |
+| delivery-monitor, final-verify | delivery-monitoring.md |
 | deferred, complete, blocked | This skill's terminal definitions |
 
 Each owner defines every declared outgoing condition and must not add an

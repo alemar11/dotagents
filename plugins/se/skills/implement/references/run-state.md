@@ -19,7 +19,7 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.8.2` |
+| CLI | `3.9.0` |
 | Runtime contract | `3.2.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
@@ -260,12 +260,13 @@ runtime-contract, envelope, or CLI-version change.
 The `delivery-pending @ candidate-published` pair uses the existing assignment
 status/checkpoint fields and requires no schema or JSON-envelope change. The
 explicit state registry and capability readback use runtime-contract version
-`3.2.0`; the shipped CLI version is `3.8.2`. The contract bump intentionally
-rejects older active ledgers that cannot prove the new first-publication
-authority handoff; reset is required rather than reconstructing that evidence.
-The orchestrator remains
-the only ledger client and the only owner of delivery monitoring, Worker
-resumption, and aggregate completion.
+`3.2.0`; the shipped CLI version is `3.9.0`. SE 3.9.0 changes no runtime
+contract, schema, or envelope and preserves every ledger already compatible
+with runtime contract 3.2.0 without migration or reset. The existing 3.2.0
+contract continues to reject only older active ledgers that cannot prove its
+first-publication authority handoff. The orchestrator remains the only ledger
+client and the only owner of delivery monitoring, Worker resumption, and
+aggregate completion.
 
 ## Recovery boundary
 

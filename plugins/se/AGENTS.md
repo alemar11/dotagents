@@ -49,12 +49,16 @@ surface.
 - skills/feature/templates/ owns reusable authoring templates and is not a
   node namespace.
 - skills/implement/SKILL.md owns the GitHub-Feature-to-PR workflow registry and
-  Mermaid projection. Its references own multi-Feature orchestration,
-  execution and delivery topology, orchestrator/worker profiles, optional
-  Feature Worker support delegation, worker-session review using a supported
-  minimal invocation, standalone and stacked delivery from the verified Worker
-  worktree, stack reconciliation, the minimal durable SE-authored PR body, and
-  the SQLite WAL run-state contract.
+  Mermaid projection. `references/orchestration.md` owns controller hierarchy,
+  scheduling, topology, actionable-frontier selection, and compact handoffs;
+  `references/worker-execution.md` owns Worker phase completion, optional
+  support, pre-candidate convergence, candidate-bound validation, and
+  hosted-finding repair semantics;
+  `references/review-delivery.md` owns native review, publication, and stack
+  reconciliation; `references/delivery-monitoring.md` owns hosted review, CI,
+  provider diagnostics, repair observation, and final verification. The task
+  profile and SQLite WAL references retain their existing profile and ledger
+  ownership.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
@@ -342,6 +346,14 @@ surface.
   same-repository stack intent, F-AC-to-T-AC evidence mapping,
   `candidate-published` child unblocking, orchestrator-owned delivery
   monitoring, resumable Worker repair, and stack-reconcile paths.
+- Validate exclusive Implement phase routing: the entrypoint remains the
+  compact invariant/router, each role loads only its current phase owner,
+  shared task-handoff remains the change-driven relay owner, and no moved
+  doctrine is duplicated across orchestration, Worker execution, publication,
+  and delivery monitoring. Validate complete initial Worker handoffs,
+  role-local progress to an existing-node boundary, material-delta resumptions,
+  and actionable-frontier behavior for exactly one, several, or zero eligible
+  effects. These rules add no mode, node, status, checkpoint, or ledger field.
 - Validate Implement's minimal durable PR-body projection, exclusion of routine
   execution counts, preservation of external template/author content, and
   exact closure-intent readback.

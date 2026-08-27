@@ -75,7 +75,9 @@ Its skills are deliberately separated by responsibility:
   visible orchestrator task in the invoking ChatGPT application project, then
   one visible isolated Sol Feature Worker task and one PR per
   implementation-eligible Feature. Fresh runs create those tasks; validated
-  resumes reuse only their exact retained project-visible identities. Implement
+  resumes reuse only their exact retained project-visible identities. Runtime
+  guidance loads by role and phase: orchestration, Worker execution,
+  publication, and delivery monitoring remain separate contracts. Implement
   may use bounded delegated support
   assignments for code analysis, execution-unit assistance, validation, or
   critique when delegation and capacity are observed; otherwise the parent
@@ -88,7 +90,8 @@ Its skills are deliberately separated by responsibility:
   default. The orchestrator refreshes and freezes the selected branch's exact
   upstream tip before each root worker wave and verifies every isolated
   worktree against that base before implementation begins. Before its first
-  candidate, the Worker uses cheap changed-surface checks and a conditional
+  candidate, the Worker owns its local phase through a semantic workflow
+  boundary, uses cheap changed-surface checks and a conditional
   read-only invariant critic for materially risky drafts, consolidates that
   pass before repairing it coherently, and defers complete validation until the
   source and prerequisite HEADs are stable. The Worker then performs exact-HEAD
@@ -105,9 +108,12 @@ Its skills are deliberately separated by responsibility:
   G-diagnosed infrastructure or flaky failure unrelated to candidate
   correctness may bypass a confirmed failure. The orchestrator centrally
   monitors hosted review, CI, exact-head state, and stack drift through
-  change-driven observations while published Feature Workers remain inactive
-  but resumable. Required Orchestrator and Worker roles never fall back to
-  subordinate in-task delegation.
+  material-delta observations. At each scheduling point it executes the sole
+  eligible authorized effect directly, retains arbitration when several
+  effects are eligible, and waits without a status relay when none is
+  eligible. Published Feature Workers remain inactive but resumable. Required
+  Orchestrator and Worker roles never fall back to subordinate in-task
+  delegation.
   G owns PR publication and pairwise stack linking, while Send remains agnostic
   about whether an explicit PR base participates in a stack. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.

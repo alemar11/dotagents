@@ -39,6 +39,7 @@ for relative in \
   skills/feature/steps/plan-publication.md \
   skills/feature/templates/maintenance-changelog.md \
   skills/implement/references/review-delivery.md \
+  skills/implement/references/delivery-monitoring.md \
   skills/implement/references/orchestration.md; do
   target="$plugin_root/$relative"
   rg -Fq -- "hosted-content-safety.md" "$target" || \
