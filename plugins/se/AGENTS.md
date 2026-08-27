@@ -40,8 +40,9 @@ surface.
   registry; its references own branch-specific detail.
 - skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
   node registry, Feature Plan Set, Feature identity, Feature-level dependency,
-  and local Macro Task contracts, question-batch rules, optional analysis
-  roles, publication adapter, and terminal states.
+  and local Macro Task contracts, planning-depth and clarification routing,
+  question-batch rules, conditional analysis roles, independent plan review,
+  publication adapter, and terminal states.
 - skills/feature/references/task-profile.md owns the required Feature planner,
   optional analyst roles, model/reasoning profiles, and topology selection.
 - skills/feature/steps/ owns the Markdown node contracts. Every step file
@@ -106,6 +107,27 @@ surface.
   Implement and never changes scheduling or stack intent.
   Implement must not create an automatic plan-repair planner for ordinary
   technical interpretation.
+- Keep Feature clarification proportional but explicit. Feature owns the
+  derived `planning_depth` and `clarification_route` fields. Only a narrow,
+  single-repository outcome with complete product boundaries and no material
+  choice may be `simple`; every other request is `substantial`. A substantial
+  request enters one consolidated clarification batch by default. It may skip
+  that batch only when the user supplied a traceably complete decision brief
+  and the independent critic confirms that no material product decision
+  remains, or when the user explicitly requests no questions and the remaining
+  uncertainty is safe to retain as assumptions. Material unresolved decisions
+  still block rather than being guessed. When delegation is available,
+  substantial planning must use separate bounded study and independent critic
+  assignments; unavailable delegation falls back to the same serial lenses
+  and never weakens the clarification gate.
+- Require Plan Review between every complete Feature draft and Plan
+  Validation. For substantial planning, reuse the independent critic
+  assignment when delegation is available; otherwise record the serial critic
+  fallback. The reviewer is read-only and the planner owns dispositions and
+  revisions. Permit one bounded correct-and-rereview cycle for findings that
+  need no user choice and at most one review-generated clarification batch.
+  A repeated material finding, a second follow-up batch, or an unresolved
+  disposition blocks before publication.
 - Keep one human-readable `references/states.md` in every bundled SE skill.
   Each file is that skill's canonical state glossary: it must include every
   workflow node, separate workflow nodes from field-qualified domain or
@@ -330,7 +352,11 @@ surface.
 - Validate Feature Plan Set graph reachability, genuinely distinct sibling
   Feature boundaries, Feature registry coverage, Feature-level acyclic
   planning relations, each local Macro Task registry, same-parent-only macro
-  relations, the question-batch wait boundary, optional delegation fallback,
+  relations, planning-depth classification, substantial-feature clarification
+  routing, question-free exception evidence, the question-batch wait boundary,
+  conditional delegation and serial fallback, mandatory post-draft review,
+  honest delegated-versus-serial reviewer provenance, bounded
+  revision/re-review, at-most-one review clarification loop,
   publication-before-hosted-access, parent/child publication and readback,
   mandatory native-dependency attempts for every canonical edge, non-blocking
   native failure outcomes, reconciliation to `complete` or `blocked`, and the

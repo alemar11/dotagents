@@ -5,6 +5,9 @@ purpose: compose-the-feature-plan-set-and-local-macro-task-registries
 entry_conditions:
   - feature-members-and-convergence-evidence-are-resolved
 inputs:
+  - planning-depth
+  - clarification-route
+  - clarification-route-evidence
   - feature-members
   - feature-plan-set-boundaries
   - feature-dependency-relations
@@ -17,6 +20,9 @@ inputs:
   - accepted-assumptions
   - critic-analysis
   - risks
+  - plan-review-findings
+  - plan-review-dispositions
+  - plan-review-round
 outputs:
   - feature-plan
   - feature-plan-set-registry
@@ -25,8 +31,9 @@ outputs:
   - macro-task-registry
   - implementation-handoff
   - plan-publication-content
+  - plan-review-round
 transitions:
-  - to: plan-validation
+  - to: plan-review
     when: textual-plan-draft-is-complete
   - to: blocked
     when: required-plan-content-is-missing
@@ -54,9 +61,19 @@ outcome, scope, non-goals, source issues, repository context, usable landing
 state, ownership, delivery reason, acceptance criteria, Feature-level
 `blocked_by` relations, the complete local Macro Task registry, local macro
 `blocked_by` relations, constraints, assumptions, risks, validation intent,
-critic findings, consolidation rationale, and the handoff to Implement.
-Clearly distinguish confirmed evidence, accepted assumptions, and unresolved
-questions.
+critic findings, planning depth, clarification route and evidence,
+consolidation rationale, and the handoff to Implement. Clearly distinguish
+confirmed evidence, accepted assumptions, answered questions, and a validated
+question-free exception.
+
+On a bounded return from Plan Review, revise only the accepted findings that do
+not require a new user decision. Preserve the original finding IDs and planner
+dispositions, then return the complete draft to Plan Review. Do not silently
+rewrite a rejected finding, invent an answer, or bypass re-review.
+
+Set `plan_review_round` to `initial` for the first complete draft. Preserve
+`post-clarification` after a review-generated question batch and preserve the
+current round during a bounded correct-and-rereview cycle.
 
 Write each Feature member's description from the confirmed evidence: explain
 who or what is affected, what outcome is desired, what is in and out of scope,

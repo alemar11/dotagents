@@ -158,9 +158,16 @@ Its skills are deliberately separated by responsibility:
   optional diagnostic context.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
-- Feature analyzes one or more source issues, runs optional bounded
-  read-only analysts and an independent critic when delegation is available,
-  presents one consolidated batch of material questions, and returns one
+- Feature analyzes one or more source issues and classifies the planning depth.
+  Substantial planning runs separate bounded study and independent critic
+  assignments when delegation is available, with a serial fallback that keeps
+  the same lenses. It presents one consolidated batch of material questions by
+  default; skipping that batch requires a narrow simple request, a traceably
+  complete brief confirmed by the critic, or explicit user direction with no
+  material decision left to guess. Once the draft is complete, the critic
+  reviews it before validation, independently delegated when available.
+  Correctable findings return for one bounded revision and a hidden product
+  decision may trigger one follow-up question batch. It then returns one
   evidence-backed textual Feature Plan Set with genuinely distinct sibling
   Features. Each Feature has ordinary list-item acceptance criteria with stable
   `F-AC-NN` identities, its own closed Macro Task registry, and optional
@@ -188,9 +195,10 @@ Its skills are deliberately separated by responsibility:
 - task-managed Feature and Implement runs pass their skill-owned profiles to
   the shared preflight. Explicit invocation authorizes exactly their declared
   project-visible task topology without a second prompt; task creation scope
-  and GitHub mutation scope remain independent. Feature delegation is optional
-  and falls back to serial planner analysis, while every principal task role
-  remains required.
+  and GitHub mutation scope remain independent. Feature delegation is
+  conditional on live capability and falls back to serial planner analysis;
+  substantial planning still runs both study and critic lenses, while every
+  principal task role remains required.
 - Idea, Feature, and Implement keep local control-plane records separate from
   hosted artifacts and apply one shared portable-content gate immediately
   before each hosted write, including content returned by workers and tools.

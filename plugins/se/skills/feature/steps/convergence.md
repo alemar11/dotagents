@@ -4,8 +4,11 @@ kind: action
 purpose: converge-source-issues-into-a-feature-plan-set
 entry_conditions:
   - analysis-evidence-is-available
-  - material-question-batch-is-answered-or-empty
+  - clarification-batch-is-answered-or-question-free-route-is-validated
 inputs:
+  - planning-depth
+  - clarification-route
+  - clarification-route-evidence
   - normalized-source-issue-set
   - intent-analysis
   - boundary-analysis
@@ -17,6 +20,9 @@ inputs:
   - answered-question-batch
   - accepted-assumptions
   - repository-context-evidence
+  - plan-review-findings
+  - plan-review-dispositions
+  - plan-review-round
 outputs:
   - feature-members
   - feature-plan-set-boundaries
@@ -27,6 +33,7 @@ outputs:
   - macro-dependency-relations
   - repository-plan-links
   - plan-input-evidence
+  - plan-review-round
 transitions:
   - to: plan
     when: every-feature-member-has-one-coherent-owned-outcome-and-local-macro-boundary
@@ -63,6 +70,12 @@ critic challenge that affected the boundary. Do not preserve an issue count
 by inventing outcomes or acceptance criteria. If a criterion spans distinct
 Features, keep it in one Feature or decompose it into Feature-local criteria;
 never create an integration Feature to hold the span.
+
+Carry the planning-depth classification, clarification route, its evidence,
+and either the answered question batch or validated question-free exception
+forward unchanged. After a review-generated clarification, also carry the
+review finding IDs and set `plan_review_round` to `post-clarification`.
+Convergence does not invent answers or reopen any other skipped route.
 
 Once each Feature member has one coherent outcome, decide whether it admits
 clean vertical slices. When it does, define one Macro Task for each bounded

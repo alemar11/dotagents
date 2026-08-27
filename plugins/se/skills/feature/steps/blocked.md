@@ -15,8 +15,8 @@ terminal_states:
 # Blocked
 
 Report the exact blocker, affected phase, retained plan and analysis
-artifacts, worker provenance when relevant, unresolved question IDs, and the
-smallest recovery input.
+artifacts, worker or plan-review provenance when relevant, unresolved finding
+and question IDs, and the smallest recovery input.
 
 Use blocked for invalid scope or identity, missing required context, declined
 material decisions, incomplete plan content, unverified publication, or

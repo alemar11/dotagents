@@ -10,6 +10,9 @@ inputs:
   - affected-repositories
   - repository-identities
 outputs:
+  - planning-depth
+  - clarification-route
+  - clarification-route-evidence
   - repository-context-evidence
   - intent-analysis
   - boundary-analysis
@@ -24,9 +27,9 @@ outputs:
   - analysis-provenance
 transitions:
   - to: clarification
-    when: material-question-batch-remains
+    when: clarification-route-is-ask
   - to: convergence
-    when: evidence-is-sufficient-and-no-blocking-question-remains
+    when: question-free-route-is-validated
   - to: blocked
     when: required-context-or-analysis-cannot-be-established
 stop_if:
@@ -44,13 +47,23 @@ For every affected repository, read the applicable AGENTS.md hierarchy and the
 documents and code it requires for safe planning. Record the sources and facts
 used; do not invent a context-document taxonomy.
 
-When delegation is available, the planner may dispatch bounded read-only
-analysts with distinct responsibilities. Otherwise run the same assignments
-serially. Every assignment receives the same immutable intent and source set,
-returns evidence or proposals, and remains unable to publish, edit the plan,
-or ask the user directly.
+Classify the request as `simple` only when it has one narrow outcome in one
+repository, a clear usable landing state, explicit scope and non-goals,
+sufficient acceptance intent, and no material product choice involving
+behavior, compatibility, migration, data, safety, rollout, ownership, or
+dependencies. Classify every other request as `substantial`; uncertainty
+selects `substantial`, not `simple`.
 
-Run these analytical lenses when useful:
+For a substantial request, run both a bounded study assignment and the
+independent critic assignment. When delegation is available, dispatch them as
+separate read-only assignments with distinct responsibilities. Otherwise run
+the same lenses serially and record the fallback. Simple requests may dispatch
+the roles when useful. Every assignment receives the same immutable intent and
+source set, returns evidence or proposals, and remains unable to publish, edit
+the plan, or ask the user directly.
+
+Run these analytical lenses for every substantial request and when useful for
+a simple request:
 
 - intent and source normalization;
 - repository context and affected-surface analysis;
@@ -73,6 +86,17 @@ duplicate questions, and separates:
 - competing interpretations;
 - material questions for the user;
 - non-blocking risks and follow-up suggestions.
+
+Select `clarification_route: ask` for every substantial request by default and
+whenever any material product decision remains. A simple request may select
+`skip-simple` only with evidence for every simple condition. A substantial
+request may select `skip-complete-brief` only when the user's supplied brief
+traceably resolves the material decision dimensions and the critic confirms
+that none remains. Select `skip-user-directed` only after an explicit request
+not to ask questions and only when remaining uncertainty is safe to retain as
+assumptions. Planner confidence, repository familiarity, or reasonable
+defaults are not question-free evidence. Preserve the route, evidence, critic
+disposition, and any assumptions for Plan Validation.
 
 Identify candidate Feature boundaries and evidence for whether each outcome
 has a separate usable landing state, ownership, acceptance obligation, or

@@ -1,17 +1,21 @@
 ---
 node_id: clarification
 kind: decision
-purpose: resolve-one-consolidated-batch-of-material-user-questions
+purpose: resolve-a-consolidated-batch-of-material-user-questions
 entry_conditions:
-  - analysis-produced-material-question-candidates
+  - analysis-selected-clarification-route-ask-or-plan-review-found-first-material-decision
 inputs:
   - question-candidates
+  - review-question-candidates
   - analysis-provenance
   - affected-repositories
+  - plan-review-findings
+  - plan-review-round
 outputs:
   - answered-question-batch
   - accepted-assumptions
   - rejected-assumptions
+  - plan-review-round
 transitions:
   - to: convergence
     when: one-complete-question-batch-has-been-answered
@@ -29,9 +33,26 @@ terminal_states: []
 
 Present every material question discovered by the analysis in one consolidated
 batch. Do not ask one question per worker or create a graph node for each
-question. Each item must include a stable question ID, the requested decision,
-why it matters, affected outcome or scope, available options, recommendation,
-`question_blocking` value, and originating evidence.
+question. Group tightly coupled decisions, remove duplicates, and use the
+smallest complete batch that lets planning continue. Each item must include a
+stable question ID, the requested decision, why it matters, affected outcome
+or scope, available options, recommendation, `question_blocking` value, and
+originating evidence.
+
+A substantial request reaches this node by default. Do not bypass it because a
+recommendation seems obvious, repository evidence suggests a likely answer, or
+the planner believes it can write a plausible plan. Ask only product and
+planning decisions whose answers can change outcome, behavior, scope,
+non-goals, acceptance, ownership, compatibility, migration, safety, rollout,
+or Feature dependencies; do not manufacture implementation questions to fill
+the batch.
+
+Plan Review may re-enter this node once when the finished draft exposes a
+previously hidden material product decision. Present only the smallest complete
+follow-up batch arising from those review findings, keep stable question IDs
+and review provenance, and set the next `plan_review_round` to
+`post-clarification`. If a review-generated batch was already used, or the user
+selected `skip-user-directed`, stop instead of asking again or guessing.
 
 The task may remain in awaiting-user-input while the batch is shown. This is a
 wait state, not a terminal blocked result and not a reason to mark the run's

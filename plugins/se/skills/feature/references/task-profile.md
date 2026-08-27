@@ -45,19 +45,30 @@ does not create or resume another planner task for the same run.
 The planner owns the application task, the Feature workflow graph, the
 Feature Plan Set registry, each Feature's local Macro Task registry, the
 question batch, the reduction of worker evidence, the canonical textual plan,
-and the final publication report. The application task is an execution
-envelope, not a Feature or Macro Task graph node.
+every plan-review finding disposition, and the final publication report. The
+application task is an execution envelope, not a Feature or Macro Task graph
+node.
 
-Optional roles are capability-conditioned. When delegation is available, the
-planner may run bounded analysis-worker assignments with distinct analytical
-responsibilities and one independent critic assignment. When delegation is
-unavailable, the planner performs those analyses serially. This fallback is
-part of the Feature profile and does not create a replacement task.
+Optional roles are capability-conditioned. For substantial planning, the study
+analysis and independent critic lenses are required: when delegation is
+available, the planner instantiates separate bounded assignments for them;
+when delegation is unavailable or lacks capacity, the planner performs both
+lenses serially and records the fallback. Simple planning may instantiate
+either role when useful. This fallback is part of the Feature profile and does
+not create a replacement task or relax the clarification gate.
 
 The critic-analyst receives the original intent and source set without the
 planner draft or context-derived requirements during its first pass. It is
 read-only, records evidence and speculation separately, and cannot publish,
-edit the plan, or ask the user directly.
+edit the plan, or ask the user directly. For a substantial question-free brief,
+it must explicitly determine whether any material product decision remains.
+After the complete draft exists, the same critic performs a second-pass plan
+review against the original intent, evidence, decisions, and assumptions. It
+returns findings only; the planner retains sole revision and disposition
+authority. If delegation is unavailable, the planner performs this review as a
+separate serial critic lens and reports the fallback honestly. A failed,
+ambiguous, or unobserved critic assignment is also serial fallback and must
+never be credited as delegated review.
 
 The planner must use the invoking session's exact local repository checkout
 and local environment. It must not create or use a Git worktree, isolated
@@ -109,8 +120,8 @@ plan.
 
 Record delegation as one of:
 
-- parallel-analysis: bounded optional roles were dispatched and observed;
-- serial-fallback: the planner completed the same roles without delegation;
+- parallel-analysis: the applicable bounded roles were dispatched and observed;
+- serial-fallback: the planner completed the same applicable lenses without delegation;
 - unavailable: the runtime could not provide delegation and the parent
   fallback was used;
 - unknown: capability evidence was insufficient and no delegated role was

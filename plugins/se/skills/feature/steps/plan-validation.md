@@ -3,8 +3,11 @@ node_id: plan-validation
 kind: validation
 purpose: validate-feature-plan-set-and-local-macro-readiness-for-implement
 entry_conditions:
-  - textual-feature-plan-set-draft-is-available
+  - critic-reviewed-feature-plan-set-is-clean
 inputs:
+  - planning-depth
+  - clarification-route
+  - clarification-route-evidence
   - feature-plan
   - feature-plan-set-registry
   - feature-acceptance-criteria
@@ -15,6 +18,12 @@ inputs:
   - repository-context-evidence
   - answered-question-batch
   - accepted-assumptions
+  - plan-review-result
+  - plan-review-findings
+  - plan-review-dispositions
+  - plan-review-evidence
+  - plan-review-round
+  - plan-review-provenance
 outputs:
   - plan-readiness
   - plan-validation-evidence
@@ -27,7 +36,13 @@ transitions:
   - to: blocked
     when: plan-contract-is-invalid-or-incomplete
 stop_if:
+  - plan-review-result-is-not-clean
+  - plan-review-evidence-or-dispositions-are-missing
+  - plan-review-provenance-is-missing-or-contradicts-observed-delegation
   - material-question-remains-unanswered
+  - planning-depth-is-missing-or-inconsistent-with-evidence
+  - clarification-route-is-missing-or-invalid-for-planning-depth
+  - question-free-route-lacks-required-evidence
   - repository-identity-or-outcome-is-missing
   - acceptance-id-is-missing-duplicate-or-high-water-inconsistent
   - feature-plan-set-registry-is-missing-incomplete-or-duplicated
@@ -48,8 +63,26 @@ Require a stable Plan Set identity/revision, genuinely distinct Feature
 members, an observable outcome, explicit scope and non-goals, repository
 identity, source mapping, context evidence, usable landing state, ownership,
 delivery reason, stable Feature acceptance criteria, validation intent,
-assumptions and risks, reconciled critic findings, a complete question batch,
-and a closed local Macro Task registry for every Feature.
+assumptions and risks, reconciled critic findings, complete clarification
+evidence, a clean independent plan review, and a closed local Macro Task
+registry for every Feature.
+
+Require `plan_review_result: clean` for the exact draft being validated. Verify
+reviewer provenance, every finding and planner disposition, closure of any
+accepted revision, and the bounded handling of any review-generated
+clarification. Reject stale review evidence, a hidden finding, an unresolved
+disposition, delegated attribution without observed assignment evidence, or a
+second follow-up question batch.
+
+Validate the clarification gate before the plan content. `simple` requires
+evidence for every narrow-request condition and `clarification_route:
+skip-simple`. `substantial` requires `clarification_route: ask` plus a fully
+answered batch unless either `skip-complete-brief` has traceable decision-brief
+coverage and an independent critic no-question finding, or
+`skip-user-directed` has the user's explicit direction and only safe,
+non-blocking assumptions. Reject a route based only on confidence, familiarity,
+repository evidence, or a plausible default. If material uncertainty remains,
+the plan is not ready.
 
 For the Feature Plan Set registry, require one stable lower-kebab `feature_id`
 per Feature, one parent Feature identity per Feature, one repository identity,

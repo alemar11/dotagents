@@ -6,6 +6,9 @@
 - feature_plan_set_revision: 1
 - plan_status: plan-ready
 - source_route: new-source
+- planning_depth: <simple or substantial>
+- clarification_route: <ask, skip-simple, skip-complete-brief, or skip-user-directed>
+- clarification_route_evidence: <classification and route evidence>
 - source_issues:
 - feature_member_count: <count>
 - feature_set_closure_policy: each-feature-and-its-associated-macro-tasks
@@ -152,9 +155,22 @@ non-blocking.
 - rejected: <challenge and evidence>
 - unresolved: <question reference>
 
+## Critic plan review
+
+- plan_review_round: <initial or post-clarification>
+- plan_review_result: <clean, revision-required, clarification-required, or blocked>
+- plan_review_provenance: <delegated-critic or serial-fallback>
+- review_findings: <stable finding IDs and evidence>
+- planner_dispositions: <accepted or rejected with evidence>
+- bounded_revision_evidence: <revision and re-review evidence or none>
+- review_generated_question_ids: <question IDs or none>
+
 ## Questions and decisions
 
 ### Question batch
+
+For a question-free route, retain the route evidence above and state that no
+question rows were required. Do not invent a placeholder question.
 
 - Q-01
   question: <decision requested>

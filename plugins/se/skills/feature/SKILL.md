@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Describe each Feature's problem, desired outcome, scope, and acceptance criteria, split it into practical Macro Tasks using vertical slices when the outcome supports them, publish semantic and native GitHub dependency projections by default, delegate optional issue label and type classification, and never implement code."
+description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Classify planning depth, clarify substantial product work, study and critique the problem, independently review the finished plan before validation, define outcomes and acceptance criteria, split Features into practical Macro Tasks, publish semantic and native GitHub dependency projections by default, and never implement code."
 ---
 
 # Feature Planning
@@ -29,7 +29,12 @@ implementation graph. For every Feature member, converge:
   outcome dependencies, with repository identity preserved for Implement's
   deterministic stack-or-scheduling projection;
 - constraints, assumptions, risks, and validation intent;
-- one complete batch of material questions for the user when decisions remain;
+- a derived planning depth and explicit clarification route;
+- one complete batch of material questions for every substantial request unless
+  a narrow, evidenced question-free exception applies;
+- an independent review of the complete plan before validation, with one
+  bounded follow-up clarification when the review exposes a hidden product
+  decision;
 - a narrative plan that is clear enough for se:implement to derive execution
   work without invoking se:feature for technical decomposition.
 
@@ -59,12 +64,15 @@ execution-target verification. Apply all three contracts in full; never rely
 on ambient profile inheritance or create a replacement after an identity,
 profile, or execution-target mismatch.
 
-The planner is the sole reducer and owner of the canonical plan. Optional
-workers return bounded read-only evidence and proposals only; they never edit
-or publish the plan, ask the user directly, or invoke se:implement. When those
-roles cannot be instantiated, the planner runs the same analytical lenses
-serially. The application task and workers are execution envelopes, not
-Feature graph nodes.
+The planner is the sole reducer and owner of the canonical plan. Read-only
+workers return bounded evidence and proposals only; they never edit or publish
+the plan, ask the user directly, or invoke se:implement. For a substantial
+request, use separate study and independent critic assignments when delegation
+is available. When those roles cannot be instantiated, the planner runs the
+same analytical lenses serially and records the fallback. Simple requests may
+use those roles when they add value. After the planner completes the draft,
+the critic reviews the plan as a second pass before Plan Validation. The
+application task and workers are execution envelopes, not Feature graph nodes.
 
 ## Repository context and source routes
 
@@ -157,9 +165,22 @@ Feature's Macro Task registry.
 
 ## Question batch
 
-Analysis must collect all material questions before asking the user. The
-clarification phase presents one consolidated batch, not one question per
-turn. Each question records:
+Analysis first derives `planning_depth`:
+
+- `simple` requires one narrow outcome in one repository, an explicit usable
+  landing state, bounded scope and non-goals, sufficiently specific acceptance
+  intent, and no material product choice involving behavior, compatibility,
+  migration, data, safety, rollout, ownership, or dependencies;
+- `substantial` applies whenever any of those conditions is absent, when
+  sources or repositories must be reconciled, or when materially different
+  product outcomes remain plausible.
+
+Default a substantial request to `clarification_route: ask`. Before drafting
+the plan, study the product problem and repository evidence, run the independent
+critic lens, and collect all unresolved material decisions. Present one
+concise consolidated batch, not one question per turn or worker. Group closely
+coupled decisions and keep the batch to the smallest complete set. Each
+question records:
 
 - a stable question ID;
 - the decision requested;
@@ -169,11 +190,33 @@ turn. Each question records:
 - blocking or non-blocking status;
 - provenance from the analysis that raised it.
 
+The only question-free routes are:
+
+- `skip-simple` when the request satisfies every `simple` condition;
+- `skip-complete-brief` when a substantial request already contains a
+  traceably complete decision brief and the independent critic confirms that
+  no material product decision remains;
+- `skip-user-directed` when the user explicitly requests no questions and all
+  remaining uncertainty is safe to retain as explicit assumptions.
+
+Do not use repository evidence, a plausible default, or the planner's
+confidence alone to select a question-free route. If a user-directed skip
+would leave a material decision unresolved, stop with that decision rather
+than guess. Record the route, its evidence, and the critic disposition in the
+plan and report.
+
 Questions that change the product outcome, repository ownership, scope,
 acceptance, or plan boundaries are blocking. The task remains
 awaiting-user-input until the user answers the batch. Non-blocking questions
 become explicit assumptions with their impact. Technical implementation
 questions belong to se:implement and do not restart Feature planning.
+
+After the plan is drafted, Plan Review may surface one previously hidden
+material product decision. Ask that decision in one smallest-complete follow-up
+batch, preserve its provenance, then rebuild and review the plan. Do not allow
+a second review-generated batch: repeated discovery means the analysis or plan
+cannot be trusted and must stop. An explicit `skip-user-directed` route forbids
+the follow-up and blocks instead of guessing.
 
 ## Feature Plan contract
 
@@ -219,7 +262,11 @@ The plan must contain:
   closing set;
 - constraints, assumptions, risks, and validation intent;
 - the critic-analyst findings and accepted or rejected challenges;
-- the resolved question batch, or the current awaiting-user-input batch;
+- `planning_depth`, `clarification_route`, and their evidence;
+- the resolved question batch, the current awaiting-user-input batch, or the
+  validated question-free exception;
+- the critic plan-review result, findings, dispositions, reviewer
+  provenance, and any bounded revision or follow-up clarification evidence;
 - implementation considerations and evidence without prescribing code design;
 - the handoff statement for se:implement;
 - selected operation and publication evidence.
@@ -281,15 +328,19 @@ flowchart TD
     maintenance -->|rehydrated plan evidence| analysis
     intake -->|invalid scope or identity| blocked
     maintenance -->|conflict or missing target| blocked
-    analysis -->|material questions| clarification
-    analysis -->|sufficient evidence| convergence
+    analysis -->|clarification route is ask| clarification
+    analysis -->|validated question-free route| convergence
     analysis -->|missing context or failed analysis| blocked
     clarification -->|answer batch received| convergence
     clarification -->|unresolved or declined decision| blocked
     convergence -->|bounded Feature members| plan
     convergence -->|independent scope cannot be resolved| blocked
-    plan -->|draft complete| plan-validation
+    plan -->|draft complete| plan-review
     plan -->|missing required content| blocked
+    plan-review -->|review clean| plan-validation
+    plan-review -->|correctable findings| plan
+    plan-review -->|first hidden product decision| clarification
+    plan-review -->|unreconciled or repeated finding| blocked
     plan-validation -->|plan-ready| plan-publication
     plan-validation -->|invalid or contradictory plan| blocked
     plan-publication -->|preview or verified semantic publish with dependency attempt results| complete
@@ -303,10 +354,11 @@ Only the following files are graph nodes:
 | maintenance | steps/maintenance.md | action | explicit maintenance request and existing plan evidence | analysis, blocked |
 | intake | steps/intake.md | action | explicit Feature intent or source issue set | analysis, blocked |
 | analysis | steps/analysis.md | action | normalized source set and repository targets | clarification, convergence, blocked |
-| clarification | steps/clarification.md | decision | consolidated material question batch | convergence, blocked |
+| clarification | steps/clarification.md | decision | initial or review-generated consolidated material question batch | convergence, blocked |
 | convergence | steps/convergence.md | action | evidence and answered questions are available | plan, blocked |
-| plan | steps/plan.md | action | bounded Feature members are resolved | plan-validation, blocked |
-| plan-validation | steps/plan-validation.md | validation | textual plan draft is complete | plan-publication, blocked |
+| plan | steps/plan.md | action | bounded Feature members are resolved | plan-review, blocked |
+| plan-review | steps/plan-review.md | validation | textual plan draft is complete | plan, clarification, plan-validation, blocked |
+| plan-validation | steps/plan-validation.md | validation | critic-reviewed plan is clean | plan-publication, blocked |
 | plan-publication | steps/plan-publication.md | action | plan is ready and operation mode is resolved | complete, blocked |
 | complete | steps/complete.md | terminal | preview is frozen or publication is verified | none |
 | blocked | steps/blocked.md | terminal | a required planning or publication contract cannot be satisfied | none |
@@ -323,7 +375,8 @@ Before executing a node, read its registered `steps/<node-id>.md` contract.
 Those files own node-specific inputs, stop conditions, detailed behavior,
 side effects, and transitions. Follow the graph and registry above as the
 canonical order; do not skip `plan-validation`, enter `plan-publication`
-early, or infer a transition from prose. In particular, the publication step
+early, or infer a transition from prose. Never skip `plan-review` or treat the
+planner's own draft as review evidence. In particular, the publication step
 owns preview selection, the G dependency handoff, hosted-content projection,
 native dependency attempts, optional tagging, readback, and recovery. Do not
 create a Feature Plan Set container. When one exact hosted Idea is the source,
@@ -363,11 +416,12 @@ plan-repair planner for ordinary implementation detail.
 
 ## Transient state and terminal report
 
-Keep current_node_id, entry_route, source_route, run_mode, source issue
-identities, Feature Plan Set and Feature members, analysis evidence, worker
-provenance, question batch, assumptions, artifacts, publication evidence,
-blockers, and terminal state explicit and transient. Do not store runtime
-state in Markdown.
+Keep current_node_id, entry_route, source_route, run_mode, planning_depth,
+clarification_route, source issue identities, Feature Plan Set and Feature
+members, analysis evidence, worker provenance, question batch, assumptions,
+plan-review round, result, findings, dispositions and provenance, artifacts,
+publication evidence, blockers, and terminal state explicit and transient. Do
+not store runtime state in Markdown.
 
 A complete report contains:
 
@@ -382,7 +436,11 @@ A complete report contains:
   readback or failure evidence for every published Feature-level and
   macro-local edge;
 - assumptions, risks, validation intent, and critic findings;
-- the full question batch and the user's resolutions;
+- planning-depth classification, clarification route, and supporting evidence;
+- the full question batch and the user's resolutions, or the validated
+  question-free exception;
+- the clean plan-review result, findings, dispositions, reviewer
+  provenance, and any bounded revision or follow-up clarification evidence;
 - the complete textual plan and Implement handoff;
 - preview or publication operation evidence, including each reconciled tagger
   result when published;
