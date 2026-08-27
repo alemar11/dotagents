@@ -13,10 +13,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_REPO = "GoogleCloudPlatform/knowledge-catalog"
+DEFAULT_REPO = "GoogleCloudPlatform/open-knowledge-format"
 DEFAULT_REF = "main"
-SOURCE_SUBPATH = Path("okf/SPEC.md")
-OFFICIAL_TREE_URL = "https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf"
+SOURCE_SUBPATH = Path("SPEC.md")
+OFFICIAL_TREE_URL = "https://github.com/GoogleCloudPlatform/open-knowledge-format/tree/main"
 USER_AGENT = "dotagents-okf-spec-refresh"
 
 REPO_ROOT = Path(__file__).resolve().parents[4]

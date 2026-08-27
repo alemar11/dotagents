@@ -158,6 +158,34 @@ class MaintainerRefreshScriptTests(unittest.TestCase):
 
             self.assertEqual(refresh_assets.call_args.args[2], "resolved-commit")
 
+    def test_okf_refresh_uses_canonical_repository_and_resolved_commit(self) -> None:
+        with (
+            patch.object(self.okf, "resolve_commit", return_value="resolved-commit") as resolve,
+            patch.object(
+                self.okf,
+                "download_text",
+                return_value="# Open Knowledge Format\n\n**Version 0.2**\n",
+            ) as download,
+            patch.object(self.okf, "load_manifest", return_value={}),
+            patch.object(self.okf, "stale_reasons", return_value=[]),
+            patch.object(
+                sys,
+                "argv",
+                ["okf_spec_refresh.py", "--check-stale"],
+            ),
+        ):
+            self.assertEqual(self.okf.main(), 0)
+
+        resolve.assert_called_once_with(
+            "GoogleCloudPlatform/open-knowledge-format",
+            "main",
+        )
+        self.assertEqual(
+            download.call_args.args[0],
+            "https://raw.githubusercontent.com/GoogleCloudPlatform/"
+            "open-knowledge-format/resolved-commit/SPEC.md",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

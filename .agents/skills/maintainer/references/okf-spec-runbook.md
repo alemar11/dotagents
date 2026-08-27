@@ -6,7 +6,7 @@ asset and validating the runtime OKF skill from within `Maintainer`.
 ## Scope
 
 - Refresh `skills/okf/assets/spec.md` from
-  `GoogleCloudPlatform/knowledge-catalog/okf/SPEC.md`.
+  `GoogleCloudPlatform/open-knowledge-format/SPEC.md`.
 - Refresh `skills/okf/assets/manifest.json`.
 - Review and update `skills/okf/references/*.md` only when local routing or
   guidance materially drifts from the official spec.
@@ -14,12 +14,15 @@ asset and validating the runtime OKF skill from within `Maintainer`.
 
 ## Source Of Truth
 
-- Repository: `GoogleCloudPlatform/knowledge-catalog`
+- Repository: `GoogleCloudPlatform/open-knowledge-format`
 - Ref: `main`
-- Source path: `okf/SPEC.md`
-- Official tree: `https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf`
+- Source path: `SPEC.md`
+- Official tree: `https://github.com/GoogleCloudPlatform/open-knowledge-format/tree/main`
 
-Do not switch source repositories unless the official OKF project moves.
+The former `GoogleCloudPlatform/knowledge-catalog/okf` tree is a frozen
+snapshot. Do not use it for freshness checks. If the official OKF project moves
+again, update the refresh constants, checker expectations, this runbook, and
+the task menu together before refreshing assets.
 
 ## Tooling
 

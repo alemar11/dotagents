@@ -1,10 +1,10 @@
 {
-  "repo": "GoogleCloudPlatform/knowledge-catalog",
+  "repo": "GoogleCloudPlatform/open-knowledge-format",
   "ref": "main",
-  "resolved_commit": "3fcbb9f828c2f23d109c855ee403c3a4c81f3a96",
-  "source_subpath": "okf/SPEC.md",
-  "content_sha256": "5a3311d270bebb16d558010e75064f5b75323f284992641732b1c8097511f948",
+  "resolved_commit": "ad30107c31c06aec8a7d5636e0d1058118604e6f",
+  "source_subpath": "SPEC.md",
+  "content_sha256": "26aa5da029278939f914e578107242d9607d4f2dc5fe153272b82f9ed1030101",
   "spec_version": "0.2",
-  "downloaded_at": "2026-07-28T08:13:30.633405+00:00",
-  "official_tree_url": "https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf"
+  "downloaded_at": "2026-08-27T10:20:00.277528+00:00",
+  "official_tree_url": "https://github.com/GoogleCloudPlatform/open-knowledge-format/tree/main"
 }

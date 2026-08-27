@@ -95,7 +95,7 @@ maintenance request needs to be routed to a concrete task.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 13. `refresh okf spec`
    - Check `skills/okf/assets/manifest.json` and the bundled official spec copy
-     against `GoogleCloudPlatform/knowledge-catalog/okf/SPEC.md`.
+     against `GoogleCloudPlatform/open-knowledge-format/SPEC.md`.
    - Refresh `skills/okf/assets/spec.md` and the manifest when stale.
    - Validate the OKF runtime skill shape, reference links, CLI executable, and
      tests.

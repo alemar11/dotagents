@@ -88,10 +88,10 @@ def main() -> int:
         if missing:
             errors.append(f"Manifest is missing keys: {sorted(missing)!r}")
         expected = {
-            "repo": "GoogleCloudPlatform/knowledge-catalog",
+            "repo": "GoogleCloudPlatform/open-knowledge-format",
             "ref": "main",
-            "source_subpath": "okf/SPEC.md",
-            "official_tree_url": "https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf",
+            "source_subpath": "SPEC.md",
+            "official_tree_url": "https://github.com/GoogleCloudPlatform/open-knowledge-format/tree/main",
         }
         for key, expected_value in expected.items():
             if manifest.get(key) != expected_value:
