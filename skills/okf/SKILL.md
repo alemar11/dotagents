@@ -20,9 +20,11 @@ This skill uses:
 
 1. Read `references/README.md` for the current routing map.
 2. Use `references/writing-okf.md` when creating or editing OKF markdown.
-3. Author OKF v0.2. Use `generated.at` instead of the retired `timestamp`
-   field, and record provenance in `sources` instead of a body
-   `# Citations` list.
+3. Author OKF v0.2. Write every timestamp-valued frontmatter key as an ISO
+   8601 datetime with an explicit UTC offset. Keep `log.md` headings as
+   `YYYY-MM-DD` dates. Use `generated.at` instead of the retired `timestamp`
+   field, and record provenance in `sources` instead of a body `# Citations`
+   list.
 4. For deterministic checks, run
    `<okf-skill-root>/scripts/okf validate <bundle>`. Use
    `<okf-skill-root>/scripts/okf --json validate <bundle>` when another

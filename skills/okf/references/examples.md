@@ -22,10 +22,13 @@ tags: [finance, revenue]
 status: stable
 generated: {"by": "process:catalog-refresh", "at": "2026-06-29T10:00:00Z"}
 verified: {"by": "human:finance-owner", "at": "2026-06-29T11:00:00Z"}
+stale_after: 2026-09-29T00:00:00Z
 sources:
   - id: revenue-policy
     resource: https://example.com/finance/revenue-policy
     title: Revenue recognition policy
+    last_modified: 2026-06-15T00:00:00Z
+usage_window: {"from": "2026-06-01T00:00:00Z", "to": "2026-06-30T00:00:00Z"}
 ---
 
 # Definition

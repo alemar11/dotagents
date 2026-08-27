@@ -42,7 +42,7 @@ class OkfCliTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 self.okf.main(["--version"])
         self.assertEqual(raised.exception.code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "2.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "3.0.0")
 
     def test_doctor_json_shape(self) -> None:
         stdout = io.StringIO()
@@ -50,7 +50,7 @@ class OkfCliTests(unittest.TestCase):
             code = self.okf.main(["--json", "doctor"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "3.0.0")
         self.assertEqual(payload["spec_version"], "0.2")
         self.assertIn("pyyaml", payload["checks"])
         self.assertTrue(payload["checks"]["anchored_io"])
@@ -140,6 +140,98 @@ class OkfCliTests(unittest.TestCase):
             with contextlib.redirect_stdout(stdout):
                 code = self.okf.main(["validate", str(bundle)])
             self.assertEqual(code, 0)
+
+    def test_noncanonical_timestamp_values_warn(self) -> None:
+        class FakeYaml:
+            @staticmethod
+            def safe_load(_text):
+                return {
+                    "type": "Reference",
+                    "timestamp": "2026-05-28",
+                    "generated": {"at": "2026-06-29T10:00:00"},
+                    "verified": [{"at": "2026-06-29"}],
+                    "stale_after": "2026-09-29",
+                    "sources": [
+                        {
+                            "last_modified": "2026-06-15",
+                            "usage_window": {
+                                "from": "2026-06-01",
+                                "to": "2026-06-30",
+                            },
+                        }
+                    ],
+                    "usage_window": {
+                        "from": "2026-06-01",
+                        "to": "2026-06-30",
+                    },
+                }
+
+        original_yaml = self.okf.yaml
+        self.okf.yaml = FakeYaml
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                bundle = Path(tmp)
+                (bundle / "concept.md").write_text(
+                    "---\ntype: Reference\n---\n\nBody.\n",
+                    encoding="utf-8",
+                )
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    code = self.okf.main(["--json", "validate", str(bundle)])
+                self.assertEqual(code, 0)
+                messages = [
+                    warning["message"]
+                    for warning in json.loads(stdout.getvalue())["warnings"]
+                ]
+                for field_name in (
+                    "timestamp",
+                    "generated.at",
+                    "verified[0].at",
+                    "stale_after",
+                    "sources[0].last_modified",
+                    "sources[0].usage_window.from",
+                    "sources[0].usage_window.to",
+                    "usage_window.from",
+                    "usage_window.to",
+                ):
+                    self.assertTrue(
+                        any(message.startswith(field_name) for message in messages),
+                        field_name,
+                    )
+        finally:
+            self.okf.yaml = original_yaml
+
+    def test_pyyaml_timestamp_validation_preserves_authored_spelling(self) -> None:
+        if self.okf.yaml is None:
+            self.skipTest("PyYAML is not installed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name, value in (
+                ("unquoted", "2026-06-29 12:00:00+00:00"),
+                ("quoted", '"2026-06-29 12:00:00+00:00"'),
+            ):
+                (bundle / f"{name}.md").write_text(
+                    f"---\ntype: Reference\nstale_after: {value}\n---\n\nBody.\n",
+                    encoding="utf-8",
+                )
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = self.okf.main(["--json", "validate", str(bundle)])
+            self.assertEqual(code, 0)
+            warnings = [
+                warning
+                for warning in json.loads(stdout.getvalue())["warnings"]
+                if warning["message"].startswith("stale_after")
+            ]
+            self.assertEqual(
+                [warning["path"] for warning in warnings],
+                ["quoted.md", "unquoted.md"],
+            )
+            self.assertTrue(
+                all(warning["message"].startswith("stale_after") for warning in warnings)
+            )
 
     def test_pyyaml_nested_v02_frontmatter_is_accepted(self) -> None:
         class FakeYaml:
@@ -668,6 +760,30 @@ class OkfCliTests(unittest.TestCase):
             self.assertEqual(payload["error"]["code"], "invalid_generation")
             self.assertFalse((Path(tmp) / "refs" / "example.md").exists())
 
+    def test_scaffold_rejects_generated_at_without_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = self.okf.main(
+                    [
+                        "--json",
+                        "scaffold",
+                        tmp,
+                        "refs/example",
+                        "--type",
+                        "Reference",
+                        "--generated-by",
+                        "process:catalog-refresh",
+                        "--generated-at",
+                        "2026-06-29T12:00:00",
+                    ]
+                )
+            self.assertEqual(code, 64)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["error"]["code"], "invalid_generation")
+            self.assertIn("explicit UTC offset", payload["error"]["message"])
+            self.assertFalse((Path(tmp) / "refs" / "example.md").exists())
+
     def test_scaffold_invalid_utf8_body_is_json_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -704,7 +820,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 0)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["version"], "2.0.0")
+            self.assertEqual(payload["version"], "3.0.0")
             self.assertEqual(payload["spec_version"], "0.2")
             self.assertTrue(Path(payload["path"]).exists())
 

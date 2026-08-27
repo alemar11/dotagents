@@ -43,10 +43,21 @@ Optional standard families include:
 - Attested Computation fields: `runtime`, `parameters`, `computation`,
   `executor`, and `attester`
 
+Every timestamp-valued frontmatter key uses an ISO 8601 datetime with an
+explicit UTC offset, for example `2026-06-29T12:00:00Z` or
+`2026-06-29T14:00:00+02:00`. This applies to `generated.at`, every
+`verified[].at`, `stale_after`, every `sources[].last_modified`, and the
+`from` and `to` values in shared or source-specific `usage_window` mappings.
+Date-only and offsetless datetime values are not canonical OKF timestamps.
+
 Use `generated.at` for the current content's last meaningful change. Do not
 author the retired v0.1 `timestamp` field. Put source materials in `sources`;
 when attributing a claim, use a markdown footnote whose label matches a
 `sources[].id`.
+
+When consuming an older v0.1 concept that has no `generated` mapping, treat its
+legacy `timestamp` fallback as timestamp-valued and require the same explicit
+UTC offset.
 
 Preserve producer-defined and unknown fields when editing. Do not reject or
 remove them.
@@ -95,4 +106,5 @@ It normally has no frontmatter. The only permitted exception is a bundle-root
 `index.md` declaring `okf_version: "0.2"`.
 
 `log.md` may appear at any level and records dated updates with `YYYY-MM-DD`
-headings, newest first.
+headings, newest first. These headings group entries by day and remain
+date-only; they are not timestamp-valued frontmatter keys.

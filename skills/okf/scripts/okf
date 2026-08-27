@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 SPEC_VERSION = "0.2"
 SPEC_REQUIRED = ("type",)
 RECOMMENDED = ("title", "description", "resource", "tags")
@@ -43,6 +43,22 @@ try:  # pragma: no cover - exercised only when PyYAML is installed.
     import yaml  # type: ignore
 except Exception:  # pragma: no cover - default in this repo's Python.
     yaml = None
+
+if yaml is not None:  # pragma: no branch - fixed when the module loads.
+    class FrontmatterYamlLoader(yaml.SafeLoader):
+        """Load YAML without coercing authored timestamp scalars."""
+
+
+    FrontmatterYamlLoader.yaml_implicit_resolvers = {
+        initial: [
+            (tag, pattern)
+            for tag, pattern in resolvers
+            if tag != "tag:yaml.org,2002:timestamp"
+        ]
+        for initial, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+else:
+    FrontmatterYamlLoader = None
 
 ANCHORED_IO_SUPPORTED = (
     hasattr(os, "O_DIRECTORY")
@@ -210,7 +226,10 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str, list[str]]:
     raw_frontmatter = "\n".join(lines[1:end_idx])
     if yaml is not None:
         try:
-            loaded = yaml.safe_load(raw_frontmatter) or {}
+            if FrontmatterYamlLoader is not None and hasattr(yaml, "load"):
+                loaded = yaml.load(raw_frontmatter, Loader=FrontmatterYamlLoader) or {}
+            else:
+                loaded = yaml.safe_load(raw_frontmatter) or {}
         except Exception as exc:
             raise OkfError(f"Invalid YAML frontmatter: {exc}") from exc
         if not isinstance(loaded, dict):
@@ -224,6 +243,62 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str, list[str]]:
     if body.startswith("\n"):
         body = body[1:]
     return frontmatter, body, warnings
+
+
+def has_explicit_utc_offset_datetime(value: Any) -> bool:
+    if not isinstance(value, str) or "T" not in value:
+        return False
+    parse_value = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = dt.datetime.fromisoformat(parse_value)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
+def timestamp_values(frontmatter: dict[str, Any]) -> list[tuple[str, Any]]:
+    values: list[tuple[str, Any]] = []
+
+    if "timestamp" in frontmatter:
+        values.append(("timestamp", frontmatter["timestamp"]))
+
+    if "stale_after" in frontmatter:
+        values.append(("stale_after", frontmatter["stale_after"]))
+
+    generated = frontmatter.get("generated")
+    if isinstance(generated, dict) and "at" in generated:
+        values.append(("generated.at", generated["at"]))
+
+    verified = frontmatter.get("verified")
+    verification_entries = verified if isinstance(verified, list) else [verified]
+    for index, entry in enumerate(verification_entries):
+        if isinstance(entry, dict) and "at" in entry:
+            values.append((f"verified[{index}].at", entry["at"]))
+
+    def add_usage_window(prefix: str, value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        for boundary in ("from", "to"):
+            if boundary in value:
+                values.append((f"{prefix}.{boundary}", value[boundary]))
+
+    add_usage_window("usage_window", frontmatter.get("usage_window"))
+
+    sources = frontmatter.get("sources")
+    if isinstance(sources, list):
+        for index, source in enumerate(sources):
+            if not isinstance(source, dict):
+                continue
+            if "last_modified" in source:
+                values.append(
+                    (f"sources[{index}].last_modified", source["last_modified"])
+                )
+            add_usage_window(
+                f"sources[{index}].usage_window",
+                source.get("usage_window"),
+            )
+
+    return values
 
 
 def is_reserved(path: Path) -> bool:
@@ -523,6 +598,13 @@ def validate_concept_file(
         if key not in frontmatter:
             result.warn(rel, f"Recommended frontmatter key is missing: {key}.")
 
+    for field_name, value in timestamp_values(frontmatter):
+        if not has_explicit_utc_offset_datetime(value):
+            result.warn(
+                rel,
+                f"{field_name} should be an ISO 8601 datetime with an explicit UTC offset.",
+            )
+
     for warning in parser_warnings:
         result.warn(rel, warning)
 
@@ -629,13 +711,11 @@ def utc_now() -> str:
 def normalized_generated_at(value: str) -> str:
     if value == "now":
         return utc_now()
-    if "T" not in value and " " not in value:
-        raise OkfError("--generated-at must be an ISO 8601 datetime or \"now\".")
-    parse_value = value[:-1] + "+00:00" if value.endswith("Z") else value
-    try:
-        dt.datetime.fromisoformat(parse_value)
-    except ValueError as exc:
-        raise OkfError("--generated-at must be an ISO 8601 datetime or \"now\".") from exc
+    if not has_explicit_utc_offset_datetime(value):
+        raise OkfError(
+            "--generated-at must be an ISO 8601 datetime with an explicit UTC "
+            "offset or \"now\"."
+        )
     return value
 
 
@@ -879,7 +959,10 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold.add_argument("--resource")
     scaffold.add_argument("--tag", action="append", default=[])
     scaffold.add_argument("--generated-by")
-    scaffold.add_argument("--generated-at", help='ISO 8601 datetime or "now".')
+    scaffold.add_argument(
+        "--generated-at",
+        help='ISO 8601 datetime with an explicit UTC offset or "now".',
+    )
     scaffold.add_argument("--body-file")
     scaffold.add_argument("--force", action="store_true")
     scaffold.set_defaults(func=command_scaffold)

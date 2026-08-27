@@ -26,6 +26,8 @@ Hard errors:
 Warnings:
 
 - missing recommended frontmatter fields
+- timestamp-valued frontmatter keys that are not ISO 8601 datetimes with an
+  explicit UTC offset, including the retained legacy `timestamp` fallback
 - broken cross-links, unless `--strict-links` is used
 
 The CLI does not reject missing optional provenance, trust, lifecycle, or
@@ -34,11 +36,12 @@ additional keys remain consumable.
 
 ## Parser Note
 
-The shipped CLI uses `PyYAML` when it is installed. Without `PyYAML`, it accepts
-flat scalars, scalar block lists, and JSON-compatible flow frontmatter. It
-fails closed on unsupported nesting or ambiguous flow mappings rather than
-certifying content it did not parse. Install `PyYAML` or use another YAML-aware
-tool when block-form nested mappings are required.
+The shipped CLI uses `PyYAML` when it is installed and preserves timestamp
+scalars as authored so validation does not change with YAML quoting. Without
+`PyYAML`, it accepts flat scalars, scalar block lists, and JSON-compatible flow
+frontmatter. It fails closed on unsupported nesting or ambiguous flow mappings
+rather than certifying content it did not parse. Install `PyYAML` or use
+another YAML-aware tool when block-form nested mappings are required.
 
 ## Machine-Readable Output
 
