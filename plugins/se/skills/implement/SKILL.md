@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement or resume only the published Features named by caller-supplied GitHub issue references, from refreshed selected base branches. A fresh run creates one new project-visible ChatGPT application task for the orchestrator and one per-Feature Worker; a validated resume reuses only the exact bound tasks. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
+description: "Implement or resume only the published Features named by caller-supplied GitHub issue references, from refreshed selected base branches. A fresh run creates one new observable user-owned ChatGPT application task for the orchestrator and one per-Feature Worker; a validated resume reuses only the exact bound tasks. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
 ---
 
 # Implement Feature Plan Sets
@@ -70,12 +70,13 @@ readback for every eligible Feature.
 
 ## Non-negotiable runtime invariants
 
-A fresh run creates one project-visible orchestrator task in the invoking
-ChatGPT application project and exactly one project-visible Feature Worker in
-the target project for each selected Feature. A validated resume reuses only
-the exact retained identities. Subordinate delegation and optional support
-never replace either required role, and an unavailable or unverifiable required
-task fails closed without a replacement.
+A fresh run creates one observable user-owned application task for the
+orchestrator and exactly one observable user-owned Feature Worker task for each
+selected Feature. A validated resume reuses only the exact retained identities.
+Subordinate delegation and optional support never replace either required role,
+and an unavailable or unverifiable required task fails closed without a
+replacement. Application routing and saved-project metadata never establish or
+invalidate either role.
 
 Before any task effect, load [task-profile.md](references/task-profile.md), the
 shared [task preflight](../../references/task-preflight.md), and the shared

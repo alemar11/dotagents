@@ -21,15 +21,17 @@ Its skills are deliberately separated by responsibility:
 - references/task-preflight.md and references/task-handoff.md are root-level
   contracts shared by task-managed Feature and Implement runs. Explicit
   invocation authorizes exactly the required user-owned tasks without a second
-  prompt, routes them through the intended ChatGPT application project, and
-  rejects subordinate delegation as a required-role substitute. The contracts
-  also require an explicit, complete role-profile request with no ambient
+  prompt and rejects subordinate delegation as a required-role substitute. The
+  controller may request an application destination, but only stable task
+  identity, authoritative bootstrap, and Git execution-target evidence gate the
+  role. The contracts also require an explicit, complete role-profile request
+  with no ambient
   inheritance plus an authoritative, assignment-specific comparison between
   requested and effective model/reasoning before normal task monitoring. They
   freeze the expected Git execution target and require the assigned task to verify its
   actual repository, checkout or worktree, remote, and topology-required base
-  facts. Saved-project identity and project-root metadata are optional
-  diagnostics and never block when absent.
+  facts. Saved-project association and project-root metadata are optional
+  diagnostics that are never compared or used as gates.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
@@ -72,10 +74,10 @@ Its skills are deliberately separated by responsibility:
   verified standalone or stacked PR topology. Its graph owns Feature-level
   scheduling, derives technical execution units and assignment-scoped T-AC
   criteria from each parent Feature plus available Macro context, creates one
-  visible orchestrator task in the invoking ChatGPT application project, then
-  one visible isolated Sol Feature Worker task and one PR per
+  observable user-owned orchestrator task, then one observable isolated Sol
+  Feature Worker task and one PR per
   implementation-eligible Feature. Fresh runs create those tasks; validated
-  resumes reuse only their exact retained project-visible identities. Runtime
+  resumes reuse only their exact retained task identities. Runtime
   guidance loads by role and phase: orchestration, Worker execution,
   publication, and delivery monitoring remain separate contracts. Implement
   may use bounded delegated support
@@ -194,8 +196,8 @@ Its skills are deliberately separated by responsibility:
   not rehydrate or repair Implement execution units.
 - task-managed Feature and Implement runs pass their skill-owned profiles to
   the shared preflight. Explicit invocation authorizes exactly their declared
-  project-visible task topology without a second prompt; task creation scope
-  and GitHub mutation scope remain independent. Feature delegation is
+  user-owned application-task topology without a second prompt; task creation
+  scope and GitHub mutation scope remain independent. Feature delegation is
   conditional on live capability and falls back to serial planner analysis;
   substantial planning still runs both study and critic lenses, while every
   principal task role remains required.

@@ -170,11 +170,12 @@ surface.
   candidate, PR, Feature Plan Set, GitHub mutation, or ledger state. Do not run
   overlapping writes in one worktree. Preserve the separate required-role
   topology: explicit Implement invocation authorizes the required hierarchy
-  without a second prompt. A fresh run creates one project-visible user-owned
-  application-task orchestrator and one project-visible Worker per Feature; a
-  validated resume reuses only exact retained identities. Optional or
-  subordinate delegation can never replace either required role; unavailable
-  or unverifiable required tasks fail closed before role-owned effects.
+  without a second prompt. A fresh run creates one observable user-owned
+  application-task orchestrator and one observable user-owned Worker per
+  Feature; a validated resume reuses only exact retained identities. Optional
+  or subordinate delegation can never replace either required role;
+  unavailable or unverifiable required tasks fail closed before role-owned
+  effects. Saved-project routing and visibility are not role evidence.
 - Keep the Implement ledger a minimal recovery index, not a second workflow
   engine. Preserve five tables, including exclusive active Feature claims,
   SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
@@ -248,11 +249,10 @@ surface.
   topology-required checkout or base facts. Handoff requires the assigned
   task to observe its actual Git execution target and compare it with that
   request. Missing required runtime observations select `unsupported-runtime`;
-  present differences select `execution-target-mismatch`. Application saved
-  project identity and project-root metadata are optional diagnostics only:
-  their absence never blocks, triggers a second read, or requires project
-  inventory refresh. Never substitute project display metadata for task or Git
-  execution evidence.
+  present differences select `execution-target-mismatch`. Application routing,
+  saved-project association, and project-root metadata are optional diagnostics
+  only: never infer, compare, refresh, retry, or block on them. Never substitute
+  project display metadata for task or Git execution evidence.
 - For Implement Feature Workers, distinguish the selected integration
   `base_branch` from the worker-owned `head_branch`. An application-managed
   worktree may bootstrap detached at the exact frozen base SHA. Require the
@@ -416,10 +416,10 @@ surface.
   mismatch.
 - Validate exact execution-target freezing and assigned-task observation,
   `execution-target-mismatch` for present Git-target differences, and
-  `unsupported-runtime` for missing required observations. Verify that saved
-  project identity and project-root metadata remain non-blocking diagnostics
-  and never trigger a second read, project inventory refresh, or replacement
-  task.
+  `unsupported-runtime` for missing required observations. Verify that
+  application routing, saved-project association, and project-root metadata
+  remain outside required records and never trigger comparison, a second read,
+  project inventory refresh, replacement task, or blocked outcome.
 - Validate flat prompt projection, best-effort canonical-title prompt hints,
   mandatory title readback/correction, and removal of nested or escaped
   transport envelopes without losing semantic constraints.

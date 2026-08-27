@@ -40,12 +40,10 @@ comparison, and controller identity binding.
 The same ownership split applies to the execution target. This preflight owns
 freezing the expected repository, execution mode, remote, and any
 topology-required checkout or base facts. Task Handoff owns the assigned task's
-post-effect observation and comparison against that target. When the invoking
-topology requires a project-visible task, preflight also freezes the exact
-application project used for routing and requires the resulting task to be
-independently visible in that project. Project identity or project-root
-metadata exposed inside the assigned task remains diagnostic rather than Git
-execution evidence or bootstrap evidence.
+post-effect observation and comparison against that target. The controller may
+request an application destination when creating or resuming a task, but
+saved-project association, visibility, and project-root metadata are not task,
+bootstrap, or Git execution evidence and never participate in a gate.
 
 The `task controller` is the session that creates or resumes one assigned
 application task, independently observes its stable identity and state, and
@@ -112,11 +110,10 @@ the requested topology:
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
 
-Only an independently observable user-owned application task associated with
-the frozen application project can satisfy a required application-task role.
-A subordinate in-task delegation, optional support assignment, or other
-non-application execution envelope is not project-visible task evidence and
-never satisfies or substitutes for a required role.
+Only an independently observable user-owned application task can satisfy a
+required application-task role. A subordinate in-task delegation, optional
+support assignment, or other non-application execution envelope never
+satisfies or substitutes for a required role.
 
 An authoritative task-scoped execution context satisfies effective-profile
 readback when it is accessible to the exact assigned task, identifies that
@@ -145,14 +142,13 @@ profile values, the fixed-profile capability gate has not passed. Stop before
 the task effect instead of creating a task and checking which defaults it
 received afterward.
 
-Application-project routing, task visibility, and Git execution-target
-verification are separate concerns. When project-visible tasks are required,
-the controller must route creation through the frozen application project and
-independently observe the resulting task in that project. The assigned task
-then verifies the target that can affect work: repository identity, checkout
-or worktree, remote, and any base facts required by the skill-owned topology.
-Missing project metadata inside the assigned task never substitutes for or
-invalidates independently observed project routing and task visibility.
+Application routing metadata is separate from task identity and Git
+execution-target verification. The controller independently observes the
+resulting task's stable identity and state, and the assigned task verifies the
+target that can affect work: repository identity, checkout or worktree,
+remote, and any base facts required by the skill-owned topology. Do not
+compare, refresh, or retry application project metadata as part of either
+verification.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or the exact assigned task
@@ -189,8 +185,8 @@ initialization available and cannot satisfy title observation or correction.
 
 ### 3. Verifiable destination
 
-Resolve one exact destination for every task before creation. Independently
-verify:
+Resolve one exact Git execution destination for every task before creation.
+Independently verify:
 
 - `repository_identity` and `remote_identity`;
 - the required execution mode, such as the exact local checkout or an isolated
@@ -201,6 +197,10 @@ verify:
 Freeze these facts before the task effect. In a multi-repository run, verify
 each repository target separately. A repository name copied from the request,
 a display title, or application project metadata alone is insufficient.
+
+An application destination may be requested as routing intent, but its
+association or display metadata is outside the frozen target and is never
+compared during bootstrap.
 
 The assigned task later observes the corresponding actual Git facts. A present
 difference is `execution-target-mismatch`. If the runtime cannot expose a
@@ -334,8 +334,6 @@ preflight:
     goals: available
     effective_mode: parallel-analysis
   target:
-    application_project_ref: "<controller-observed project>"
-    project_task_visibility: required
     repository_identity: "<independently observed repository>"
     remote_identity: "<independently observed remote>"
     execution_mode: "<exact-local-checkout or isolated-worktree>"
@@ -364,8 +362,8 @@ return the smallest recovery input and stop before the affected role-owned
 effect. It must not claim that a task is being monitored or completed until
 the required live evidence is available.
 
-If a required project-visible application task cannot be created, resumed,
-independently observed in its project, or monitored, use `blocker:
+If a required application task cannot be created, resumed, independently
+observed by stable identity and state, or monitored, use `blocker:
 unsupported-runtime`. Do not launch, continue, relabel, or promote a
 subordinate delegation, optional support assignment, or other execution
 envelope as the missing role. Reconciliation may retry only the original
@@ -386,12 +384,9 @@ present bootstrap evidence identity that differs from the controller-observed
 assigned task is `task-identity-mismatch`, and a present execution-target
 difference is `execution-target-mismatch`.
 
-Saved-project identity and project-root metadata exposed inside the assigned
-task are outside the fail-closed gate. Record them only as optional diagnostics
-when present. Their absence does not weaken the controller's required project
-routing and visibility evidence, authorize inference, or require a second
-task-local read, project inventory refresh, replacement task, or blocked
-outcome.
+Saved-project association and project-root metadata are optional diagnostics
+only. Do not infer, compare, refresh, retry, or block on them, and never use
+them as a substitute for stable task identity or Git execution evidence.
 
 A difference between the task controller's profile and the assigned role's
 requested profile is not a mismatch. Only the exact assigned task's

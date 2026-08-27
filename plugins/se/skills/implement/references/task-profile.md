@@ -36,20 +36,19 @@ assignment state and live Feature Worker or path-claim modes.
 
 The explicit se:implement invocation requests and authorizes the required
 user-owned application-task hierarchy without a second permission prompt. The
-orchestrator and every Feature Worker must be separate tasks independently
-visible in the ChatGPT application project: associate the orchestrator with the
-invoking project and each Worker with the project for its target repository.
-Subordinate in-task delegation and optional support never satisfy either
-required role. Project metadata inside an assigned task remains diagnostic;
-the controller-observed project association and actual Git target provide the
-required routing and execution evidence.
+orchestrator and every Feature Worker must be separate, independently
+observable user-owned application tasks. Subordinate in-task delegation and
+optional support never satisfy either required role. The controller may request
+an application destination, but saved-project association and visibility are
+not role evidence. Stable task identity, the authoritative assigned-task
+bootstrap, and the actual Git target provide the required execution evidence.
 
 For a fresh run, create exactly one new orchestrator and one new Feature Worker
 per selected Feature. A validated resume reuses only the exact previously
-bound project-visible identities. Create a not-yet-created role only after
-authoritative evidence proves no prior creation effect was applied. A missing
-or unverifiable retained identity is `unsupported-runtime`; never create a
-replacement role task.
+bound task identities. Create a not-yet-created role only after authoritative
+evidence proves no prior creation effect was applied. A missing or unverifiable
+retained identity is `unsupported-runtime`; never create a replacement role
+task.
 
 The invocation also selects these role profiles as required runtime inputs.
 Actively request both the resolved model and reasoning for the orchestrator,
@@ -127,7 +126,7 @@ in-task delegation continues to use the delegation evidence below.
 
 There is no model, reasoning, or required execution-topology fallback for the
 orchestrator or Feature Worker role. If the live runtime cannot create or
-resume the project-visible task, actively request the selected profile,
+resume the user-owned application task, actively request the selected profile,
 observe the stable assigned-task identity, or receive the task's authoritative
 bootstrap result, stop with `unsupported-runtime` before role-owned effects or
 monitoring. Optional Feature Worker support remains subordinate and cannot be

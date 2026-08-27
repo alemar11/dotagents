@@ -85,11 +85,10 @@ local action.
 
 Apply the shared [task handoff](../../../references/task-handoff.md) to both
 required controller edges. The invoking controller creates or resumes the one
-orchestrator in the invoking application project, independently observes its
-stable identity, project visibility, state, and title, and binds the
-orchestrator's assigned-task bootstrap before normal relay. The orchestrator's
-first turn performs that authoritative self-check before ledger, repository,
-Worker, or hosted effects.
+orchestrator, independently observes its stable identity, state, and title, and
+binds the orchestrator's assigned-task bootstrap before normal relay. The
+orchestrator's first turn performs that authoritative self-check before ledger,
+repository, Worker, or hosted effects.
 
 That controller-to-orchestrator bootstrap is the invocation envelope outside
 the Implement node registry. The verified orchestrator enters the graph at
@@ -99,22 +98,22 @@ orchestrator bootstrap and authoritative source-read evidence needed to report
 the failure.
 
 A fresh run creates new required roles; a validated resume reuses only the exact
-retained project-visible identities. Create a missing role only after
-authoritative evidence proves no prior creation effect was applied. Missing or
-unverifiable retained identity is `unsupported-runtime`, never authority for a
-replacement.
+retained task identities. Create a missing role only after authoritative
+evidence proves no prior creation effect was applied. Missing or unverifiable
+retained identity is `unsupported-runtime`, never authority for a replacement.
 
 After bootstrap, the orchestrator becomes controller for every Feature Worker.
-It freezes the assignment-specific request, creates or resumes the Worker in
-the target repository's application project, independently observes the stable
-identity and project visibility, and binds the Worker's authoritative bootstrap
-and actual Git target before accepting role work. The Worker performs this
-self-check before content writes, never creates another Feature Worker, and may
-have a profile intentionally different from the orchestrator.
+It freezes the assignment-specific request, creates or resumes the Worker,
+independently observes the stable identity and state, and binds the Worker's
+authoritative bootstrap and actual Git target before accepting role work. The
+Worker performs this self-check before content writes, never creates another
+Feature Worker, and may have a profile intentionally different from the
+orchestrator.
 
-Both edges are required project-visible application tasks; subordinate
-delegation cannot satisfy either. Optional support may start only below a
-verified Worker. Preserve the same task after `unsupported-runtime`,
+Both edges require observable user-owned application tasks; subordinate
+delegation cannot satisfy either. Application routing and saved-project
+metadata do not participate in either gate. Optional support may start only
+below a verified Worker. Preserve the same task after `unsupported-runtime`,
 `effective-profile-mismatch`, `task-identity-mismatch`, or
 `execution-target-mismatch` and follow the shared reconciliation path. These
 checks add no ledger state.

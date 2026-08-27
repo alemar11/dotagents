@@ -27,10 +27,10 @@ Create one handoff for one logical task assignment. It must point to the
 validated preflight record and carry the invoking skill's own task profile and
 topology. Do not invent a common profile or topology here.
 
-For a required application-task role, create the handoff only for the
-user-owned task independently visible in the frozen application project. A
-subordinate delegation, optional support assignment, or other execution
-envelope cannot receive, satisfy, or later inherit that required handoff.
+For a required application-task role, create the handoff only for an
+independently observable user-owned application task. A subordinate
+delegation, optional support assignment, or other execution envelope cannot
+receive, satisfy, or later inherit that required handoff.
 
 The handoff must contain, or link to:
 
@@ -89,8 +89,7 @@ complementary:
    defined below;
 4. before normal monitoring or update relay, the controller verifies that the
    bootstrap evidence identity exactly equals the stable assigned-task
-   identity, independently confirms that the task is visible in the frozen
-   application project, and completes title reconciliation.
+   identity and completes title reconciliation.
 
 The controller does not duplicate the assigned task's authoritative profile
 read. Role-owned work waits for the assigned-task bootstrap, while normal
@@ -105,7 +104,7 @@ result derived from the authoritative task-scoped source and includes the
 source task identity, requested and observed values, and evidence reference.
 
 For a required role, bootstrap binding is valid only for the independently
-observed project-visible application-task identity created or resumed under the
+observed user-owned application-task identity created or resumed under the
 declared topology. An identity or result from subordinate delegation, optional
 support, or another execution envelope is invalid and cannot be promoted into
 the required handoff.
@@ -319,20 +318,17 @@ worktree root, remote identity, execution mode, and every checkout, ref,
 base, or HEAD fact required by the skill-owned topology.
 
 The execution-target record describes where work can actually happen. A
-request payload, creation receipt, display title, or application saved-project
-label cannot substitute for Git and filesystem observations. Conversely,
-`project_identity` and application project-root metadata are optional
-diagnostics only. When either is absent, continue without a second read or
-project inventory refresh.
+request payload, creation receipt, display title, saved-project association,
+or project-root metadata cannot substitute for Git and filesystem
+observations. Application routing metadata is optional context only: do not
+compare, refresh, retry, or block on it.
 
 Apply these outcomes once to the same stable task:
 
 1. complete matching observations permit the handoff to continue;
 2. a missing required observation is `unsupported-runtime`;
 3. a present repository, remote, checkout, worktree, ref, base, or HEAD
-   difference is `execution-target-mismatch`;
-4. optional project metadata, whether present or absent, has no effect on the
-   outcome.
+   difference is `execution-target-mismatch`.
 
 Preserve the same task identity for every blocked result. Never create a
 replacement task or switch execution targets merely to seek matching evidence.
@@ -358,8 +354,6 @@ minimum fields:
 
 ```yaml
 task_observation:
-  application_project_ref: "<controller-observed project>"
-  visible_in_application_project: true
   requested_title: "<canonical display title>"
   observed_title: "<final read-back display title or null>"
   title_status: verified
@@ -396,8 +390,8 @@ the assigned task. The independently observed task identity and the assigned
 task's authoritative bootstrap readback are execution evidence; titles and
 other display metadata are not.
 
-Null project diagnostics do not affect bootstrap or execution-target success.
-Do not infer those optional values from another field.
+Application routing metadata is outside this minimum observation and has no
+effect on bootstrap or execution-target success.
 
 ## Update relay
 
