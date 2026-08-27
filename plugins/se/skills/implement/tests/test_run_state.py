@@ -35,7 +35,7 @@ class RunStateTests(unittest.TestCase):
         version = subprocess.run(
             [str(SCRIPT), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "3.10.1")
+        self.assertEqual(version.stdout.strip(), "3.11.0")
         db = self.root / "nested/run-state.sqlite3"
         result = self.payload(self.invoke(db, "doctor"))["result"]
         self.assertEqual(result["database_state"], "absent")
@@ -178,9 +178,25 @@ class RunStateTests(unittest.TestCase):
 
     def test_capabilities_publish_the_complete_state_registry(self) -> None:
         db = self.root / "run-state.sqlite3"
-        registry = self.payload(self.invoke(db, "capabilities"))["result"][
-            "state_registry"
-        ]
+        capabilities = self.payload(self.invoke(db, "capabilities"))["result"]
+        registry = capabilities["state_registry"]
+        self.assertEqual(capabilities["feature_commands"], ["claim", "recover", "release"])
+        self.assertEqual(
+            capabilities["claim_recovery"],
+            {
+                "dispositions": ["retire", "supersede"],
+                "required_claim_fields": [
+                    "authority_ref", "expected_orchestrator_task_id",
+                    "expected_revision", "expected_run_id", "feature_ref",
+                    "ownership_observation_ref",
+                ],
+                "audit_actions": [
+                    "feature-claim-retire", "feature-claim-supersede"
+                ],
+                "atomic": True,
+                "compare_and_swap": "feature-claim-revision",
+            },
+        )
         self.assertEqual(
             registry["run_pairs"],
             [
@@ -529,6 +545,217 @@ class RunStateTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(self.payload(conflict)["error"]["code"], "feature-already-claimed")
+
+    def test_scoped_claim_recovery_retires_supersedes_and_retries_idempotently(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        for run_id, task_id in (("old-run", "old-task"), ("new-run", "new-task")):
+            self.invoke(
+                db, "run", "start", "--run-id", run_id,
+                "--orchestrator-task-id", task_id,
+            )
+        features = self.root / "features.json"
+        features.write_text(json.dumps({
+            "feature_refs": ["owner/repo#10", "owner/repo#20"]
+        }), encoding="utf-8")
+        self.invoke(
+            db, "feature", "claim", "--run-id", "old-run", "--input", str(features)
+        )
+
+        recovery = self.root / "recovery.json"
+        recovery.write_text(json.dumps({
+            "disposition": "retire",
+            "feature_claims": [{
+                "feature_ref": "owner/repo#10",
+                "expected_run_id": "old-run",
+                "expected_orchestrator_task_id": "old-task",
+                "expected_revision": 0,
+                "authority_ref": "authority/retire-10",
+                "ownership_observation_ref": "observation/old-task-terminal",
+            }],
+        }), encoding="utf-8")
+        retired = self.payload(self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+        ))["result"]
+        self.assertTrue(retired["changed"])
+        self.assertEqual(retired["recoveries"][0]["feature_claim"]["status"], "released")
+        self.assertEqual(retired["recoveries"][0]["feature_claim"]["run_id"], "old-run")
+        self.assertEqual(retired["recoveries"][0]["operation"]["status"], "applied")
+        operation_id = retired["recoveries"][0]["operation"]["operation_id"]
+        retried = self.payload(self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+        ))["result"]
+        self.assertFalse(retried["changed"])
+        self.assertEqual(
+            retried["recoveries"][0]["operation"]["operation_id"], operation_id
+        )
+        conflicting_payload = json.loads(recovery.read_text(encoding="utf-8"))
+        conflicting_payload["feature_claims"][0]["authority_ref"] = "authority/different"
+        recovery.write_text(json.dumps(conflicting_payload), encoding="utf-8")
+        conflicting_retry = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+            check=False,
+        )
+        self.assertEqual(
+            self.payload(conflicting_retry)["error"]["code"], "recovery-conflict"
+        )
+
+        recovery.write_text(json.dumps({
+            "disposition": "supersede",
+            "feature_claims": [{
+                "feature_ref": "owner/repo#20",
+                "expected_run_id": "old-run",
+                "expected_orchestrator_task_id": "old-task",
+                "expected_revision": 0,
+                "authority_ref": "authority/supersede-20",
+                "ownership_observation_ref": "observation/old-task-abandoned",
+            }],
+        }), encoding="utf-8")
+        superseded = self.payload(self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+        ))["result"]
+        claim = superseded["recoveries"][0]["feature_claim"]
+        self.assertEqual((claim["run_id"], claim["status"], claim["revision"]),
+                         ("new-run", "active", 1))
+        stale_effect = self.invoke(
+            db, "operation", "begin", "--run-id", "old-run", "--action", "push",
+            "--subject-id", "stale-candidate", check=False,
+        )
+        self.assertEqual(
+            self.payload(stale_effect)["error"]["code"], "feature-claim-required"
+        )
+
+    def test_claim_recovery_conflicts_and_ambiguous_ownership_are_atomic(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        for run_id, task_id in (("old-run", "old-task"), ("new-run", "new-task")):
+            self.invoke(
+                db, "run", "start", "--run-id", run_id,
+                "--orchestrator-task-id", task_id,
+            )
+        features = self.root / "features.json"
+        features.write_text(json.dumps({
+            "feature_refs": ["owner/repo#10", "owner/repo#20"]
+        }), encoding="utf-8")
+        self.invoke(
+            db, "feature", "claim", "--run-id", "old-run", "--input", str(features)
+        )
+        recovery = self.root / "recovery.json"
+        base = {
+            "expected_run_id": "old-run",
+            "expected_orchestrator_task_id": "old-task",
+            "expected_revision": 0,
+            "authority_ref": "authority/recover",
+            "ownership_observation_ref": "observation/exact-owner",
+        }
+        recovery.write_text(json.dumps({
+            "disposition": "supersede",
+            "feature_claims": [
+                {**base, "feature_ref": "owner/repo#10"},
+                {**base, "feature_ref": "owner/repo#20", "expected_revision": 1},
+            ],
+        }), encoding="utf-8")
+        conflict = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+            check=False,
+        )
+        self.assertEqual(
+            self.payload(conflict)["error"]["code"], "revision-conflict"
+        )
+        with sqlite3.connect(db) as connection:
+            claims = connection.execute(
+                "SELECT run_id,status,revision FROM feature_claims ORDER BY feature_ref"
+            ).fetchall()
+            operations = connection.execute(
+                "SELECT count(*) FROM operations WHERE run_id='new-run'"
+            ).fetchone()[0]
+        self.assertEqual(claims, [("old-run", "active", 0), ("old-run", "active", 0)])
+        self.assertEqual(operations, 0)
+
+        malformed = self.root / "malformed.json"
+        malformed.write_text(json.dumps({
+            "disposition": "retire",
+            "feature_claims": [{
+                key: value for key, value in {**base, "feature_ref": "owner/repo#10"}.items()
+                if key != "ownership_observation_ref"
+            }],
+        }), encoding="utf-8")
+        ambiguous = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(malformed),
+            check=False,
+        )
+        self.assertEqual(
+            self.payload(ambiguous)["error"]["code"], "ambiguous-claim-ownership"
+        )
+        ambiguous_owner = self.root / "ambiguous-owner.json"
+        ambiguous_owner.write_text(json.dumps({
+            "disposition": "retire",
+            "feature_claims": [{
+                **base,
+                "feature_ref": "owner/repo#10",
+                "expected_orchestrator_task_id": "unverified-task",
+            }],
+        }), encoding="utf-8")
+        ambiguous = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task",
+            "--input", str(ambiguous_owner), check=False,
+        )
+        self.assertEqual(
+            self.payload(ambiguous)["error"]["code"], "ambiguous-claim-ownership"
+        )
+        wrong_controller = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "other-task", "--input", str(recovery),
+            check=False,
+        )
+        self.assertEqual(self.payload(wrong_controller)["error"]["code"], "run-conflict")
+
+    def test_claim_recovery_rejects_unresolved_source_effects(self) -> None:
+        db = self.root / "run-state.sqlite3"
+        self.invoke(db, "state", "prepare")
+        for run_id, task_id in (("old-run", "old-task"), ("new-run", "new-task")):
+            self.invoke(
+                db, "run", "start", "--run-id", run_id,
+                "--orchestrator-task-id", task_id,
+            )
+        features = self.root / "features.json"
+        features.write_text(
+            json.dumps({"feature_refs": ["owner/repo#10"]}), encoding="utf-8"
+        )
+        self.invoke(
+            db, "feature", "claim", "--run-id", "old-run", "--input", str(features)
+        )
+        self.invoke(
+            db, "operation", "begin", "--run-id", "old-run", "--action", "push",
+            "--subject-id", "candidate",
+        )
+        recovery = self.root / "recovery.json"
+        recovery.write_text(json.dumps({
+            "disposition": "supersede",
+            "feature_claims": [{
+                "feature_ref": "owner/repo#10",
+                "expected_run_id": "old-run",
+                "expected_orchestrator_task_id": "old-task",
+                "expected_revision": 0,
+                "authority_ref": "authority/supersede",
+                "ownership_observation_ref": "observation/old-task-terminal",
+            }],
+        }), encoding="utf-8")
+        rejected = self.invoke(
+            db, "feature", "recover", "--run-id", "new-run",
+            "--orchestrator-task-id", "new-task", "--input", str(recovery),
+            check=False,
+        )
+        self.assertEqual(
+            self.payload(rejected)["error"]["code"], "recovery-effects-unresolved"
+        )
 
     def test_assignment_requires_claim_and_rejects_non_text_state(self) -> None:
         db = self.root / "run-state.sqlite3"

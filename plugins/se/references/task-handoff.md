@@ -36,9 +36,12 @@ The handoff must contain, or link to:
 
 - the explicit user request and bounded objective;
 - the source Feature Plan, source issue, or other durable input references;
-- the exact repository destination and allowed scope;
-- the frozen Git execution target, including repository, remote, execution
-  mode, and any topology-required checkout or base facts;
+- the role-specific target kind and allowed scope;
+- for a repository-bound role, the frozen repository, remote, execution mode,
+  base branch/SHA, intended head branch, worktree, and path envelope;
+- for a control-plane role, the complete peer repository-observation set and
+  explicit absence of a repository, checkout, worktree, or primary-repository
+  binding;
 - a reference to the skill-owned task profile and the role assigned to this
   handoff;
 - the exact requested model and reasoning resolved for this assignment;
@@ -85,16 +88,16 @@ complementary:
 3. before role-owned planning, orchestration, implementation, repository, or
    hosted work, the assigned task reads its own authoritative task-scoped
    execution context, compares its effective profile with the handoff, observes
-   its actual Git execution target, and returns the structured bootstrap result
-   defined below;
+   its actual role-specific execution target, and returns the structured
+   bootstrap result defined below;
 4. before normal monitoring or update relay, the controller verifies that the
    bootstrap evidence identity exactly equals the stable assigned-task
    identity and completes title reconciliation.
 
 The controller does not duplicate the assigned task's authoritative profile
 read. Role-owned work waits for the assigned-task bootstrap, while normal
-controller monitoring and relay wait for exact identity binding, execution
-target comparison, and title reconciliation.
+controller monitoring and relay wait for exact identity binding, role-target
+comparison, and title reconciliation.
 
 The controller and assigned task may run under intentionally different model
 or reasoning profiles. Only the assigned task's authoritatively self-observed
@@ -305,17 +308,21 @@ readback.
 The role observation is evidence, not a new state machine. Do not add an
 `accepted` or routing-status field: the invoking workflow retains its existing
 `ready`, fallback, `complete`, and `blocked` outcomes. Do not add generic
-sandbox or permission fields here. Repository, host, checkout, and worktree
-boundaries remain with their existing owners; a skill that requires another
-execution-boundary fact must define its semantic requirement itself.
+sandbox or permission fields here. Repository, host, checkout, worktree, and
+control-plane repository-set boundaries remain with their existing owners; a
+skill that requires another execution-boundary fact must define its semantic
+requirement itself.
 
 ## Execution-target observation
 
 After the controller independently observes the stable task identity, the
 assigned task inspects its actual execution target and compares it with the
-target frozen by preflight. Observe the repository identity, Git root or
-worktree root, remote identity, execution mode, and every checkout, ref,
-base, or HEAD fact required by the skill-owned topology.
+target frozen by preflight. For `repository-bound`, observe the repository
+identity, Git/worktree root, remote identity, execution mode, base branch/SHA,
+intended head branch, path-envelope binding, and every stricter ref or HEAD fact
+required by the skill-owned topology. For `control-plane`, verify that no Git
+checkout or worktree is required and reconcile one authoritative observation
+for every selected repository without selecting a primary repository.
 
 The execution-target record describes where work can actually happen. A
 request payload, creation receipt, display title, saved-project association,
@@ -327,8 +334,9 @@ Apply these outcomes once to the same stable task:
 
 1. complete matching observations permit the handoff to continue;
 2. a missing required observation is `unsupported-runtime`;
-3. a present repository, remote, checkout, worktree, ref, base, or HEAD
-   difference is `execution-target-mismatch`.
+3. a present target-kind, repository-set, repository, remote, checkout,
+   worktree, branch, path-envelope, ref, base, or HEAD difference is
+   `execution-target-mismatch`.
 
 Preserve the same task identity for every blocked result. Never create a
 replacement task or switch execution targets merely to seek matching evidence.
@@ -336,14 +344,32 @@ replacement task or switch execution targets merely to seek matching evidence.
 ```yaml
 execution_target_observation:
   request_ref: "<frozen preflight target>"
+  target_kind: repository-bound
   repository_identity: "<observed repository>"
   repository_root: "<observed Git root>"
-  worktree_root: "<observed isolated worktree or null>"
+  worktree_root: "<observed isolated worktree>"
   remote_identity: "<observed remote>"
-  execution_mode: "<observed local or isolated mode>"
-  base_ref: "<required observed ref or null>"
-  base_sha: "<required observed full SHA or null>"
-  head_sha: "<required observed full SHA or null>"
+  execution_mode: isolated-worktree
+  base_branch: "<observed selected branch>"
+  base_sha: "<observed full SHA>"
+  head_branch: "<frozen intended Worker branch>"
+  path_envelope_ref: "<observed allowed write envelope>"
+  comparison: exact-match
+```
+
+A control-plane observation uses the exclusive alternate shape:
+
+```yaml
+execution_target_observation:
+  request_ref: "<frozen preflight target>"
+  target_kind: control-plane
+  execution_mode: projectless-control-plane
+  repository_binding: none
+  selected_repository_observations:
+    - repository_identity: "<observed repository>"
+      remote_identity: "<observed remote>"
+      observation_ref: "<authoritative observation>"
+  primary_repository: none
   comparison: exact-match
 ```
 
@@ -383,7 +409,7 @@ skill-owned profile, and its
 `assigned_task_bootstrap.profile_request_ref` must prove the complete resolved
 profile was actively requested. A missing explicit request, ambient
 inheritance, or a mismatch in effective model, effective reasoning, task
-identity, execution target, or state is a blocker until reconciled.
+identity, role-specific execution target, or state is a blocker until reconciled.
 Require `assigned_task_bootstrap.evidence_task_identity` to equal the enclosing
 `task_observation.task_identity`; a different identity is not evidence about
 the assigned task. The independently observed task identity and the assigned

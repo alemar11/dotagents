@@ -38,8 +38,9 @@ boundary.
 The Worker may complete its role-owned phase only at a registered node boundary:
 
 - complete candidate-bound validation enters `candidate`; before first
-  publication the same Worker continues through native review under
-  review-delivery without a generic continuation message;
+  publication the same Worker continues through native review under the
+  verified local-only boundary owned by review-delivery without a generic
+  continuation message;
 - a clean exact-HEAD native result completes `review-decision` and enters
   `publish-pr` for orchestrator-owned reservation and authorization;
 - after first publication, a validated repair candidate enters `candidate`, or
@@ -177,7 +178,7 @@ envelope or isolated helper context. The Feature Worker integrates the result
 and owns the final candidate commit.
 
 Before first publication, follow pre-candidate convergence, complete
-candidate-bound validation, and mandatory native review. After an actionable
+candidate-bound validation, and mandatory local-only native review. After an actionable
 hosted finding, treat it as evidence of a violated invariant rather than a
 line-edit instruction. Repair every equivalent path governed by that invariant,
 remain inside the Feature contract, and add or update focused regression

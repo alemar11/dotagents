@@ -117,9 +117,26 @@ selected session authoritatively, and refresh its state. If full active-session
 coverage cannot be established but a reliable subset is available, continue
 with `coverage: partial`; do not claim complete coverage.
 
-At `discover`, freeze the initial cohort of sessions that are active at that
-observation boundary. Newly started sessions are outside the run and require a
-new or explicitly broadened audit. Exclude:
+Treat every bounded page, recent-task window, host partition, or project
+partition as incomplete until the runtime's authoritative continuation or
+partition boundary is exhausted. For `coverage: complete`, traverse every
+available continuation and every relevant host/project partition, deduplicate
+by stable session identity, and establish one stable discovery boundary before
+freezing the cohort. If inventory changes while a complete pass is assembled,
+repeat the bounded pass or downgrade coverage rather than combining an unstable
+cohort. A single capped result set—even when it returns the requested maximum—
+is never complete-inventory evidence.
+
+When exhaustive traversal is unavailable, freeze only the reliably observed
+subset and record `coverage: partial` with the observed cap/window, partitions
+visited, unavailable continuation boundary, and the classes of sessions that
+may have been omitted. Equivalent complete-inventory mechanisms are acceptable
+only when they authoritatively cover the same full active-session population;
+repeated overlapping recent-window reads are not pagination.
+
+At `discover`, freeze the deduplicated initial cohort of sessions that are
+active at the stable observation boundary. Newly started sessions are outside
+the run and require a new or explicitly broadened audit. Exclude:
 
 - the current audit session and other audit or monitor sessions;
 - inactive sessions at the discovery boundary;

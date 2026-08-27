@@ -74,9 +74,9 @@ The workflow nodes `candidate`, `publish-pr`, `stack-reconcile`,
 `candidate-published`, `delivery-monitor`, and `final-verify` perform the work
 between those durable pairs. After every assignment reaches
 `delivery-ready @ final-verify`, the run enters `active @ release-claims` and
-then `complete @ complete`. Optional provider-policy dispositions such as
-`ready` and `ready-with-manual-action` may be recorded as diagnostics, but they
-are not required by final verification and are not assignment statuses.
+then `complete @ complete`. Implement owns no provider-policy disposition and
+never requests one; an externally supplied observation is report-only and is
+not final-verification evidence or an assignment status.
 For a stacked assignment whose first PR is read back but whose link is not yet
 verified, `active @ native-review` remains the coarse checkpoint while the
 applied first-publication operation makes hosted review authoritative; resume at
@@ -146,6 +146,39 @@ against the declared base using its resolved Sol reasoning level. The required
 outcome is an independently reported exact-HEAD finding set or clean result;
 the skill does not encode an application operation or interface.
 
+Native review runs inside a verified `local-only` isolation boundary. Before
+launch, establish that the review can read the frozen repository, base, and
+candidate plus local scratch outputs, but cannot access the network, GitHub or
+another hosted provider, invoke a G-owned hosted workflow, mutate repository or
+Git transport state, or perform a hosted operation. Bind that isolation
+evidence to the Worker, worktree, review lineage, and exact candidate SHA. If
+the boundary cannot be established, stop with `unsupported-runtime` before
+review launch; never weaken isolation to obtain a result.
+
+If observation proves or cannot exclude network/provider access, a hosted
+operation, or repository/Git mutation during review, discard the complete
+terminal result. It is neither a clean result nor an actionable finding set.
+Reconcile any suspected external effect through the applicable G-owned
+readback path, preserve the unchanged candidate, and fail closed while the
+effect or boundary remains ambiguous. The existing bounded replacement-review
+rule applies only when authoritative evidence proves the prior review terminal,
+the candidate unchanged, no external effect unresolved, and the replacement
+can run under verified `local-only` isolation.
+
+```yaml
+native_review_isolation:
+  mode: local-only
+  repository_access: read-only-candidate
+  local_scratch: isolated
+  network_access: denied
+  hosted_provider_access: denied
+  hosted_operations: denied
+  repository_mutation: denied
+  git_transport: denied
+  candidate_sha: "<exact full SHA>"
+  evidence_ref: "<verified review-boundary observation>"
+```
+
 The earlier advisory critic and every cheap, focused, gap-driven, or parallel
 pre-candidate check are implementation evidence only. They never satisfy,
 replace, narrow, or authorize this native-review gate, and they do not alter its
@@ -164,7 +197,8 @@ be obtained.
 Treat the native review result and its delivery or monitoring stream as
 separate evidence. Retain the same stable review lineage when the live
 capability exposes one, together with the verified Worker, repository,
-worktree, base SHA, candidate SHA, and resolved review profile. A timeout,
+worktree, base SHA, candidate SHA, resolved review profile, and isolation
+evidence. A timeout,
 disconnected stream, interrupted execution status, missing relay, or failed
 parent Worker does not prove that the review failed or that no terminal result
 exists.
@@ -180,7 +214,8 @@ and exact candidate before resuming implementation or starting another review:
   again later without starting a duplicate;
 - when authoritative observation proves that the prior review is terminal and
   has no usable result, retain that failure and make at most one replacement
-  minimal review in the same Worker against the unchanged exact candidate;
+  minimal review in the same Worker against the unchanged exact candidate and
+  the same verified local-only boundary;
 - when the prior effect, review identity, terminal content, or exact-HEAD
   binding remains unknown, conflicting, inaccessible, or stale, fail closed
   without a replacement review.

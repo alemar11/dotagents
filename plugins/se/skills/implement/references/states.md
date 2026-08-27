@@ -77,7 +77,7 @@ the whole run, one assignment, or the current invocation.
 | `implement-validate` | Assignment | Derive technical units and T-AC; implement and stabilize the first unpublished draft through cheap checks, conditional advisory critique, integrated repair, and complete candidate-bound validation; or run complete final validation for a published repair. An unchanged published HEAD may proceed directly to final verification. |
 | `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
 | `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence; route an unpublished candidate to native review and a published repair directly to PR update. |
-| `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker before first PR publication. |
+| `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker under verified local-only isolation before first PR publication. |
 | `review-decision` | Assignment | Before first publication, send a native-clean candidate to publication or return native findings for repair. |
 | `publish-pr` | Assignment | Push the exact candidate; create the draft PR after native review, or update the verified existing PR directly for a hosted repair. |
 | `stack-reconcile` | Assignment | Verify the immediate parent, base, ancestry, stack order, and link for a stacked PR. |
@@ -173,11 +173,13 @@ the dependent evidence and requires live reconciliation.
 | State | Description |
 | --- | --- |
 | `active` | This run exclusively owns the canonical Feature ref. |
-| `released` | A successfully completed run released the Feature for future ownership. |
+| `released` | The owning run released the Feature after successful completion, or a scoped audited recovery retired the exact stale/foreign claim. |
 
-Deferred and blocked runs retain active claims. Release the complete claim set
-only from `active @ release-claims`, after every assignment is
-`delivery-ready @ final-verify` and every operation is resolved.
+Deferred and blocked runs normally retain active claims. The aggregate release
+path still releases the complete claim set only from `active @ release-claims`,
+after every assignment is `delivery-ready @ final-verify` and every operation
+is resolved. Scoped recovery is the only exception and does not imply delivery
+completion.
 
 ## Operation results
 
@@ -193,20 +195,14 @@ Do not use operation result `blocked` for a temporary prerequisite, unavailable
 path claim, pending authority, or retryable provider condition. Leave that
 operation `pending` and resume the same reservation after the condition changes.
 
-## Provider dispositions
+## External provider-policy observations
 
-Provider dispositions are optional exact-HEAD observations returned by
-`$g:github-delivery-status`. They are never run statuses, assignment statuses,
-or operation results, and Implement never requires them for completion.
-
-| Disposition | Description | Implement interpretation |
-| --- | --- | --- |
-| `ready` | Optional provider policy gates are observed satisfied for the exact PR HEAD. | Informational only; never a completion gate. |
-| `ready-with-manual-action` | Optional provider evidence is satisfied except for a manual branch action. | Informational only; never a completion gate. |
-| `pending` | Optional hosted policy evidence is incomplete. | Report diagnostically; do not block an otherwise verified PR. |
-| `blocked` | Optional hosted policy currently prevents provider readiness. | Report diagnostically; do not confuse it with an Implement blocker. |
-| `conflicting` | Optional provider observation reports a merge conflict. | Reconcile only when implementation or stack evidence must change. |
-| `unknown` | Optional provider evidence is missing, stale, ambiguous, or incomplete. | Report diagnostically; never infer merge readiness. |
+Implement owns no provider-readiness disposition registry and never requests a
+delivery-status classification. Branch-protection, ruleset, mergeability-policy,
+merge-queue, auto-merge, or provider-policy observations supplied by another
+actor remain external report-only facts. They are never run statuses,
+assignment statuses, operation results, workflow-transition inputs, or
+completion evidence.
 
 ## Runtime-only modes
 
@@ -215,6 +211,9 @@ not stored as ledger statuses.
 
 | Domain | Mode | Description |
 | --- | --- | --- |
+| Task target | `control-plane` | The orchestrator has no repository/worktree binding and retains one authoritative observation per selected peer repository without a primary. |
+| Task target | `repository-bound` | A Feature Worker is bound to its exact repository, remote, base branch/SHA, head branch, isolated worktree, and path envelope. |
+| Native review isolation | `local-only` | Review may inspect the frozen local candidate but has no network, hosted-provider, repository-mutation, or Git-transport capability. |
 | Feature Worker | active | The Worker may execute only while its exact path envelope is held. |
 | Feature Worker | inactive but resumable | The Worker is preserved after candidate publication, performs no writes, and never polls its PR. |
 | Path claim | held | The assignment exclusively owns its normalized write envelope. |
@@ -254,11 +253,18 @@ statuses and never imply merge or post-merge closure.
   final verification without native review, even when stack reconciliation has
   not yet established `candidate-published`; complete validation is required
   on the exact final HEAD.
+- Native review evidence is usable only with exact-candidate `local-only`
+  isolation proof. Missing isolation blocks launch; observed or ambiguous
+  network, hosted-provider, repository-mutation, or Git-transport access
+  discards the entire result and requires reconciliation before any bounded
+  replacement review.
 - A PR-body-only change invalidates only body readback. A base, parent, or
   stack-link change invalidates only the affected integration and descendant
   evidence. An interrupted hosted monitor resumes the same review lineage
   without a duplicate request.
 - Persist `delivery-ready @ final-verify` only after all final requirements pass
   for the same exact HEAD.
-- Retain Feature claims for deferred or blocked runs; release them only on the
-  successful aggregate path.
+- Retain Feature claims for ordinary deferred or blocked runs. Exceptional
+  scoped recovery may retire or supersede exact stale/foreign claims only with
+  authoritative ownership and recovery evidence, CAS revision matching, no
+  unresolved source effects, and an atomic applied audit operation.

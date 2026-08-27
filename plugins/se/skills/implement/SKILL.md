@@ -82,10 +82,14 @@ Before any task effect, load [task-profile.md](references/task-profile.md), the
 shared [task preflight](../../references/task-preflight.md), and the shared
 [task handoff](../../references/task-handoff.md). Actively request each
 role's complete model and reasoning profile, bind its authoritative assigned
-task bootstrap and Git execution target to the independently observed stable
-task identity, and reconcile its deterministic title once. The explicit
-Implement invocation authorizes only this required hierarchy and its declared
-delivery effects.
+task bootstrap and role-specific execution target to the independently observed
+stable task identity, and reconcile its deterministic title once. The
+orchestrator uses a projectless control-plane target with one verified
+observation per selected repository and no primary-repository binding. Every
+Feature Worker remains bound to its exact repository, remote, base branch/SHA,
+head branch, isolated worktree, and path envelope. The explicit Implement
+invocation authorizes only this required hierarchy and its declared delivery
+effects.
 
 The orchestrator alone owns the SQLite ledger, Feature claims, path-claim
 coordination, side-effect reservations, delivery monitoring, and aggregate
@@ -93,8 +97,12 @@ completion. A Worker owns one Feature's implementation, validation, candidate
 and repair semantics; it never accesses the ledger or polls its inactive PR.
 
 Before first publication, complete validation and native review bind to the
-same exact candidate HEAD in the same Worker. Any pre-publication HEAD change
-invalidates both and repeats that gate. Exact first-PR publication readback
+same exact candidate HEAD in the same Worker. Native review must run under a
+verified local-only boundary with network, GitHub/provider access, hosted
+operations, repository mutation, and Git transport unavailable; crossed or
+ambiguous isolation invalidates the whole review result and fails closed. Any
+pre-publication HEAD change invalidates both and repeats that gate. Exact
+first-PR publication readback
 permanently transfers review authority to the hosted lineage; later repairs,
 rebases, or parent drift update the same PR and never restart native review.
 Complete validation and clean hosted review must converge on the same final
@@ -104,9 +112,11 @@ Before the first required GitHub read or write, load the shared
 [G dependency preflight](../../references/codex-dependency-preflight.md).
 Route every Git and GitHub operation through its G-owned workflow and apply the
 shared [hosted-content-safety.md](../../references/hosted-content-safety.md)
-contract immediately before every hosted write. Branch protection, rulesets,
-merge queue, auto-merge, and the general delivery-status workflow are not
-completion gates.
+contract immediately before every hosted write. Implement never invokes the
+general delivery-status workflow or requests branch-protection, ruleset,
+mergeability-policy, merge-queue, auto-merge, or provider-policy
+classification. Supplied observations remain report-only and never enter the
+closed completion evidence set.
 
 The role about to make each G handoff owns that handoff's dependency gate. A
 prior pass never substitutes for the next required handoff gate.
@@ -124,7 +134,7 @@ only the current role and phase owner:
 | Controller and orchestrator bootstrap, plan interpretation, scheduling, topology, plan questions, and aggregate control | [orchestration.md](references/orchestration.md) |
 | Feature Worker implementation, optional support, pre-candidate convergence, complete validation, and phase exits | [worker-execution.md](references/worker-execution.md) |
 | Candidate boundary, native review, first publication or PR update, stack reconciliation, and candidate-published handoff | [review-delivery.md](references/review-delivery.md) |
-| Ready transition, hosted review and CI, repair monitoring, provider diagnostics, and final verification | [delivery-monitoring.md](references/delivery-monitoring.md) |
+| Ready transition, hosted review and CI, repair monitoring, externally supplied diagnostics, and final verification | [delivery-monitoring.md](references/delivery-monitoring.md) |
 | Ledger preparation, checkpointing, reservation, reset, or recovery | [run-state.md](references/run-state.md) |
 
 The orchestrator loads monitoring guidance only after a verified publication

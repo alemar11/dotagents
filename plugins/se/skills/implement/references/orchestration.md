@@ -15,6 +15,12 @@ contract to the exact final content. G owns transport and readback.
 
 ## Control plane
 
+The orchestrator is a projectless control plane, not a repository Worker. It
+has no Git checkout, worktree, or primary-repository binding. Before
+repository-specific scheduling or Worker creation, retain one independently
+verified repository/remote observation for every selected repository and
+reconcile the complete peer set against the caller-selected Feature refs.
+
 The orchestrator coordinates the exact caller-selected Features. Each retains
 its Feature and repository identity, Macro projection state, one assignment,
 one Feature Worker, and one PR output. The orchestrator derives execution units
@@ -33,9 +39,13 @@ independent work because another assignment is blocked, deferred, or
 delivery-pending.
 
 Before any Worker starts, claim the complete sorted Feature set atomically. A
-conflicting active claim blocks startup without partial claims or a competing
-orchestrator. Release the complete claim set only after terminal
-reconciliation.
+conflicting active claim blocks ordinary startup without partial claims or a
+competing orchestrator. When authoritative task observation proves exact stale
+or foreign ownership and explicit recovery authority is available, the
+orchestrator may instead use the scoped CAS recovery in
+[run-state.md](run-state.md); ambiguous ownership or unresolved source effects
+remain blocked. Release the complete claim set on the normal path only after
+terminal reconciliation.
 
 ## Actionable frontier and handoff discipline
 
@@ -87,8 +97,10 @@ Apply the shared [task handoff](../../../references/task-handoff.md) to both
 required controller edges. The invoking controller creates or resumes the one
 orchestrator, independently observes its stable identity, state, and title, and
 binds the orchestrator's assigned-task bootstrap before normal relay. The
-orchestrator's first turn performs that authoritative self-check before ledger,
-repository, Worker, or hosted effects.
+orchestrator's first turn performs that authoritative self-check, including the
+control-plane target and complete repository-observation set, before ledger,
+Worker, or hosted effects. Ambient Git state is ignored rather than promoted to
+an arbitrary primary repository.
 
 That controller-to-orchestrator bootstrap is the invocation envelope outside
 the Implement node registry. The verified orchestrator enters the graph at
@@ -103,14 +115,18 @@ evidence proves no prior creation effect was applied. Missing or unverifiable
 retained identity is `unsupported-runtime`, never authority for a replacement.
 
 After bootstrap, the orchestrator becomes controller for every Feature Worker.
-It freezes the assignment-specific request, creates or resumes the Worker,
+It freezes the assignment-specific request and exact repository-bound target,
+creates or resumes the Worker,
 independently observes the stable identity and state, and binds the Worker's
 authoritative bootstrap and actual Git target before accepting role work. The
 Worker performs this self-check before content writes, never creates another
 Feature Worker, and may have a profile intentionally different from the
 orchestrator.
 
-Both edges require observable user-owned application tasks; subordinate
+The controller-to-orchestrator edge uses the control-plane target. Every
+orchestrator-to-Worker edge uses a repository-bound target with exact
+repository, remote, base branch/SHA, head branch, isolated worktree, and path
+envelope. Both edges require observable user-owned application tasks; subordinate
 delegation cannot satisfy either. Application routing and saved-project
 metadata do not participate in either gate. Optional support may start only
 below a verified Worker. Preserve the same task after `unsupported-runtime`,

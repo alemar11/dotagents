@@ -19,7 +19,7 @@ independent identities. The current contract is:
 
 | Domain | Version |
 | --- | --- |
-| CLI | `3.10.0` |
+| CLI | Reported by `scripts/run-state --version` from the canonical `CLI_VERSION` source |
 | Runtime contract | `3.2.0` |
 | Database schema | integer `3` |
 | JSON envelope | `se-implement/ledger-envelope` version `3.0.0` |
@@ -64,7 +64,9 @@ compatibility aliases, or old-path probes. A detectable mismatch returns
 Reset is an explicit destructive operation requiring the exact confirmation
 token documented by `scripts/run-state --help`. It removes only the resolved
 ledger database and its SQLite sidecars, then recreates the current schema.
-Never reset automatically after a mismatch or error.
+Never reset automatically after a mismatch or error. Reset is not the recovery
+path for a stale or foreign Feature claim: use the scoped claim-recovery
+transaction below when its exact ownership and authority evidence is available.
 
 ## Minimal data model
 
@@ -79,8 +81,8 @@ Keep only five tables:
   release state;
 - `assignments`: one immutable Feature ref, Feature Worker identity and
   worktree, branches, SHAs, PR ref, checkpoint, status, and revision;
-- `operations`: one idempotency reservation for a side effect, its subject,
-  status, receipt ref, and readback ref.
+- `operations`: one idempotency reservation or scoped claim-recovery audit
+  record, its subject, status, receipt ref, and readback ref.
 
 Do not store plan bodies, prompts, messages, findings, logs, arbitrary
 JSON, model/reasoning profiles, code state, or Feature Worker technical state.
@@ -126,6 +128,7 @@ scripts/run-state --json run start ...
 scripts/run-state --json run show ...
 scripts/run-state --json run checkpoint ...
 scripts/run-state --json feature claim --run-id ... --input ...
+scripts/run-state --json feature recover --run-id ... --orchestrator-task-id ... --input ...
 scripts/run-state --json feature release --run-id ... --input ...
 scripts/run-state --json assignment checkpoint ...
 scripts/run-state --json operation begin ...
@@ -143,6 +146,39 @@ operation remains pending or unknown, then releases the whole set in one
 transaction. It never releases one Feature independently. Preserve claims for
 resumable blocked or deferred runs. Never infer release from plan or PR state
 without terminal reconciliation.
+
+`feature recover` is the exceptional, scoped alternative to a destructive
+ledger reset. The recovery run must be active and bound to the exact supplied
+orchestrator task identity. Input selects `retire` or `supersede` and supplies a
+complete non-empty set whose every member contains only:
+
+```json
+{
+  "feature_ref": "owner/repository#123",
+  "expected_run_id": "source-run",
+  "expected_orchestrator_task_id": "source-orchestrator-task",
+  "expected_revision": 4,
+  "authority_ref": "authoritative recovery decision",
+  "ownership_observation_ref": "authoritative exact-owner observation"
+}
+```
+
+Before invoking recovery, independently establish the exact source task/run
+owner and either explicit user abandonment/transfer authority or authoritative
+terminal/unrecoverable owner evidence. A deferred, blocked, silent, or old
+ledger row alone is never stale-owner proof. Missing or non-exact ownership or
+authority evidence is `ambiguous-claim-ownership` and changes nothing.
+
+The CLI validates the complete sorted set under one immediate transaction,
+requires each claim to remain active under the exact source run/orchestrator and
+expected claim revision, and rejects recovery while the source run has a
+pending or unknown relevant effect. It then inserts one immutable applied
+operation audit row per Feature and CAS-updates every claim. `retire` preserves
+the source run identity and marks the claim released; `supersede` transfers the
+active claim directly to the recovery run. A failure rolls back every audit row
+and claim update. An exact retry whose audit evidence and resulting claim state
+match returns `changed=false`; partial, changed, or conflicting evidence fails
+closed. Normal aggregate release semantics remain unchanged.
 
 Exactly one assignment may exist per claimed Feature in a run. An assignment
 may be created or moved only while its `feature_ref` has an
@@ -228,6 +264,14 @@ readback proves non-application, and the reservation must not be retried. A
 temporary prerequisite, authority wait, path-claim conflict, or provider delay
 leaves the operation `pending` for later reconciliation.
 
+Scoped claim recovery is the only command that creates an already-`applied`
+operation: the audit row and claim CAS occur in the same local transaction, so
+there is no external effect window to reserve separately. Its action is
+`feature-claim-retire` or `feature-claim-supersede`; its deterministic subject
+encodes the Feature, exact source owner, expected revision, and disposition,
+while receipt/readback references preserve the recovery authority and ownership
+observation. It never bypasses an unresolved provider operation.
+
 Treat a bounded application-task title adjustment as an application side
 effect. Before applying it, reserve an operation with
 `action=task-title-adjust` and a stable subject derived from the exact task
@@ -257,12 +301,12 @@ publication as `applied` and stack-link as `unknown`; it never replays PR
 creation or linking without reconciliation. This usage requires no schema,
 runtime-contract, envelope, or CLI-version change.
 
-The `delivery-pending @ candidate-published` pair uses the existing assignment
-status/checkpoint fields and requires no schema or JSON-envelope change. The
-explicit state registry and capability readback use runtime-contract version
-`3.2.0`; the shipped CLI version is `3.10.0`. SE 3.10.0 changes no runtime
-contract, schema, or envelope and preserves every ledger already compatible
-with runtime contract 3.2.0 without migration or reset. The existing 3.2.0
+The `delivery-pending @ candidate-published` pair and scoped claim recovery use
+the existing tables, fields, and operation evidence contract and require no
+schema or JSON-envelope change. The explicit state registry and capability
+readback use runtime-contract version `3.2.0`. The current CLI preserves every
+ledger already compatible with runtime contract 3.2.0 without migration or
+reset. The existing 3.2.0
 contract continues to reject only older active ledgers that cannot prove its
 first-publication authority handoff. The orchestrator remains the only ledger
 client and the only owner of delivery monitoring, Worker resumption, and
@@ -275,6 +319,13 @@ application tasks, worktrees, repositories, Feature Plan issues, PRs, and
 reviews. For stacked assignments, also re-read parent/child bases, full heads,
 stack order, and link state. Reconcile differences before another side effect.
 Ledger text never proves external state.
+
+When an exact claim is owned by another retained run, first reconcile that
+source orchestrator task, every relevant pending/unknown operation, and the
+claim revision. Continue the original run whenever ownership remains live or
+recoverable. Use scoped retirement or supersession only from an explicit,
+identity-bound recovery decision; an ambiguous task state or ownership
+observation remains blocked and never justifies global reset or claim theft.
 
 For every standalone or stack-root assignment, also re-read the authoritative
 tip of its recorded `base_branch`. Before an unstarted Worker bootstrap,

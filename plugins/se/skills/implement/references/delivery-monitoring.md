@@ -132,21 +132,27 @@ PR, head, artifact, and observation fingerprint. Reacquire the Worker's path
 envelope, then return that evidence to the same Feature Worker. Never
 force-push, merge, enqueue, deploy, release, or perform post-merge closure.
 
-## Optional provider diagnostics
+## Externally supplied diagnostics
 
-Implement does not invoke `$g:github-delivery-status` as part of its required
-completion path. If an outer coordinator supplies a current-head provider
-observation, preserve it as diagnostic context only. A missing, incomplete, or
-plan-limited branch-protection or ruleset surface must never block an otherwise
-verified PR, CI, review, and stack outcome. Implement must still never enable,
-disable, enqueue, dequeue, bypass, or merge anything. If another actor merges
+Implement never invokes `$g:github-delivery-status`, requests provider-policy
+classification, or waits for a branch-protection, ruleset, mergeability-policy,
+merge-queue, or auto-merge certificate. If an outer coordinator supplies such
+an observation, preserve it as report-only context; it cannot enter a workflow
+transition, assignment checkpoint, or completion decision. A missing,
+incomplete, negative, or plan-limited policy surface must never block an
+otherwise verified PR, CI, review, and stack outcome. Implement must still
+never enable, disable, enqueue, dequeue, bypass, or merge anything. If another actor merges
 or closes the PR during the run, observe the changed lifecycle, stop normal
 delivery reconciliation, and report the external event without post-merge
 work.
 
 ## Final verification
 
-The orchestrator performs read-only final verification. Require:
+The orchestrator performs read-only final verification. The following list is
+closed: provider readiness, delivery-status output, branch protection,
+rulesets, mergeability policy, merge queue, auto-merge, and provider-policy
+certificates are not additional requirements and are rejected as
+`delivery-ready @ final-verify` evidence. Require:
 
 - exact caller-supplied parent issue ref, Feature Plan Set ref/revision,
   selected Feature ID, repository, and complete hosted sibling readback;
@@ -170,7 +176,8 @@ The orchestrator performs read-only final verification. Require:
 - complete current-head validation evidence plus clean current-head hosted
   review evidence; retain native review as the historical first-publication
   gate, not as current-head evidence after a repair push;
-- current-head CI evidence with no failing or pending applicable checks;
+- current-head CI evidence showing every applicable check passed or
+  authoritatively showing that no checks are configured;
 - evidence that final verification started from
   `delivery-pending @ candidate-published`, plus the exact Worker handoff and
   any later resumption lineage;
@@ -189,8 +196,7 @@ The orchestrator performs read-only final verification. Require:
   certificate for an unchanged initial HEAD, or the latest explicit-request
   receipt plus its clean current-head review result after one or more fix
   pushes;
-- zero unresolved actionable review threads. Any provider-policy certificate,
-  if available, is informational and cannot block this final verification.
+- zero unresolved actionable review threads.
 
 When every requirement passes for the same exact HEAD, persist
 `delivery-ready @ final-verify`. Until then, preserve

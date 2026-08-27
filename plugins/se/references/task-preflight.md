@@ -22,7 +22,7 @@ The contract owns the common gates for task creation and observation:
 - independent stable task identity and state observation;
 - deterministic display-title capability and bounded correction authority;
 - partial and final update relay;
-- Git execution-target verification;
+- role-specific execution-target verification;
 - recovery after an ambiguous effect;
 - optional runtime capabilities declared by the invoking skill.
 
@@ -38,12 +38,17 @@ task; [Task Handoff](task-handoff.md) owns the typed task-owned observation,
 comparison, and controller identity binding.
 
 The same ownership split applies to the execution target. This preflight owns
-freezing the expected repository, execution mode, remote, and any
-topology-required checkout or base facts. Task Handoff owns the assigned task's
-post-effect observation and comparison against that target. The controller may
-request an application destination when creating or resuming a task, but
-saved-project association, visibility, and project-root metadata are not task,
-bootstrap, or Git execution evidence and never participate in a gate.
+freezing the role-specific target contract selected by the invoking skill.
+A repository-bound role freezes its repository, execution mode, remote, and
+every topology-required checkout, branch, base, worktree, and path-envelope
+fact. A control-plane role instead freezes the exact selected repository set
+and requires one authoritative observation per member; it has no repository,
+checkout, worktree, or arbitrary primary-repository binding of its own. Task
+Handoff owns the assigned task's post-effect observation and comparison against
+the selected target shape. The controller may request an application
+destination when creating or resuming a task, but saved-project association,
+visibility, ambient checkout, and project-root metadata are not task,
+bootstrap, or execution evidence and never participate in a gate.
 
 The `task controller` is the session that creates or resumes one assigned
 application task, independently observes its stable identity and state, and
@@ -106,7 +111,8 @@ the requested topology:
   context and compare its effective model and reasoning with the handoff;
 - receive a structured bootstrap result whose evidence task identity can be
   bound to the independently observed stable task identity;
-- let the assigned task inspect and compare its actual Git execution target;
+- let the assigned task inspect and compare every fact required by its
+  role-specific target contract;
 - receive partial updates and a final update;
 - relay those updates to the invoking session.
 
@@ -142,13 +148,13 @@ profile values, the fixed-profile capability gate has not passed. Stop before
 the task effect instead of creating a task and checking which defaults it
 received afterward.
 
-Application routing metadata is separate from task identity and Git
-execution-target verification. The controller independently observes the
-resulting task's stable identity and state, and the assigned task verifies the
-target that can affect work: repository identity, checkout or worktree,
-remote, and any base facts required by the skill-owned topology. Do not
-compare, refresh, or retry application project metadata as part of either
-verification.
+Application routing metadata is separate from task identity and target
+verification. The controller independently observes the resulting task's
+stable identity and state. A repository-bound task verifies its exact Git and
+filesystem target; a control-plane task verifies that it is not repository
+bound and reconciles the complete selected-repository observation set required
+by the invoking topology. Do not compare, refresh, or retry application project
+metadata or an ambient checkout as part of either verification.
 
 The profile capability check is equally strict for required roles. If any
 required role is not supported by the live runtime, or the exact assigned task
@@ -185,27 +191,33 @@ initialization available and cannot satisfy title observation or correction.
 
 ### 3. Verifiable destination
 
-Resolve one exact Git execution destination for every task before creation.
-Independently verify:
+Resolve exactly one target kind for every task before creation:
 
-- `repository_identity` and `remote_identity`;
-- the required execution mode, such as the exact local checkout or an isolated
-  worktree;
-- any exact checkout, starting ref, base SHA, or path-envelope constraint owned
-  by the invoking topology.
+- `repository-bound`: independently verify `repository_identity`,
+  `remote_identity`, execution mode, base branch and full base SHA, intended
+  head branch, worktree constraint, and path-envelope reference, plus any
+  stricter checkout fact owned by the invoking topology;
+- `control-plane`: independently verify that the task requires no Git checkout
+  or worktree, freeze the complete selected repository set, and require one
+  authoritative repository/remote observation for every member before
+  repository-specific orchestration begins.
 
-Freeze these facts before the task effect. In a multi-repository run, verify
-each repository target separately. A repository name copied from the request,
-a display title, or application project metadata alone is insufficient.
+The invoking skill decides which roles may use each kind. Freeze the applicable
+facts before the task effect. A multi-repository control plane retains a set of
+peer repository observations and never nominates, infers, or compares a primary
+repository. A repository name copied from the request, a display title, an
+ambient checkout, or application project metadata alone is insufficient.
 
 An application destination may be requested as routing intent, but its
 association or display metadata is outside the frozen target and is never
 compared during bootstrap.
 
-The assigned task later observes the corresponding actual Git facts. A present
-difference is `execution-target-mismatch`. If the runtime cannot expose a
-required target fact at all, use `unsupported-runtime`. An absent saved-project
-identity or project-root field has no effect on either classification.
+The assigned task later observes the corresponding actual target facts. A
+present difference in target kind, a repository-bound fact, or the
+control-plane repository set is `execution-target-mismatch`. If the runtime
+cannot expose a required target fact at all, use `unsupported-runtime`. An
+absent saved-project identity or project-root field has no effect on either
+classification.
 
 ### 4. Task identity and assigned-task bootstrap
 
@@ -221,7 +233,7 @@ The task controller owns creation/resume, stable identity observation, and
 binding of the structured bootstrap result. The assigned task owns the
 authoritative read of its own task-scoped execution context and every
 requested-versus-observed comparison. The controller does not duplicate that
-profile read. The assigned task also observes the actual Git execution target;
+profile read. The assigned task also observes its actual role-specific target;
 the controller compares that structured observation with the frozen target.
 
 The assigned task compares its effective model and reasoning with the
@@ -239,8 +251,8 @@ parent or serial fallback and do not claim delegated work.
 A missing authoritative evidence task identity is `unsupported-runtime`; a
 present evidence identity that differs from the controller-observed task is
 `task-identity-mismatch`. A missing required execution-target observation is
-`unsupported-runtime`; present repository, remote, checkout, worktree,
-or base values that differ from the frozen target are
+`unsupported-runtime`; a present target-kind, repository-set, repository,
+remote, checkout, worktree, branch, path-envelope, or base difference is
 `execution-target-mismatch`. Project metadata never participates in these
 comparisons.
 
@@ -322,7 +334,7 @@ preflight:
     request_explicit_role_profile: available
     assigned_task_bootstrap: available
     receive_bootstrap_result: available
-    observe_execution_target: available
+    observe_role_target: available
     monitor_task: available
     relay_partial_updates: available
     relay_final_update: available
@@ -333,14 +345,26 @@ preflight:
     observed_worker_capacity: null
     goals: available
     effective_mode: parallel-analysis
-  target:
-    repository_identity: "<independently observed repository>"
-    remote_identity: "<independently observed remote>"
-    execution_mode: "<exact-local-checkout or isolated-worktree>"
-    checkout_constraint: "<topology-owned checkout requirement>"
-    starting_ref: "<required ref or null>"
-    base_sha: "<required full SHA or null>"
-    independently_verified: true
+  targets:
+    - role: orchestrator
+      target_kind: control-plane
+      execution_mode: projectless-control-plane
+      selected_repositories:
+        - repository_identity: "<independently observed repository>"
+          remote_identity: "<independently observed remote>"
+          observation_ref: "<authoritative observation>"
+      independently_verified: true
+    - role: feature-worker
+      target_kind: repository-bound
+      repository_identity: "<independently observed repository>"
+      remote_identity: "<independently observed remote>"
+      execution_mode: isolated-worktree
+      base_branch: "<selected branch>"
+      base_sha: "<required full SHA>"
+      head_branch: "<frozen Worker branch>"
+      worktree_constraint: "<exact isolated worktree>"
+      path_envelope_ref: "<normalized allowed write envelope>"
+      independently_verified: true
   authorization:
     task_creation: granted
     title_adjustment: granted-for-declared-title
@@ -376,7 +400,7 @@ task receipt and never treat a coincidentally matching inherited profile as a
 valid task initialization.
 
 `unsupported-runtime` means that the required request, stable task identity,
-authoritative assigned-task bootstrap capability, or required target
+authoritative assigned-task bootstrap capability, or required role-target
 observation is unavailable, or that the exact task's required values remain
 missing or unobservable. It does not describe a successful readback of
 different effective values; that case is `effective-profile-mismatch`. A
@@ -384,9 +408,10 @@ present bootstrap evidence identity that differs from the controller-observed
 assigned task is `task-identity-mismatch`, and a present execution-target
 difference is `execution-target-mismatch`.
 
-Saved-project association and project-root metadata are optional diagnostics
-only. Do not infer, compare, refresh, retry, or block on them, and never use
-them as a substitute for stable task identity or Git execution evidence.
+Saved-project association, ambient checkout, and project-root metadata are
+optional diagnostics only. Do not infer, compare, refresh, retry, or block on
+them, and never use them as a substitute for stable task identity or
+role-specific execution evidence.
 
 A difference between the task controller's profile and the assigned role's
 requested profile is not a mismatch. Only the exact assigned task's

@@ -32,7 +32,7 @@ them.
 | field or domain | allowed values | plain description |
 | --- | --- | --- |
 | monitoring objective | `active` | Remains active across bounded waits until the cohort is terminal or empty, or the user stops the audit. |
-| coverage | `complete`, `partial` | States whether the frozen cohort was covered completely. Reduced or incomplete visibility is reported as `partial`. |
+| coverage | `complete`, `partial` | `complete` requires an exhausted stable inventory across every available continuation and relevant host/project partition, deduplicated by stable session identity. Any capped, unstable, or untraversable boundary is `partial` with the omission boundary reported. |
 | report completeness | `complete`, `partial` | States whether the terminal report is complete or intentionally partial, independently of entering `reported`. |
 | contract baseline | `verified`, `contract-baseline-unverified` | States whether the selected session's exact loaded SE contract was established. The unverified value limits contract-derived conclusions. |
 | graph conformance | `confirmed`, `compatible-unobserved`, `indeterminate`, `violated` | Classifies the evidence for one workflow node or transition. |

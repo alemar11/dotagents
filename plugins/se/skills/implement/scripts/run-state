@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 
-CLI_VERSION = "3.10.1"
+CLI_VERSION = "3.11.0"
 CONTRACT_VERSION = "3.2.0"
 SCHEMA_VERSION = 3
 ENVELOPE = "se-implement/ledger-envelope"
@@ -58,6 +58,11 @@ ASSIGNMENT_STATE_PAIRS = {
     *{("blocked", checkpoint) for checkpoint in ASSIGNMENT_DURABLE_CHECKPOINTS},
 }
 FEATURE_CLAIM_STATES = {"active", "released"}
+FEATURE_RECOVERY_DISPOSITIONS = {"retire", "supersede"}
+FEATURE_RECOVERY_FIELDS = {
+    "feature_ref", "expected_run_id", "expected_orchestrator_task_id",
+    "expected_revision", "authority_ref", "ownership_observation_ref",
+}
 OPERATION_STATES = {"pending", "applied", "not-applied", "unknown", "blocked"}
 FINAL_OPERATION_STATES = OPERATION_STATES - {"pending"}
 ASSIGNMENT_FIELDS = {
@@ -668,6 +673,253 @@ def release_input(path: Path) -> list[tuple[str, int]]:
     return sorted(normalized)
 
 
+def recovery_input(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LedgerError("invalid-input", f"cannot read recovery input: {error}")
+    if not isinstance(payload, dict) or set(payload) != {"disposition", "feature_claims"}:
+        raise LedgerError(
+            "invalid-input",
+            "recovery input requires only disposition and feature_claims",
+        )
+    disposition = payload["disposition"]
+    if disposition not in FEATURE_RECOVERY_DISPOSITIONS:
+        raise LedgerError(
+            "invalid-input", "recovery disposition must be retire or supersede"
+        )
+    claims = payload["feature_claims"]
+    if not isinstance(claims, list) or not claims:
+        raise LedgerError(
+            "invalid-input", "recovery input requires a non-empty feature_claims list"
+        )
+    normalized = []
+    for claim in claims:
+        if not isinstance(claim, dict) or set(claim) != FEATURE_RECOVERY_FIELDS:
+            raise LedgerError(
+                "ambiguous-claim-ownership",
+                "each recovery claim requires exact Feature, owner, revision, authority, and observation evidence",
+            )
+        revision = claim["expected_revision"]
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+            raise LedgerError(
+                "invalid-input", "expected_revision must be an integer >= 0"
+            )
+        normalized.append({
+            "feature_ref": canonical_issue_ref(claim["feature_ref"], "feature_ref"),
+            "expected_run_id": text(claim["expected_run_id"], "expected_run_id"),
+            "expected_orchestrator_task_id": text(
+                claim["expected_orchestrator_task_id"],
+                "expected_orchestrator_task_id",
+            ),
+            "expected_revision": revision,
+            "authority_ref": text(claim["authority_ref"], "authority_ref"),
+            "ownership_observation_ref": text(
+                claim["ownership_observation_ref"], "ownership_observation_ref"
+            ),
+        })
+    if len({claim["feature_ref"] for claim in normalized}) != len(normalized):
+        raise LedgerError("invalid-input", "recovery Feature claims must be unique")
+    return disposition, sorted(normalized, key=lambda claim: claim["feature_ref"])
+
+
+def recovery_subject(disposition: str, claim: dict[str, Any]) -> str:
+    return json.dumps(
+        {
+            "disposition": disposition,
+            "expected_orchestrator_task_id": claim["expected_orchestrator_task_id"],
+            "expected_revision": claim["expected_revision"],
+            "expected_run_id": claim["expected_run_id"],
+            "feature_ref": claim["feature_ref"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def feature_recover(path: Path, run_id: str, orchestrator_id: str,
+                    input_path: Path) -> dict[str, Any]:
+    run_id = text(run_id, "run_id")
+    orchestrator_id = text(orchestrator_id, "orchestrator_task_id")
+    disposition, requested = recovery_input(input_path)
+    action = f"feature-claim-{disposition}"
+    db = require_db(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        recovery_run = db.execute(
+            "SELECT * FROM runs WHERE run_id=?", (run_id,)
+        ).fetchone()
+        if recovery_run is None:
+            raise LedgerError("run-not-found", f"run {run_id} was not found")
+        if recovery_run["orchestrator_task_id"] != orchestrator_id:
+            raise LedgerError(
+                "run-conflict", "recovery run belongs to another orchestrator"
+            )
+        if recovery_run["status"] != "active":
+            raise LedgerError("run-not-active", "claim recovery requires an active run")
+
+        prepared = []
+        for claim in requested:
+            if claim["expected_run_id"] == run_id:
+                raise LedgerError(
+                    "invalid-input", "a recovered claim must come from another run"
+                )
+            subject = recovery_subject(disposition, claim)
+            operation = db.execute(
+                "SELECT * FROM operations WHERE run_id=? AND action=? AND subject_id=?",
+                (run_id, action, subject),
+            ).fetchone()
+            current = db.execute(
+                "SELECT * FROM feature_claims WHERE feature_ref=?",
+                (claim["feature_ref"],),
+            ).fetchone()
+            expected_state = (
+                (claim["expected_run_id"], "released")
+                if disposition == "retire"
+                else (run_id, "active")
+            )
+            expected_final = current is not None and (
+                current["run_id"], current["status"], current["revision"]
+            ) == (*expected_state, claim["expected_revision"] + 1)
+            if operation is not None:
+                evidence_matches = (
+                    operation["status"] == "applied"
+                    and operation["assignment_id"] is None
+                    and operation["receipt_ref"] == claim["authority_ref"]
+                    and operation["readback_ref"] == claim["ownership_observation_ref"]
+                )
+                if not evidence_matches or not expected_final:
+                    raise LedgerError(
+                        "recovery-conflict",
+                        f"prior recovery evidence conflicts for {claim['feature_ref']}",
+                    )
+                prepared.append((claim, subject, dict(operation), True))
+                continue
+
+            if current is None:
+                raise LedgerError(
+                    "ambiguous-claim-ownership",
+                    f"Feature claim is absent: {claim['feature_ref']}",
+                )
+            owner = db.execute(
+                "SELECT * FROM runs WHERE run_id=?", (claim["expected_run_id"],)
+            ).fetchone()
+            if (
+                owner is None
+                or owner["orchestrator_task_id"]
+                != claim["expected_orchestrator_task_id"]
+                or current["run_id"] != claim["expected_run_id"]
+                or current["status"] != "active"
+            ):
+                raise LedgerError(
+                    "ambiguous-claim-ownership",
+                    f"Feature claim ownership is absent, changed, or not exact: {claim['feature_ref']}",
+                )
+            if current["revision"] != claim["expected_revision"]:
+                raise LedgerError(
+                    "revision-conflict",
+                    f"Feature claim revision changed: {claim['feature_ref']}",
+                )
+            unresolved = db.execute(
+                "SELECT 1 FROM operations o LEFT JOIN assignments a "
+                "ON a.run_id=o.run_id AND a.assignment_id=o.assignment_id "
+                "WHERE o.run_id=? AND o.status IN ('pending','unknown') "
+                "AND (o.assignment_id IS NULL OR a.feature_ref=?) LIMIT 1",
+                (claim["expected_run_id"], claim["feature_ref"]),
+            ).fetchone()
+            if unresolved:
+                raise LedgerError(
+                    "recovery-effects-unresolved",
+                    f"source run has unresolved effects for {claim['feature_ref']}",
+                )
+            prepared.append((claim, subject, None, False))
+
+        if all(item[3] for item in prepared):
+            db.execute("COMMIT")
+            return {
+                "changed": False,
+                "disposition": disposition,
+                "recoveries": [
+                    {
+                        "feature_claim": dict(db.execute(
+                            "SELECT * FROM feature_claims WHERE feature_ref=?",
+                            (claim["feature_ref"],),
+                        ).fetchone()),
+                        "operation": operation,
+                    }
+                    for claim, _, operation, _ in prepared
+                ],
+            }
+        if any(item[3] for item in prepared):
+            raise LedgerError(
+                "recovery-conflict", "recovery set is only partially applied"
+            )
+
+        now = timestamp()
+        recoveries = []
+        for claim, subject, _, _ in prepared:
+            operation_id = str(uuid.uuid4())
+            db.execute(
+                "INSERT INTO operations "
+                "(operation_id,run_id,assignment_id,action,subject_id,status,"
+                "receipt_ref,readback_ref,created_at,updated_at) "
+                "VALUES (?,?,NULL,?,?,'applied',?,?,?,?)",
+                (
+                    operation_id, run_id, action, subject,
+                    claim["authority_ref"], claim["ownership_observation_ref"],
+                    now, now,
+                ),
+            )
+            if disposition == "retire":
+                cursor = db.execute(
+                    "UPDATE feature_claims SET status='released',revision=revision+1,"
+                    "updated_at=? WHERE feature_ref=? AND run_id=? "
+                    "AND status='active' AND revision=?",
+                    (
+                        now, claim["feature_ref"], claim["expected_run_id"],
+                        claim["expected_revision"],
+                    ),
+                )
+            else:
+                cursor = db.execute(
+                    "UPDATE feature_claims SET run_id=?,status='active',"
+                    "revision=revision+1,updated_at=? WHERE feature_ref=? AND run_id=? "
+                    "AND status='active' AND revision=?",
+                    (
+                        run_id, now, claim["feature_ref"],
+                        claim["expected_run_id"], claim["expected_revision"],
+                    ),
+                )
+            if cursor.rowcount != 1:
+                raise LedgerError(
+                    "revision-conflict",
+                    f"Feature claim changed during recovery: {claim['feature_ref']}",
+                )
+            recoveries.append((claim["feature_ref"], operation_id))
+        db.execute("COMMIT")
+        return {
+            "changed": True,
+            "disposition": disposition,
+            "recoveries": [
+                {
+                    "feature_claim": dict(db.execute(
+                        "SELECT * FROM feature_claims WHERE feature_ref=?", (feature_ref,)
+                    ).fetchone()),
+                    "operation": dict(db.execute(
+                        "SELECT * FROM operations WHERE operation_id=?", (operation_id,)
+                    ).fetchone()),
+                }
+                for feature_ref, operation_id in recoveries
+            ],
+        }
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+    finally:
+        db.close()
+
+
 def feature_release(path: Path, run_id: str, input_path: Path) -> dict[str, Any]:
     expected = release_input(input_path)
     db = require_db(path)
@@ -985,6 +1237,14 @@ def capabilities() -> dict[str, Any]:
         "journal_mode": "wal", "busy_timeout_ms": TIMEOUT_MS, "migrations": False,
         "reset_confirmation": RESET_TOKEN, "tables": sorted(TABLE_COLUMNS),
         "command_families": ["state", "run", "feature", "assignment", "operation"],
+        "feature_commands": ["claim", "recover", "release"],
+        "claim_recovery": {
+            "dispositions": sorted(FEATURE_RECOVERY_DISPOSITIONS),
+            "required_claim_fields": sorted(FEATURE_RECOVERY_FIELDS),
+            "audit_actions": ["feature-claim-retire", "feature-claim-supersede"],
+            "atomic": True,
+            "compare_and_swap": "feature-claim-revision",
+        },
         "state_registry": {
             "run_pairs": [
                 {"status": status, "checkpoint": checkpoint}
@@ -1021,6 +1281,7 @@ def parser() -> argparse.ArgumentParser:
 
     feature = commands.add_parser("feature").add_subparsers(dest="feature_command", required=True)
     claim = feature.add_parser("claim"); claim.add_argument("--run-id", required=True); claim.add_argument("--input", type=Path, required=True)
+    recover = feature.add_parser("recover"); recover.add_argument("--run-id", required=True); recover.add_argument("--orchestrator-task-id", required=True); recover.add_argument("--input", type=Path, required=True)
     release = feature.add_parser("release"); release.add_argument("--run-id", required=True); release.add_argument("--input", type=Path, required=True)
 
     assignment = commands.add_parser("assignment").add_subparsers(dest="assignment_command", required=True)
@@ -1043,6 +1304,7 @@ def dispatch(args: argparse.Namespace, path: Path) -> dict[str, Any]:
     if route == ("run", "show"): return run_show(path, args.run_id)
     if route == ("run", "checkpoint"): return run_checkpoint(path, args.run_id, args.expected_revision, args.status, args.checkpoint)
     if route == ("feature", "claim"): return feature_claim(path, args.run_id, args.input)
+    if route == ("feature", "recover"): return feature_recover(path, args.run_id, args.orchestrator_task_id, args.input)
     if route == ("feature", "release"): return feature_release(path, args.run_id, args.input)
     if route == ("assignment", "checkpoint"): return assignment_checkpoint(path, args.run_id, args.assignment_id, args.expected_revision, args.input)
     if route == ("operation", "begin"): return operation_begin(path, args.run_id, args.assignment_id, args.action, args.subject_id)

@@ -23,14 +23,17 @@ Its skills are deliberately separated by responsibility:
   invocation authorizes exactly the required user-owned tasks without a second
   prompt and rejects subordinate delegation as a required-role substitute. The
   controller may request an application destination, but only stable task
-  identity, authoritative bootstrap, and Git execution-target evidence gate the
-  role. The contracts also require an explicit, complete role-profile request
+  identity, authoritative bootstrap, and role-specific target evidence gate the
+  role. Implement's orchestrator is a projectless control plane with one
+  authoritative observation per selected repository and no primary-repository
+  binding; Feature Workers remain fully repository/worktree bound. The
+  contracts also require an explicit, complete role-profile request
   with no ambient
   inheritance plus an authoritative, assignment-specific comparison between
   requested and effective model/reasoning before normal task monitoring. They
-  freeze the expected Git execution target and require the assigned task to verify its
-  actual repository, checkout or worktree, remote, and topology-required base
-  facts. Saved-project association and project-root metadata are optional
+  freeze the applicable control-plane or repository-bound target and require the
+  assigned task to verify every required fact. Saved-project association,
+  ambient checkout, and project-root metadata are optional
   diagnostics that are never compared or used as gates.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
@@ -56,8 +59,11 @@ Its skills are deliberately separated by responsibility:
   tracker, publication, task, or worker behavior. Invoke it explicitly as
   se:learn.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
-  freezes an attributable active-session cohort, reconstructs each observed
-  SE workflow path from positive evidence, and reports feedback, bugs,
+  exhausts every authoritative continuation or host/project partition before
+  claiming complete inventory, deduplicates stable task identities, freezes an
+  attributable active-session cohort, and marks capped or untraversable
+  inventories partial. It reconstructs each observed SE workflow path from
+  positive evidence and reports feedback, bugs,
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
@@ -91,14 +97,18 @@ Its skills are deliberately separated by responsibility:
   target repository; otherwise Implement uses that repository's provider
   default. The orchestrator refreshes and freezes the selected branch's exact
   upstream tip before each root worker wave and verifies every isolated
-  worktree against that base before implementation begins. Before its first
+  worktree against that base before implementation begins. The orchestrator has
+  no Git checkout or worktree binding and never invents a primary repository
+  for a multi-repository run. Before its first
   candidate, the Worker owns its local phase through a semantic workflow
   boundary, uses cheap changed-surface checks and a conditional
   read-only invariant critic for materially risky drafts, consolidates that
   pass before repairing it coherently, and defers complete validation until the
   source and prerequisite HEADs are stable. The Worker then performs exact-HEAD
-  in-session review before first publication; after exact readback of the first
-  published PR, hosted review becomes authoritative and later fixes update the
+  in-session review under verified local-only isolation with network,
+  GitHub/provider access, hosted operations, repository mutation, and Git
+  transport unavailable before first publication; after exact readback of the
+  first published PR, hosted review becomes authoritative and later fixes update the
   same PR without rerunning native review. The workflow selectively
   invalidates dependent evidence, handles stack reconciliation, and requires
   complete validation plus clean hosted review on the same final exact HEAD.
@@ -119,10 +129,12 @@ Its skills are deliberately separated by responsibility:
   G owns PR publication and pairwise stack linking, while Send remains agnostic
   about whether an explicit PR base participates in a stack. GitHub interaction is
   mandatory end to end; there is no local-only or preview execution mode.
-  Final verification uses the focused exact-head publication, CI, review, and
-  stack evidence owned by the workflow. Provider-policy observations remain
-  optional diagnostics and never grant Implement merge, auto-merge, bypass, or
-  queue authority.
+  Final verification uses only the closed exact-head publication, hosted review,
+  CI or authoritative no-checks, clean-worktree/HEAD, body/closure-intent,
+  topology/stack, and acceptance evidence owned by the workflow. Implement
+  never invokes delivery-status or requests provider-policy classification;
+  externally supplied policy observations remain report-only and never grant
+  merge, auto-merge, bypass, or queue authority.
   Feature acceptance criteria use stable bracketed IDs rather than Markdown
   checkbox state; Feature Workers may derive T-AC criteria that specialize but
   never replace or weaken F-AC, and bind both to the same final candidate HEAD.
@@ -141,12 +153,15 @@ Its skills are deliberately separated by responsibility:
   validation command or check names, material operational notes when needed,
   and canonical closing lines, without routine test counts or internal
   delivery logs. Pre-publication native review uses the minimal supported
-  base-scoped mode, while later candidates stay in the hosted review lineage;
+  base-scoped mode inside its verified local-only isolation boundary, while
+  later candidates stay in the hosted review lineage;
   publication runs from the reverified Feature Worker worktree rather than an
   inherited or temporary directory.
   Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
-  and side-effect idempotency, with explicit drop-and-recreate instead of
-  migrations.
+  and side-effect idempotency. Incompatible ledgers retain explicit
+  drop-and-recreate instead of migrations; exact stale or foreign claims use a
+  scoped atomic CAS recovery with durable operation audit evidence and
+  idempotent retry.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local

@@ -11,6 +11,12 @@ assignment state and live Feature Worker or path-claim modes.
         model: gpt-5.6-sol
         reasoning: medium
         topology: single-orchestrator-task
+        target_contract:
+          target_kind: control-plane
+          execution_mode: projectless-control-plane
+          repository_binding: none
+          repository_observations: every-selected-repository
+          primary_repository: forbidden
         title_templates:
           singular: "🤖 Orchestrator · 1 Feature"
           plural: "🤖 Orchestrator · <feature_count> Features"
@@ -22,6 +28,17 @@ assignment state and live Feature Worker or path-claim modes.
           - high
           - xhigh
         topology: one-feature-worker-per-feature
+        target_contract:
+          target_kind: repository-bound
+          execution_mode: isolated-worktree
+          required_bindings:
+            - repository
+            - remote
+            - base-branch
+            - base-sha
+            - head-branch
+            - worktree
+            - path-envelope
         title_template: "🛠️ Feature Worker · <Feature outcome>"
     optional_roles:
       - role: feature-worker-support
@@ -40,8 +57,12 @@ orchestrator and every Feature Worker must be separate, independently
 observable user-owned application tasks. Subordinate in-task delegation and
 optional support never satisfy either required role. The controller may request
 an application destination, but saved-project association and visibility are
-not role evidence. Stable task identity, the authoritative assigned-task
-bootstrap, and the actual Git target provide the required execution evidence.
+not role evidence. The orchestrator uses the projectless control-plane target
+and retains one verified observation for every selected repository without
+choosing a primary. Each Feature Worker is repository-bound to its exact
+repository, remote, base branch/SHA, intended head branch, isolated worktree,
+and path envelope. Stable task identity, the authoritative assigned-task
+bootstrap, and the matching role target provide the required execution evidence.
 
 For a fresh run, create exactly one new orchestrator and one new Feature Worker
 per selected Feature. A validated resume reuses only the exact previously
@@ -74,14 +95,19 @@ contracts and their verified sibling context, records each Macro projection as
 `complete`, `partial`, or `absent`, then derives transient technical execution
 units and assignment-scoped T-AC criteria for each Feature. It also owns central exact-head PR
 monitoring, stack-wide parent-drift reconciliation, assignment state, and
-aggregate completion. The Feature Worker owns one complete
+aggregate completion. The orchestrator has no Git checkout or worktree binding
+of its own. Its repository-specific decisions require the complete peer
+repository-observation set frozen by preflight and independently refreshed at
+the owning source or branch boundary. The Feature Worker owns one complete
 Feature member, its observed Macro projection and available local Task context,
 its derived execution units and T-AC criteria, one verified repository target,
 one isolated worktree, and one PR.
 
 The Feature Worker chooses technical design, implements and validates the
 derived units, binds F-AC and mapped T-AC criteria to the final exact HEAD, and
-runs native review in the same task and worktree before first publication.
+runs native review in the same task and worktree before first publication under
+a verified local-only boundary that makes network, GitHub/provider access,
+hosted operations, repository mutation, and Git transport unavailable.
 After exact readback of the first published PR, it repairs hosted findings and
 republishes without running native review again. Review remains a phase of the
 Feature Worker lifecycle, not another role or task.
@@ -119,8 +145,9 @@ value is `unsupported-runtime`; present authoritative exact-task values that
 differ from the assignment request are `effective-profile-mismatch`. Preserve
 the observed task and do not create a replacement. A present evidence task
 identity that differs from the controller-observed task is
-`task-identity-mismatch`; a present repository, remote, worktree, or base
-difference is `execution-target-mismatch`. Apply the same rule to optional
+`task-identity-mismatch`; a present target-kind or repository-set difference,
+or a Worker repository, remote, base, branch, worktree, or path-envelope
+difference, is `execution-target-mismatch`. Apply the same rule to optional
 support only when it is instantiated as its own application task; subordinate
 in-task delegation continues to use the delegation evidence below.
 
@@ -135,8 +162,8 @@ promoted into either required role.
 An Orchestrator or Feature Worker already running from a valid handoff applies
 only the shared assigned-task bootstrap for its own role. It does not rerun the
 controller's creation preflight against itself. Its structured authoritative
-bootstrap is the operational profile gate, and its actual Git execution target
-is compared separately with the frozen handoff. Its controller verifies
+bootstrap is the operational profile gate, and its role-specific execution
+target is compared separately with the frozen handoff. Its controller verifies
 identity binding and does not duplicate the raw task-scoped profile read.
 
 Delegation is an optional capability of the Feature Worker topology. Record

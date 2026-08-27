@@ -112,21 +112,31 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `se:implement` accepts only caller-supplied published parent Feature issues
   and treats each parent as the semantic contract. A fresh run creates one
-  visible orchestrator task in the current ChatGPT application project and one
-  visible Worker task per Feature in its target project; a validated resume
+  observable projectless control-plane orchestrator with one verified
+  observation per selected repository and no primary-repository binding, plus
+  one observable repository-bound Worker task per Feature; a validated resume
   reuses only those exact task identities. Subordinate in-task delegation never
   substitutes for either required role. Implement tolerates and
   reports partial or absent Macro Task projections, derives T-AC criteria without
   weakening F-AC, conditionally consolidates material pre-candidate risks before
-  complete validation, refreshes exact starting-branch tips, and delivers one
-  reviewed PR per Feature. Same-repository Feature dependencies become stacked
+  complete validation, refreshes exact starting-branch tips, runs first-PR
+  native review under verified local-only network/provider isolation, and
+  delivers one reviewed PR per Feature. Same-repository Feature dependencies become stacked
   PR intent; cross-repository dependencies remain scheduling-only. The orchestrator uses
   change-driven observations for exact-head publication, CI, hosted review, and
-  stack evidence, while published Workers remain inactive but resumable. Provider
-  policy is diagnostic only, and merge, auto-merge, bypass, queue, release, and
-  post-merge closure remain outside Implement. Its SQLite WAL ledger stores only
-  exclusive claims, durable checkpoints, and idempotent effects.
-- `se:audit` runs only after explicit invocation and observes a frozen cohort of active SE sessions until terminal state or user stop. It keeps all evidence transient, treats missing visibility as indeterminate rather than a violation, and never contacts tasks or mutates repositories and GitHub.
+  stack evidence, while published Workers remain inactive but resumable.
+  Delivery-status and provider policy are outside the completion path, and
+  merge, auto-merge, bypass, queue, release, and post-merge closure remain
+  outside Implement. Its SQLite WAL ledger stores only exclusive claims,
+  durable checkpoints, and idempotent effects, with scoped audited CAS recovery
+  for exact stale or foreign claims.
+- `se:audit` runs only after explicit invocation and observes a frozen cohort of
+  active SE sessions until terminal state or user stop. Complete coverage
+  requires exhausting every authoritative continuation and host/project
+  partition; capped or untraversable inventories are reported as partial. It
+  keeps all evidence transient, treats missing visibility as indeterminate
+  rather than a violation, and never contacts tasks or mutates repositories and
+  GitHub.
 - Multi-repository runs additionally validate the complete linked Feature Plan Set and finish with one independently verified GitHub PR per implementation-eligible Feature plus one exact HEAD vector.
 
 ## Project-Local Skills

@@ -178,9 +178,13 @@ surface.
   effects. Saved-project routing and visibility are not role evidence.
 - Keep the Implement ledger a minimal recovery index, not a second workflow
   engine. Preserve five tables, including exclusive active Feature claims,
-  SQLite WAL, explicit drop-and-recreate, and the boundary against prompts,
-  message logs, findings, and routine worker state. The orchestrator is its only
-  runtime client; workers supply evidence but never access the ledger.
+  SQLite WAL, explicit drop-and-recreate for incompatible ledgers, scoped
+  audited CAS recovery for exact stale/foreign claims, and the boundary against
+  prompts, message logs, findings, and routine worker state. Scoped recovery
+  must reuse atomic operation audit rows, exact owner/revision and authority
+  evidence, unresolved-effect guards, and idempotent retry; it must never become
+  a migration or claim-stealing shortcut. The orchestrator is the only runtime
+  client; workers supply evidence but never access the ledger.
 - Keep Feature-level scheduling and derived execution-unit dependency edges
   separate. A Feature `blocked_by` edge may cross repositories. Implement maps
   every same-repository edge to mandatory stack intent and every
@@ -210,6 +214,20 @@ surface.
   topology, monitor lineage, or external effect; preserve unrelated durable
   identities and resolved receipts. Require complete validation and clean
   hosted review on the same final exact HEAD.
+- Keep native review local-only. Its execution boundary must make network,
+  GitHub/provider access, hosted workflows and operations, repository mutation,
+  and Git transport unavailable while permitting read-only inspection of the
+  frozen candidate and local scratch outputs. Bind verified isolation to the
+  exact review lineage and candidate. Missing isolation blocks before launch;
+  crossed or ambiguous isolation discards the entire review result and requires
+  G-owned reconciliation of any suspected external effect.
+- Keep Implement's completion evidence closed to exact-HEAD PR publication,
+  hosted review, CI or authoritative no-checks evidence, clean Worker
+  worktree/HEAD, body and source-derived closure intent, topology/stack, and
+  Feature acceptance evidence. Implement never invokes delivery-status or
+  requests branch-protection, ruleset, mergeability-policy, merge-queue,
+  auto-merge, or provider-policy classification. Externally supplied policy
+  observations are report-only and never affect a transition or checkpoint.
 - Keep deterministic task-title initialization shared by every task-managed
   SE skill. Compute the title before creation and include it as a best-effort
   plain-text hint in the flat creation prompt, without treating the hint as
@@ -244,15 +262,18 @@ surface.
   authoritative values for the exact assigned task differ from the request.
   Use `task-identity-mismatch` when present authoritative bootstrap evidence is
   bound to another task.
-- Keep execution-target verification shared by every task-managed SE skill.
-  Preflight freezes the expected repository, execution mode, remote, and any
-  topology-required checkout or base facts. Handoff requires the assigned
-  task to observe its actual Git execution target and compare it with that
-  request. Missing required runtime observations select `unsupported-runtime`;
-  present differences select `execution-target-mismatch`. Application routing,
+- Keep role-specific execution-target verification shared by every task-managed
+  SE skill. Preflight freezes either `repository-bound` Git/worktree facts or a
+  `control-plane` repository-observation set. The Implement orchestrator uses a
+  projectless control plane with no repository/worktree/primary-repository
+  binding and one authoritative observation per selected repository. Every
+  Feature Worker remains bound to its exact repository, remote, base
+  branch/SHA, head branch, isolated worktree, and path envelope. Missing
+  required observations select `unsupported-runtime`; present target-kind,
+  repository-set, or bound-fact differences select
+  `execution-target-mismatch`. Application routing, ambient checkout,
   saved-project association, and project-root metadata are optional diagnostics
-  only: never infer, compare, refresh, retry, or block on them. Never substitute
-  project display metadata for task or Git execution evidence.
+  only: never infer, compare, refresh, retry, or block on them.
 - For Implement Feature Workers, distinguish the selected integration
   `base_branch` from the worker-owned `head_branch`. An application-managed
   worktree may bootstrap detached at the exact frozen base SHA. Require the
@@ -283,7 +304,8 @@ surface.
   interrupted delivery stream against the same review lineage and exact
   candidate before retry: accept matching terminal content independently of
   generic transport status, wait when the review remains active, and fail
-  closed when identity, result, or binding is ambiguous. Run publication only
+  closed when identity, result, isolation, or binding is ambiguous. Run
+  publication only
   from the independently re-observed Feature Worker worktree rather than an
   inherited or temporary-artifact directory.
 - Keep Feature preview local-only. Route Feature maintenance or existing-source
@@ -389,8 +411,9 @@ surface.
   isolated parallel validation, and complete candidate-bound validation. Keep
   the critic advisory, add no workflow or ledger state, and never weaken the
   mandatory exact-HEAD native-review gate or its invalidation rules.
-- Validate native review's minimal supported fallback, interrupted-stream
-  reconciliation against the same exact candidate without duplicate review,
+- Validate native review's verified local-only isolation, minimal supported
+  fallback, interrupted-stream reconciliation against the same exact candidate
+  without duplicate review,
   and publication from the exact re-observed Feature Worker worktree rather
   than inherited or temporary directories.
 - Validate the one-way native-to-hosted review handoff: published repair and
@@ -414,9 +437,12 @@ surface.
   `effective-profile-mismatch`, and `task-identity-mismatch`; and ensure resume
   paths cannot repeat an uncertain adjustment or create a replacement after a
   mismatch.
-- Validate exact execution-target freezing and assigned-task observation,
-  `execution-target-mismatch` for present Git-target differences, and
-  `unsupported-runtime` for missing required observations. Verify that
+- Validate role-specific target freezing and assigned-task observation: the
+  orchestrator control plane has a complete peer repository-observation set and
+  no primary repository, while every Feature Worker retains exact Git/worktree
+  bindings. Require `execution-target-mismatch` for present target-kind,
+  repository-set, or bound-fact differences and `unsupported-runtime` for
+  missing required observations. Verify that
   application routing, saved-project association, and project-root metadata
   remain outside required records and never trigger comparison, a second read,
   project inventory refresh, replacement task, or blocked outcome.
@@ -432,8 +458,10 @@ surface.
   the tagger cardinalities of zero or more labels and zero or one type.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, exact transition-condition coverage, the
-  intentional refresh loop, terminal reachability, evidence classifications,
-  and prohibited mutation behavior.
+  intentional refresh loop, terminal reachability, exhaustive stable inventory
+  traversal before complete coverage, explicit partial coverage at capped or
+  untraversable boundaries, evidence classifications, and prohibited mutation
+  behavior.
 - Run the Implement run-state CLI help, version, read-only doctor, and focused
   standard-library tests against temporary databases.
 - Check that the marketplace path and plugin metadata point to this package.
