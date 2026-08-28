@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, or pg_durable patterns.
+description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns.
 ---
 
 # Postgres
@@ -8,9 +8,9 @@ description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migration
 ## Goal
 
 Use this skill to connect to Postgres, run SQL, inspect schemas, review query
-performance, design tables and indexes, work with common PostGIS, pgvector, or
-pg_durable patterns, select SQL supported by the target PostgreSQL major, and
-manage migration release flow through the shipped
+performance, design tables and indexes, work with common PostGIS, pgvector,
+pg_cron, or pg_durable patterns, select SQL supported by the target PostgreSQL
+major, and manage migration release flow through the shipped
 `scripts/postgres` launcher in the skill package.
 
 ## Runtime surface
@@ -126,7 +126,8 @@ its syntax or behavior.
   constraints, keys, data types, partitioning, naming, or storage layout.
 - Query and access design: load `references/design/query-performance.md` for
   indexes and measured plans, and `references/design/data-access-patterns.md`
-  for batching, upserts, pagination, query shape, or write-heavy workloads.
+  for batching, upserts, pagination, query shape, write-heavy workloads, or
+  rebuildable `UNLOGGED` cache and staging tables.
 - Concurrency and connections: load `references/design/concurrency-locking.md`
   for transactions and locks, or `references/design/connection-management.md`
   for pooling, session behavior, memory, and connection timeouts.
@@ -140,6 +141,8 @@ its syntax or behavior.
   types, SRIDs, spatial predicates, or spatial-index tasks.
 - pgvector guidance: load `references/extensions/pgvector.md` only for
   embeddings, vector indexes, similarity search, or retrieval tasks.
+- pg_cron guidance: load `references/extensions/pg-cron.md` only for periodic
+  SQL, database maintenance, retention, rollup, or in-database scheduling tasks.
 - pg_durable guidance: load `references/extensions/pg-durable.md` only for
   asynchronous workflow, retry, schedule, signal, or durable-job tasks.
 - SQL capability router and version-selection rules:

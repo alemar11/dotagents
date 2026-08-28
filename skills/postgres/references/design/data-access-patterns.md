@@ -92,9 +92,47 @@ where exists (
 ```
 
 ## 10) Shape tables for write-heavy workloads
-For high-ingest tables, keep secondary indexes minimal, batch writes, and use `COPY` when loading large files. Consider `UNLOGGED` only for rebuildable staging data where crash recovery and replication tradeoffs are acceptable.
+For high-ingest tables, keep secondary indexes minimal, batch writes, and use `COPY` when loading large files.
 
 For update-heavy tables, avoid repeatedly updating indexed columns, keep transactions short, and consider table-specific `fillfactor` only after measuring page churn and HOT update behavior.
+
+## 11) Use `UNLOGGED` only for disposable caches and staging data
+An `UNLOGGED` table skips write-ahead logging for its data and indexes, which
+can reduce write cost for a write-heavy cache. The tradeoff is a hard
+durability boundary: PostgreSQL truncates it after a crash or unclean shutdown,
+and its contents are not replicated to standby servers. Treat it as empty after
+crash recovery or standby promotion even if clean restarts usually preserve its
+contents.
+
+Use `UNLOGGED` only when all of these are true:
+
+- a durable source of truth exists outside the table
+- a cache miss can rebuild the value without changing business semantics
+- startup and failover remain correct while the cache is empty or warming
+- expiry or cleanup bounds table and index growth
+- monitoring distinguishes expected cache loss from a failed rebuild
+
+Do not use it for sessions, authentication state, security rate limits,
+idempotency keys, locks, queues, or the only copy of business data. Prefer a
+regular table when cache contents must survive failover, and a temporary table
+when the data is private to one session.
+
+```sql
+create unlogged table rendered_page_cache (
+  cache_key text primary key,
+  payload jsonb not null,
+  source_version text not null,
+  expires_at timestamptz not null
+);
+
+create index rendered_page_cache_expires_at_idx
+on rendered_page_cache (expires_at);
+```
+
+Make the read path treat a missing or expired row as a normal cache miss. Keep
+the rebuild idempotent, upsert by the stable cache key, and run bounded expiry
+deletes. Do not route standby reads to this cache because standby contents are
+not maintained.
 
 ## Verification References
 - https://www.postgresql.org/docs/current/sql-copy.html
