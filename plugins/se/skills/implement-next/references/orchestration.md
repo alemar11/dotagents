@@ -52,7 +52,7 @@ can make the intended visible home ambiguous.
 
 Set display titles when tasks are created:
 
-- orchestrator: `🤖 Implement · <Feature or graph name>`;
+- orchestrator: `🤖 Orchestrator · <Feature or graph name>`;
 - worker: `🛠 <repository> · <current Feature>`.
 
 Best-effort rename a reused worker for its current Feature. Titles and project
