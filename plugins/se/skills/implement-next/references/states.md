@@ -53,7 +53,7 @@ same provisional or bound task value.
 | `acquired` | The complete unclaimed repository set was inserted provisionally. |
 | `reuse-bound` | The requested repositories already belong to the same bound claim; reuse that orchestrator. |
 | `reconcile-provisional` | The requested repositories already belong to the same provisional claim; determine whether task creation happened before retrying. |
-| `bound` | The complete provisional claim was attached to the independently observed orchestrator task. |
+| `bound` | The complete provisional claim was attached to the independently observed invoking or separately created orchestrator task. |
 | `already-bound` | An idempotent bind observed that the same task already owns the complete claim. |
 | `released` | The complete claim group was removed after an authorized bound release or fenced provisional abandonment. |
 

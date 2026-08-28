@@ -33,6 +33,10 @@ and alone decides concurrency. Load
 creating or reusing a worker, accepting a worker target, scheduling a Feature,
 or deriving branch and pull-request topology. That reference is the canonical
 owner of these decisions and every workflow transition condition.
+Read [repository-claims.md](references/repository-claims.md) before deciding
+whether the invoking visible task itself can be bound as that orchestrator or
+a separate orchestrator must be created, and before acquiring, binding,
+inspecting, or releasing claims.
 
 ## Read routing
 
@@ -46,8 +50,6 @@ Project both obligations into every worker handoff that permits G-owned work.
 Read the shared [workflow-graph contract](../../references/workflow-graph.md)
 before using the graph registry. Read [states.md](references/states.md) before
 interpreting workflow nodes or repository claims.
-Read [repository-claims.md](references/repository-claims.md) before acquiring,
-binding, inspecting, or releasing claims.
 
 ## Workflow graph
 

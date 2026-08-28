@@ -15,13 +15,14 @@ provider field and serialization prevents aliases for the same repository.
 Choose one cryptographically fresh 32-character lowercase hexadecimal
 `claim_token` for the complete selected repository set. The token is the
 provisional owner's fencing capability: keep it out of logs and ordinary
-diagnostics, and pass it only in the initial orchestrator handoff. No command
-receipt, inspection, or error discloses it; the acquiring role retains the
-value it generated. The repository set is immutable for that orchestrator. A
-smaller selection may reuse an existing claim, but no run may add repositories
-to its token. To implement a larger graph, hand off or abandon the old run,
-release its complete claim, and start a new orchestrator for the newly frozen
-set.
+diagnostics. The acquiring role retains the value it generated. Pass it only
+in the initial handoff when a separate orchestrator must be created; an
+invoking task that becomes the orchestrator retains it without projecting it
+into a prompt, record, or diagnostic. No command receipt, inspection, or error
+discloses it. The repository set is immutable for that orchestrator. A smaller
+selection may reuse an existing claim, but no run may add repositories to its
+token. To implement a larger graph, hand off or abandon the old run, release
+its complete claim, and start a new orchestrator for the newly frozen set.
 
 The registry stores exactly repository key, claim token, visible-home key,
 optional orchestrator task identity, and diagnostic claim time. Use the stable
@@ -58,17 +59,23 @@ token.
 
 1. Freeze the full repository set and visible home before acquisition.
 2. Acquire all keys in one operation. Never loop over repositories.
-3. On `acquired`, create exactly one orchestrator. Put the opaque claim token,
-   frozen repository keys, selected Feature references, and visible home key
-   in its initial handoff together with an explicit binding barrier. The task
-   may observe its own stable identity but must not create workers or perform
-   Git, GitHub, or other role-owned effects yet. Bind only after independently
-   observing the handoff correlation and stable task identity. Read back the
-   complete bound claim, then release the same task from the barrier with that
-   matching confirmation.
-4. On `reuse-bound`, inspect and resume the identified orchestrator only after
+3. On `acquired`, use the invoking task as the orchestrator only when it is
+   already visible in the intended home and its stable identity and exact
+   Feature-selection correlation are independently observed. Bind that exact
+   identity, read back the complete claim, and only then permit workers, Git,
+   GitHub, or other role-owned effects. The task retains the fencing token in
+   its acquiring context; it does not send itself a token-bearing handoff.
+4. When the invoking task cannot satisfy that reuse path, create exactly one
+   separate orchestrator. Put the opaque claim token, frozen repository keys,
+   selected Feature references, and visible home key in its initial handoff
+   together with an explicit binding barrier. The task may observe its own
+   stable identity but must not create workers or perform Git, GitHub, or other
+   role-owned effects yet. Bind only after independently observing the handoff
+   correlation and stable task identity. Read back the complete bound claim,
+   then release the same task from the barrier with that matching confirmation.
+5. On `reuse-bound`, inspect and resume the identified orchestrator only after
    confirming that the complete claim still names that stable task identity.
-5. On `reconcile-provisional`, the original acquiring invocation still holds
+6. On `reconcile-provisional`, the original acquiring invocation still holds
    the fencing token. Determine from visible task history whether creation
    occurred. Bind the matching task if proved. It may abandon provisionally
    only when task creation was never attempted or an attempted creation is
@@ -77,7 +84,7 @@ token.
    not applied, keep the provisional claim and use the registered
    `claim-repositories -> claim-repositories` edge for at most one new task
    creation attempt. A second non-application blocks rather than looping.
-6. On overlap, mixed ownership, or a foreign claim, do not create another
+7. On overlap, mixed ownership, or a foreign claim, do not create another
    orchestrator. Route the request to the existing owner when one claim covers
    the selection; otherwise report the ownership conflict.
 

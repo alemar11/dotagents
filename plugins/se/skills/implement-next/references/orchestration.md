@@ -44,6 +44,14 @@ repository projects and isolated worktrees. A projectless orchestrator is only
 a warned fallback; use `projectless` as its visible-home claim key. It does not
 change repository ownership.
 
+Reuse the invoking visible task as the orchestrator when its stable identity
+and intended home can be independently observed and correlated to this exact
+Feature selection. Otherwise create one separate visible orchestrator. In both
+cases, complete the acquisition and binding protocol in
+[repository-claims.md](repository-claims.md) before any worker or G-owned
+effect. A title, current directory, or self-report never establishes the
+required identity or correlation.
+
 Freeze all repository identities before acquisition. Version 1 does not expand
 a live claim because independent multi-repository expansion can deadlock and
 can make the intended visible home ambiguous.
