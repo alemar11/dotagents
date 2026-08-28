@@ -16,7 +16,7 @@ pub fn render_table(table: &QueryTable, title: Option<&str>) -> String {
     }
 
     let mut pretty = Table::new();
-    pretty.load_preset(UTF8_FULL);
+    pretty.load_style(UTF8_FULL);
     pretty.set_content_arrangement(ContentArrangement::Dynamic);
     pretty.set_header(table.columns.iter().map(Cell::new));
     for row in &table.rows {
