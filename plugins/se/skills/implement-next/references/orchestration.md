@@ -17,7 +17,7 @@ the condition for every declared edge.
 | claim-repositories | blocked | Claim overlap, provisional task effects, binding, or orchestrator identity cannot be reconciled safely. |
 | reconcile | schedule | At least one selected Feature remains unfinished and current authoritative evidence supports another scheduling decision. |
 | reconcile | release-claims | The caller explicitly requested handoff or abandonment and every task created by the orchestrator is independently quiescent. |
-| reconcile | complete | Every selected Feature has a current exact-HEAD pull request whose applicable required validation, review, and CI gates pass with no unresolved blocker, or is proved already incorporated into its integration base, and no explicit release is pending. |
+| reconcile | complete | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base, and no explicit release is pending. |
 | reconcile | deferred | Safe continuation requires a material semantic decision or additional user authority. |
 | reconcile | blocked | Required capability, identity, ownership, or effect evidence remains unavailable or ambiguous. |
 | schedule | deliver-feature | One or more dependency-ready Features are not already assigned to an independently observed active lane and have verified bases, topology, and trustworthy worker targets. |
@@ -171,6 +171,37 @@ invent a multi-base pull request.
 If a stack parent changes, identify every descendant whose ancestry or
 validation depends on it, restack those branches in order, and revalidate the
 affected exact HEADs. Do not infer readiness from an older parent SHA.
+
+## Hosted review convergence
+
+Treat the draft returned by a fresh G Send publication as intermediate
+evidence. When the candidate's full HEAD, body, base, and stack topology are
+stable, the assigned worker must:
+
+1. make the PR ready through the focused G owner and independently verify the
+   draft-to-ready transition against the unchanged full HEAD;
+2. retain the typed transition evidence and use the G-owned ready-wait workflow
+   for the automatic initial Codex review without posting an explicit request;
+3. return to `reconcile` with the exact normalized review and CI evidence.
+
+An existing ready PR may proceed only with terminal clean G-normalized review
+evidence for its current full HEAD. If no valid initial ready-transition
+lineage can be reconstructed and no current clean result exists, use one
+G-owned explicit review request and its bound wait for that HEAD; never convert
+the PR back to draft merely to retrigger automatic review.
+
+Review findings return the same trustworthy worker to `deliver-feature` for a
+focused repair, required validation, and publication to the existing PR. A
+changed full HEAD invalidates the prior review and requires one new G-owned
+explicit re-review request and bound wait. Pending or timed-out review remains
+unfinished work; reconcile and resume the same lineage without another ready
+transition or duplicate request. `not-requested`, absent comments, zero review
+threads, draft-only review, stale evidence, provider failure, and ambiguous
+correlation never satisfy `reconcile -> complete`.
+
+These receipts and observations remain external delivery evidence available
+from G, GitHub, and task history. Do not persist them in the repository-claims
+registry or add a delivery-state machine.
 
 Before every handoff to a G-owned workflow, the orchestrator or worker making
 that handoff runs the shared

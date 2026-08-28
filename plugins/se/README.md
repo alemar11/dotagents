@@ -172,7 +172,10 @@ Its skills are deliberately separated by responsibility:
   registry stores only host-local repository ownership. Workflow position,
   Feature, worker, Git, pull-request, review, and CI truth remain external, with
   no workflow ledger, persisted checkpoint graph, fixed task profile, or title
-  gate.
+  gate. A newly published draft is intermediate: the worker makes the stable
+  exact-head PR ready, waits for the automatic Codex review through the G-owned
+  ready lineage, and cannot complete until current-head review is terminal
+  clean; later fix SHAs use explicit G-owned re-review.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local

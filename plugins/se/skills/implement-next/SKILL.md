@@ -65,9 +65,9 @@ return re-enters `reconcile` before another scheduling decision.
 | claim-repositories | action | Acquire or reuse the complete repository claim and establish one correlated visible orchestrator. | Intake produced a valid immutable repository set and visible home. | Repository keys, home key, selected Features, and optional existing claim. | Independently bound orchestrator identity and fenced repository ownership. | claim-repositories, reconcile, blocked | Claim ownership, provisional task effects, or orchestrator identity cannot be reconciled safely. | durable | none |
 | reconcile | validation | Reconstruct current execution truth and resolve ambiguous effects once from authoritative owners. | A bound orchestrator exists, or a returning worker or material external change requires refresh. | Feature graph, Git/worktrees, pull requests, review/CI, task history, and ownership claim. | Current delivery evidence, trustworthy worker lanes, and unresolved blockers or choices. | schedule, release-claims, complete, deferred, blocked | An effect remains ambiguous, required evidence is unavailable, or safe continuation needs user authority. | read, transient | none |
 | schedule | decision | Compute the ready frontier and choose serial execution or bounded concurrent worker lanes. | Reconciled evidence shows unfinished selected Features. | Feature graph, delivery evidence, repository bases, and trustworthy lanes. | One or more flat Feature assignments, or a reason to reconcile, defer, or stop. | deliver-feature, reconcile, deferred, blocked | No responsible scheduling decision can be made from current evidence. | read, transient | none |
-| deliver-feature | action | Verify or resume a repository worker, implement and validate one Feature, and create or update its standalone or stacked pull request. | `schedule` selected a dependency-ready Feature and verified delivery topology. | Feature contract, worker target, branch/base facts, allowed mutations, and G handoff obligations. | Exact branch, base, HEAD, pull request, validation, review, CI, and blocker evidence. | reconcile | The worker must return partial evidence for reconciliation rather than inventing success or retrying an ambiguous effect. | durable, hosted | none |
+| deliver-feature | action | Verify or resume a repository worker, implement and validate one Feature, publish its standalone or stacked pull request, make the stable candidate ready for review, and converge exact-HEAD hosted review and CI. | `schedule` selected a dependency-ready Feature and verified delivery topology. | Feature contract, worker target, branch/base facts, allowed mutations, and G handoff obligations. | Exact branch, base, HEAD, pull request, ready transition, validation, hosted review, CI, and blocker evidence. | reconcile | The worker must return partial evidence for reconciliation rather than inventing success or retrying an ambiguous effect. | durable, hosted | none |
 | release-claims | action | Release the exact complete repository claim after an explicitly requested handoff or abandonment. | `reconcile` proved the orchestrator and all workers quiescent and release is authorized. | Bound claim, fencing token, and quiescence evidence. | Verified whole-group release. | complete, blocked | Any actor or ownership fact remains active, uncertain, or mismatched. | durable | none |
-| complete | terminal | Return verified selected Feature outcomes, or confirm an explicitly requested ownership handoff or abandonment. | Every selected Feature has a current exact-HEAD pull request whose applicable required validation, review, and CI gates pass with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, `release-claims` completed. | Final reconciled evidence. | Plain-language delivery or release report. | none | terminal | none | complete |
+| complete | terminal | Return verified selected Feature outcomes, or confirm an explicitly requested ownership handoff or abandonment. | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, `release-claims` completed. | Final reconciled evidence. | Plain-language delivery or release report. | none | terminal | none | complete |
 | deferred | terminal | Return the material user decision required for a contract-preserving continuation. | A semantic choice or missing authority cannot be resolved safely inside Implement Next. | Reconciled evidence and the smallest concrete question. | Deferred report retaining the bound claim. | none | terminal | none | deferred |
 | blocked | terminal | Return the exact capability, identity, evidence, ownership, or reconciliation blocker. | No responsible graph edge remains. | Retained evidence and blocker. | Blocked report retaining the claim unless an authorized release already completed. | none | terminal | none | blocked |
 
@@ -107,9 +107,29 @@ their focused G owners. Verify the actual current branch, base, and exact HEAD
 before each publication or update. If a parent changes, rebase or restack its
 descendants and rerun the validation invalidated by that change.
 
-Apply repository- or caller-required review. This skill adds no mandatory
-native-to-hosted review state machine. Never weaken required validation or
-claim a current result from evidence bound to an older HEAD.
+A fresh pull request created by G Send is an intermediate draft, not completed
+delivery. Once its exact HEAD, body, base, and stack topology are stable, make
+it ready through the focused G owner, independently read back that it is no
+longer draft at the same full HEAD, retain the typed ready-transition evidence,
+and use `$g:github-review-threads` to wait for the automatic initial Codex
+review. Do not post an explicit review request for that ready-triggered cycle.
+
+Only a terminal clean G-normalized review bound to the current full HEAD can
+satisfy hosted review. `not-requested`, absent comments, zero review threads,
+draft-only review, pending or timed-out observation, stale evidence, findings,
+provider failure, or ambiguous correlation are non-terminal. After findings,
+reuse the same trustworthy worker to repair and validate the candidate, publish
+the new full HEAD to the existing PR, then issue one G-owned explicit re-review
+request and wait on its exact receipt. Reconcile an interrupted transition,
+request, or wait from authoritative PR and review evidence before retrying;
+never toggle ready state or duplicate a review request to manufacture a fresh
+lineage.
+
+Keep this lifecycle transient: do not add review fields, checkpoints, or
+receipts to the repository-claims registry. If the caller explicitly requires
+a PR to remain draft, preserve that constraint and return `deferred` with the
+verified draft evidence instead of claiming `complete`. Never weaken required
+validation or claim a current result from evidence bound to an older HEAD.
 
 ## Result
 
