@@ -60,6 +60,7 @@ knowledge, and audits active work:
 | `codex-cli` | Launch one complete prompt in a separate Codex CLI task with Sol/Terra/Luna selection and model-aware reasoning. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
+| `eli5` | Turn a topic, code path, design tradeoff, or incident into a picture-first HTML explainer with large visuals and very few words. |
 | `ms-roberts` | Track substantive grammar issues in medium or complex English prompts and return a Markdown report with American English corrections, explanations, and tips. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -221,7 +222,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -249,6 +250,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-cli \
   --skill code-wiki \
   --skill crusty \
+  --skill eli5 \
   --skill ms-roberts \
   --skill okf \
   --skill skill-cli-creator \
