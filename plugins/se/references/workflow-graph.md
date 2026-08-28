@@ -1,15 +1,16 @@
 # SE Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE
-workflows. It applies to Learn, Idea, Feature, Implement, and Audit without turning
-every skill into an implementation graph.
+workflows. It applies to Learn, Idea, Feature, Implement, Implement Next, and
+Audit without turning every skill into the same implementation graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 hosted shape. This reference owns workflow structure only.
 Feature owns Feature Plan Set semantics, Feature identities, Feature-level
 planning dependencies, and the durable local Macro Task projections;
 Implement owns the derived technical execution units, scheduling
-interpretation, and delivery graph.
+interpretation, and strict delivery graph. Implement Next owns a smaller
+transient workflow graph and reconstructs its position from live evidence.
 Learn, Idea, and Audit own their skill-specific registries and branch details.
 
 Every SE skill routes to `references/states.md`. The skill registry remains the
@@ -103,8 +104,8 @@ as the source of truth. Explanatory prose may clarify a condition but must not
 add an unregistered edge.
 
 Feature keeps its planning step files and registry as its local source of truth.
-Learn, Idea, Implement, and Audit keep their registries in their SKILL.md files
-while branch-specific details remain in routed references.
+Learn, Idea, Implement, Implement Next, and Audit keep their registries in their
+SKILL.md files while branch-specific details remain in routed references.
 
 ## Common terminal meanings
 
@@ -119,6 +120,7 @@ Each skill declares the subset it supports. Feature retains its existing
 complete and blocked terminal contract. Learn uses all four meanings. Idea
 uses reported, deferred, complete, and blocked.
 Implement uses complete, deferred, and blocked.
+Implement Next uses complete, deferred, and blocked.
 Audit uses reported and blocked.
 
 ## Authority and side effects

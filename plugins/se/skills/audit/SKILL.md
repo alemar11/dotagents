@@ -205,8 +205,10 @@ Confirm `graph-violation` only when evidence proves at least one of:
 - a terminal claim incompatible with required evidence.
 
 Missing narration or hidden reasoning is never automatically a violation. For
-Implement's hierarchical graph, combine orchestrator and worker evidence only
-through independently established session identities and SE handoffs.
+Implement's hierarchical graph and Implement Next's lightweight graph, combine
+orchestrator and worker evidence only through independently established session
+identities and SE handoffs. Several Implement Next workers may occupy
+`deliver-feature` concurrently after one `schedule` decision.
 
 A conforming run may still support `graph-design-improvement` when repeated
 loops, ambiguous ownership, weak stopping rules, or unavoidable evidence gaps

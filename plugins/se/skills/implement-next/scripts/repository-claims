@@ -1,0 +1,606 @@
+#!/usr/bin/env python3
+"""Host-local repository ownership registry for se:implement-next."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sqlite3
+import sys
+from collections.abc import Sequence
+from contextlib import closing
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+CLI_VERSION = "3.12.0"
+SCHEMA_VERSION = 1
+TIMEOUT_MS = 5000
+DATABASE_NAME = "repository-claims.sqlite3"
+DEFAULT_DB = (
+    Path.home()
+    / ".cache/dotagents/plugins/se/skills/implement-next"
+    / DATABASE_NAME
+)
+PUBLIC_COLUMNS = (
+    "repository_key",
+    "home_project_key",
+    "orchestrator_task_id",
+    "claimed_at",
+)
+TABLE_DEFINITION = (
+    ("repository_key", "TEXT", 1, None, 1),
+    ("claim_token", "TEXT", 1, None, 0),
+    ("home_project_key", "TEXT", 1, None, 0),
+    ("orchestrator_task_id", "TEXT", 0, None, 0),
+    ("claimed_at", "TEXT", 1, None, 0),
+)
+REPOSITORY_KEY = re.compile(r"^github:[1-9][0-9]*$")
+CLAIM_TOKEN = re.compile(r"^[a-f0-9]{32}$")
+CREATE_TABLE_SQL = """
+CREATE TABLE repository_claims (
+    repository_key       TEXT PRIMARY KEY,
+    claim_token          TEXT NOT NULL,
+    home_project_key     TEXT NOT NULL,
+    orchestrator_task_id TEXT,
+    claimed_at           TEXT NOT NULL
+) WITHOUT ROWID
+"""
+
+
+class ClaimError(Exception):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def required_text(value: str | None, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ClaimError("invalid-input", f"{field} must be non-empty")
+    return value.strip()
+
+
+def repository_key(value: str) -> str:
+    key = required_text(value, "repository_key")
+    if not REPOSITORY_KEY.fullmatch(key):
+        raise ClaimError(
+            "invalid-input",
+            "repository_key must be canonical github:<decimal-database-id>",
+        )
+    return key
+
+
+def claim_token(value: str | None) -> str:
+    token = required_text(value, "claim_token")
+    if not CLAIM_TOKEN.fullmatch(token):
+        raise ClaimError(
+            "invalid-input",
+            "claim_token must be a fresh 32-character lowercase hexadecimal value",
+        )
+    return token
+
+
+def claim_token_from_stdin() -> str:
+    if sys.stdin.isatty():
+        raise ClaimError(
+            "invalid-input",
+            "claim_token must be supplied through protected standard input",
+        )
+    return claim_token(sys.stdin.read())
+
+
+def timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def safe_path(value: str | Path) -> Path:
+    path = Path(value).expanduser().absolute()
+    resolved_parent = path.parent.resolve(strict=False)
+    if path.name != DATABASE_NAME or resolved_parent in {Path("/"), Path.home().resolve()}:
+        raise ClaimError(
+            "unsafe-database-path",
+            f"database must be a narrowly scoped path named {DATABASE_NAME}",
+        )
+    for candidate in (path, *path.parents[:-1]):
+        if candidate.is_symlink():
+            raise ClaimError(
+                "unsafe-database-path", "database path must not contain symlinks"
+            )
+    return path
+
+
+def reject_symlink(path: Path) -> None:
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ClaimError(
+            "unsafe-database-path", "database and its direct parent must not be symlinks"
+        )
+
+
+def prepare_database(path: Path) -> None:
+    reject_symlink(path)
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=False)
+    except FileExistsError:
+        pass
+    reject_symlink(path)
+    if not path.parent.is_dir():
+        raise ClaimError(
+            "unsafe-database-path", "database parent must be a directory"
+        )
+    if path.parent.stat().st_mode & 0o777 != 0o700:
+        raise ClaimError(
+            "unsafe-database-permissions", "database directory mode must be 0700"
+        )
+    if not path.exists():
+        flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(descriptor)
+    reject_symlink(path)
+    if not path.is_file():
+        raise ClaimError("unsafe-database-file", "database must be a regular file")
+    if path.stat().st_mode & 0o777 != 0o600:
+        raise ClaimError("unsafe-database-permissions", "database mode must be 0600")
+
+
+def verify_permissions(path: Path) -> None:
+    reject_symlink(path)
+    if not path.is_file():
+        raise ClaimError("unsafe-database-file", "database must be a regular file")
+    if path.stat().st_mode & 0o777 != 0o600:
+        raise ClaimError("unsafe-database-permissions", "database mode must be 0600")
+    if path.parent.stat().st_mode & 0o777 != 0o700:
+        raise ClaimError("unsafe-database-permissions", "database directory mode must be 0700")
+
+
+def connect(path: Path, *, readonly: bool = False) -> sqlite3.Connection:
+    if readonly:
+        target = f"{path.resolve().as_uri()}?mode=ro"
+        connection = sqlite3.connect(
+            target, uri=True, timeout=TIMEOUT_MS / 1000, isolation_level=None
+        )
+    else:
+        prepare_database(path)
+        connection = sqlite3.connect(
+            path, timeout=TIMEOUT_MS / 1000, isolation_level=None
+        )
+    connection.row_factory = sqlite3.Row
+    connection.execute(f"PRAGMA busy_timeout = {TIMEOUT_MS}")
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def initialize(connection: sqlite3.Connection) -> None:
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if version == 0 and not tables:
+            connection.execute(CREATE_TABLE_SQL)
+            connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        else:
+            verify_schema(connection)
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def normalized_table_sql(connection: sqlite3.Connection) -> str:
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'repository_claims'"
+    ).fetchone()
+    return " ".join(row[0].split()) if row and row[0] else ""
+
+
+def expected_table_sql() -> str:
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.execute(CREATE_TABLE_SQL)
+        return normalized_table_sql(connection)
+    finally:
+        connection.close()
+
+
+def verify_schema(connection: sqlite3.Connection) -> None:
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    if version != SCHEMA_VERSION:
+        raise ClaimError(
+            "schema-mismatch",
+            f"expected schema version {SCHEMA_VERSION}, observed {version}",
+        )
+    objects = tuple(
+        (row[0], row[1], row[2])
+        for row in connection.execute(
+            "SELECT type, name, tbl_name FROM sqlite_master "
+            "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
+        )
+    )
+    if objects != (("table", "repository_claims", "repository_claims"),):
+        raise ClaimError("schema-mismatch", "registry contains unexpected schema objects")
+    if normalized_table_sql(connection) != expected_table_sql():
+        raise ClaimError("schema-mismatch", "repository_claims SQL does not match schema v1")
+    columns = tuple(
+        (row[1], row[2].upper(), row[3], row[4], row[5])
+        for row in connection.execute("PRAGMA table_info(repository_claims)")
+    )
+    if columns != TABLE_DEFINITION:
+        raise ClaimError("schema-mismatch", "repository_claims definition does not match schema v1")
+    if connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal":
+        raise ClaimError("unsupported-journal-mode", "registry must not use WAL")
+    invalid_type = connection.execute(
+        """
+        SELECT 1 FROM repository_claims
+         WHERE typeof(repository_key) != 'text'
+            OR typeof(claim_token) != 'text'
+            OR typeof(home_project_key) != 'text'
+            OR typeof(claimed_at) != 'text'
+            OR (
+                orchestrator_task_id IS NOT NULL
+                AND typeof(orchestrator_task_id) != 'text'
+            )
+         LIMIT 1
+        """
+    ).fetchone()
+    if invalid_type:
+        raise ClaimError("registry-corrupt", "claim row contains a non-text identity field")
+    invalid = connection.execute(
+        """
+        SELECT 1 FROM repository_claims
+         WHERE trim(repository_key) = ''
+            OR trim(claim_token) = ''
+            OR trim(home_project_key) = ''
+            OR trim(claimed_at) = ''
+            OR (orchestrator_task_id IS NOT NULL AND trim(orchestrator_task_id) = '')
+         LIMIT 1
+        """
+    ).fetchone()
+    if invalid:
+        raise ClaimError("registry-corrupt", "claim row contains an empty identity field")
+    identity_rows = connection.execute(
+        "SELECT repository_key, claim_token FROM repository_claims"
+    ).fetchall()
+    try:
+        for row in identity_rows:
+            repository_key(row["repository_key"])
+            claim_token(row["claim_token"])
+    except ClaimError as error:
+        raise ClaimError(
+            "registry-corrupt", "claim row contains a noncanonical identity"
+        ) from error
+    rows = connection.execute(
+        """
+        SELECT claim_token,
+               COUNT(DISTINCT home_project_key) AS homes,
+               COUNT(*) AS row_count,
+               COUNT(orchestrator_task_id) AS bound_count,
+               COUNT(DISTINCT orchestrator_task_id) AS task_count
+          FROM repository_claims
+      GROUP BY claim_token
+        HAVING homes != 1
+            OR NOT (
+                bound_count = 0
+                OR (bound_count = row_count AND task_count = 1)
+            )
+        """
+    ).fetchall()
+    if rows:
+        raise ClaimError("registry-corrupt", "claim group has inconsistent home or task binding")
+    duplicate_tasks = connection.execute(
+        """
+        SELECT orchestrator_task_id
+          FROM repository_claims
+         WHERE orchestrator_task_id IS NOT NULL
+      GROUP BY orchestrator_task_id
+        HAVING COUNT(DISTINCT claim_token) != 1
+        """
+    ).fetchall()
+    if duplicate_tasks:
+        raise ClaimError("registry-corrupt", "orchestrator task is bound to multiple claims")
+
+
+def rows_for_token(connection: sqlite3.Connection, token: str) -> list[sqlite3.Row]:
+    return connection.execute(
+        "SELECT * FROM repository_claims WHERE claim_token = ? ORDER BY repository_key",
+        (token,),
+    ).fetchall()
+
+
+def serialize_rows(rows: Sequence[sqlite3.Row]) -> list[dict[str, Any]]:
+    return [{column: row[column] for column in PUBLIC_COLUMNS} for row in rows]
+
+
+def disposition(rows: Sequence[sqlite3.Row]) -> str:
+    return "reuse-bound" if rows[0]["orchestrator_task_id"] else "reconcile-provisional"
+
+
+def acquire(connection: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    token = claim_token(args.claim_token)
+    home = required_text(args.home_project_key, "home_project_key")
+    repositories = sorted(
+        {repository_key(value) for value in args.repository_key}
+    )
+    if not repositories:
+        raise ClaimError("invalid-input", "at least one repository_key is required")
+
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        verify_schema(connection)
+        existing_group = rows_for_token(connection, token)
+        if existing_group:
+            group_keys = {row["repository_key"] for row in existing_group}
+            requested = set(repositories)
+            if not requested.issubset(group_keys):
+                raise ClaimError(
+                    "repository-set-expansion-unsupported",
+                    "an existing claim token cannot acquire additional repositories",
+                )
+            if any(row["home_project_key"] != home for row in existing_group):
+                raise ClaimError(
+                    "home-project-mismatch",
+                    "existing claim uses a different visible home project",
+                )
+            result = {
+                "disposition": disposition(existing_group),
+                "claims": serialize_rows(existing_group),
+            }
+            connection.commit()
+            return result
+
+        placeholders = ",".join("?" for _ in repositories)
+        conflicts = connection.execute(
+            f"SELECT * FROM repository_claims WHERE repository_key IN ({placeholders}) "
+            "ORDER BY repository_key",
+            repositories,
+        ).fetchall()
+        if conflicts:
+            raise ClaimError(
+                "repository-claimed",
+                "requested repositories overlap an existing claim",
+            )
+        claimed_at = timestamp()
+        connection.executemany(
+            """
+            INSERT INTO repository_claims (
+                repository_key, claim_token, home_project_key,
+                orchestrator_task_id, claimed_at
+            ) VALUES (?, ?, ?, NULL, ?)
+            """,
+            [(repository, token, home, claimed_at) for repository in repositories],
+        )
+        rows = rows_for_token(connection, token)
+        connection.commit()
+        return {
+            "disposition": "acquired",
+            "claims": serialize_rows(rows),
+        }
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def bind(connection: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    token = claim_token(args.claim_token)
+    task_id = required_text(args.orchestrator_task_id, "orchestrator_task_id")
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        verify_schema(connection)
+        rows = rows_for_token(connection, token)
+        if not rows:
+            raise ClaimError("claim-not-found", "claim token does not exist")
+        bindings = {row["orchestrator_task_id"] for row in rows}
+        if bindings == {task_id}:
+            connection.commit()
+            return {"disposition": "already-bound", "claims": serialize_rows(rows)}
+        if bindings != {None}:
+            raise ClaimError("binding-conflict", "claim is bound to another orchestrator task")
+        other_claim = connection.execute(
+            """
+            SELECT claim_token FROM repository_claims
+             WHERE orchestrator_task_id = ? AND claim_token != ?
+             LIMIT 1
+            """,
+            (task_id, token),
+        ).fetchone()
+        if other_claim:
+            raise ClaimError(
+                "orchestrator-already-bound",
+                "orchestrator task already owns another immutable repository set",
+            )
+        connection.execute(
+            "UPDATE repository_claims SET orchestrator_task_id = ? WHERE claim_token = ?",
+            (task_id, token),
+        )
+        rows = rows_for_token(connection, token)
+        connection.commit()
+        return {"disposition": "bound", "claims": serialize_rows(rows)}
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def inspect(connection: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    verify_schema(connection)
+    if args.repository_key:
+        repositories = sorted(
+            {repository_key(value) for value in args.repository_key}
+        )
+        placeholders = ",".join("?" for _ in repositories)
+        rows = connection.execute(
+            f"SELECT * FROM repository_claims WHERE repository_key IN ({placeholders}) "
+            "ORDER BY repository_key",
+            repositories,
+        ).fetchall()
+    else:
+        rows = connection.execute(
+            "SELECT * FROM repository_claims ORDER BY claim_token, repository_key"
+        ).fetchall()
+    return {"claims": serialize_rows(rows)}
+
+
+def release(connection: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    token = claim_token(args.claim_token)
+    task_id = (
+        required_text(args.orchestrator_task_id, "orchestrator_task_id")
+        if args.orchestrator_task_id is not None
+        else None
+    )
+    if bool(task_id) == bool(args.abandon_provisional):
+        raise ClaimError(
+            "invalid-input",
+            "release requires exactly one of orchestrator_task_id or "
+            "abandon_provisional",
+        )
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        verify_schema(connection)
+        rows = rows_for_token(connection, token)
+        if not rows:
+            raise ClaimError("claim-not-found", "claim token does not exist")
+        bindings = {row["orchestrator_task_id"] for row in rows}
+        if args.abandon_provisional:
+            if bindings != {None}:
+                raise ClaimError("release-binding-mismatch", "claim is bound, not provisional")
+        elif bindings != {task_id}:
+            raise ClaimError(
+                "release-binding-mismatch", "orchestrator task does not own this claim"
+            )
+        deleted = connection.execute(
+            "DELETE FROM repository_claims WHERE claim_token = ?", (token,)
+        ).rowcount
+        if deleted != len(rows):
+            raise ClaimError("registry-corrupt", "release did not remove the complete claim")
+        connection.commit()
+        return {
+            "disposition": "released",
+            "released_repository_keys": [row["repository_key"] for row in rows],
+        }
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def doctor(path: Path) -> dict[str, Any]:
+    if path.is_symlink():
+        raise ClaimError("unsafe-database-path", "database must not be a symlink")
+    if not path.exists():
+        return {
+            "status": "absent",
+            "schema_version": SCHEMA_VERSION,
+            "database": str(path),
+        }
+    verify_permissions(path)
+    with closing(connect(path, readonly=True)) as connection:
+        verify_schema(connection)
+        count = connection.execute("SELECT COUNT(*) FROM repository_claims").fetchone()[0]
+    return {
+        "status": "ok",
+        "schema_version": SCHEMA_VERSION,
+        "claim_count": count,
+        "database": str(path),
+    }
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description=__doc__)
+    result.add_argument("--version", action="version", version=CLI_VERSION)
+    result.add_argument("--json", action="store_true", help="emit a JSON envelope")
+    result.add_argument("--db", default=str(DEFAULT_DB), help="registry database path")
+    commands = result.add_subparsers(dest="command", required=True)
+
+    commands.add_parser("doctor", help="verify the registry without creating it")
+
+    acquire_parser = commands.add_parser("acquire", help="atomically claim repositories")
+    acquire_parser.add_argument("--home-project-key", required=True)
+    acquire_parser.add_argument("--repository-key", action="append", required=True)
+
+    bind_parser = commands.add_parser("bind", help="bind a claim to an orchestrator task")
+    bind_parser.add_argument("--orchestrator-task-id", required=True)
+
+    inspect_parser = commands.add_parser("inspect", help="inspect registry claims")
+    inspect_parser.add_argument("--repository-key", action="append")
+
+    release_parser = commands.add_parser("release", help="release one complete claim")
+    release_parser.add_argument("--orchestrator-task-id")
+    release_parser.add_argument("--abandon-provisional", action="store_true")
+    return result
+
+
+def execute(args: argparse.Namespace, path: Path) -> dict[str, Any]:
+    if args.command == "doctor":
+        return doctor(path)
+    if args.command == "inspect":
+        if not path.exists():
+            return {"claims": [], "database_state": "absent"}
+        verify_permissions(path)
+        with closing(connect(path, readonly=True)) as connection:
+            return inspect(connection, args)
+    with closing(connect(path)) as connection:
+        initialize(connection)
+        verify_permissions(path)
+        if args.command == "acquire":
+            return acquire(connection, args)
+        if args.command == "bind":
+            return bind(connection, args)
+        if args.command == "release":
+            return release(connection, args)
+    raise ClaimError("invalid-command", "unknown command")
+
+
+def emit(payload: dict[str, Any], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+    else:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    if any(
+        argument == "--claim-token" or argument.startswith("--claim-token=")
+        for argument in raw_argv
+    ):
+        emit(
+            {
+                "ok": False,
+                "error": {
+                    "code": "invalid-input",
+                    "message": "claim token must be supplied through standard input",
+                },
+            },
+            as_json="--json" in raw_argv,
+        )
+        return 2
+    args = parser().parse_args(raw_argv)
+    try:
+        if args.command in {"acquire", "bind", "release"}:
+            args.claim_token = claim_token_from_stdin()
+        path = safe_path(args.db)
+        result = execute(args, path)
+        emit({"ok": True, "result": result}, as_json=args.json)
+        return 0
+    except (ClaimError, sqlite3.Error, OSError) as error:
+        code = error.code if isinstance(error, ClaimError) else "registry-error"
+        emit(
+            {"ok": False, "error": {"code": code, "message": str(error)}},
+            as_json=args.json,
+        )
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

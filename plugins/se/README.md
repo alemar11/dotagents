@@ -11,15 +11,16 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, Feature, Implement, and Audit workflow graphs. Feature owns the textual
-  Feature Plan Set, sibling Feature registry, and local Macro Task graphs;
-  Implement derives its technical execution units and runtime graph from that
-  durable set.
+  Idea, Feature, legacy Implement, Implement Next, and Audit workflow graphs.
+  Feature owns the textual Feature Plan Set, sibling Feature registry, and local
+  Macro Task graphs; Implement derives its technical execution units and strict
+  runtime graph from that durable set, while Implement Next uses a smaller
+  transient graph reconstructed from live evidence.
 - Every bundled skill owns `references/states.md`, a compact human-readable
   table that distinguishes workflow nodes from domain values, persisted
   statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
-  contracts shared by task-managed Feature and Implement runs. Explicit
+  contracts shared by task-managed Feature and legacy Implement runs. Explicit
   invocation authorizes exactly the required user-owned tasks without a second
   prompt and rejects subordinate delegation as a required-role substitute. The
   controller may request an application destination, but only stable task
@@ -37,7 +38,7 @@ Its skills are deliberately separated by responsibility:
   diagnostics that are never compared or used as gates.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
-  Feature, and Implement hosted handoffs.
+  Feature, Implement, and Implement Next hosted handoffs.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title normalization, and local-path correction
   before every SE-hosted issue, comment, PR, or review write, plus one bounded
@@ -162,6 +163,18 @@ Its skills are deliberately separated by responsibility:
   drop-and-recreate instead of migrations; exact stale or foreign claims use a
   scoped atomic CAS recovery with durable operation audit evidence and
   idempotent retry.
+- skills/implement-next/ is the explicit lightweight delivery pilot. One visible
+  graph orchestrator follows a small transient workflow graph, owns an immutable
+  selected repository set, and chooses serial or concurrent execution.
+  Repository-bound workers are reusable lanes:
+  serial Features may reuse a clean worker worktree, while concurrent work gets
+  additional isolated lanes. Every Feature delta still gets its own branch and
+  pull request; same-repository dependencies stack and cross-repository
+  dependencies schedule standalone pull requests. Its one-table SQLite
+  registry stores only host-local repository ownership. Workflow position,
+  Feature, worker, Git, pull-request, review, and CI truth remain external, with
+  no workflow ledger, persisted checkpoint graph, fixed task profile, or title
+  gate.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local
@@ -209,15 +222,16 @@ Its skills are deliberately separated by responsibility:
   it rehydrates the existing sibling Features, reconciles an explicit
   indication, and republishes the revised projections when requested. It does
   not rehydrate or repair Implement execution units.
-- task-managed Feature and Implement runs pass their skill-owned profiles to
+- task-managed Feature and legacy Implement runs pass their skill-owned profiles to
   the shared preflight. Explicit invocation authorizes exactly their declared
   user-owned application-task topology without a second prompt; task creation
   scope and GitHub mutation scope remain independent. Feature delegation is
   conditional on live capability and falls back to serial planner analysis;
   substantial planning still runs both study and critic lenses, while every
   principal task role remains required.
-- Idea, Feature, and Implement keep local control-plane records separate from
-  hosted artifacts and apply one shared portable-content gate immediately
-  before each hosted write, including content returned by workers and tools.
+- Idea, Feature, Implement, and Implement Next keep local control-plane records
+  separate from hosted artifacts and apply one shared portable-content gate
+  immediately before each hosted write, including content returned by workers
+  and tools.
 
 SE is the active repository-local design surface for these workflows.

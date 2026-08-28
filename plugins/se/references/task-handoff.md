@@ -2,7 +2,7 @@
 
 This is the root-level SE contract for assigning work to, observing, and
 reporting a task after [Task Preflight](task-preflight.md) has passed. It is
-shared by Feature and Implement. It defines the handoff and
+shared by Feature and legacy Implement. It defines the handoff and
 relay evidence, while the preflight reference owns the common gates and
 authorization decisions.
 
@@ -133,8 +133,8 @@ workflow state, ledger column, replacement task, or second state machine.
 
 ## Canonical title metadata
 
-Every task created by SE receives a deterministic display-title request using
-the established SE Implement grammar:
+Every task governed by this Feature and legacy Implement contract receives a
+deterministic display-title request using the established SE Implement grammar:
 
 ```text
 <emoji> <role or workflow> · <scope or outcome>

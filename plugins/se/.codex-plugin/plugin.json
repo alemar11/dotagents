@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "description": "Turn ideas into clear Feature plans, deliver them through reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Plan Features, deliver reviewed pull requests, and maintain project knowledge.",
-    "longDescription": "SE supports a complete software-delivery workflow. Learn maintains durable project knowledge and decisions. Idea captures proposals for later planning. Feature turns one or more source issues into an evidence-backed Feature Plan Set, classifies planning depth, requires a consolidated product-question batch for substantial work unless a validated exception applies, uses delegated study and critic lenses when available, independently reviews every complete plan before validation with bounded revision and follow-up clarification, creates separate Feature issues and practical Macro Tasks, preserves repository-sensitive dependency intent, publishes mandatory best-effort native GitHub dependency projections backed by authoritative body relations, and delegates optional label and native type classification to G during publication. Implement selects Features only from caller-supplied GitHub issue references, never from labels or Issue Types. A fresh Implement run creates one observable user-owned orchestrator task plus one observable user-owned Worker task per Feature; a validated resume reuses only those exact bound task identities. Saved-project routing and visibility do not gate those roles, which never fall back to subordinate in-task delegation or replacement tasks. Implement treats each parent Feature as the required semantic contract, treats native dependency state as non-blocking diagnostics, tolerates and reports partial or absent Macro Task projections, derives technical T-AC criteria without weakening F-AC, loads role- and phase-specific contracts, conditionally consolidates material pre-candidate risks before complete validation, accepts an optional starting branch per target repository, refreshes and freezes its exact upstream tip before root Feature Worker worktrees start, delivers each Feature through a dedicated resumable Worker that owns each phase to a semantic boundary, publishes concise durable PR bodies, starts stacked children from verified candidate-published parents, centrally monitors pull requests, CI, review feedback, and exact-head stack state through material-delta observations and actionable-frontier scheduling, and leaves merge and post-merge closure to the user. Audit observes active SE work and reports problems or workflow improvements without making changes.",
+    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Idea captures proposals, and Feature publishes evidence-backed Feature Plan Sets with acceptance criteria and dependency intent. Implement remains the strict resumable delivery workflow with dedicated Feature Workers and exact-head checkpoints. Implement Next is an explicit pilot for lighter delivery: one visible graph orchestrator follows a small transient workflow graph, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implementation skills leave merge, deploy, release, and post-merge closure to the user.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -22,7 +22,7 @@
     "defaultPrompt": [
       "Use $se:learn to maintain durable repository knowledge, or $se:idea to save a proposal for later planning.",
       "Use $se:feature to turn related requests into Feature issues and Macro Tasks without writing code.",
-      "Use $se:implement to deliver a planned Feature through observable user-owned tasks and reviewed pull requests."
+      "Use $se:implement for strict delivery, or $se:implement-next for lightweight reusable-worker delivery and PR stacks."
     ],
     "brandColor": "#BE185D"
   }

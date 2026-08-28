@@ -51,6 +51,7 @@ knowledge, and audits active work:
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
 | `se:implement` | Deliver planned Features through reviewed pull requests and verify their final delivery state. |
+| `se:implement-next` | Pilot lightweight graph orchestration with reusable workers and standalone or stacked pull requests. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 ## Reusable Skills
@@ -131,6 +132,16 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   outside Implement. Its SQLite WAL ledger stores only exclusive claims,
   durable checkpoints, and idempotent effects, with scoped audited CAS recovery
   for exact stale or foreign claims.
+- `se:implement-next` is the explicit lightweight delivery pilot. It places one
+  visible graph orchestrator in the single involved project or a selected
+  coordination project. The orchestrator follows a small transient execution
+  graph, reuses repository-bound worker worktrees for serial Features, and adds
+  lanes only when it chooses concurrent work. Same-repository dependencies use
+  stacked branches and pull requests;
+  cross-repository dependencies affect scheduling only. Its host-local SQLite
+  registry atomically protects an immutable repository set and stores only
+  repository ownership, while Features, workers, Git, pull requests, review,
+  and CI remain externally owned. It never merges, deploys, or releases.
 - `se:audit` runs only after explicit invocation and observes a frozen cohort of
   active SE sessions until terminal state or user stop. Complete coverage
   requires exhausting every authoritative continuation and host/project

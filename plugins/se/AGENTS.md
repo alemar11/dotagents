@@ -1,21 +1,23 @@
 # SE Plugin Maintenance
 
 plugins/se/ is the repository's graph-first workflow package. Learn, Idea,
-Feature, Implement, and Audit expose distinct workflow graphs; Feature owns the
-repository-scoped textual Feature Plan Set graph. Keep SE as the sole active
-owner of these workflow contracts; do not reintroduce a retired compatibility
-surface.
+Feature, Implement, Implement Next, and Audit expose distinct workflow
+surfaces; Feature owns the repository-scoped textual Feature Plan Set graph.
+Keep SE as the sole active owner of these workflow contracts; do not
+reintroduce a retired compatibility surface.
 
 ## Ownership map
 
 - .codex-plugin/plugin.json owns SE identity, version, discovery metadata,
   and bundled-skill exposure.
-- references/task-preflight.md owns the root-level live task capability,
+- references/task-preflight.md owns the root-level live task capability for
+  Feature and legacy Implement,
   explicit-profile request capability, assigned-task authoritative bootstrap
   capability, stable task-identity observation, execution-target verification,
   destination, authorization, display-title capability, update-relay, and
   recovery gates.
-- references/task-handoff.md owns the shared task assignment, typed task-owned
+- references/task-handoff.md owns the Feature and legacy Implement task
+  assignment, typed task-owned
   requested-versus-effective role observation, controller identity binding,
   assigned-task execution-target observation, flat semantic prompt projection,
   partial/final relay, deterministic emoji title grammar and first-prompt
@@ -29,9 +31,9 @@ surface.
   gate before any SE workflow uses a required G-owned GitHub workflow.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title-artifact normalization, and local-path
-  correction before every hosted write produced by Idea, Feature, or Implement,
-  plus one bounded non-blocking repair of the same artifact after readback. G
-  owns transport and readback, not semantic cleanup.
+  correction before every hosted write produced by Idea, Feature, Implement,
+  or Implement Next, plus one bounded non-blocking repair of the same artifact
+  after readback. G owns transport and readback, not semantic cleanup.
 - scripts/validate-hosted-content-safety owns the static owner-routing,
   duplicate-doctrine, and hosted-template path checks for that contract.
 - skills/learn/SKILL.md owns independent durable repository-context routing,
@@ -63,6 +65,15 @@ surface.
 - skills/implement/scripts/run-state is the shipped checkpoint and idempotency
   CLI. Its version constants and schema are runtime sources of truth; focused
   tests live under skills/implement/tests/.
+- skills/implement-next/SKILL.md owns the lightweight workflow graph and
+  orchestration entrypoint. Its directly routed references own transition
+  conditions, Feature-graph scheduling, repository claims, and its intentionally
+  minimal state vocabulary. The entrypoint must not route
+  through the legacy task preflight, task handoff, fixed profile, or run-state
+  ledger contracts.
+- skills/implement-next/scripts/repository-claims is the shipped host-local
+  repository-ownership CLI. Its schema and version constants are runtime
+  sources of truth; focused tests live under skills/implement-next/tests/.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,
   workflow registry, preview/publish routing, and the capture-only terminal
   boundary. Its references own the canonical body, Idea source handoff, and
@@ -185,6 +196,15 @@ surface.
   evidence, unresolved-effect guards, and idempotent retry; it must never become
   a migration or claim-stealing shortcut. The orchestrator is the only runtime
   client; workers supply evidence but never access the ledger.
+- Keep Implement Next's public runtime contract in its `SKILL.md` and directly
+  routed references. Its repository-claims CLI remains an ownership-only
+  implementation detail and the sole source of truth for its exact schema and
+  version; workflow position must never be persisted there. Do not duplicate
+  those runtime contracts in maintenance guidance.
+- Keep Implement Next separate from the legacy task preflight, task handoff,
+  fixed-profile, per-Feature-worker, title-reconciliation, and run-state ledger
+  contracts. Maintenance must preserve that boundary and validate the owners
+  named in the package ownership map.
 - Keep Feature-level scheduling and derived execution-unit dependency edges
   separate. A Feature `blocked_by` edge may cross repositories. Implement maps
   every same-repository edge to mandatory stack intent and every
@@ -228,11 +248,11 @@ surface.
   requests branch-protection, ruleset, mergeability-policy, merge-queue,
   auto-merge, or provider-policy classification. Externally supplied policy
   observations are report-only and never affect a transition or checkpoint.
-- Keep deterministic task-title initialization shared by every task-managed
-  SE skill. Compute the title before creation and include it as a best-effort
-  plain-text hint in the flat creation prompt, without treating the hint as
-  metadata or evidence. After stable identity readback, require one bounded
-  reconciliation outcome before monitoring: exact verification or an explicit
+- Keep deterministic task-title initialization shared by task-managed Feature
+  and legacy Implement. Compute the title before creation and include it as a
+  best-effort plain-text hint in the flat creation prompt, without treating the
+  hint as metadata or evidence. After stable identity readback, require one
+  bounded reconciliation outcome before monitoring: exact verification or an explicit
   `title-unverified`/`title-drift` warning. Never use a title as identity,
   repeat an adjustment, or create a replacement task for title failure.
 - Keep task prompts as flat semantic handoffs. Preserve bounded intent,
@@ -240,10 +260,10 @@ surface.
   but unwrap raw task/delegation transport envelopes, escaped wrapper markup,
   parent prompts, and transcripts before creating a child task. Never use a
   transport wrapper as user intent or durable evidence.
-- Keep effective task-profile verification shared by every task-managed SE
-  skill. The invoking skill owns requested role, model, reasoning, and topology;
-  the shared preflight owns explicit-request, stable task-identity observation,
-  and assigned-task bootstrap capability; and the shared handoff owns one typed
+- Keep effective task-profile verification shared by task-managed Feature and
+  legacy Implement. The invoking skill owns requested role, model, reasoning,
+  and topology; the shared preflight owns explicit-request, stable task-identity
+  observation, and assigned-task bootstrap capability; and the shared handoff owns one typed
   assignment-specific self-comparison bound to the controller-observed task
   identity. Required profiles must be actively requested in full; ambient or
   configured-default inheritance is prohibited even when it happens to produce
@@ -262,9 +282,10 @@ surface.
   authoritative values for the exact assigned task differ from the request.
   Use `task-identity-mismatch` when present authoritative bootstrap evidence is
   bound to another task.
-- Keep role-specific execution-target verification shared by every task-managed
-  SE skill. Preflight freezes either `repository-bound` Git/worktree facts or a
-  `control-plane` repository-observation set. The Implement orchestrator uses a
+- Keep role-specific execution-target verification shared by task-managed
+  Feature and legacy Implement. Preflight freezes either `repository-bound`
+  Git/worktree facts or a `control-plane` repository-observation set. The
+  Implement orchestrator uses a
   projectless control plane with no repository/worktree/primary-repository
   binding and one authoritative observation per selected repository. Every
   Feature Worker remains bound to its exact repository, remote, base
@@ -421,15 +442,19 @@ surface.
   hosted lineage, selectively invalidate dependent evidence, and recover
   complete validation plus clean hosted review on the same final HEAD.
 - Validate that every bundled skill routes to `references/states.md`, every
-  graph node appears in its skill's state table, and Implement's documented
-  persisted values exactly match the run-state capability registry.
+  graph node appears in its skill's state table, Implement's documented
+  persisted values exactly match the run-state capability registry, and
+  Implement Next's small workflow registry, transition conditions, and Mermaid
+  projection agree while every workflow node remains absent from
+  repository-claim storage.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
-  Implement, and their write-owning references route through the one canonical
-  hosted-content owner without duplicate Idea doctrine. Include exact
-  single-line title artifacts without serialization-added terminators.
-- Validate that Feature and Implement both route every created task through the
-  shared typed assigned-task bootstrap, controller identity binding, and
-  title-reconciliation outcome before normal monitoring or update relay;
+  Implement, Implement Next, and their write-owning references route through
+  the one canonical hosted-content owner without duplicate Idea doctrine.
+  Include exact single-line title artifacts without serialization-added
+  terminators.
+- Validate that Feature and legacy Implement both route every created task
+  through the shared typed assigned-task bootstrap, controller identity
+  binding, and title-reconciliation outcome before normal monitoring or update relay;
   require the assigned task's non-recursive authoritative self-check before
   role-owned work; exclude the controller's own profile from child comparison;
   reject unstructured self-report and profile evidence bound to a different
@@ -464,6 +489,16 @@ surface.
   behavior.
 - Run the Implement run-state CLI help, version, read-only doctor, and focused
   standard-library tests against temporary databases.
+- Run the Implement Next repository-claims CLI help, version, read-only absent
+  doctor, and focused standard-library tests. Validate atomic overlap rollback,
+  same-token acquisition reuse, immutable repository sets, exact whole-group
+  bind and release, corruption detection, file permissions, and the absence of
+  WAL, TTL, heartbeat, force-release, and execution-state storage.
+- Use bounded forward-model scenarios to validate Implement Next selection
+  scope, workflow-graph traversal, visible orchestrator placement,
+  orchestrator-owned concurrency, serial worker reuse, same-repository stacks,
+  cross-repository scheduling, resume reconstruction through `reconcile`, claim
+  conflict behavior, and mutation boundaries.
 - Check that the marketplace path and plugin metadata point to this package.
 - Validate Learn front matter, UI metadata, routed references, explicit-only
   invocation, and the absence of retired compatibility surfaces.

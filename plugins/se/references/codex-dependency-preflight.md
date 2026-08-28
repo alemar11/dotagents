@@ -14,13 +14,13 @@ and the `plan-publication` node reaches this gate before its first hosted read
 or write; an explicitly requested `preview` does not load this gate for a new
 local source. Feature maintenance or an existing-source route must still run
 the gate before the first hosted plan rehydration read, regardless of the
-eventual terminal mode. Implement has no local-only or preview mode: run the
-gate before its mandatory first authoritative GitHub Feature Plan, PR, review,
-label, or relation read. A passing gate authorizes only the next handoff to the
-applicable G-owned workflow; it does not broaden the mutation scope. For an
-explicit SE request, the exact hosted writes required by that selected
-workflow are already implicitly authorized; the gate only verifies that the
-owner is available.
+eventual terminal mode. Implement and Implement Next have no local-only or
+preview mode: run the gate before their mandatory first authoritative GitHub
+Feature Plan, PR, review, label, or relation read. A passing gate authorizes
+only the next handoff to the applicable G-owned workflow; it does not broaden
+the mutation scope. For an explicit SE request, the exact hosted writes
+required by that selected workflow are already implicitly authorized; the gate
+only verifies that the owner is available.
 
 ## Required evidence
 
@@ -48,11 +48,11 @@ existing-source route that only rehydrates hosted state requires
 a new local source requires neither workflow because it performs no hosted
 access.
 
-For Implement, the required workflow set includes the G owners needed by the
-selected publication, review, CI, issue, local Git, and stack paths. The
-delivery-status workflow plus branch-protection, ruleset, mergeability-policy,
-merge-queue, auto-merge, and provider-policy inspection are not required and
-must not be added to the dependency gate. A generic
+For Implement and Implement Next, the required workflow set includes the G
+owners needed by the selected publication, review, CI, issue, local Git, and
+stack paths. The delivery-status workflow plus branch-protection, ruleset,
+mergeability-policy, merge-queue, auto-merge, and provider-policy inspection
+are not required and must not be added to the dependency gate. A generic
 GitHub read or raw provider call is not a substitute for the focused typed
 workflow that owns the evidence being collected.
 

@@ -1,9 +1,9 @@
 # Task Preflight
 
-This is the root-level SE contract for any workflow that creates, resumes, or
-monitors a task in the ChatGPT/Codex application. Feature and Implement skills
-must load it before attempting a task handoff. It defines required outcomes and
-evidence; it does not define an application interface.
+This is the root-level SE contract for Feature and legacy Implement workflows
+that create, resume, or monitor a task in the ChatGPT/Codex application. Those
+skills must load it before attempting a task handoff. It defines required
+outcomes and evidence; it does not define an application interface.
 
 ## Contents
 
