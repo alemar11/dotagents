@@ -1,8 +1,8 @@
 # Task Preflight
 
-This is the root-level SE contract for Feature and legacy Implement workflows
-that create, resume, or monitor a task in the ChatGPT/Codex application. Those
-skills must load it before attempting a task handoff. It defines required
+This is the root-level SE contract for the legacy Implement workflow when it
+creates, resumes, or monitors tasks in the ChatGPT/Codex application. Implement
+must load it before attempting a task handoff. It defines required
 outcomes and evidence; it does not define an application interface.
 
 ## Contents
@@ -53,7 +53,7 @@ bootstrap, or execution evidence and never participate in a gate.
 The `task controller` is the session that creates or resumes one assigned
 application task, independently observes its stable identity and state, and
 binds the task-owned bootstrap result to that exact identity. The `assigned
-task` is the planner, orchestrator, Feature Worker, or separately instantiated
+task` is the orchestrator, Feature Worker, or separately instantiated
 optional role named by the handoff. The task controller's own effective model
 and reasoning are not assignment evidence and must never be compared with the
 assigned role's requested profile. The two profiles may differ intentionally.
@@ -65,9 +65,9 @@ the value comparison before the assigned task exists. Task Handoff owns the
 assigned task's authoritative bootstrap comparison and the controller's
 post-effect identity binding.
 
-An explicit invocation of a task-managed Feature or Implement workflow is the
-user's explicit request for the required user-owned application tasks declared
-by that workflow. It grants `task_creation_authorization` for exactly those
+An explicit invocation of the task-managed Implement workflow is the user's
+explicit request for the required user-owned application tasks declared by that
+workflow. It grants `task_creation_authorization` for exactly those
 roles without a second permission prompt unless the user explicitly forbids
 task creation. It also selects the exact required role profiles. For every
 required role, and for every optional role instantiated as its own application
@@ -93,8 +93,8 @@ Do not infer permission from a feature description, a title, a previous task,
 or the fact that the current session can access the application. An implicit or
 ambiguous request is `blocked` before any task effect.
 
-For a task-managed Feature or Implement workflow, its explicit invocation is
-that request. Record task creation as `granted` for only the required roles in
+For a task-managed Implement workflow, its explicit invocation is that request.
+Record task creation as `granted` for only the required roles in
 the declared topology and do not ask for a second confirmation. An explicit
 user prohibition overrides the workflow request and blocks the required
 topology.

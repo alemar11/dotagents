@@ -1,59 +1,66 @@
 ---
 node_id: intake
 kind: action
-purpose: normalize-feature-intent-and-source-issue-set
+purpose: resolve-source-route-repositories-authority-and-plan-scope
 entry_conditions:
-  - explicit-feature-intent-or-source-issue-set-is-available
+  - explicit-feature-planning-intent-source-set-or-revision-request-is-available
 inputs:
-  - user-intent
-  - source-issues
-  - idea-source
+  - user_intent
+  - source_references
+  - existing_plan_reference
 outputs:
-  - normalized-intent
-  - normalized-source-issue-set
-  - entry_route
   - source_route
-  - affected-repositories
-  - repository-identities
-  - feature-set-scope-candidates
+  - run_mode
+  - normalized_source_set
+  - affected_repositories
+  - repository_and_source_evidence
+  - existing_plan_evidence
+  - publication_authority
+  - bounded_plan_scope
 transitions:
   - to: analysis
-    when: source-set-and-repository-identities-are-resolved
+    when: sources-repositories-and-scope-are-resolved
   - to: blocked
-    when: scope-is-invalid-or-repository-identity-is-missing
+    when: source-scope-or-required-repository-is-invalid-or-inaccessible
 stop_if:
   - request-is-implementation-only
   - scope-is-unbounded
-  - source-set-is-empty
+  - existing-source-revision-cannot-preserve-authoritative-identity
 side_effects:
-  - none
+  - read
 terminal_states: []
 ---
 
 # Intake
 
-Normalize the explicit intent and every supplied source issue into one
-attributable source set. Preserve the desired outcome, source references,
-non-goals, affected repositories, constraints, and observable success signals
-without treating titles, numbering, or caller-proposed splits as durable
-identities.
+Normalize the requested outcome and attributable source set. Resolve
+`new-source` or `existing-source`, every affected repository identity, and
+`publish` or explicitly requested `preview`. Publication remains the default;
+do not infer preview from missing authority or dependencies.
 
-Multiple source issues may describe one outcome or several independently
-deliverable outcomes. Retain their provenance and defer consolidation or
-separation to the Convergence node. A multi-repository source set may carry
-multiple Feature candidates per repository; never infer identity from
-filesystem proximity or a display title.
+Read each repository's applicable `AGENTS.md` hierarchy and verify the actual
+repository and source identities needed for planning. These observations are
+planning evidence, not task-target or saved-project gates. A multi-repository
+request has peer repositories and does not acquire an artificial primary
+repository from the planner task's application placement.
 
-When an Idea source is supplied, keep it tentative. Preserve its open
-questions and source identity, but derive every Feature Plan field
-independently. Do not promote Idea wording into requirements without evidence.
+Before reading a hosted source, apply the shared
+[G dependency preflight](../../../references/codex-dependency-preflight.md).
+This is source routing inside Intake, not a separate workflow node.
 
-Resolve entry_route as create or maintenance and source_route as new-source or
-existing-source. Maintenance is selected only by an explicit request with an
-existing published Feature Plan Set or linked sibling Feature set. It does
-not create a second set identity.
+When the source is an Idea handoff, read and validate the canonical
+[idea-source.md](../../idea/references/idea-source.md) shape and exclusions.
+Keep `source_route` as `new-source`, reload repository context, preserve its
+open questions as clarification evidence, and derive all Feature Plan fields
+independently. A typed handoff never supplies acceptance criteria, dependencies,
+implementation design, or readiness.
 
-If the request is implementation-only, unbounded, contradictory, or missing an
-authorized repository identity, retain the smallest recovery input and
-transition to blocked. Do not create an application task or hosted issue from
-an invalid intake.
+For an existing-source request, rehydrate the complete current Plan Set and
+every affected parent and child issue before analysis. Freeze their stable
+identities, unaffected semantic content, dependency graph, metadata, and any
+executor-owned progress as `existing_plan_evidence`. Reject a request that
+would silently create a replacement Plan Set or mutate implementation-owned
+state. For new-source work, record that evidence as not applicable.
+
+Preserve explicit publication, preview, no-code, no-delegation, repository,
+and downstream-handoff constraints in the normalized input.

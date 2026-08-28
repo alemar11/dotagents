@@ -1,98 +1,54 @@
 # Feature Plan Report
 
-## Run
-
-- entry_route: <create or maintenance>
-- source_route: <new-source or existing-source>
-- run_mode: <preview or publish>
-- planning_depth: <simple or substantial>
-- clarification_route: <ask, skip-simple, skip-complete-brief, or skip-user-directed>
-- plan_status: <planning, awaiting-user-input, plan-ready, published, or blocked>
-- goal_status: <active, complete, or not-available>
-
-## Feature Plan Set
+## Result
 
 - feature_plan_set_id: <set identity>
 - feature_plan_set_revision: <revision>
-- set_status: <preview, published, or blocked>
+- source_route: <new-source or existing-source>
+- run_mode: <publish or preview>
+- plan_status: <preview, published, or blocked>
 
-| feature_id | repository | parent Feature issue | Feature blocked_by | feature_status |
+## Feature registry
+
+| feature_id | repository | parent Feature issue | blocked_by | status |
 | --- | --- | --- | --- | --- |
-| <feature-id> | <repository> | <issue reference or local preview> | <Feature ID or none> | <ready or blocked> |
+| <feature-id> | <repository> | <hosted identity or proposed preview ref> | <Feature IDs or none> | <ready or blocked> |
 
-### Feature members
+## Macro Task registries
 
-| feature_id | repository | Feature Plan issue | outcome | feature_status |
-| --- | --- | --- | --- | --- |
-| <feature-id> | <repository> | <issue reference or local preview> | <outcome> | <ready or blocked> |
-
-### Macro Tasks
-
-| Feature ID | Feature issue | parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | macro_status |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| <feature-id> | <Feature issue> | <feature-id> | <macro-01> | <issue reference or local preview> | <F-AC-01> | <local macro ID or none> | <ready or blocked> |
-
-## Source and boundary evidence
-
-- source issues:
-- consolidation decision:
-- separate or out-of-scope sources:
-- linked Feature members and repositories:
-- Feature Plan Set identity and revision:
-- Feature-level dependency graph:
-
-## Analysis
-
-- intent analysis:
-- repository context:
-- boundary analysis:
-- critic findings:
-- accepted assumptions:
-- risks:
-
-## Question batch
-
-- clarification_route_evidence: <depth evidence, brief coverage and critic finding, or explicit user direction>
-
-For a question-free route, report an empty batch and its validated exception;
-do not emit the placeholder row below.
-
-| id | question | question_blocking | question_status | answer | evidence |
+| parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | status |
 | --- | --- | --- | --- | --- | --- |
-| Q-01 | <decision> | <yes or no> | <open or resolved> | <answer or none> | <source> |
+| <feature-id> | <macro-id> | <hosted identity or proposed preview ref> | <F-AC refs> | <same-parent Macro IDs or none> | <ready or blocked> |
 
-## Critic plan review
+## Planning evidence
 
-- plan_review_round:
-- plan_review_result:
-- plan_review_provenance:
-- findings and planner dispositions:
-- bounded revision and re-review evidence:
-- review-generated question IDs:
-
-## Plan content
-
-- problem statement:
-- desired outcome:
-- scope:
-- non-goals:
-- Feature acceptance criteria by Feature:
-- Feature registry and parent issue mapping:
-- local Macro Task registries and macro dependencies:
-- validation intent:
-- Implement handoff:
+- sources and repository context:
+- boundary and consolidation decisions:
+- acceptance criteria by Feature:
+- material questions and answers:
+- accepted assumptions and risks:
+- review method, findings, and dispositions:
+- structural review result:
 
 ## Operation evidence
 
-- critic plan-review evidence:
-- plan-validation:
-- publication:
-- read-after-write:
-- parent Feature publication and set readback:
-- Macro Task child publication and local registry readback:
-- Feature-level dependency readback:
-- native Feature dependency attempt and `blockedBy`/`blocking` result:
-- native same-parent Task dependency attempt and `blockedBy`/`blocking` result:
-- delegated tagger result per issue, including final labels and type:
-- source-Idea lifecycle:
-- blockers:
+- semantic issue and body readback:
+- final parent-body reconciliation:
+- parent-child relationship readback:
+- Feature dependency attempts and native results:
+- same-parent Macro dependency attempts and native results:
+- explicitly removed prior SE-owned dependency results:
+- optional classification results:
+- existing-source preservation evidence:
+- downstream handoff status:
+- warnings:
+
+## Implementation handoff
+
+<Summarize the implementation-neutral outcome, same-repository stack intent,
+cross-repository scheduling intent, F-ACs, Macro outcomes, and validation intent.>
+
+## Blocker
+
+<When blocked, provide the exact blocker, retained identities, and smallest
+recovery input. Omit this section on complete preview or publication.>

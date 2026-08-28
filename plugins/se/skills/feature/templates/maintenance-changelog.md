@@ -25,6 +25,6 @@ before projecting this changelog into hosted plan content.
 
 ## Handoff
 
-<Explain what the next se:implement run must reconsider. Do not include
-technical execution-unit IDs, technical dependency edges, allowed paths,
-execution waves, or worker state.>
+<Explain what the next se:implement or se:implement-next run must reconsider.
+Do not include technical execution-unit IDs, technical dependency edges,
+allowed paths, execution waves, or worker state.>

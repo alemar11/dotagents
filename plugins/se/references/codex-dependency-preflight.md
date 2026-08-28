@@ -10,17 +10,17 @@ For Learn, do not load this gate: Learn is local-repository-only and has no
 hosted dependency. For Idea, `publish` is the default; run the gate before its
 first hosted read or write, while an explicitly requested `preview` remains
 local and does not access GitHub. For Feature Plans, `publish` is the default
-and the `plan-publication` node reaches this gate before its first hosted read
-or write; an explicitly requested `preview` does not load this gate for a new
-local source. Feature maintenance or an existing-source route must still run
-the gate before the first hosted plan rehydration read, regardless of the
-eventual terminal mode. Implement and Implement Next have no local-only or
-preview mode: run the gate before their mandatory first authoritative GitHub
-Feature Plan, PR, review, label, or relation read. A passing gate authorizes
-only the next handoff to the applicable G-owned workflow; it does not broaden
-the mutation scope. For an explicit SE request, the exact hosted writes
-required by that selected workflow are already implicitly authorized; the gate
-only verifies that the owner is available.
+and Intake reaches this gate before any hosted source read, while Publish
+reaches it before the first hosted publication operation. An explicitly
+requested `preview` from a new local source does not load this gate. A preview
+whose source is hosted, including a hosted Idea or issue, still runs the gate
+for that read. Implement and Implement Next have no local-only or preview mode:
+run the gate before their mandatory first authoritative GitHub Feature Plan,
+PR, review, label, or relation read. A passing gate authorizes only the next
+handoff to the applicable G-owned workflow; it does not broaden the mutation
+scope. For an explicit SE request, the exact hosted writes required by that
+selected workflow are already implicitly authorized; the gate only verifies
+that the owner is available.
 
 ## Required evidence
 
@@ -39,14 +39,13 @@ Do not infer availability from a display name, an installed cache directory,
 historical task output, or an unrelated GitHub connector. Do not require source
 and installed versions to match as part of this gate.
 
-For Idea, the required workflow set contains `$g:github-issues`. For every
-Feature publication, including a maintenance publication, it contains both
-`$g:github-issues` for exact issue lifecycle operations and `$g:github-tagger`
-for repository-owned label and native type classification. A maintenance or
-existing-source route that only rehydrates hosted state requires
-`$g:github-issues` until publication is selected. The Feature preview route for
-a new local source requires neither workflow because it performs no hosted
-access.
+For Idea, the required workflow set contains `$g:github-issues`. Every Feature
+hosted source read or publication, including maintenance, requires
+`$g:github-issues` for exact issue lifecycle operations. Check
+`$g:github-tagger` only when optional repository-owned classification is
+actually attempted; its absence or failure never blocks semantic publication.
+The Feature preview route for a new local source requires neither workflow
+because it performs no hosted access.
 
 For Implement and Implement Next, the required workflow set includes the G
 owners needed by the selected publication, review, CI, issue, local Git, and

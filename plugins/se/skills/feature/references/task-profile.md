@@ -1,128 +1,44 @@
-# Feature Planning Task Profile
+# Feature Planner Task Profile
 
-This is the skill-owned task profile for a task-managed se:feature run.
-Pass the complete profile to the root task preflight. The root preflight
-verifies the required planner role and records optional runtime capabilities;
-it does not select or rewrite these values.
+This profile owns the one required application-task launch for `se:feature`.
+It is intentionally separate from the legacy Implement task preflight and
+handoff contracts.
 
-## Required planner role
+```yaml
+task_profile: feature-planner
+role: planner
+model: gpt-5.6-sol
+reasoning: high
+topology: single-planner-task
+title_template: "📚 Plan Feature Set · <set outcome>"
+execution: direct-local-project
+```
 
-    task_profile: feature-planner
-    roles:
-      - role: planner
-        required: true
-        model: gpt-5.6-sol
-        reasoning: medium
-        topology: single-planner-task
-    optional_roles:
-      - role: analysis-worker
-        model: gpt-5.6-sol
-        reasoning: medium
-        topology: bounded-readonly-analysis
-      - role: critic-analyst
-        model: gpt-5.6-sol
-        reasoning: medium
-        topology: independent-first-principles-analysis
-    topology: planner-with-optional-analysis-workers
-    title_template: "📚 Plan Feature Set · <set outcome>"
+Resolve and pass `model` and `reasoning` explicitly when creating or resuming
+the planner. Do not rely on ambient inheritance. These values are required
+request inputs, not a post-effect attestation protocol: retain what was
+requested, but do not require the planner to read back or self-certify its
+effective profile.
 
-The explicit se:feature invocation selects these role profiles as required
-runtime inputs. Actively request both the resolved model and reasoning for the
-planner and for any optional role instantiated as its own application task.
-Never omit either value or rely on the invoking session, application, project,
-host, or provider default. The required planner is always requested as
-`gpt-5.6-sol` with `medium` reasoning.
+Explicit `se:feature` invocation authorizes exactly one visible planner task.
+Request the deterministic title when the runtime supports it, but never gate
+planning on title observation or correction. Run in the caller-selected direct
+local project checkout without a worktree or fork. The planner may inspect
+every repository explicitly in scope; application project metadata does not
+establish repository identity or constrain the Plan Set.
 
-The invoking task controller owns planner creation or resume, independently
-observes the resulting stable planner task identity, and verifies that the
-planner's structured bootstrap evidence is bound to that identity. Its own
-model or reasoning may differ from the planner profile and is never compared
-with this assignment. Once started, the planner reads its own authoritative
-task-scoped execution context and performs the shared assigned-task bootstrap
-self-check before repository analysis, planning, goals, or hosted work. It
-does not create or resume another planner task for the same run.
+An accepted creation or resume receipt with a stable task identity starts the
+planner. Its first turn begins `intake` and performs role work immediately. Do
+not request an `assigned_task_bootstrap`, effective-profile comparison,
+execution-target self-check, goal, title reconciliation, or a second planner.
 
-The planner owns the application task, the Feature workflow graph, the
-Feature Plan Set registry, each Feature's local Macro Task registry, the
-question batch, the reduction of worker evidence, the canonical textual plan,
-every plan-review finding disposition, and the final publication report. The
-application task is an execution envelope, not a Feature or Macro Task graph
-node.
+When the task effect is ambiguous, inspect that same attempt once. Resume the
+observed identity when it exists. Create another planner only after
+authoritative evidence proves the original effect did not apply. If creation
+is rejected or remains ambiguous, report the launch blocker without beginning
+publication.
 
-Optional roles are capability-conditioned. For substantial planning, the study
-analysis and independent critic lenses are required: when delegation is
-available, the planner instantiates separate bounded assignments for them;
-when delegation is unavailable or lacks capacity, the planner performs both
-lenses serially and records the fallback. Simple planning may instantiate
-either role when useful. This fallback is part of the Feature profile and does
-not create a replacement task or relax the clarification gate.
-
-The critic-analyst receives the original intent and source set without the
-planner draft or context-derived requirements during its first pass. It is
-read-only, records evidence and speculation separately, and cannot publish,
-edit the plan, or ask the user directly. For a substantial question-free brief,
-it must explicitly determine whether any material product decision remains.
-After the complete draft exists, the same critic performs a second-pass plan
-review against the original intent, evidence, decisions, and assumptions. It
-returns findings only; the planner retains sole revision and disposition
-authority. If delegation is unavailable, the planner performs this review as a
-separate serial critic lens and reports the fallback honestly. A failed,
-ambiguous, or unobserved critic assignment is also serial fallback and must
-never be credited as delegated review.
-
-The planner must use the invoking session's exact local repository checkout
-and local environment. It must not create or use a Git worktree, isolated
-checkout, or task fork. Saved-project identity and project-root metadata are
-optional diagnostics. If the Git execution target cannot be independently
-verified, stop before creating, resuming, or monitoring the planner task.
-
-The title uses the established planner emoji convention. Replace only
-Feature outcome with a short, deterministic outcome. A title is display
-metadata, never task identity or recovery evidence.
-
-The planner role is required exactly as declared. Do not substitute another
-model or reasoning level. Optional workers may fall back to the parent, but
-the planner has no automatic model or destination fallback. If the live
-runtime cannot actively request the planner profile, observe its stable task
-identity, or receive its authoritative bootstrap result, stop with
-unsupported-runtime.
-
-Resolve and actively request the planner's model and reasoning from this
-profile before creation or resume. Require the shared handoff's explicit
-profile-request evidence; a matching value obtained through ambient
-inheritance does not satisfy this invariant. After stable task identity
-readback, require the planner to return the shared handoff's typed
-`assigned_task_bootstrap` containing authoritative effective values that
-exactly match the request and an `evidence_task_identity` equal to the stable
-planner identity observed by the controller. A request, creation receipt, or
-unstructured self-report is not proof. A missing or unobservable exact-planner
-value is `unsupported-runtime`; present authoritative exact-planner values
-that differ from the request are `effective-profile-mismatch`. Preserve the
-observed task and do not create a replacement. A present evidence task identity
-that differs from the controller-observed planner is
-`task-identity-mismatch`; a present local repository-target difference is
-`execution-target-mismatch`. Apply the same rule to an optional role only when
-it is instantiated as its own application task; otherwise the delegation
-evidence below remains authoritative.
-
-The planner's authoritative bootstrap is the operational profile gate. The
-planner also observes its actual local Git execution target for comparison with
-the frozen handoff. The invoking controller verifies identity binding and does
-not duplicate the planner's raw task-scoped profile read.
-
-## Optional goal and delegation facts
-
-When goal tools are available, create or adopt one goal for the whole Feature
-Plan run after required task preflight is ready. Keep it active while the
-question batch waits for the user and complete it only after preview or
-verified publication. Goal unavailability is reported and does not block the
-plan.
-
-Record delegation as one of:
-
-- parallel-analysis: the applicable bounded roles were dispatched and observed;
-- serial-fallback: the planner completed the same applicable lenses without delegation;
-- unavailable: the runtime could not provide delegation and the parent
-  fallback was used;
-- unknown: capability evidence was insufficient and no delegated role was
-  claimed.
+The planner may use subordinate read-only helpers for study or review. They
+inherit the planner's execution context unless the caller explicitly requests
+another supported profile, never become required application tasks, and always
+fall back to serial planner work when unavailable or prohibited.

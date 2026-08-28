@@ -1,456 +1,219 @@
 ---
 name: feature
-description: "Turn one or more related requests into a clear, evidence-backed Feature Plan Set. Classify planning depth, clarify substantial product work, study and critique the problem, independently review the finished plan before validation, define outcomes and acceptance criteria, split Features into practical Macro Tasks, publish semantic and native GitHub dependency projections by default, and never implement code."
+description: "Turn one or more related requests into an evidence-backed Feature Plan Set with stable acceptance criteria, coherent Macro Tasks, and explicit dependency intent. Use for new planning or bounded maintenance, publish by default, and never implement code."
 ---
 
 # Feature Planning
 
-## Purpose and invocation
+## Purpose and boundary
 
-Use this skill only for an explicit SE Feature-planning request. Accept a
-new request, a set of related source issues, or an explicit plan-maintenance
-request for an existing published plan.
+Use this skill only for an explicit SE Feature-planning request. Accept a new
+request, related source issues, an Idea source, or an explicit revision of an
+existing published Feature Plan Set.
 
-The result is a Feature Plan Set with one or more repository-owned Feature
-members and a durable macro-planning projection, not a technical
-implementation graph. For every Feature member, converge:
+Produce one complete textual Plan Set containing only genuinely distinct
+repository-owned Features. Every Feature has a bounded outcome, stable
+`F-AC-NN` acceptance criteria, and a closed set of coherent Macro Tasks. The
+Plan Set records hard Feature dependencies and same-parent Macro planning
+dependencies without turning either into a technical execution graph.
 
-- an evidence-backed description of the problem, affected users, actors, or
-  systems, and bounded product or capability outcome;
-- the source-issue relationship and multi-issue consolidation rationale;
-- the problem analysis, scope, non-goals, and repository context;
-- stable Feature acceptance criteria;
-- an observable usable landing state, ownership boundary, and delivery reason;
-- a closed set of Macro Task areas that collectively cover the Feature outcome
-  and its acceptance criteria, using vertical slices when the outcome supports
-  them;
-- macro planning dependencies or `blocked_by` relations between those areas;
-- Feature-level `blocked_by` relations to other Feature members only for hard
-  outcome dependencies, with repository identity preserved for Implement's
-  deterministic stack-or-scheduling projection;
-- constraints, assumptions, risks, and validation intent;
-- a derived planning depth and explicit clarification route;
-- one complete batch of material questions for every substantial request unless
-  a narrow, evidenced question-free exception applies;
-- an independent review of the complete plan before validation, with one
-  bounded follow-up clarification when the review exposes a hidden product
-  decision;
-- a narrative plan that is clear enough for se:implement to derive execution
-  work without invoking se:feature for technical decomposition.
+Feature never writes product code, chooses code design, creates branches or
+worktrees, schedules implementation workers, defines technical execution
+units, assigns `T-AC-NN` criteria, creates pull requests, merges, deploys, or
+releases. Those responsibilities belong to Implement or Implement Next.
 
-For a multi-repository request, produce one or more linked Feature members per
-affected repository. Keep repository context and source evidence separate per
-member. Do not create an artificial Feature container or integration issue.
+## Planner task
 
-This skill never writes repository code, derives technical implementation
-execution units or an execution graph, schedules implementation workers,
-creates worktrees, chooses code design, merges changes, or decides delivery
-completion. It does create the Feature-owned macro Task projections and their
-non-operational planning relations. Its terminal product is the complete Plan
-Set, one closed Macro Task registry per Feature, and their optional GitHub
-projections.
+Read [task-profile.md](references/task-profile.md) before creating or resuming
+the planner. Explicit invocation authorizes exactly one visible planner task.
+Pass the profile's model and reasoning effort explicitly and use a direct local
+project checkout, never an isolated worktree or task fork.
 
-## Application task, delegation, and goal
+An accepted creation or resume receipt with a stable task identity is enough to
+start work. The planner begins at `intake` in its first turn. Do not add a
+bootstrap-only turn, ask the planner to rediscover its task identity or
+effective profile, compare task metadata with the request, gate on title
+readback, or apply the shared legacy Implement task preflight and handoff.
+Request a useful title when supported, but treat it as display metadata only.
 
-For a task-managed run, read
-[task-profile.md](references/task-profile.md), the shared
-[task preflight](../../references/task-preflight.md), and the shared
-[task handoff](../../references/task-handoff.md) before creating, resuming, or
-monitoring the planner.
-The task profile owns the required planner and optional analyst roles, their
-model/reasoning profiles, and topology selection. The shared task preflight and
-handoff own capability and recovery gates plus typed bootstrap, identity, and
-execution-target verification. Apply all three contracts in full; never rely
-on ambient profile inheritance or create a replacement after an identity,
-profile, or execution-target mismatch.
+If the creation effect is genuinely ambiguous, inspect that same attempt once.
+Resume the observed task when it exists; create another only after authoritative
+evidence proves the first effect did not apply. A rejected creation request or
+an ambiguity that cannot be reconciled is a real launch blocker.
 
-The planner is the sole reducer and owner of the canonical plan. Read-only
-workers return bounded evidence and proposals only; they never edit or publish
-the plan, ask the user directly, or invoke se:implement. For a substantial
-request, use separate study and independent critic assignments when delegation
-is available. When those roles cannot be instantiated, the planner runs the
-same analytical lenses serially and records the fallback. Simple requests may
-use those roles when they add value. After the planner completes the draft,
-the critic reviews the plan as a second pass before Plan Validation. The
-application task and workers are execution envelopes, not Feature graph nodes.
+The planner is the sole owner of the canonical plan and publication decision.
+It may use bounded read-only helpers for repository study or review when useful.
+Helpers never publish, edit the plan, ask the user directly, or become required
+application tasks. When delegation is unavailable or prohibited, the planner
+performs the same work serially.
 
-## Repository context and source routes
+## Feature Plan Set contract
 
-Resolve the affected repository set and source route during Intake. For every
-repository, read the applicable AGENTS.md hierarchy and the documents and
-paths it requires. The main planner uses that hierarchy as normative planning
-context and records the sources and facts used.
+For every affected repository, read the applicable `AGENTS.md` hierarchy and
+the sources it requires. Treat repository and source identity as planning
+evidence gathered during Intake, not application-task metadata. A planner task
+may read every repository explicitly in scope; its application project does not
+create a primary-repository or correctness boundary.
 
-The critic-analyst is deliberately independent from those context-derived
-constraints during its first-pass problem study. If the critic identifies a
-rule that appears to obstruct the requested outcome, retain the conflict as
-evidence and surface it as a decision or question. Do not silently override
-AGENTS.md and do not silently let it erase the user problem.
+When Intake receives a typed Idea source, validate it against the canonical
+[idea-source.md](../idea/references/idea-source.md) handoff before deriving any
+Feature fields.
 
-Source routes are:
+The Plan Set contains:
 
-- new-source: build a plan from explicit intent and source issues;
-- existing-source: rehydrate one published plan or linked plan set and apply
-  only an explicit semantic maintenance request.
+- a stable lower-kebab `feature_plan_set_id`, monotonic revision, source map,
+  and selected `preview` or `publish` operation;
+- one entry per genuinely independent Feature with a stable lower-kebab
+  `feature_id`, repository identity, problem, observable outcome, scope,
+  non-goals, context evidence, constraints, assumptions, risks, and validation
+  intent;
+- ordinary list-item acceptance criteria with stable bracketed `F-AC-NN`
+  identities and a monotonic high-water mark per Feature;
+- a closed Macro Task registry per Feature. Each lower-kebab `macro_task_id`
+  describes a coherent outcome or vertical slice, maps to one or more F-ACs,
+  and never acts as an implementation unit or PR boundary;
+- hard-outcome Feature `blocked_by` edges and same-parent Macro `blocked_by`
+  edges, both acyclic;
+- resolved material questions and explicit assumptions;
+- review findings and dispositions when they materially changed the plan;
+- an implementation-neutral handoff that lets Implement or Implement Next
+  derive technical work while preserving every Feature criterion and available
+  Macro outcome.
 
-An Idea source is tentative evidence. Preserve its open questions and derive
-every plan field independently. Do not promote Idea fields into requirements
-without fresh evidence.
+Multiple source issues may converge into one Feature. Create siblings only
+when a distinct usable landing state, acceptance obligation, ownership
+boundary, or delivery reason remains. Never create a container or integration
+Feature merely to group the set.
 
-## Consolidation and multi-issue semantics
+A Feature dependency may reference only another Feature in the same Plan Set.
+Implementation workflows project a same-repository edge as mandatory stack
+intent and a cross-repository edge as scheduling-only because Git ancestry
+cannot cross repositories. Preferred order is prose, not `blocked_by`.
 
-Treat issue titles, headings, requested counts, and proposed splits as
-candidate evidence. Consolidate sources when they describe one independently
-deliverable outcome. Keep separate Feature members when an exclusive outcome,
-acceptance obligation, usable landing state, or delivery reason remains.
+A Macro dependency may reference only another Macro Task owned by the same
+`parent_feature_id`. Macro edges are planning context; an implementation
+workflow may combine, reorder, or internalize them while preserving their
+outcomes and F-AC coverage. Cross-Feature Task-to-Task edges are invalid.
 
-Multiple source issues may map to one Feature member. Independently
-deliverable outcomes become separate sibling Feature members in the same Plan
-Set or separate explicit planning runs. Multi-repository work may produce one
-or more Feature members per repository. Source mapping and the consolidation
-or separation decision remain visible in the final plan.
+For an existing-source revision, retain the exact Plan Set, Feature, Macro, and
+hosted issue identities. Apply the smallest semantic patch, increment the
+revision, preserve every unaffected field and executor-owned progress, and
+state what a later Implement or Implement Next run must reconsider. Never
+silently create a replacement plan.
 
-Create separate Feature members only when the user outcome, acceptance
-criteria, usable landing state, ownership, or delivery reason is genuinely
-independent. A shared integration narrative is not a reason to create a
-Feature container. If an acceptance criterion inherently spans distinct
-Features, keep the outcome in one Feature or decompose the criterion into
-Feature-local criteria; never invent a cross-Feature integration Feature.
+Use [plan.md](templates/plan.md) for the canonical plan,
+[macro-task.md](templates/macro-task.md) for child projections, and
+[plan-report.md](templates/plan-report.md) for the terminal report.
 
-After each Feature member has one coherent outcome, define its closed set of
-Macro Tasks and decide whether that outcome admits clean vertical slicing. When
-it does, make each Macro Task a
-bounded vertical view of one slice of the same Feature outcome, not an optional
-deliverable or a technical execution unit. When it does not, keep fewer
-coherent Macro Tasks and explain the boundary rather than forcing a vertical
-split. Macro Tasks may cross repository layers when those layers serve one
-coherent outcome. Do not split only into backend, frontend, tests, or other
-technical layers. The complete set must cover the Feature acceptance criteria
-and must not introduce scope outside the Feature.
+## Questions and review
 
-Feature-level `blocked_by` relations connect distinct Feature IDs in the same
-Plan Set and express a hard outcome dependency, never preferred order alone.
-Repository identity gives the relation a deterministic Implement projection:
-a same-repository edge is mandatory stack intent, while a cross-repository
-edge remains scheduling-only because no Git ancestry can span repositories.
-After every parent issue identity is known, publication must mirror each edge
-as an exact native GitHub `blocked by` relationship from the dependent Feature
-issue to the blocking Feature issue. Cross-repository Feature dependencies use
-exact issue URLs. The Plan Set remains semantic authority; the native edge is
-an expected provider projection that publication must always attempt. A
-verified edge is preferred, but a failed, unavailable, or unknown native result
-is reported and does not block the body-backed semantic publication.
-This projection does not make Feature the owner of branches, exact heads,
-technical execution edges, or worker scheduling. Record non-blocking preferred
-order as prose instead of `blocked_by`.
+Ask only when a material product decision remains after evidence gathering.
+Collect all such decisions into one concise batch with recommendations. The
+planner may continue without questions when the request is already complete,
+the user delegated the choice, or remaining uncertainty is safe as an explicit
+assumption. Technical implementation choices belong to the later implementation
+workflow.
 
-A Macro Task `blocked_by` relation is narrower: it may reference only a Macro
-Task whose `parent_feature_id` is exactly the current Feature ID.
-Cross-Feature Task-to-Task edges are invalid, including when the Features
-share a repository. After all child issue identities are known, publication
-must mirror every valid macro-local edge as a native GitHub `blocked by`
-relationship from the dependent child Task to the blocking child Task. A
-native Task dependency may never cross parent Features.
+Clarification is a nonterminal wait. After answers arrive, return to Analysis
+and incorporate them. If the user declines a required decision, report the
+smallest unresolved blocker rather than guessing.
 
-Macro Task `blocked_by` relations are planning structure and sequencing
-context. They are not Implement execution edges, worker gates, PR boundaries,
-or stack instructions. Implement may combine, reorder, or internalize them in
-its technical execution graph, but it must preserve every Macro Task outcome
-and Feature acceptance criterion.
+Review every complete draft. Use an independent read-only helper when useful
+and available, otherwise a separate serial review lens. Review must verify the
+semantic content and these structural invariants:
 
-Do not create technical implementation units, allowed-path claims, execution
-waves, worker assignments, or technical dependency IDs in Feature planning.
-se:implement derives those from the complete Feature Plan Set and each
-Feature's Macro Task registry.
+- stable identities and monotonic revisions/high-water marks;
+- genuinely distinct Feature boundaries and no container Feature;
+- observable, non-duplicative F-ACs covered by the closed Macro registries;
+- no scope added by Macro Tasks;
+- valid, acyclic Feature and same-parent Macro dependency graphs;
+- complete source provenance, repository mapping, and publication projections;
+- correct same-repository stack and cross-repository scheduling semantics;
+- preservation of existing identities, unaffected content, and executor-owned
+  progress during maintenance.
 
-## Question batch
-
-Analysis first derives `planning_depth`:
-
-- `simple` requires one narrow outcome in one repository, an explicit usable
-  landing state, bounded scope and non-goals, sufficiently specific acceptance
-  intent, and no material product choice involving behavior, compatibility,
-  migration, data, safety, rollout, ownership, or dependencies;
-- `substantial` applies whenever any of those conditions is absent, when
-  sources or repositories must be reconciled, or when materially different
-  product outcomes remain plausible.
-
-Default a substantial request to `clarification_route: ask`. Before drafting
-the plan, study the product problem and repository evidence, run the independent
-critic lens, and collect all unresolved material decisions. Present one
-concise consolidated batch, not one question per turn or worker. Group closely
-coupled decisions and keep the batch to the smallest complete set. Each
-question records:
-
-- a stable question ID;
-- the decision requested;
-- why it matters;
-- affected outcome, scope, acceptance, or ownership;
-- available options and the recommended answer;
-- blocking or non-blocking status;
-- provenance from the analysis that raised it.
-
-The only question-free routes are:
-
-- `skip-simple` when the request satisfies every `simple` condition;
-- `skip-complete-brief` when a substantial request already contains a
-  traceably complete decision brief and the independent critic confirms that
-  no material product decision remains;
-- `skip-user-directed` when the user explicitly requests no questions and all
-  remaining uncertainty is safe to retain as explicit assumptions.
-
-Do not use repository evidence, a plausible default, or the planner's
-confidence alone to select a question-free route. If a user-directed skip
-would leave a material decision unresolved, stop with that decision rather
-than guess. Record the route, its evidence, and the critic disposition in the
-plan and report.
-
-Questions that change the product outcome, repository ownership, scope,
-acceptance, or plan boundaries are blocking. The task remains
-awaiting-user-input until the user answers the batch. Non-blocking questions
-become explicit assumptions with their impact. Technical implementation
-questions belong to se:implement and do not restart Feature planning.
-
-After the plan is drafted, Plan Review may surface one previously hidden
-material product decision. Ask that decision in one smallest-complete follow-up
-batch, preserve its provenance, then rebuild and review the plan. Do not allow
-a second review-generated batch: repeated discovery means the analysis or plan
-cannot be trusted and must stop. An explicit `skip-user-directed` route forbids
-the follow-up and blocks instead of guessing.
-
-## Feature Plan contract
-
-The Feature Plan Set is the canonical semantic content. When published, each
-Feature member becomes one GitHub parent issue. There is no hosted container
-issue. Each parent Feature carries the common Plan Set identity and revision,
-the set-membership manifest, its own Feature identity, and its own closed Macro
-Task registry. Repository labels and native GitHub Issue Types are optional
-metadata and do not carry these semantics. Feature never preselects their
-values. After each final hosted issue projection and exact identity are
-verified, delegate classification and authorized application to
-`$g:github-tagger`. Instruct it to choose the smallest relevant set of existing
-labels, including none, and zero or one available native issue type for that
-exact issue.
-
-The plan must contain:
-
-- Feature Plan Set identity, revision, and source-issue mapping;
-- one Feature identity, evidence-backed problem statement, affected users,
-  actors, or systems, desired outcome, and analysis per member;
-- explicit scope and non-goals;
-- affected Feature members, repositories, and parent-issue identities;
-- repository-context sources and relevant facts per Feature member;
-- stable Feature acceptance criteria rendered as F-AC-NN list items per
-  Feature member;
-- a Feature Plan Set registry that maps every Feature identity to its parent
-  Feature issue, Feature-level `blocked_by` refs, and local Macro Task
-  registry;
-- the repository-sensitive projection rule that same-repository Feature
-  `blocked_by` is mandatory stack intent and cross-repository `blocked_by` is
-  scheduling-only;
-- one native GitHub `blocked by` operation and readback attempt for every
-  Feature-level dependency, including cross-repository edges, with its
-  verified, no-op, failed, unavailable, or unknown outcome;
-- one hosted child Task projection for every Macro Task, linked to its own
-  parent Feature issue;
-- Macro `blocked_by` relations that reference only Macro Tasks with the same
-  `parent_feature_id` and remain planning-only;
-- one native GitHub `blocked by` operation and readback attempt for every
-  macro-local dependency, with its outcome and no cross-Feature Task edge;
-- the per-Feature closure policy that each parent Feature and only its own
-  associated Macro Tasks belong to that Feature's final implementation
-  closing set;
-- constraints, assumptions, risks, and validation intent;
-- the critic-analyst findings and accepted or rejected challenges;
-- `planning_depth`, `clarification_route`, and their evidence;
-- the resolved question batch, the current awaiting-user-input batch, or the
-  validated question-free exception;
-- the critic plan-review result, findings, dispositions, reviewer
-  provenance, and any bounded revision or follow-up clarification evidence;
-- implementation considerations and evidence without prescribing code design;
-- the handoff statement for se:implement;
-- selected operation and publication evidence.
-
-Feature identities use stable lower-kebab `feature_id` values within the
-`feature_plan_set_id`. Feature criteria use stable F-AC-NN identities and a
-monotonic feature_acceptance_high_water per Feature member. They are contract
-identity, not Markdown checkbox state. Macro Tasks use stable lower-kebab
-`macro_task_id` values scoped by `parent_feature_id` and map to one or more
-F-AC-NN identities. This workflow does not assign T-AC-NN identities or an
-execution-unit acceptance high-water; those belong to the technical
-execution evidence derived by se:implement.
-
-The canonical Feature Plan Set registry contains one entry per Feature:
-
-- `feature_plan_set_id`: stable identity for the sibling Feature set;
-- `feature_plan_set_revision`: monotonic set revision;
-- `feature_id`: stable lower-kebab identity within the set;
-- `repository_identity`: the repository owned by this Feature;
-- `parent_issue_ref`: the authoritative hosted Feature issue after publication;
-- `blocked_by`: zero or more Feature IDs in the same set;
-- `macro_tasks`: the complete local Macro Task registry for this Feature.
-
-Each Macro Task entry contains:
-
-- `parent_feature_id`: the Feature identity that owns the Macro Task;
-- `macro_task_id`: stable lower-kebab identity within that Feature;
-- `macro_outcome`, `scope`, and `feature_acceptance_refs`;
-- `blocked_by`: zero or more Macro Task IDs whose `parent_feature_id` is the
-  same value;
-- `macro_status` and `child_issue_ref` after publication.
-
-The set registry is closed. Every Feature identity has exactly one parent
-issue and every Macro Task has exactly one parent Feature and one child Task.
-The registry is projected into every parent Feature issue with the same set
-identity and revision; authoritative readback must reconcile those
-projections. No child issue, title, or narrative text can add a sibling,
-Feature dependency, or Macro Task to the registry.
+Return correctable findings to Plan while revisions are making progress. A
+newly exposed material decision returns to Clarification. Repeated unresolved
+findings, no-progress revision, or a genuinely unavailable required decision
+blocks publication. A separate Plan Validation node or review-round state
+machine is not required.
 
 ## Workflow graph
 
-The graph contains planning milestones and one publication adapter. Its
-publication node loads the shared
-[G dependency preflight](../../references/codex-dependency-preflight.md) and
-hosted-content contracts internally; transport and read-after-write safeguards
-remain mandatory but do not become planning nodes.
-
-Read [states.md](references/states.md) for the human-readable meaning of every
-workflow node and for the separate plan, report, domain, and external state
-registries. That reference also defines the runtime-checkpoint boundary.
-
-Before every hosted write in plan-publication, load the shared
-[hosted-content-safety.md](../../references/hosted-content-safety.md) contract
-for the exact projected content.
-
-~~~mermaid
-flowchart TD
-    intake -->|normalized source set| analysis
-    maintenance -->|rehydrated plan evidence| analysis
-    intake -->|invalid scope or identity| blocked
-    maintenance -->|conflict or missing target| blocked
-    analysis -->|clarification route is ask| clarification
-    analysis -->|validated question-free route| convergence
-    analysis -->|missing context or failed analysis| blocked
-    clarification -->|answer batch received| convergence
-    clarification -->|unresolved or declined decision| blocked
-    convergence -->|bounded Feature members| plan
-    convergence -->|independent scope cannot be resolved| blocked
-    plan -->|draft complete| plan-review
-    plan -->|missing required content| blocked
-    plan-review -->|review clean| plan-validation
-    plan-review -->|correctable findings| plan
-    plan-review -->|first hidden product decision| clarification
-    plan-review -->|unreconciled or repeated finding| blocked
-    plan-validation -->|plan-ready| plan-publication
-    plan-validation -->|invalid or contradictory plan| blocked
-    plan-publication -->|preview or verified semantic publish with dependency attempt results| complete
-    plan-publication -->|semantic publication failure or missing dependency attempt result| blocked
-~~~
-
-Only the following files are graph nodes:
+The node table is the structural source of truth. Mermaid is its maintained
+projection. Read [states.md](references/states.md) before interpreting nodes or
+reported values. Before executing a node, read its registered step file.
 
 | node_id | file | kind | entry condition | transitions |
 | --- | --- | --- | --- | --- |
-| maintenance | steps/maintenance.md | action | explicit maintenance request and existing plan evidence | analysis, blocked |
-| intake | steps/intake.md | action | explicit Feature intent or source issue set | analysis, blocked |
-| analysis | steps/analysis.md | action | normalized source set and repository targets | clarification, convergence, blocked |
-| clarification | steps/clarification.md | decision | initial or review-generated consolidated material question batch | convergence, blocked |
-| convergence | steps/convergence.md | action | evidence and answered questions are available | plan, blocked |
-| plan | steps/plan.md | action | bounded Feature members are resolved | plan-review, blocked |
-| plan-review | steps/plan-review.md | validation | textual plan draft is complete | plan, clarification, plan-validation, blocked |
-| plan-validation | steps/plan-validation.md | validation | critic-reviewed plan is clean | plan-publication, blocked |
-| plan-publication | steps/plan-publication.md | action | plan is ready and operation mode is resolved | complete, blocked |
-| complete | steps/complete.md | terminal | preview is frozen or publication is verified | none |
-| blocked | steps/blocked.md | terminal | a required planning or publication contract cannot be satisfied | none |
+| intake | steps/intake.md | action | explicit Feature intent, source set, or revision request | analysis, blocked |
+| analysis | steps/analysis.md | action | sources and affected repositories are resolved | clarification, plan, blocked |
+| clarification | steps/clarification.md | decision | one or more material product decisions remain | analysis, blocked |
+| plan | steps/plan.md | action | evidence and required decisions are available | review, blocked |
+| review | steps/review.md | validation | a complete textual Plan Set draft exists | plan, clarification, publish, blocked |
+| publish | steps/publish.md | action | review is clean and operation authority is resolved | complete, blocked |
+| complete | steps/complete.md | terminal | preview is frozen, or semantic publication, required dependency attempts, and any requested handoff are verified | none |
+| blocked | steps/blocked.md | terminal | no responsible transition remains | none |
 
-The application task and optional analysis workers are execution envelopes,
-not workflow graph nodes. The durable Feature Plan Set registry and its
-Feature/Macro Task relations are planning projections, not workflow nodes or
-the Implement runtime graph. A question batch is a user-facing wait state
-inside clarification, not a separate node for each question.
+~~~mermaid
+flowchart TD
+    intake -->|sources and repositories resolved| analysis
+    intake -->|invalid or inaccessible scope| blocked
+    analysis -->|material decision remains| clarification
+    analysis -->|evidence is sufficient| plan
+    analysis -->|required evidence unavailable| blocked
+    clarification -->|answers received| analysis
+    clarification -->|required decision declined or unavailable| blocked
+    plan -->|complete Plan Set draft| review
+    plan -->|contract cannot be completed| blocked
+    review -->|correctable findings with progress| plan
+    review -->|new material decision| clarification
+    review -->|clean semantic and structural result| publish
+    review -->|repeated unresolved or no-progress finding| blocked
+    publish -->|preview frozen or all required publication results reconciled| complete
+    publish -->|authority, attempt, handoff, or required write unresolved| blocked
+~~~
 
-## Workflow rules
+Workflow position is transient. Do not persist a queue, current node,
+checkpoint, task bootstrap, review-round machine, or recovery ledger. Resume
+from the current conversation and authoritative published Plan Set, then choose
+the next edge from live evidence.
 
-Before executing a node, read its registered `steps/<node-id>.md` contract.
-Those files own node-specific inputs, stop conditions, detailed behavior,
-side effects, and transitions. Follow the graph and registry above as the
-canonical order; do not skip `plan-validation`, enter `plan-publication`
-early, or infer a transition from prose. Never skip `plan-review` or treat the
-planner's own draft as review evidence. In particular, the publication step
-owns preview selection, the G dependency handoff, hosted-content projection,
-native dependency attempts, optional tagging, readback, and recovery. Do not
-create a Feature Plan Set container. When one exact hosted Idea is the source,
-close that source Idea as completed only after the complete Plan Set and all
-required publication results reconcile; preview and ambiguous identity never
-close it.
+## Publication and result
 
-### Implement handoff
+Publication is the default. Preview is selected only when the user explicitly
+requests a local, non-durable result. Never silently downgrade publish to
+preview because a dependency, permission, or provider is unavailable.
 
-Feature must publish and reconcile the complete Feature Plan Set and every
-planned child projection before it can report its own workflow complete. At
-the Implement handoff, however, each published parent Feature issue is the
-required semantic contract; its Macro Task children are useful planning
-projections rather than an implementation gate. Implement may classify those
-projections as `complete`, `partial`, or `absent`, report any degradation, and
-derive missing execution coverage from outcome, scope, and F-AC without
-creating or repairing Task issues. Implement reads the authoritative set,
-projects same-repository Feature `blocked_by` as mandatory stack intent and
-cross-repository Feature `blocked_by` as scheduling-only, re-evaluates real
-technical prerequisites, and derives technical execution units, stable
-assignment-scoped T-AC criteria, path envelopes, and runtime waves in its own
-control plane. It may combine, reorder, or internalize available Macro Task
-dependencies while preserving every Feature criterion and available Macro
-outcome. A T-AC may specialize an F-AC but never replace, weaken, or change it.
-It creates one Feature Worker and one PR per
-implementation-eligible Feature member. A same-repository child may start from
-its parent's verified `candidate-published` exact HEAD before that parent is
-delivery-ready only when no applicable current-head CI check is confirmed
-failing; pending CI remains non-blocking, and Implement may exempt only a
-G-verified infrastructure or flaky failure unrelated to candidate correctness.
-Technical interpretation remains in Implement. A product-level
-contradiction that cannot be resolved without changing outcome, scope, F-AC,
-or Feature dependencies is reported to the user as a bounded plan question;
-missing task decomposition, technical ambiguity, and acceptance specificity
-remain autonomous Implement work. Implement must not create an automatic
-plan-repair planner for ordinary implementation detail.
+Intake applies the G dependency check before any hosted source read. The
+Publish node owns the same check for hosted publication, hosted-content
+projection, parent/child issue operations, relationship and dependency
+attempts, exact readback, optional classification, existing-source updates,
+and any explicitly requested post-publication handoff. Provider transport
+details stay with the focused G skills. Immediately before every hosted write,
+apply the canonical
+[hosted-content-safety.md](../../references/hosted-content-safety.md) contract.
 
-## Transient state and terminal report
+Issue identity and semantic body readback are mandatory. Reconcile a genuinely
+ambiguous write against the same intended artifact before retrying. The Plan
+Set bodies and registries are semantic authority. After exact parent and child
+identities exist, reconcile every parent body in place and read the complete
+projection back. Record one native dependency attempt and observable result per
+canonical edge. A confirmed failed, unavailable, or unknown result is a warning,
+but a missing attempt or result blocks. Reconcile any explicitly requested
+post-publication handoff before completion. Optional labels and native Issue
+Types never gate completion.
 
-Keep current_node_id, entry_route, source_route, run_mode, planning_depth,
-clarification_route, source issue identities, Feature Plan Set and Feature
-members, analysis evidence, worker provenance, question batch, assumptions,
-plan-review round, result, findings, dispositions and provenance, artifacts,
-publication evidence, blockers, and terminal state explicit and transient. Do
-not store runtime state in Markdown.
+Report the Plan Set identity and revision, Feature/repository mapping, F-ACs,
+Macro registries, dependency semantics, material questions and assumptions,
+review outcome, preview or hosted issue identities, publication/readback
+evidence, warnings, and the implementation-neutral handoff. On failure, report
+the exact blocker and smallest recovery input without claiming a partial plan
+complete.
 
-A complete report contains:
+## Skill Dependencies
 
-- the Feature Plan Set identity and every Feature member/repository identity;
-- source issues, consolidation and separation rationale;
-- problem analysis, outcome, scope, non-goals, and context sources;
-- Feature acceptance criteria and high-water evidence;
-- the complete Feature registry, Feature-level dependency relations, every
-  local Macro Task registry, and projected parent/child issue identities when
-  published;
-- native GitHub dependency attempt and `blockedBy`/reciprocal `blocking`
-  readback or failure evidence for every published Feature-level and
-  macro-local edge;
-- assumptions, risks, validation intent, and critic findings;
-- planning-depth classification, clarification route, and supporting evidence;
-- the full question batch and the user's resolutions, or the validated
-  question-free exception;
-- the clean plan-review result, findings, dispositions, reviewer
-  provenance, and any bounded revision or follow-up clarification evidence;
-- the complete textual plan and Implement handoff;
-- preview or publication operation evidence, including each reconciled tagger
-  result when published;
-- source-Idea lifecycle evidence when applicable;
-- retained identities, no-op operations, and unresolved blockers when
-  applicable.
-
-Terminal states:
-
-- complete: the plan is complete and preview-frozen or published with required
-  read-after-write evidence;
-- blocked: the exact planning, authority, capability, or publication blocker
-  and the smallest recovery input are reported.
+Any hosted source read or hosted write requires the installed `g@alemar11`
+workflows for GitHub issue operations and optional classification. A local
+new-source preview needs no G workflow. This skill never installs, refreshes,
+or substitutes that dependency.

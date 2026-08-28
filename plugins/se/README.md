@@ -20,12 +20,10 @@ Its skills are deliberately separated by responsibility:
   table that distinguishes workflow nodes from domain values, persisted
   statuses, checkpoints, modes, external observations, and output labels.
 - references/task-preflight.md and references/task-handoff.md are root-level
-  contracts shared by task-managed Feature and legacy Implement runs. Explicit
-  invocation authorizes exactly the required user-owned tasks without a second
-  prompt and rejects subordinate delegation as a required-role substitute. The
-  controller may request an application destination, but only stable task
-  identity, authoritative bootstrap, and role-specific target evidence gate the
-  role. Implement's orchestrator is a projectless control plane with one
+  contracts for legacy Implement runs. Explicit invocation authorizes exactly
+  the required user-owned tasks without a second prompt and rejects subordinate
+  delegation as a required-role substitute. Implement's orchestrator is a
+  projectless control plane with one
   authoritative observation per selected repository and no primary-repository
   binding; Feature Workers remain fully repository/worktree bound. The
   contracts also require an explicit, complete role-profile request
@@ -69,7 +67,7 @@ Its skills are deliberately separated by responsibility:
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
 - task-handoff.md binds typed effective-role and execution-target observations
-  to planner, orchestrator, and Feature Worker task identity, then applies the
+  to orchestrator and Feature Worker task identity, then applies the
   established SE Implement emoji-title grammar with authoritative readback and
   at most one bounded correction before monitoring; titles remain display
   metadata. Each task receives one flat semantic prompt with a best-effort
@@ -182,22 +180,26 @@ Its skills are deliberately separated by responsibility:
   idea-source handoff for later Feature planning; it never writes project memory
   or starts an application task.
   Invoke it explicitly as `se:idea`.
-- The Feature planner stays in the invoking session's exact local repository
-  checkout and local environment without a Git worktree; isolated worktrees
-  belong only to the separate Implement workflow. Saved-project metadata is
-  optional diagnostic context.
+- Feature creates or resumes one visible planner task in a direct local project
+  checkout without a Git worktree or fork. It explicitly passes
+  `gpt-5.6-sol` with `high` reasoning, accepts the stable task receipt, and
+  starts Intake in the planner's first turn. It has no bootstrap-only turn,
+  effective-profile readback, identity self-attestation, title gate,
+  execution-target comparison, or goal. One readback is reserved for a
+  genuinely ambiguous creation effect.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
-- Feature analyzes one or more source issues and classifies the planning depth.
-  Substantial planning runs separate bounded study and independent critic
-  assignments when delegation is available, with a serial fallback that keeps
-  the same lenses. It presents one consolidated batch of material questions by
-  default; skipping that batch requires a narrow simple request, a traceably
-  complete brief confirmed by the critic, or explicit user direction with no
-  material decision left to guess. Once the draft is complete, the critic
-  reviews it before validation, independently delegated when available.
-  Correctable findings return for one bounded revision and a hidden product
-  decision may trigger one follow-up question batch. It then returns one
+- Feature analyzes one or more source issues and asks one consolidated batch
+  only when material product decisions remain. Complete briefs, delegated
+  choices, and safe explicit assumptions proceed directly. Optional read-only
+  helpers may study or review; unavailable or prohibited delegation uses a
+  serial planner lens. Clarification waits nonterminally. Once the draft is
+  complete, Review verifies semantic quality plus stable identity, F-AC
+  coverage, closed registry, dependency DAG, boundary, projection, and
+  maintenance-preservation invariants. Correctable findings return to Plan
+  while progress is made, and a hidden product decision returns to
+  Clarification. There is no separate Plan Validation node or review-round
+  state machine. Feature then returns one
   evidence-backed textual Feature Plan Set with genuinely distinct sibling
   Features. Each Feature has ordinary list-item acceptance criteria with stable
   `F-AC-NN` identities, its own closed Macro Task registry, and optional
@@ -206,29 +208,29 @@ Its skills are deliberately separated by responsibility:
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by
-  default; it never creates a container issue. The body and registries remain
-  semantic authority. After exact issue publication, Feature always attempts
+  default; it never creates a container issue. After exact identities exist,
+  it reconciles every parent body in place with the final sibling and child
+  mappings and reads the result back. The body and registries remain semantic
+  authority. Feature then always attempts
   to mirror every Feature edge and every same-parent Macro edge as a native
   GitHub `blocked by` relationship. Each attempt is recorded; a native failure
-  is reported but does not block a complete body-backed publication. Feature
-  then delegates optional label and native type classification to
-  `g:github-tagger` for each issue. The tagger chooses the smallest relevant
-  existing label set, including none, and zero or one available native type;
-  Feature never presets `Feature`, `Task`, or any other metadata value. An
-  empty assignment is valid and does not block semantic publication. Explicit
+  is reported but does not block a complete body-backed publication, while a
+  missing attempt or result does. Existing-source maintenance removes only
+  prior SE-owned native edges explicitly retired from the revised plan and
+  preserves foreign edges. Optional
+  label and native type classification may then use `g:github-tagger`. The
+  tagger chooses the smallest relevant existing label set, including none, and
+  zero or one available native type; Feature never presets `Feature`, `Task`,
+  or any other metadata value. Classification never gates semantic publication.
+  Explicit
   preview remains local and non-durable. Hosted publication requires G
   preflight and read-after-write verification.
-- Feature maintenance is an alternate entry into the same Plan Set graph:
-  it rehydrates the existing sibling Features, reconciles an explicit
-  indication, and republishes the revised projections when requested. It does
-  not rehydrate or repair Implement execution units.
-- task-managed Feature and legacy Implement runs pass their skill-owned profiles to
-  the shared preflight. Explicit invocation authorizes exactly their declared
-  user-owned application-task topology without a second prompt; task creation
-  scope and GitHub mutation scope remain independent. Feature delegation is
-  conditional on live capability and falls back to serial planner analysis;
-  substantial planning still runs both study and critic lenses, while every
-  principal task role remains required.
+- Feature maintenance uses the same graph: Intake rehydrates exact identities,
+  Analysis bounds the requested change, Plan applies the smallest semantic
+  patch, Review verifies preserved content and executor progress, and Publish
+  updates and reads back the same issues. Any explicitly requested downstream
+  handoff must reconcile before completion. Feature does not rehydrate or
+  repair implementation execution units.
 - Idea, Feature, Implement, and Implement Next keep local control-plane records
   separate from hosted artifacts and apply one shared portable-content gate
   immediately before each hosted write, including content returned by workers

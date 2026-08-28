@@ -1,11 +1,20 @@
 ---
 node_id: blocked
 kind: terminal
-purpose: report-the-smallest-planning-or-publication-blocker
+purpose: report-the-real-planning-or-publication-blocker
 entry_conditions:
-  - a-required-feature-plan-contract-cannot-be-satisfied
+  - no-responsible-workflow-edge-remains
+inputs:
+  - current_plan_evidence
+  - unresolved_decisions
+  - publication_evidence
+  - retained_hosted_identities
+outputs:
+  - blocker_report
+  - smallest_recovery_input
 transitions: []
-stop_if: []
+stop_if:
+  - another-safe-graph-edge-remains
 side_effects:
   - none
 terminal_states:
@@ -14,12 +23,13 @@ terminal_states:
 
 # Blocked
 
-Report the exact blocker, affected phase, retained plan and analysis
-artifacts, worker or plan-review provenance when relevant, unresolved finding
-and question IDs, and the smallest recovery input.
+Report the exact invalid or inaccessible source, unresolved material decision,
+inconsistent Plan Set, missing publication authority or dependency, or
+unreconciled required write. Preserve any verified hosted identities and state
+the smallest input needed to continue safely.
 
-Use blocked for invalid scope or identity, missing required context, declined
-material decisions, incomplete plan content, unverified publication, or
-unrecoverable runtime and authority failures. Do not use it for ordinary
-awaiting-user-input while a consolidated question batch is actively waiting
-for an answer; that is a resumable plan wait state.
+Do not block because the planner cannot self-observe its task identity, model,
+reasoning effort, title, application project metadata, or an execution-target
+bootstrap. Those are not Feature correctness properties. Do not convert an
+ordinary clarification wait or an optional metadata/native-dependency warning
+into a terminal blocker.

@@ -1,113 +1,60 @@
 ---
 node_id: analysis
 kind: action
-purpose: run-grounded-and-independent-parallel-problem-analysis
+purpose: gather-evidence-and-identify-material-decisions
 entry_conditions:
-  - normalized-source-issue-set-and-repository-identities-are-available
+  - intake-resolved-sources-repositories-and-scope
 inputs:
-  - normalized-intent
-  - normalized-source-issue-set
-  - affected-repositories
-  - repository-identities
+  - normalized_source_set
+  - affected_repositories
+  - repository_and_source_evidence
+  - existing_plan_evidence
+  - bounded_plan_scope
+  - answered_questions
+  - accepted_assumptions
 outputs:
-  - planning-depth
-  - clarification-route
-  - clarification-route-evidence
-  - repository-context-evidence
-  - intent-analysis
-  - boundary-analysis
-  - feature-boundary-evidence
-  - feature-dependency-evidence
-  - macro-boundary-evidence
-  - macro-dependency-evidence
-  - question-candidates
-  - critic-analysis
-  - assumptions
-  - risks
-  - analysis-provenance
+  - problem_and_user_analysis
+  - source_and_boundary_evidence
+  - repository_context_evidence
+  - constraints_assumptions_and_risks
+  - material_question_batch
+  - clarification_context
+  - plan_inputs
 transitions:
   - to: clarification
-    when: clarification-route-is-ask
-  - to: convergence
-    when: question-free-route-is-validated
+    when: one-or-more-material-product-decisions-remain
+  - to: plan
+    when: evidence-and-decisions-are-sufficient
   - to: blocked
-    when: required-context-or-analysis-cannot-be-established
+    when: required-planning-evidence-cannot-be-established
 stop_if:
-  - repository-context-cannot-be-read
-  - analysis-workers-return-unreconciled-authority-conflict
-  - source-set-cannot-be-grounded
+  - evidence-and-speculation-cannot-be-distinguished
+  - repository-ownership-or-feature-boundary-remains-unknowable
 side_effects:
-  - none
+  - read
 terminal_states: []
 ---
 
 # Analysis
 
-For every affected repository, read the applicable AGENTS.md hierarchy and the
-documents and code it requires for safe planning. Record the sources and facts
-used; do not invent a context-document taxonomy.
+Study the user or product problem, affected actors, observable outcome,
+repository context, source relationships, constraints, assumptions, risks, and
+validation intent. Separate evidence from inference. Optional read-only helpers
+may study independent repositories or challenge assumptions, but the planner
+reduces their results and serial work is always valid.
 
-Classify the request as `simple` only when it has one narrow outcome in one
-repository, a clear usable landing state, explicit scope and non-goals,
-sufficient acceptance intent, and no material product choice involving
-behavior, compatibility, migration, data, safety, rollout, ownership, or
-dependencies. Classify every other request as `substantial`; uncertainty
-selects `substantial`, not `simple`.
+Identify only material product decisions: outcome, scope, behavior,
+compatibility, migration, data, safety, rollout, ownership, or hard Feature
+dependencies. A complete brief, an explicitly delegated choice, or a safe
+assumption does not require a question. Technical code design, implementation
+decomposition, allowed paths, worker topology, and validation commands that can
+be derived from repository evidence belong to the later implementation
+workflow. Feature records only outcome-level validation intent.
 
-For a substantial request, run both a bounded study assignment and the
-independent critic assignment. When delegation is available, dispatch them as
-separate read-only assignments with distinct responsibilities. Otherwise run
-the same lenses serially and record the fallback. Simple requests may dispatch
-the roles when useful. Every assignment receives the same immutable intent and
-source set, returns evidence or proposals, and remains unable to publish, edit
-the plan, or ask the user directly.
+When questions remain, produce one smallest-complete batch with the decision,
+why it matters, options, recommendation, and evidence. Otherwise pass the
+bounded evidence directly to Plan.
 
-Run these analytical lenses for every substantial request and when useful for
-a simple request:
-
-- intent and source normalization;
-- repository context and affected-surface analysis;
-- multi-issue boundary and residual-outcome analysis;
-- acceptance, validation, risk, and documentation analysis;
-- independent critic analysis.
-
-The critic analyst receives the original problem and repository snapshot
-without the planner draft or context-derived requirements during its first
-pass. It challenges assumptions, unnecessary constraints, missing outcomes,
-and possible conflicts with repository instructions. It remains read-only and
-must separate evidence from speculation. A critic does not override AGENTS.md;
-it produces a conflict or question for the parent planner to reconcile.
-
-The planner aggregates all worker results once, preserves provenance, removes
-duplicate questions, and separates:
-
-- confirmed evidence;
-- accepted assumptions;
-- competing interpretations;
-- material questions for the user;
-- non-blocking risks and follow-up suggestions.
-
-Select `clarification_route: ask` for every substantial request by default and
-whenever any material product decision remains. A simple request may select
-`skip-simple` only with evidence for every simple condition. A substantial
-request may select `skip-complete-brief` only when the user's supplied brief
-traceably resolves the material decision dimensions and the critic confirms
-that none remains. Select `skip-user-directed` only after an explicit request
-not to ask questions and only when remaining uncertainty is safe to retain as
-assumptions. Planner confidence, repository familiarity, or reasonable
-defaults are not question-free evidence. Preserve the route, evidence, critic
-disposition, and any assumptions for Plan Validation.
-
-Identify candidate Feature boundaries and evidence for whether each outcome
-has a separate usable landing state, ownership, acceptance obligation, or
-delivery reason. Record candidate Feature-level `blocked_by` relations and
-their evidence for later Plan Set composition only when one outcome is a hard
-prerequisite, not merely preferred order. Preserve both repository identities:
-Implement projects a same-repository relation as mandatory stack intent and a
-cross-repository relation as scheduling-only. Identify candidate Macro Task
-areas and evidence-backed local macro `blocked_by` relationships. Keep both
-levels vertical at the product/capability level and do not split by technical
-layer. Do not create Feature containers or cross-Feature Macro Task edges.
-Do not derive technical execution units, allowed paths, execution waves,
-worker schedules, or technical dependency IDs in this node. Those belong to
-Implement.
+On re-entry after Clarification, incorporate the answers and rerun only the
+analysis they affect. Do not restart task creation, repository discovery, or
+unrelated evidence gathering.

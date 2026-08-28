@@ -2,7 +2,7 @@
 
 This is the root-level SE contract for assigning work to, observing, and
 reporting a task after [Task Preflight](task-preflight.md) has passed. It is
-shared by Feature and legacy Implement. It defines the handoff and
+owned by legacy Implement. It defines the handoff and
 relay evidence, while the preflight reference owns the common gates and
 authorization decisions.
 
@@ -120,7 +120,7 @@ model or reasoning differs from the request, use
 `effective-profile-mismatch` instead. A missing evidence task identity remains
 `unsupported-runtime` because no exact-task comparison is possible.
 
-An assigned planner, orchestrator, Feature Worker, or optional task that has
+An assigned orchestrator, Feature Worker, or optional task that has
 already started from a valid handoff does not create or resume another task for
 its own required role. It performs only the assigned-task bootstrap and then
 enters its role-owned workflow. In the Implement hierarchy, a verified
@@ -133,15 +133,15 @@ workflow state, ledger column, replacement task, or second state machine.
 
 ## Canonical title metadata
 
-Every task governed by this Feature and legacy Implement contract receives a
+Every task governed by this legacy Implement contract receives a
 deterministic display-title request using the established SE Implement grammar:
 
 ```text
 <emoji> <role or workflow> · <scope or outcome>
 ```
 
-Apply these shared rules to the Feature planner task, the Implement
-orchestrator, and every Implement Feature Worker:
+Apply these shared rules to the Implement orchestrator and every Implement
+Feature Worker:
 
 - begin with exactly one contextual emoji, followed by one space;
 - keep the role, scope, or outcome short, concrete, and deterministic;
@@ -149,8 +149,8 @@ orchestrator, and every Implement Feature Worker:
   either an immutable selected scope or a bounded Feature outcome; never
   choose them randomly;
 - use the skill-owned profile template for the role's content, while retaining
-  the shared grammar and the existing `📚` planner, `🤖` orchestrator, and
-  `🛠️` Feature Worker convention;
+  the shared grammar and the existing `🤖` orchestrator and `🛠️` Feature
+  Worker convention;
 - for an Implement orchestrator, use `1 Feature` for one selected Feature and
   `<feature_count> Features` for multiple selected Features. Freeze that count
   from the authoritative run scope; do not derive it from worker count,
@@ -230,7 +230,7 @@ readback already matches, otherwise record `title-unverified` or `title-drift`.
 ## Role-profile request
 
 Treat the skill-owned model and reasoning as required task-effect inputs, not
-preferences or defaults. The explicit Feature or Implement invocation selects
+preferences or defaults. The explicit Implement invocation selects
 the profile declared for every required role and for any optional role
 instantiated as its own application task. Before creation or resume, actively
 request both resolved values and freeze semantic request evidence in the
@@ -390,7 +390,7 @@ task_observation:
   assigned_task_bootstrap:
     task_profile_ref: "<skill-owned profile>"
     role: "<profile role>"
-    assignment_ref: "<planner, orchestration, Feature, or other stable scope>"
+    assignment_ref: "<orchestration, Feature, or other stable scope>"
     profile_request_ref: "<explicit profile-request evidence>"
     evidence_task_identity: "<task identity exposed by the authoritative source>"
     evidence_ref: "<authoritative task-scoped runtime readback>"
@@ -502,7 +502,7 @@ The final relay must preserve the exact task identity and include:
   required gate does not pass;
 - the assigned-task bootstrap self-check outcome;
 - the final title-reconciliation status and any display-metadata warning;
-- the Feature Plan outcome and validation evidence;
+- the Feature implementation outcome and validation evidence;
 - any repository or documentation changes actually made by the task;
 - the preflight authorization record by reference;
 - reconciliation evidence for every interrupted or retried operation;

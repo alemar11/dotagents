@@ -2,212 +2,129 @@
 
 ## Plan identity
 
-- feature_plan_set_id: <stable lower-kebab set identity>
-- feature_plan_set_revision: 1
-- plan_status: plan-ready
-- source_route: new-source
-- planning_depth: <simple or substantial>
-- clarification_route: <ask, skip-simple, skip-complete-brief, or skip-user-directed>
-- clarification_route_evidence: <classification and route evidence>
-- source_issues:
+- feature_plan_set_id: <stable lower-kebab identity>
+- feature_plan_set_revision: <monotonic revision>
+- source_route: <new-source or existing-source>
+- run_mode: <publish or preview>
+- plan_status: <draft, awaiting-input, ready, preview, published, or blocked>
+- source_refs: <attributable sources>
 - feature_member_count: <count>
-- feature_set_closure_policy: each-feature-and-its-associated-macro-tasks
+- closure_policy: each-feature-and-its-associated-macro-tasks
 
-## Feature Plan Set Registry
+## Feature Plan Set registry
 
-The Plan Set contains only genuinely distinct sibling Features. It never
-publishes a container or integration issue. Each Feature entry has its own
-outcome, acceptance criteria, parent Feature issue, and closed Macro Task
-registry.
+The set contains genuinely independent Features and no container issue.
 
-| feature_id | repository_identity | parent_issue_ref | blocked_by Feature IDs | feature_status |
+| feature_id | repository_identity | parent_issue_ref | blocked_by | feature_status |
 | --- | --- | --- | --- | --- |
-| feature-a | <repository> | <assigned after publication> | <Feature ID or none> | <ready or blocked> |
+| feature-a | <repository> | <hosted identity or proposed preview ref> | <Feature IDs or none> | <ready or blocked> |
 
-`feature_id` is stable lower-kebab identity within the
-`feature_plan_set_id`. Feature-level `blocked_by` may reference only another
-Feature ID in this table and represents a hard outcome dependency, not
-preferred order. se:implement projects a same-repository edge as mandatory
-stack intent and a cross-repository edge as scheduling-only.
+Feature `blocked_by` references only another Feature in this registry and
+expresses a hard outcome dependency. A same-repository edge is stack intent for
+Implement or Implement Next; a cross-repository edge is scheduling-only.
 
-The registry and Feature bodies are semantic authority. Hosted publication
-always attempts the corresponding native GitHub dependency between exact
-parent Feature issues, including across repositories, but a recorded provider
-failure does not invalidate this graph.
+## Source and boundary decisions
 
-## Plan Set context
+| source | interpretation | feature_id | source_disposition |
+| --- | --- | --- | --- |
+| <source> | <evidence-backed interpretation> | <member> | <consolidated, separated, revised, or out-of-scope> |
 
-<Explain the shared source context and why the set contains separate Feature
-outcomes rather than one Feature container.>
+<Explain why each residual outcome is one Feature or a distinct sibling.>
 
 ## Feature member plans
 
-Repeat the following member sections for every `feature_id` in the registry.
+Repeat this section for every registry member.
 
 ### Feature `<feature_id>`
 
+- repository_identity: <repository>
+- feature_acceptance_high_water: <monotonic high-water>
+- parent_issue_ref: <hosted identity or proposed preview ref>
+
 #### Problem and outcome
 
-##### Problem statement
+<State the affected user, actor, or system, evidence-backed problem, observable
+outcome, usable landing state, and ownership boundary.>
 
-<Explain who or what experiences the user or product problem, the evidence
-that establishes it, and any material uncertainty.>
-
-##### Desired outcome
-
-<Describe the observable outcome in user and system terms, including the usable
-landing state and ownership boundary.>
-
-##### Scope
+#### Scope
 
 - <in-scope outcome or surface>
 
-##### Non-goals
+#### Non-goals
 
 - <explicitly excluded outcome>
 
-#### Source analysis and convergence
+#### Repository context
 
-##### Source issue map
+- source: <AGENTS.md, code, documentation, or hosted source>
+  fact: <relevant planning evidence>
 
-| source issue | interpretation | feature_id | decision |
-| --- | --- | --- | --- |
-| <source> | <evidence-backed interpretation> | <member> | <consolidated, separated, or out-of-scope> |
+#### Feature acceptance criteria
 
-##### Boundary decision
+- [F-AC-01] <unique observable success criterion>
+- [F-AC-02] <unique observable success criterion>
 
-<Explain the residual-outcome test and why sources were consolidated or
-separated.>
+F-AC identities are durable contract identifiers, not execution checkboxes.
 
-##### Repository context
+#### Macro Task registry
 
-###### Sources read
-
-- <AGENTS.md, scoped context, code, documentation, or other required source>
-
-###### Relevant facts
-
-- <fact and source>
-
-##### Acceptance criteria
-
-- feature_acceptance_high_water: <monotonic high-water for this Feature>
-
-- [F-AC-01] <observable success criterion>
-- [F-AC-02] <observable success criterion>
-
-These are contract identities, not execution checkboxes. Each F-AC belongs to
-this Feature member and must be covered by its local Macro Task registry.
-
-#### Macro Task Plan
-
-This is the closed set for the current Feature member, not the entire Plan
-Set. Macro Tasks are not optional scope, technical execution units, worker
-assignments, or separate PR boundaries. Use vertical rows when the Feature
-outcome admits clean slices; otherwise keep fewer coherent rows and explain
-the boundary. Every entry is included in this Feature's final implementation
-closing set, and sibling Feature issues are excluded.
-
-- macro_task_registry_revision: 1
 - parent_feature_id: `<feature_id>`
-- macro_task_closure_policy: parent-feature-and-its-associated-macro-tasks
+- macro_task_registry_revision: <monotonic revision>
 
-| parent_feature_id | macro_task_id | macro outcome | scope | F-AC refs | blocked_by | macro status | child issue ref |
+| parent_feature_id | macro_task_id | macro outcome | scope | F-AC refs | blocked_by | macro_status | child_issue_ref |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `<feature_id>` | macro-01 | <vertical slice when the outcome admits one; otherwise coherent macro outcome> | <macro boundary> | <F-AC-01> | <none or local macro ID> | <ready or blocked> | <assigned after publication> |
+| `<feature_id>` | macro-01 | <coherent outcome or vertical slice> | <boundary> | <F-AC-01> | <same-parent Macro IDs or none> | <ready or blocked> | <hosted identity or proposed preview ref> |
 
-Each `(parent_feature_id, macro_task_id)` pair is stable. Macro `blocked_by`
-may reference only another Macro Task with the same `parent_feature_id` and
-expresses planning order, not a technical Implement gate. Cross-Feature
-Task-to-Task edges are invalid. The local registry must cover every F-AC-NN
-in this Feature and must not add scope outside it.
+The registry is closed, covers every F-AC, adds no scope, and contains only
+same-parent Macro dependencies. Macro edges are planning context, not technical
+execution or PR boundaries.
 
-Hosted publication always attempts each macro-local edge as a native GitHub
-dependency between the corresponding child Task issues. The local body-backed
-registry remains authoritative, and a recorded provider failure is
-non-blocking.
+#### Constraints, assumptions, and risks
 
-## Constraints and assumptions
+- constraint: <constraint and evidence>
+- assumption: <safe assumption and impact>
+- risk: <risk and validation or mitigation intent>
 
-### Confirmed constraints
+#### Validation intent
 
-- <constraint and evidence>
-
-### Accepted assumptions
-
-- <assumption, impact, and owner>
-
-## Risks and validation intent
-
-- risk: <risk>
-  impact: <impact>
-  mitigation_or_validation: <validation intent>
-
-## Critic analysis
-
-### Independent challenges
-
-- <critic challenge>
-
-### Reconciliation
-
-- accepted: <challenge or alternative>
-- rejected: <challenge and evidence>
-- unresolved: <question reference>
-
-## Critic plan review
-
-- plan_review_round: <initial or post-clarification>
-- plan_review_result: <clean, revision-required, clarification-required, or blocked>
-- plan_review_provenance: <delegated-critic or serial-fallback>
-- review_findings: <stable finding IDs and evidence>
-- planner_dispositions: <accepted or rejected with evidence>
-- bounded_revision_evidence: <revision and re-review evidence or none>
-- review_generated_question_ids: <question IDs or none>
+- <observable behavioral, integration, or operational evidence>
 
 ## Questions and decisions
 
-### Question batch
+List only real questions. When none were needed, state why the brief, delegated
+choice, or safe assumptions were sufficient.
 
-For a question-free route, retain the route evidence above and state that no
-question rows were required. Do not invent a placeholder question.
+- question: <material decision>
+  status: <open, resolved, or assumption>
+  recommendation: <recommended answer>
+  answer: <answer or assumption>
+  evidence: <source>
 
-- Q-01
-  question: <decision requested>
-  why_it_matters: <impact>
-  options:
-    - <option>
-  recommendation: <recommended option>
-  question_status: resolved
-  answer: <user answer or accepted assumption>
+## Review
+
+- review_result: <clean, revision-required, clarification-required, or blocked>
+- review_method: <independent-helper or serial-lens>
+- material_findings: <findings and dispositions or none>
+- structural_checks: <identity, F-AC coverage, registries, DAGs, boundaries, projections, maintenance preservation>
 
 ## Implementation handoff
 
-<Explain what se:implement must achieve and what evidence it should preserve.
-Project every same-repository Feature-level `blocked_by` edge as mandatory
-stack intent and every cross-repository edge as scheduling-only. Derive the
-technical execution units independently, and cover every local Macro Task in
-this Feature's final evidence. Keep this implementation-neutral: do not
-prescribe code design, technical execution-unit IDs, allowed paths, execution
-waves, or worker scheduling.>
+<Describe the outcomes and evidence Implement or Implement Next must preserve.
+Include same-repo stack and cross-repo scheduling intent, but do not prescribe
+code design, technical execution-unit IDs, allowed paths, waves, workers, or
+branches.>
 
-### Likely affected surfaces
+## Operation evidence
 
-- <surface or repository area, with evidence>
-
-### Validation intent
-
-- <behavioral, integration, or operational validation expectation>
-
-## Plan operation
-
-- run_mode: publish
-- dependency_semantic_authority: body-and-registries
-- native_dependency_policy: always-attempt; provider-failure-non-blocking
-- feature_plan_set_registry_readback:
-- parent_feature_issue_refs:
-- native_dependency_results: <one attempted outcome per Feature and Macro edge; none only when the graph has no edges>
-- macro_task_issue_refs_by_feature:
-- feature_dependency_readback:
-- macro_task_registry_readback_by_feature:
-- publication_evidence:
+- semantic_authority: body-and-registries
+- parent_feature_issue_refs: <hosted identities or preview refs>
+- macro_task_issue_refs_by_feature: <mapping>
+- final_parent_body_reconciliation: <verified, no-op, ambiguous, or preview>
+- parent_child_readback: <verified, no-op, failed, unavailable, unknown, or not-applicable>
+- feature_dependency_results: <one result per edge or none>
+- macro_dependency_results: <one result per edge or none>
+- removed_dependency_results: <one result per explicitly removed prior SE-owned edge or none>
+- semantic_body_readback: <verified, no-op, ambiguous, or preview>
+- optional_classification_results: <results or not-requested>
+- downstream_handoff_status: <not-requested, verified, no-op, failed, unavailable, or ambiguous>
+- publication_warnings: <warnings or none>

@@ -11,9 +11,9 @@ purpose: describe-the-node-outcome
 entry_conditions:
   - prior-contract-is-satisfied
 inputs:
-  - input-artifact
+  - input_artifact
 outputs:
-  - output-artifact
+  - output_artifact
 transitions:
   - to: next-node
     when: output-is-complete

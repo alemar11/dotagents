@@ -1,29 +1,24 @@
 ---
 node_id: clarification
 kind: decision
-purpose: resolve-a-consolidated-batch-of-material-user-questions
+purpose: resolve-material-product-decisions
 entry_conditions:
-  - analysis-selected-clarification-route-ask-or-plan-review-found-first-material-decision
+  - analysis-or-review-produced-a-material-question-batch
 inputs:
-  - question-candidates
-  - review-question-candidates
-  - analysis-provenance
-  - affected-repositories
-  - plan-review-findings
-  - plan-review-round
+  - material_question_batch
+  - clarification_context
 outputs:
-  - answered-question-batch
-  - accepted-assumptions
-  - rejected-assumptions
-  - plan-review-round
+  - answered_questions
+  - accepted_assumptions
+  - unresolved_material_decisions
 transitions:
-  - to: convergence
-    when: one-complete-question-batch-has-been-answered
+  - to: analysis
+    when: required-answers-or-safe-assumptions-are-available
   - to: blocked
-    when: a-required-decision-is-declined-or-remains-unresolved
+    when: a-required-decision-is-declined-or-cannot-be-obtained
 stop_if:
-  - user-answer-would-change-the-authorized-repository-set
-  - evidence-remains-contradictory-after-the-batch
+  - planner-would-guess-a-material-product-decision
+  - repeated-review-clarification-shows-the-plan-is-not-converging
 side_effects:
   - none
 terminal_states: []
@@ -31,40 +26,14 @@ terminal_states: []
 
 # Clarification
 
-Present every material question discovered by the analysis in one consolidated
-batch. Do not ask one question per worker or create a graph node for each
-question. Group tightly coupled decisions, remove duplicates, and use the
-smallest complete batch that lets planning continue. Each item must include a
-stable question ID, the requested decision, why it matters, affected outcome
-or scope, available options, recommendation, `question_blocking` value, and
-originating evidence.
+Present one concise consolidated question batch and wait nonterminally for the
+user. Keep recommendations clear and avoid one-question-per-turn churn.
 
-A substantial request reaches this node by default. Do not bypass it because a
-recommendation seems obvious, repository evidence suggests a likely answer, or
-the planner believes it can write a plausible plan. Ask only product and
-planning decisions whose answers can change outcome, behavior, scope,
-non-goals, acceptance, ownership, compatibility, migration, safety, rollout,
-or Feature dependencies; do not manufacture implementation questions to fill
-the batch.
+Record answers and safe user-approved assumptions, then return to Analysis so
+the affected evidence and boundaries can be reconciled. Do not treat the wait
+as a blocked task and do not persist a workflow checkpoint.
 
-Plan Review may re-enter this node once when the finished draft exposes a
-previously hidden material product decision. Present only the smallest complete
-follow-up batch arising from those review findings, keep stable question IDs
-and review provenance, and set the next `plan_review_round` to
-`post-clarification`. If a review-generated batch was already used, or the user
-selected `skip-user-directed`, stop instead of asking again or guessing.
-
-The task may remain in awaiting-user-input while the batch is shown. This is a
-wait state, not a terminal blocked result and not a reason to mark the run's
-goal blocked. Resume the same planning task and preserve the original question
-IDs when the user replies.
-
-A question is blocking when it changes the product outcome, repository
-ownership, plan boundary, scope, acceptance criteria, or an essential safety
-constraint. Non-blocking questions become explicit assumptions and retain
-their impact. Technical implementation choices are not Feature clarification
-questions; Implement owns them.
-
-After the complete user response is reconciled, carry accepted decisions and
-assumptions to Convergence. If the user declines a required decision or
-changes the authorized repository set, stop with the smallest recovery input.
+Review may expose one previously hidden material decision. Ask it as the
+smallest follow-up batch, then rebuild the plan. If review repeatedly discovers
+new material decisions or the user declines one required to define the Feature,
+stop rather than guessing.

@@ -1,73 +1,49 @@
-# Feature States
+# Feature Planning States
 
-This reference is the human-readable state registry for `se:feature`. It keeps
-workflow position separate from plan metadata, durable planning projections,
-and external runtime state. The workflow registry and step front matter remain
-the structural sources of truth for transitions.
+Feature owns a small transient planning graph. It has no workflow ledger,
+checkpoint, task-bootstrap state, title state, review-round machine, or
+persisted current node.
 
 ## Workflow nodes
 
-Workflow nodes describe where the planning run is executing. They are
-transient and are never Feature, Macro Task, publication, or provider states.
-
-| node | kind | plain description |
+| Node | Kind | Meaning |
 | --- | --- | --- |
-| `maintenance` | action | Rehydrate an existing published Feature Plan Set for an explicit semantic revision. |
-| `intake` | action | Normalize a new Feature request, its source issues, and repository identities. |
-| `analysis` | action | Collect repository, boundary, dependency, question, and critic evidence. |
-| `clarification` | decision | Present and reconcile the initial material question batch or the one permitted review-generated follow-up batch. |
-| `convergence` | action | Resolve the final sibling Feature boundaries and local Macro Task structure. |
-| `plan` | action | Compose the Feature Plan Set and each Feature's Macro Task registry. |
-| `plan-review` | validation | Critically review the complete draft, reconcile correctable findings, and surface at most one follow-up clarification batch. |
-| `plan-validation` | validation | Verify that the planning contract is complete and internally consistent. |
-| `plan-publication` | action | Freeze a preview or publish and verify the hosted planning projections. |
-| `complete` | terminal | Finish with a frozen preview or a semantic publication verified by read-after-write evidence with one recorded native dependency result per edge. |
-| `blocked` | terminal | Stop because a required planning or publication contract needs a specific recovery input. |
+| `intake` | action | Resolve the source route, affected repositories, authority, and exact create or revision scope. |
+| `analysis` | action | Gather repository and problem evidence, identify material decisions, and prepare bounded planning inputs. |
+| `clarification` | decision | Present one consolidated material question batch and wait nonterminally for answers. |
+| `plan` | action | Converge genuine Feature boundaries and draft the complete Plan Set, F-ACs, Macro registries, and dependency graphs. |
+| `review` | validation | Review semantic quality and deterministic structural invariants, then revise, clarify, publish, or block. |
+| `publish` | action | Freeze a local preview or publish and read back the semantic GitHub projection. |
+| `complete` | terminal | The preview is frozen or the semantic hosted projection is verified. |
+| `blocked` | terminal | No responsible edge remains because a required decision, source, authority, or write result is unavailable. |
 
-`current_node_id` contains exactly one node from this table. The question batch
-may wait for the user inside `clarification`; `awaiting-user-input` is not a
-separate workflow node and is not terminal `blocked`.
+## Transient plan values
 
-## Plan, report, and domain states
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `source_route` | `new-source`, `existing-source` | Selects creation or smallest-patch maintenance through the same graph. |
+| `run_mode` | `publish`, `preview` | Selects durable GitHub projection or a local non-durable result. Preview must be explicit. |
+| `plan_status` | `draft`, `awaiting-input`, `ready`, `preview`, `published`, `blocked` | Reports the observed Plan Set outcome; it is not a persisted workflow state. |
+| `question_status` | `open`, `resolved`, `assumption` | Records whether a material question waits, was answered, or was safely retained as an assumption. |
+| `feature_status` | `ready`, `blocked` | Reports whether one Feature contract is usable for an implementation workflow. |
+| `macro_status` | `ready`, `blocked` | Reports whether one Macro projection is usable planning context. |
+| `source_disposition` | `consolidated`, `separated`, `revised`, `out-of-scope` | Records how one source maps into the final sibling Feature set. |
+| `review_result` | `clean`, `revision-required`, `clarification-required`, `blocked` | Selects the Review transition without creating a review-round state machine. |
+| `downstream_handoff_status` | `not-requested`, `verified`, `no-op`, `failed`, `unavailable`, `ambiguous` | Records whether an explicitly requested post-publication handoff is reconciled; only not-requested, verified, or no-op permits completion. |
 
-| field or domain | allowed values | lifetime | plain description |
-| --- | --- | --- | --- |
-| `entry_route` | `create`, `maintenance` | transient and reported | Selects a new plan or an explicit revision of an existing plan. The `maintenance` value is a route; the node with the same name performs that route. |
-| `source_route` | `new-source`, `existing-source` | plan and report | Identifies whether planning starts from new intent or an existing published Plan Set. |
-| `run_mode` | `preview`, `publish` | transient and reported | Selects the operation. Omission means `publish`; the value describes intent, not its result. |
-| `planning_depth` | `simple`, `substantial` | plan and report | Derived during analysis. `simple` is limited to one narrow, fully bounded single-repository outcome with no material product choice; uncertainty selects `substantial`. |
-| `clarification_route` | `ask`, `skip-simple`, `skip-complete-brief`, `skip-user-directed` | transient, plan, and report | Controls the transition from analysis. Substantial planning defaults to `ask`; every skip value requires its own evidence and never permits guessing a material decision. |
-| `plan_review_round` | `initial`, `post-clarification` | plan and report | Distinguishes the first complete-draft review from the one review allowed after a review-generated clarification batch. Another material question after `post-clarification` blocks. |
-| `plan_review_result` | `clean`, `revision-required`, `clarification-required`, `blocked` | plan and report | Records the critic draft-review outcome. Only `clean` may enter Plan Validation; the other values select bounded revision, one follow-up clarification, or terminal blocking. |
-| `plan_review_provenance` | `delegated-critic`, `serial-fallback` | plan and report | Records who performed the finished-draft review. `delegated-critic` requires an observed successful assignment; failed, unavailable, ambiguous, or unobserved delegation must be reported as `serial-fallback`. |
-| `plan_status` | `planning`, `awaiting-user-input`, `plan-ready`, `published`, `blocked` | plan and report | Summarizes semantic planning progress. A successful preview remains `plan-ready`; `published` requires verified hosted publication. |
-| `set_status` | `preview`, `published`, `blocked` | report | Summarizes the Plan Set operation result. It is separate from requested `run_mode`. |
-| `feature_status` | `ready`, `blocked` | durable plan projection | Describes whether one Feature member satisfies its planning contract or retains a member-specific blocker. It is not Implement or PR readiness. |
-| `macro_status` | `ready`, `blocked` | durable Macro Task projection | Describes whether one Macro Task satisfies its planning contract. It is not an Implement execution gate. |
-| `question_status` | `open`, `resolved` | plan and report | Describes whether one material planning question still needs a decision. |
-| `question_blocking` | `yes`, `no` | plan and report | States whether the question prevents convergence. A non-blocking open question becomes an explicit assumption. |
-| source-map decision | `consolidated`, `separated`, `out-of-scope` | durable plan content | Records how each source issue contributes to the Feature Plan Set. |
-| critic disposition | `accepted`, `rejected`, `unresolved` | durable plan content | Records how each independent critic challenge was reconciled. |
+## Publication observations
 
-`plan-readiness` is validation evidence, not another status enum. Its outcome is
-represented by the transition from `plan-validation` and by `plan_status`.
+| Observation | Meaning |
+| --- | --- |
+| `verified` | The intended hosted identity and semantic projection were read back. |
+| `no-op` | The current hosted artifact already matched the intended projection. |
+| `failed` | A provider operation definitely failed and its impact is reported. |
+| `unavailable` | An optional provider projection was unavailable. |
+| `unknown` | An optional native projection could not be observed; the body-backed semantic graph remains authoritative. |
+| `ambiguous` | A required issue create/update may have applied but cannot be reconciled; publication blocks without retrying blindly. |
+| `not-applicable` | The observation does not apply to this source route or operation. |
+| `preview` | The local non-durable projection was frozen without a hosted write. |
 
-## External execution and hosted states
-
-| field or domain | values | owner | plain description |
-| --- | --- | --- | --- |
-| planner task wait | `awaiting-user-input` | application runtime | A resumable wait while the question batch is with the user. It remains nonterminal. |
-| `goal_status` | `active`, `complete`, `not-available` | goal runtime and report | Reports the optional goal lifecycle. Goal `complete` is not the Feature workflow node `complete`. |
-| delegation outcome | `parallel-analysis`, `serial-fallback`, `unavailable`, `unknown` | planner report | Reports how analysis roles were handled. Substantial planning requires the study and critic lenses even when both run through serial fallback. |
-| tagger result | values defined by `$g:github-tagger` | `$g:github-tagger` | Records the reconciled classification and application result for each published issue. It may contain zero selected labels and zero selected types and is not Feature or Macro Task semantic state. |
-| native dependency result | `verified`, `no-op`, `failed`, `unavailable`, `unknown` | `$g:github-issues` result and Feature report | Records the mandatory native projection attempt for one canonical dependency. Only an absent attempt/result blocks publication; failure does not override the body-backed semantic graph. |
-| source Idea close reason | `completed` | hosted issue provider | Used only after the complete Plan Set, all projections, and every tagger handoff have reconciled. |
-
-## Persistence boundary
-
-Feature Plan Set, Feature, Macro Task, and question metadata may be rendered in
-durable plan or hosted artifacts. The planning run itself remains transient.
-`se:feature` owns no persisted runtime checkpoint, checkpoint status, resume
-ledger, or delivery state. Implementation checkpoints such as
-`candidate-published` and `delivery-pending` belong to `se:implement`, not this
-skill.
+Plan Set, Feature, F-AC, Macro, issue, and dependency identities are durable
+domain or provider facts, not workflow nodes. The task receipt is retained only
+to wait for or resume the same planner; it is not plan correctness evidence.

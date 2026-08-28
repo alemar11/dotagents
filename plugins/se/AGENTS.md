@@ -11,13 +11,12 @@ reintroduce a retired compatibility surface.
 - .codex-plugin/plugin.json owns SE identity, version, discovery metadata,
   and bundled-skill exposure.
 - references/task-preflight.md owns the root-level live task capability for
-  Feature and legacy Implement,
+  legacy Implement,
   explicit-profile request capability, assigned-task authoritative bootstrap
   capability, stable task-identity observation, execution-target verification,
   destination, authorization, display-title capability, update-relay, and
   recovery gates.
-- references/task-handoff.md owns the Feature and legacy Implement task
-  assignment, typed task-owned
+- references/task-handoff.md owns the legacy Implement task assignment, typed task-owned
   requested-versus-effective role observation, controller identity binding,
   assigned-task execution-target observation, flat semantic prompt projection,
   partial/final relay, deterministic emoji title grammar and first-prompt
@@ -42,12 +41,13 @@ reintroduce a retired compatibility surface.
   registry; its references own branch-specific detail.
 - skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
   node registry, Feature Plan Set, Feature identity, Feature-level dependency,
-  and local Macro Task contracts, planning-depth and clarification routing,
-  question-batch rules, conditional analysis roles, independent plan review,
-  publication adapter, and terminal states.
-- skills/feature/references/task-profile.md owns the required Feature planner,
-  optional analyst roles, model/reasoning profiles, and topology selection.
-- skills/feature/steps/ owns the Markdown node contracts. Every step file
+  and local Macro Task contracts, material-question routing, optional read-only
+  helpers, structural plan review, publication adapter, and terminal states.
+- skills/feature/references/task-profile.md owns the one required Feature
+  planner launch and its explicitly requested model/reasoning profile. It does
+  not own post-effect profile, identity, title, or execution-target validation.
+- skills/feature/steps/ owns the eight lightweight Markdown node contracts.
+  Every step file
   keeps the standard front matter and its declared transitions synchronized.
 - skills/feature/templates/ owns reusable authoring templates and is not a
   node namespace.
@@ -94,12 +94,13 @@ reintroduce a retired compatibility surface.
   Use vertical slices when a Feature outcome admits coherent slices; never
   manufacture them by splitting technical layers. Feature-level `blocked_by`
   remains a planning-owned relation,
-  but repository identity gives it a deterministic Implement projection: a
-  same-repository edge is mandatory stack intent and a cross-repository edge
+  but repository identity gives it a deterministic implementation projection:
+  a same-repository edge is mandatory stack intent and a cross-repository edge
   is scheduling-only. Macro-local `blocked_by` remains planning-only and may be
-  internalized by Implement while preserving every available Macro Task
-  outcome. The Plan Set body and registries remain semantic authority for both
-  relation levels. After exact hosted identities exist, Feature must always
+  internalized by Implement or Implement Next while preserving every available
+  Macro Task outcome. The Plan Set body and registries remain semantic
+  authority for both relation levels. After exact hosted identities exist,
+  Feature must always
   attempt one native GitHub `blocked by` projection per canonical edge:
   parent Feature to parent Feature, including exact URLs across repositories,
   and child Task to child Task only inside one parent Feature. A missing
@@ -118,27 +119,19 @@ reintroduce a retired compatibility surface.
   Implement and never changes scheduling or stack intent.
   Implement must not create an automatic plan-repair planner for ordinary
   technical interpretation.
-- Keep Feature clarification proportional but explicit. Feature owns the
-  derived `planning_depth` and `clarification_route` fields. Only a narrow,
-  single-repository outcome with complete product boundaries and no material
-  choice may be `simple`; every other request is `substantial`. A substantial
-  request enters one consolidated clarification batch by default. It may skip
-  that batch only when the user supplied a traceably complete decision brief
-  and the independent critic confirms that no material product decision
-  remains, or when the user explicitly requests no questions and the remaining
-  uncertainty is safe to retain as assumptions. Material unresolved decisions
-  still block rather than being guessed. When delegation is available,
-  substantial planning must use separate bounded study and independent critic
-  assignments; unavailable delegation falls back to the same serial lenses
-  and never weakens the clarification gate.
-- Require Plan Review between every complete Feature draft and Plan
-  Validation. For substantial planning, reuse the independent critic
-  assignment when delegation is available; otherwise record the serial critic
-  fallback. The reviewer is read-only and the planner owns dispositions and
-  revisions. Permit one bounded correct-and-rereview cycle for findings that
-  need no user choice and at most one review-generated clarification batch.
-  A repeated material finding, a second follow-up batch, or an unresolved
-  disposition blocks before publication.
+- Keep Feature clarification proportional. Ask one consolidated batch only
+  when material product decisions remain after evidence gathering. A complete
+  brief, an explicitly delegated choice, or safe explicit assumptions proceed
+  without question-route classifications. Clarification is a nonterminal wait;
+  material unresolved decisions still block rather than being guessed.
+- Require Review between every complete Feature draft and Publish. The reviewer
+  is read-only and may be an optional helper or a separate serial planner lens.
+  Review owns deterministic identity, F-AC coverage, closed-registry,
+  dependency-DAG, boundary, projection, and maintenance-preservation checks.
+  Correctable findings return to Plan while revisions make progress; a hidden
+  material decision returns to Clarification. Repeated unresolved or
+  no-progress findings block. Do not restore a separate Plan Validation node,
+  review-round state machine, or mandatory critic task.
 - Keep one human-readable `references/states.md` in every bundled SE skill.
   Each file is that skill's canonical state glossary: it must include every
   workflow node, separate workflow nodes from field-qualified domain or
@@ -150,9 +143,10 @@ reintroduce a retired compatibility surface.
   identity, stable Feature identities, criterion identity, monotonic retirement
   high-water marks, source and question provenance, Feature-level dependency
   relations, each closed Macro Task registry, macro-local planning relations,
-  and the durable parent/child projection. Implement owns technical
-  execution-unit decomposition, assignment-scoped T-AC criteria, exact-head
-  implementation evidence, and one source-derived closing set per Feature.
+  and the durable parent/child projection. Implement and Implement Next own
+  technical execution-unit decomposition, implementation criteria, exact-head
+  evidence, and one source-derived closing set per Feature according to their
+  respective runtime contracts.
   T-AC may specialize but never replace, weaken, or reinterpret F-AC. Macro
   Tasks are planning views of the same Feature outcome; every verified existing
   local child is included with that parent Feature, while missing or
@@ -205,6 +199,14 @@ reintroduce a retired compatibility surface.
   fixed-profile, per-Feature-worker, title-reconciliation, and run-state ledger
   contracts. Maintenance must preserve that boundary and validate the owners
   named in the package ownership map.
+- Keep Feature separate from the legacy task preflight and task handoff. Its
+  controller creates or resumes one planner task with `gpt-5.6-sol` and
+  `high` passed explicitly, then starts Intake in the planner's first turn.
+  An accepted stable task receipt is sufficient. Do not add a bootstrap-only
+  turn, effective-profile readback, identity self-attestation, title
+  reconciliation, execution-target comparison, goal, or replacement protocol.
+  Inspect the same task effect once only when creation is genuinely ambiguous.
+  Repository and source identity are verified later as Intake evidence.
 - Keep Feature-level scheduling and derived execution-unit dependency edges
   separate. A Feature `blocked_by` edge may cross repositories. Implement maps
   every same-repository edge to mandatory stack intent and every
@@ -248,20 +250,18 @@ reintroduce a retired compatibility surface.
   requests branch-protection, ruleset, mergeability-policy, merge-queue,
   auto-merge, or provider-policy classification. Externally supplied policy
   observations are report-only and never affect a transition or checkpoint.
-- Keep deterministic task-title initialization shared by task-managed Feature
-  and legacy Implement. Compute the title before creation and include it as a
-  best-effort plain-text hint in the flat creation prompt, without treating the
-  hint as metadata or evidence. After stable identity readback, require one
-  bounded reconciliation outcome before monitoring: exact verification or an explicit
-  `title-unverified`/`title-drift` warning. Never use a title as identity,
-  repeat an adjustment, or create a replacement task for title failure.
+- Keep deterministic task-title initialization for legacy Implement. Compute
+  the title before creation and include it as a best-effort plain-text hint in
+  the flat creation prompt, without treating the hint as metadata or evidence.
+  Feature requests its planner title when supported but never reads, corrects,
+  or gates on it.
 - Keep task prompts as flat semantic handoffs. Preserve bounded intent,
   constraints, source references, destination, validation, and return evidence,
   but unwrap raw task/delegation transport envelopes, escaped wrapper markup,
   parent prompts, and transcripts before creating a child task. Never use a
   transport wrapper as user intent or durable evidence.
-- Keep effective task-profile verification shared by task-managed Feature and
-  legacy Implement. The invoking skill owns requested role, model, reasoning,
+- Keep effective task-profile verification for legacy Implement. The invoking
+  skill owns requested role, model, reasoning,
   and topology; the shared preflight owns explicit-request, stable task-identity
   observation, and assigned-task bootstrap capability; and the shared handoff owns one typed
   assignment-specific self-comparison bound to the controller-observed task
@@ -272,7 +272,7 @@ reintroduce a retired compatibility surface.
   mismatch or unobservable required profile.
   The task controller owns pre-effect capability verification, task creation or
   resume, independent stable identity observation, and bootstrap-result binding;
-  the assigned planner, orchestrator, or Worker owns the authoritative,
+  the assigned orchestrator or Worker owns the authoritative,
   non-recursive bootstrap self-check before role work. Never compare the
   controller's own profile with the assigned child profile. Reject generic or
   unstructured self-report, but accept the typed bootstrap only when its
@@ -282,8 +282,8 @@ reintroduce a retired compatibility surface.
   authoritative values for the exact assigned task differ from the request.
   Use `task-identity-mismatch` when present authoritative bootstrap evidence is
   bound to another task.
-- Keep role-specific execution-target verification shared by task-managed
-  Feature and legacy Implement. Preflight freezes either `repository-bound`
+- Keep role-specific execution-target verification for legacy Implement.
+  Preflight freezes either `repository-bound`
   Git/worktree facts or a `control-plane` repository-observation set. The
   Implement orchestrator uses a
   projectless control plane with no repository/worktree/primary-repository
@@ -333,16 +333,22 @@ reintroduce a retired compatibility surface.
   hosted Plan Set rehydration through the shared G dependency gate before
   hosted reads, and route default publication through the single publication
   adapter and G-owned issue workflow before any hosted mutation. Publication
-  creates every sibling parent Feature, every local child Macro Task, their
-  planning relations, and the final set registry readback without a container
-  issue. After identities are final, attempt every exact native Feature and
-  same-parent Macro dependency through `g:github-issues`, recording one
-  verified, no-op, failed, unavailable, or unknown result per edge. Native
-  failure does not downgrade a complete semantic publication. Then delegate
-  optional label and native type selection to `g:github-tagger`; Feature must
-  not preselect metadata values. Preserve the tagger's smallest-set policy:
-  zero or more relevant labels and zero or one relevant type, with empty
-  selections valid. Preview is opt-in and must never be selected implicitly
+  creates every sibling parent Feature and every local child Macro Task without
+  a container issue, then reconciles each parent body in place with the final
+  set registry and exact child mappings before readback. After identities are
+  final, attempt every exact native Feature and same-parent Macro dependency
+  through `g:github-issues`, recording one verified, no-op, failed, unavailable,
+  or unknown result per edge. Existing-source maintenance also removes only
+  prior SE-owned native edges explicitly removed from the revised semantic
+  graph and preserves foreign edges. A missing attempt or result blocks; a
+  recorded native failure does not downgrade a complete semantic publication.
+  Any explicitly requested downstream handoff must also have a reconciled
+  terminal result before completion. Classification
+  is optional after semantic readback; when used, delegate label and native type
+  selection to `g:github-tagger` and never preselect metadata values. Preserve
+  the tagger's smallest-set policy: zero or more relevant labels and zero or one
+  relevant type, with empty selections valid. Classification never gates
+  completion. Preview is opt-in and must never be selected implicitly
   when publish authority or G is unavailable.
 - Keep Implement GitHub-backed end to end. It accepts authoritative published
   parent Feature semantic contracts with verified sibling context, tolerates
@@ -394,15 +400,16 @@ reintroduce a retired compatibility surface.
   read-first routing, evolution-rule projection, and no-dangling-pointer rule.
 - Validate Feature Plan Set graph reachability, genuinely distinct sibling
   Feature boundaries, Feature registry coverage, Feature-level acyclic
-  planning relations, each local Macro Task registry, same-parent-only macro
-  relations, planning-depth classification, substantial-feature clarification
-  routing, question-free exception evidence, the question-batch wait boundary,
-  conditional delegation and serial fallback, mandatory post-draft review,
-  honest delegated-versus-serial reviewer provenance, bounded
-  revision/re-review, at-most-one review clarification loop,
-  publication-before-hosted-access, parent/child publication and readback,
+  planning relations, each closed local Macro Task registry, same-parent-only
+  macro relations, material-question routing and nonterminal waits, optional
+  delegation with serial fallback, mandatory post-draft structural Review,
+  progress-bounded revision and review clarification, G preflight before hosted
+  source reads or publication, final in-place parent-body reconciliation,
+  parent/child publication and readback,
   mandatory native-dependency attempts for every canonical edge, non-blocking
-  native failure outcomes, reconciliation to `complete` or `blocked`, and the
+  native failure outcomes, maintenance removal of only explicitly retired
+  SE-owned edges, requested-handoff reconciliation, reconciliation to
+  `complete` or `blocked`, and the
   absence of side effects or outgoing edges on terminal nodes.
 - Validate Idea default-publish/explicit-preview routing, Learn's local-only
   boundary, and Implement's mandatory hosted-source and PR-output path.
@@ -452,9 +459,9 @@ reintroduce a retired compatibility surface.
   the one canonical hosted-content owner without duplicate Idea doctrine.
   Include exact single-line title artifacts without serialization-added
   terminators.
-- Validate that Feature and legacy Implement both route every created task
-  through the shared typed assigned-task bootstrap, controller identity
-  binding, and title-reconciliation outcome before normal monitoring or update relay;
+- Validate that legacy Implement routes every created task through the shared
+  typed assigned-task bootstrap, controller identity binding, and
+  title-reconciliation outcome before normal monitoring or update relay;
   require the assigned task's non-recursive authoritative self-check before
   role-owned work; exclude the controller's own profile from child comparison;
   reject unstructured self-report and profile evidence bound to a different
@@ -462,8 +469,14 @@ reintroduce a retired compatibility surface.
   `effective-profile-mismatch`, and `task-identity-mismatch`; and ensure resume
   paths cannot repeat an uncertain adjustment or create a replacement after a
   mismatch.
-- Validate role-specific target freezing and assigned-task observation: the
-  orchestrator control plane has a complete peer repository-observation set and
+- Validate that Feature explicitly requests its planner's model and reasoning
+  once, accepts a stable creation or resume receipt, and begins Intake in the
+  planner's first turn without assigned-task bootstrap, effective-profile
+  readback, title reconciliation, execution-target comparison, or a goal.
+  Require at most one readback only for a genuinely ambiguous creation effect.
+- Validate legacy Implement role-specific target freezing and assigned-task
+  observation: the orchestrator control plane has a complete peer
+  repository-observation set and
   no primary repository, while every Feature Worker retains exact Git/worktree
   bindings. Require `execution-target-mismatch` for present target-kind,
   repository-set, or bound-fact differences and `unsupported-runtime` for
@@ -471,16 +484,18 @@ reintroduce a retired compatibility surface.
   application routing, saved-project association, and project-root metadata
   remain outside required records and never trigger comparison, a second read,
   project inventory refresh, replacement task, or blocked outcome.
-- Validate flat prompt projection, best-effort canonical-title prompt hints,
-  mandatory title readback/correction, and removal of nested or escaped
-  transport envelopes without losing semantic constraints.
+- Validate flat prompt projection and removal of nested or escaped transport
+  envelopes without losing semantic constraints. Require best-effort title
+  hints plus mandatory title readback/correction only for legacy Implement;
+  Feature title metadata never gates its planner.
 - Validate the canonical bracketed Feature acceptance syntax, monotonic
   high-water marks, plan publication/readback, malformed and legacy-checkbox
   rejection, question-batch completeness, and Implement evidence bound to the
   current candidate SHA.
-- Validate that Feature publication delegates label and native type selection
-  only after exact issue readback, never presets metadata values, and preserves
-  the tagger cardinalities of zero or more labels and zero or one type.
+- Validate that optional Feature classification runs only after exact issue
+  readback, never presets metadata values, preserves the tagger cardinalities
+  of zero or more labels and zero or one type, and never gates semantic
+  completion.
 - Validate Audit explicit-only metadata, frozen-cohort and stopping rules,
   registry/projection reconciliation, exact transition-condition coverage, the
   intentional refresh loop, terminal reachability, exhaustive stable inventory
