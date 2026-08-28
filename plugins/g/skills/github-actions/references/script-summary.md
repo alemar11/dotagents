@@ -22,6 +22,9 @@ Success payloads include:
 - `version`
 - check, inspection, or Actions-permissions data
 
+PR inspection reports one of the canonical summaries defined in
+[`states.md`](states.md).
+
 Errors include a message and non-zero exit code. The script does not write
 configuration files.
 

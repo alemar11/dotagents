@@ -464,9 +464,14 @@ def inspect_pr_failures(
     payload: dict[str, Any] = {
         "repo": repo,
         "pr": pr_number,
+        "checkCount": len(checks),
         "failingCount": len(failing),
         "results": [],
     }
+    if not checks:
+        payload["summary"] = "no_checks"
+        payload["message"] = f"PR #{pr_number}: no checks configured or reported."
+        return payload, 0
     if not failing:
         payload["summary"] = "no_failing_checks"
         payload["message"] = f"PR #{pr_number}: no failing checks detected."
@@ -513,6 +518,8 @@ def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[
         index += 1
 
     if result is None or result.returncode != 0:
+        if confirm_empty_check_rollup(pr_value, repo, repo_root):
+            return []
         message = (result.stderr or result.stdout or "").strip() if result is not None else ""
         if index > 1:
             raise InspectionError(
@@ -528,6 +535,30 @@ def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[
     if not isinstance(data, list):
         raise InspectionError("Error: unexpected checks JSON shape.", 1)
     return data
+
+
+def confirm_empty_check_rollup(
+    pr_value: str,
+    repo: str,
+    repo_root: Path | None,
+) -> bool:
+    result = run_gh_command(
+        append_repo_flag(
+            ["pr", "view", pr_value, "--json", "statusCheckRollup"],
+            repo,
+        ),
+        cwd=repo_root,
+    )
+    if result.returncode != 0:
+        return False
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    rollup = data.get("statusCheckRollup")
+    return isinstance(rollup, list) and not rollup
 
 
 def is_failing(check: dict[str, Any]) -> bool:
@@ -774,6 +805,8 @@ def render_results(payload: dict[str, Any]) -> str:
     repo = str(payload.get("repo") or "")
     pr = str(payload.get("pr") or "")
     results = list(payload.get("results") or [])
+    if payload.get("summary") == "no_checks":
+        return f"PR #{pr} in {repo}: no checks configured or reported.\n"
     if not results:
         return f"PR #{pr} in {repo}: no failing checks detected.\n"
 

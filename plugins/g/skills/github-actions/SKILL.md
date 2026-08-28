@@ -14,6 +14,9 @@ Connector calls and local-only commands do not use shell escalation.
 Inspect GitHub Actions and PR checks. Keep status, diagnosis, and review
 requests read-only. When the user explicitly asks to fix CI, carry the workflow
 through the smallest implementation, local validation, and remote recheck.
+An authoritative empty check rollup is successful `no_checks` inspection
+evidence: report that no checks are configured or reported, never that CI
+passed.
 
 ## Transport and CLI
 
@@ -78,4 +81,5 @@ local test alone, or edit code during an inspection-only request.
 - `references/workflows.md`: connector and `gh` CI workflows.
 - `references/configuration.md`: repository Actions settings, workflow
   permissions, and the read-only permissions preflight.
+- `references/states.md`: canonical `g ci inspect` result summaries.
 - `references/script-summary.md`: shared `g ci inspect` contract.
