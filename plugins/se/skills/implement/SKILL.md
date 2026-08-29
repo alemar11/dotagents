@@ -1,300 +1,151 @@
 ---
 name: implement
-description: "Implement or resume only the published Features named by caller-supplied GitHub issue references, from refreshed selected base branches. A fresh run creates one new observable user-owned ChatGPT application task for the orchestrator and one per-Feature Worker; a validated resume reuses only the exact bound tasks. Deliver each Feature through one resumable worker and pull request, centrally monitor exact-head delivery, and leave merge and post-merge closure to the user."
+description: "Implement or resume published SE Features through a small transient workflow graph, visible orchestrator, and reusable workers. Use for lightweight standalone or stacked PR delivery; never merge, deploy, or release without separate authorization."
 ---
 
-# Implement Feature Plan Sets
+# Implement
 
-## Scope and result
+## Scope and authority
 
-Use this skill only for an explicit request to implement or resume one or more
-published SE parent Features identified by caller-supplied GitHub issue
-references. The selected set is exactly those parent issues. Never discover or
-add Features from a Plan Set ID, sibling registry, title, search, label, native
-Issue Type, or dependency edge. An unqualified issue number is valid only when
-one target repository is unambiguous.
+Use `se:implement` only when the caller explicitly asks to implement or
+resume published SE parent Features. The selected set is exactly the supplied
+Feature issue references. Read sibling and dependency data for context and
+consistency, but never add a sibling merely because it is discoverable.
 
-Each selected parent issue must resolve to one complete authoritative sibling
-registry and the exact supplied parent reference. Require
-`feature_plan_set_id`, revision, stable `feature_id`, repository identity and
-complete hosted readback; observable outcome, scope, non-goals, landing state,
-ownership boundary, and delivery reason; stable F-AC-NN criteria and monotonic
-high-water evidence; resolved material questions, explicit assumptions, risks,
-and validation intent; Feature-level `blocked_by`, set-membership and dependency
-readback; a complete textual handoff ready for technical interpretation; and
-publication readiness. Sibling entries are consistency and dependency evidence
-only.
+An explicit invocation authorizes the visible Codex tasks, isolated worktrees,
+branches, commits, pushes, and pull requests needed to deliver the selected
+Features. It does not authorize merge, deploy, release, issue closure,
+destructive recovery, or unrelated cleanup.
 
-Classify the optional local Macro Task registry and hosted child projections as
-`complete`, `partial`, or `absent`. Use every verified unambiguous child as
-planning context and closure intent. Quarantine missing, extra, duplicate,
-cross-set, cross-parent, cyclic, or mismatched projections and continue when the
-parent Feature contract is still sufficient. Never invent, repair, or publish a
-Task projection during Implement.
+The durable outputs are Git branches, commits, pull requests, and provider
+state. The small local registry coordinates repository ownership only. The
+workflow graph below governs execution, but its current node is reconstructed
+from live evidence rather than persisted. The registry must never become the
+source of truth for workflow position, Feature, worker, branch, commit,
+pull-request, review, or CI state.
 
-The caller may select one optional `starting_branch` per repository. Require
-repository-qualified overrides for a multi-repository run; otherwise use that
-repository's authoritative provider default. Reject a supplied branch that is
-missing, ambiguous, inaccessible, or belongs to another repository. Refresh
-and freeze the exact selected upstream tip before root Worker bootstrap; never
-silently substitute the current checkout or another branch.
+## Runtime topology
 
-Feature-level `blocked_by` is semantic authority and may cross repositories.
-Every same-repository edge is mandatory stack intent; every cross-repository
-edge is scheduling-only. Native GitHub dependency relations are diagnostic and
-never add, remove, repair, or gate an edge. Macro dependencies remain
-same-parent planning context and never define a Worker or PR boundary.
+Create or reuse one visible graph orchestrator for the complete immutable set
+of selected repositories. The orchestrator follows this skill's workflow graph
+and alone decides concurrency. Load
+[orchestration.md](references/orchestration.md) before choosing task placement,
+creating or reusing a worker, accepting a worker target, scheduling a Feature,
+or deriving branch and pull-request topology. That reference is the canonical
+owner of these decisions and every workflow transition condition.
+Read [repository-claims.md](references/repository-claims.md) before deciding
+whether the invoking visible task itself can be bound as that orchestrator or
+a separate orchestrator must be created, and before acquiring, binding,
+inspecting, or releasing claims.
 
-During Prepare Run, derive transient technical execution units, safe path
-envelopes, real implementation prerequisites, and stable assignment-scoped
-`T-AC-NN` criteria. Every T-AC specializes one or more current F-AC criteria
-without replacing, weakening, or reinterpreting them, and both evidence sets
-bind to the current exact HEAD. Resolve ordinary technical ambiguity inside
-Implement. Enter `plan-question` only when no semantic-preserving
-implementation exists because criteria or outcome conflict, scope must change,
-Feature dependencies are contradictory or cyclic, or an unselected or
-unfulfilled Feature blocks the selection.
+## Read routing
 
-The result is exactly one verified PR output per implementation-eligible
-Feature, standalone or stacked as derived above. Its source-derived closing set
-contains only that parent Feature and every verified existing associated local
-Macro Task. A Feature with no exclusive implementation delta receives no empty
-commit, cosmetic change, artificial proof, or empty PR; report the product
-question and stop that assignment.
-
-GitHub is mandatory end to end. Implement never merges, deploys, releases,
-changes provider policy, performs post-merge closure, or substitutes a local
-result. Complete requires one current exact-HEAD PR topology with complete
-F-AC/T-AC validation, hosted review, CI, body/closure-intent, base, and stack
-readback for every eligible Feature.
-
-## Non-negotiable runtime invariants
-
-A fresh run creates one observable user-owned application task for the
-orchestrator and exactly one observable user-owned Feature Worker task for each
-selected Feature. A validated resume reuses only the exact retained identities.
-Subordinate delegation and optional support never replace either required role,
-and an unavailable or unverifiable required task fails closed without a
-replacement. Application routing and saved-project metadata never establish or
-invalidate either role.
-
-Before any task effect, load [task-profile.md](references/task-profile.md), the
-shared [task preflight](../../references/task-preflight.md), and the shared
-[task handoff](../../references/task-handoff.md). Actively request each
-role's complete model and reasoning profile, bind its authoritative assigned
-task bootstrap and role-specific execution target to the independently observed
-stable task identity, and reconcile its deterministic title once. The
-orchestrator uses a projectless control-plane target with one verified
-observation per selected repository and no primary-repository binding. Every
-Feature Worker remains bound to its exact repository, remote, base branch/SHA,
-head branch, isolated worktree, and path envelope. The explicit Implement
-invocation authorizes only this required hierarchy and its declared delivery
-effects.
-
-The orchestrator alone owns the SQLite ledger, Feature claims, path-claim
-coordination, side-effect reservations, delivery monitoring, and aggregate
-completion. A Worker owns one Feature's implementation, validation, candidate
-and repair semantics; it never accesses the ledger or polls its inactive PR.
-
-Before first publication, complete validation and native review bind to the
-same exact candidate HEAD in the same Worker. Native review must run under a
-verified local-only boundary with network, GitHub/provider access, hosted
-operations, repository mutation, and Git transport unavailable; crossed or
-ambiguous isolation invalidates the whole review result and fails closed. Any
-pre-publication HEAD change invalidates both and repeats that gate. Exact
-first-PR publication readback
-permanently transfers review authority to the hosted lineage; later repairs,
-rebases, or parent drift update the same PR and never restart native review.
-Complete validation and clean hosted review must converge on the same final
-exact HEAD.
-
-Before the first required GitHub read or write, load the shared
+Before every handoff to a G-owned workflow, the role making that handoff must
+run the shared
 [G dependency preflight](../../references/codex-dependency-preflight.md).
-Route every Git and GitHub operation through its G-owned workflow and apply the
-shared [hosted-content-safety.md](../../references/hosted-content-safety.md)
-contract immediately before every hosted write. Implement never invokes the
-general delivery-status workflow or requests branch-protection, ruleset,
-mergeability-policy, merge-queue, auto-merge, or provider-policy
-classification. Supplied observations remain report-only and never enter the
-closed completion evidence set.
-
-The role about to make each G handoff owns that handoff's dependency gate. A
-prior pass never substitutes for the next required handoff gate.
-
-## Phase routing
+Immediately before every hosted write, that role must apply the shared
+[hosted-content safety contract](../../references/hosted-content-safety.md).
+Project both obligations into every worker handoff that permits G-owned work.
 
 Read the shared [workflow-graph contract](../../references/workflow-graph.md)
-before using this registry, and read
-[states.md](references/states.md) before interpreting any workflow node,
-persisted pair, provider disposition, runtime-only mode, or output label. Load
-only the current role and phase owner:
-
-| Role or phase | Canonical reference |
-| --- | --- |
-| Controller and orchestrator bootstrap, plan interpretation, scheduling, topology, plan questions, and aggregate control | [orchestration.md](references/orchestration.md) |
-| Feature Worker implementation, optional support, pre-candidate convergence, complete validation, and phase exits | [worker-execution.md](references/worker-execution.md) |
-| Candidate boundary, native review, first publication or PR update, stack reconciliation, and candidate-published handoff | [review-delivery.md](references/review-delivery.md) |
-| Ready transition, hosted review and CI, repair monitoring, externally supplied diagnostics, and final verification | [delivery-monitoring.md](references/delivery-monitoring.md) |
-| Ledger preparation, checkpointing, reservation, reset, or recovery | [run-state.md](references/run-state.md) |
-
-The orchestrator loads monitoring guidance only after a verified publication
-handoff. The Worker loads review-delivery only after candidate-bound validation
-reaches `candidate`; it never loads ledger or aggregate-monitoring doctrine.
-Project stable source facts and shared contracts by canonical reference rather
-than copying them into task prompts.
-
-The shared handoff owns change-driven relay. Implement specializes material
-deltas and actionable-frontier scheduling in orchestration, while
-worker-execution owns autonomous progress to existing-node phase boundaries.
-These refinements add no mode, state, checkpoint, ledger field, or alternate
-topology.
-
-## Transition-condition ownership
-
-| Source nodes | Canonical condition owner |
-| --- | --- |
-| intake, source-preflight, runtime-preflight, prepare-run | This skill's scope, invariants, and shared contracts |
-| schedule, delivery-gate, worker-bootstrap, plan-question, assignment-blocked, assignment-deferred, release-claims | orchestration.md |
-| implement-validate | worker-execution.md |
-| candidate, native-review, review-decision, publish-pr, stack-reconcile, candidate-published | review-delivery.md |
-| delivery-monitor, final-verify | delivery-monitoring.md |
-| deferred, complete, blocked | This skill's terminal definitions |
-
-Each owner defines every declared outgoing condition and must not add an
-unregistered edge. Run-state owns persistence and recovery evidence, not
-workflow transitions.
+before using the graph registry. Read [states.md](references/states.md) before
+interpreting workflow nodes or repository claims.
 
 ## Workflow graph
 
-| node_id | kind | entry condition | transitions | side effects | terminal state |
-| --- | --- | --- | --- | --- | --- |
-| intake | action | explicit implementation or resume request with one or more exact parent Feature issue refs | source-preflight, blocked | none | none |
-| source-preflight | validation | every supplied parent Feature semantic contract and its dependency context are readable; Macro projection state is classified | runtime-preflight, blocked | hosted | none |
-| runtime-preflight | validation | plans, target repositories, and selected or default starting branches are known and refreshable | prepare-run, blocked | read | none |
-| prepare-run | action | required roles, destinations, refreshed base snapshots, and plan interpretation are ready | schedule, blocked | durable | none |
-| schedule | decision | run is ready for another Feature wave, published-candidate observation, or aggregate reconciliation | delivery-gate, delivery-monitor, release-claims, deferred, blocked | none | none |
-| delivery-gate | decision | unfinished Feature assignments are candidates for the next wave | worker-bootstrap, schedule, assignment-blocked, blocked | read | none |
-| worker-bootstrap | action | one or more Feature assignments are dependency-ready | implement-validate, assignment-blocked, blocked | durable | none |
-| implement-validate | action | Feature Worker identity, worktree, sibling context, Macro projection state, derived execution units, and F-AC/T-AC criteria are verified; implementation and validation converge under Worker ownership | candidate, final-verify, plan-question, assignment-blocked, blocked | durable, hosted | none |
-| plan-question | decision | a semantic conflict requires user authority because no contract-preserving implementation exists | schedule, assignment-deferred, blocked | none | none |
-| candidate | validation | Feature Worker reports a committed candidate HEAD with the required initial or published-repair evidence | native-review, publish-pr, assignment-blocked, blocked | read, durable | none |
-| native-review | action | Feature Worker session is pinned to the committed candidate HEAD | review-decision, assignment-blocked, blocked | read, durable | none |
-| review-decision | decision | in-session review result is bound to the current candidate HEAD | implement-validate, publish-pr, assignment-blocked, blocked | durable | none |
-| publish-pr | action | pre-publication native review is clean, or a verified existing PR makes hosted review authoritative for this repair candidate | stack-reconcile, candidate-published, assignment-blocked, blocked | hosted, durable | none |
-| stack-reconcile | validation | a stacked PR was published or its parent/base/link/exact-HEAD evidence drifted | candidate-published, implement-validate, assignment-blocked, blocked | read, durable | none |
-| candidate-published | validation | PR identity, branch, exact candidate HEAD, closing set, and any required stack link are verified | schedule, assignment-blocked, blocked | read, durable | none |
-| delivery-monitor | action | one or more published assignments are delivery-pending on a verified exact PR HEAD | schedule, implement-validate, stack-reconcile, final-verify, assignment-blocked, blocked | hosted, durable | none |
-| final-verify | validation | current PR, topology, CI, review, checkout, HEAD, and acceptance evidence are available | schedule, stack-reconcile, assignment-blocked, blocked | read | none |
-| assignment-blocked | action | one Feature assignment cannot progress but independent work remains | schedule | durable | none |
-| assignment-deferred | action | one Feature assignment awaits bounded user authority | schedule | durable | none |
-| release-claims | action | every assignment is `delivery-ready @ final-verify` and every operation is resolved | complete, blocked | durable | none |
-| deferred | terminal | all remaining work awaits user authority | none | none | deferred |
-| complete | terminal | every eligible Feature maps to one verified PR-ready output | none | none | complete |
-| blocked | terminal | required evidence, capability, identity, authority, or reconciliation is unavailable | none | none | blocked |
+The workflow node table in this section is the structural source of truth.
+Follow its edges; do not replace it with an improvised numbered procedure.
+Mermaid is only its maintained projection. Multiple ready assignments may
+occupy `deliver-feature` concurrently when `schedule` chooses fan-out, but each
+return re-enters `reconcile` before another scheduling decision.
+
+| node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| intake | action | Resolve the exact selected Feature set, body-backed dependency graph, repository identities, and intended visible home. | Explicit implementation or resume request with exact parent Feature issue references. | Caller request and published Feature contracts. | Validated selection, dependency graph, immutable repository set, and visible home. | claim-repositories, deferred, blocked | The selection is ambiguous, cyclic, semantically incomplete, or requires a material user choice. | read, transient | none |
+| claim-repositories | action | Acquire or reuse the complete repository claim and establish one correlated visible orchestrator. | Intake produced a valid immutable repository set and visible home. | Repository keys, home key, selected Features, and optional existing claim. | Independently bound orchestrator identity and fenced repository ownership. | claim-repositories, reconcile, blocked | Claim ownership, provisional task effects, or orchestrator identity cannot be reconciled safely. | durable | none |
+| reconcile | validation | Reconstruct current execution truth and resolve ambiguous effects once from authoritative owners. | A bound orchestrator exists, or a returning worker or material external change requires refresh. | Feature graph, Git/worktrees, pull requests, review/CI, task history, and ownership claim. | Current delivery evidence, trustworthy worker lanes, and unresolved blockers or choices. | schedule, release-claims, complete, deferred, blocked | An effect remains ambiguous, required evidence is unavailable, or safe continuation needs user authority. | read, transient | none |
+| schedule | decision | Compute the ready frontier and choose serial execution or bounded concurrent worker lanes. | Reconciled evidence shows unfinished selected Features. | Feature graph, delivery evidence, repository bases, and trustworthy lanes. | One or more flat Feature assignments, or a reason to reconcile, defer, or stop. | deliver-feature, reconcile, deferred, blocked | No responsible scheduling decision can be made from current evidence. | read, transient | none |
+| deliver-feature | action | Verify or resume a repository worker, implement and validate one Feature, publish its standalone or stacked pull request, make the stable candidate ready for review, and converge exact-HEAD hosted review and CI. | `schedule` selected a dependency-ready Feature and verified delivery topology. | Feature contract, worker target, branch/base facts, allowed mutations, and G handoff obligations. | Exact branch, base, HEAD, pull request, ready transition, validation, hosted review, CI, and blocker evidence. | reconcile | The worker must return partial evidence for reconciliation rather than inventing success or retrying an ambiguous effect. | durable, hosted | none |
+| release-claims | action | Release the exact complete repository claim after an explicitly requested handoff or abandonment. | `reconcile` proved the orchestrator and all workers quiescent and release is authorized. | Bound claim, fencing token, and quiescence evidence. | Verified whole-group release. | complete, blocked | Any actor or ownership fact remains active, uncertain, or mismatched. | durable | none |
+| complete | terminal | Return verified selected Feature outcomes, or confirm an explicitly requested ownership handoff or abandonment. | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, `release-claims` completed. | Final reconciled evidence. | Plain-language delivery or release report. | none | terminal | none | complete |
+| deferred | terminal | Return the material user decision required for a contract-preserving continuation. | A semantic choice or missing authority cannot be resolved safely inside Implement. | Reconciled evidence and the smallest concrete question. | Deferred report retaining the bound claim. | none | terminal | none | deferred |
+| blocked | terminal | Return the exact capability, identity, evidence, ownership, or reconciliation blocker. | No responsible graph edge remains. | Retained evidence and blocker. | Blocked report retaining the claim unless an authorized release already completed. | none | terminal | none | blocked |
 
 ~~~mermaid
 flowchart TD
-    intake --> source-preflight
+    intake --> claim-repositories
+    intake --> deferred
     intake --> blocked
-    source-preflight --> runtime-preflight
-    source-preflight --> blocked
-    runtime-preflight --> prepare-run
-    runtime-preflight --> blocked
-    prepare-run --> schedule
-    prepare-run --> blocked
-    schedule --> delivery-gate
-    schedule --> delivery-monitor
-    schedule --> release-claims
+    claim-repositories --> claim-repositories
+    claim-repositories --> reconcile
+    claim-repositories --> blocked
+    reconcile --> schedule
+    reconcile --> release-claims
+    reconcile --> complete
+    reconcile --> deferred
+    reconcile --> blocked
+    schedule --> deliver-feature
+    schedule --> reconcile
     schedule --> deferred
     schedule --> blocked
-    delivery-gate --> worker-bootstrap
-    delivery-gate --> schedule
-    delivery-gate --> assignment-blocked
-    delivery-gate --> blocked
-    worker-bootstrap --> implement-validate
-    worker-bootstrap --> assignment-blocked
-    worker-bootstrap --> blocked
-    implement-validate --> candidate
-    implement-validate -->|published HEAD unchanged after complete validation| final-verify
-    implement-validate --> plan-question
-    implement-validate --> assignment-blocked
-    implement-validate --> blocked
-    plan-question --> schedule
-    plan-question --> assignment-deferred
-    plan-question --> blocked
-    candidate -->|first publication| native-review
-    candidate -->|published repair| publish-pr
-    candidate --> assignment-blocked
-    candidate --> blocked
-    native-review --> review-decision
-    native-review --> assignment-blocked
-    native-review --> blocked
-    review-decision --> implement-validate
-    review-decision --> publish-pr
-    review-decision --> assignment-blocked
-    review-decision --> blocked
-    publish-pr -->|standalone| candidate-published
-    publish-pr -->|stacked| stack-reconcile
-    publish-pr --> assignment-blocked
-    publish-pr --> blocked
-    stack-reconcile --> candidate-published
-    stack-reconcile -->|published drift| implement-validate
-    stack-reconcile --> assignment-blocked
-    stack-reconcile --> blocked
-    candidate-published --> schedule
-    candidate-published --> assignment-blocked
-    candidate-published --> blocked
-    delivery-monitor --> schedule
-    delivery-monitor --> implement-validate
-    delivery-monitor --> stack-reconcile
-    delivery-monitor --> final-verify
-    delivery-monitor --> assignment-blocked
-    delivery-monitor --> blocked
-    final-verify --> schedule
-    final-verify --> stack-reconcile
-    final-verify --> assignment-blocked
-    final-verify --> blocked
-    assignment-blocked --> schedule
-    assignment-deferred --> schedule
+    deliver-feature --> reconcile
     release-claims --> complete
     release-claims --> blocked
 ~~~
 
-## Terminal report
+Do not persist a queue, current node, checkpoint, worker assignment, operation
+receipt, or retry record. On resume, enter at `intake`, establish the exact
+claim at `claim-repositories`, then derive the current continuation at
+`reconcile` from Feature issues, branches and commits, worktrees, pull requests,
+and Codex task history. Reconcile an ambiguous task or provider effect once
+from authoritative current state before attempting it again.
 
-Return one aggregate report with:
+## Delivery boundaries
 
-- every caller-supplied parent issue ref and its authoritative Feature Plan Set
-  and Feature/repository member;
-- the Macro projection state (`complete`, `partial`, or `absent`), every
-  verified local parent/child Task identity, and every quarantined defect;
-- every Feature-level dependency and its scheduling/technical interpretation;
-- every observed native dependency result or drift warning, explicitly marked
-  non-authoritative and non-blocking;
-- every derived execution unit and its F-AC/T-AC mapping plus any available
-  Macro context;
-- every T-AC and its mapping to final Feature evidence;
-- every Feature Worker identity and verified destination;
-- every repository's requested or default starting branch, refreshed full base
-  SHA, and the worktree-bootstrap readback bound to that SHA;
-- execution waves, path-overlap evidence, and deferred or blocked assignments;
-- candidate, `delivery-pending @ candidate-published`, Worker resumption,
-  review, publication, CI, stack, and exact-HEAD evidence;
-- Feature acceptance evidence bound to each final candidate SHA;
-- one source-derived `closing_issue_refs` set per Feature containing only that
-  parent Feature and every verified existing associated local Macro Task, plus exact PR-body
-  closure-intent readback; any GitHub `closingIssuesReferences` observation is
-  optional diagnostic evidence and never a gate;
-- aggregate outcome complete, deferred, or blocked.
+Route local Git, publication, review, CI diagnosis, and stack operations to
+their focused G owners. Verify the actual current branch, base, and exact HEAD
+before each publication or update. If a parent changes, rebase or restack its
+descendants and rerun the validation invalidated by that change.
 
-Never claim completion while an eligible Feature lacks a verified PR,
-current exact-HEAD evidence, or verified F-AC and derived T-AC coverage. A
-reported `partial` or `absent` Macro projection is not by itself incomplete.
+A fresh pull request created by G Send is an intermediate draft, not completed
+delivery. Once its exact HEAD, body, base, and stack topology are stable, make
+it ready through the focused G owner, independently read back that it is no
+longer draft at the same full HEAD, retain the typed ready-transition evidence,
+and use `$g:github-review-threads` to wait for the automatic initial Codex
+review. Do not post an explicit review request for that ready-triggered cycle.
 
-## Terminal meanings
+Only a terminal clean G-normalized review bound to the current full HEAD can
+satisfy hosted review. `not-requested`, absent comments, zero review threads,
+draft-only review, pending or timed-out observation, stale evidence, findings,
+provider failure, or ambiguous correlation are non-terminal. After findings,
+reuse the same trustworthy worker to repair and validate the candidate, publish
+the new full HEAD to the existing PR, then issue one G-owned explicit re-review
+request and wait on its exact receipt. Reconcile an interrupted transition,
+request, or wait from authoritative PR and review evidence before retrying;
+never toggle ready state or duplicate a review request to manufacture a fresh
+lineage.
 
-- complete: every eligible Feature has verified PR delivery and the
-  aggregate evidence is reconciled;
-- deferred: all remaining work awaits explicit user authority;
-- blocked: a required contract, capability, identity, authority, or
-  reconciliation result is unavailable.
+Keep this lifecycle transient: do not add review fields, checkpoints, or
+receipts to the repository-claims registry. If the caller explicitly requires
+a PR to remain draft, preserve that constraint and return `deferred` with the
+verified draft evidence instead of claiming `complete`. Never weaken required
+validation or claim a current result from evidence bound to an older HEAD.
+
+## Result
+
+Report:
+
+- each Feature's repository, branch, pull-request base, exact HEAD,
+  pull-request URL, validation, review, and CI evidence;
+- which worker lanes were created or reused;
+- whether repository claims were retained or released;
+- blockers and the smallest concrete next action.
+
+Do not invent a persisted terminal status. Describe the observed result in
+plain language and preserve the orchestrator for a legitimate resume.
+
+## Skill Dependencies
+
+This skill requires the installed `g@alemar11` workflows that own its selected
+Git, GitHub, review, CI, and stacked-pull-request operations. It never installs,
+enables, refreshes, or substitutes that dependency.

@@ -49,7 +49,7 @@ explain the boundary. Every F-AC must be covered, no Macro may add scope, and
 each Macro dependency must remain inside its parent Feature.
 
 Build an acyclic hard-outcome Feature graph. Same-repository edges are stack
-intent for Implement or Implement Next; cross-repository edges are
+intent for Implement; cross-repository edges are
 scheduling-only. Keep preferred order as prose.
 
 For existing-source work, revise the same identities and hosted projections,

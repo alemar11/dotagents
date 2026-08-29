@@ -1,8 +1,8 @@
 # Feature Planner Task Profile
 
 This profile owns the one required application-task launch for `se:feature`.
-It is intentionally separate from the legacy Implement task preflight and
-handoff contracts.
+It is intentionally separate from Implement orchestration and repository-claim
+handling.
 
 ```yaml
 task_profile: feature-planner

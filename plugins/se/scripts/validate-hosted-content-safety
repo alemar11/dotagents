@@ -35,14 +35,10 @@ for relative in \
   skills/idea/SKILL.md \
   skills/feature/SKILL.md \
   skills/implement/SKILL.md \
-  skills/implement-next/SKILL.md \
   skills/idea/references/publishing.md \
   skills/feature/steps/publish.md \
   skills/feature/templates/maintenance-changelog.md \
-  skills/implement/references/review-delivery.md \
-  skills/implement/references/delivery-monitoring.md \
-  skills/implement/references/orchestration.md \
-  skills/implement-next/references/orchestration.md; do
+  skills/implement/references/orchestration.md; do
   target="$plugin_root/$relative"
   rg -Fq -- "hosted-content-safety.md" "$target" || \
     fail "missing canonical route in $relative"

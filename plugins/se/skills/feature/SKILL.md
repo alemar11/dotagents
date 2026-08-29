@@ -20,7 +20,7 @@ dependencies without turning either into a technical execution graph.
 Feature never writes product code, chooses code design, creates branches or
 worktrees, schedules implementation workers, defines technical execution
 units, assigns `T-AC-NN` criteria, creates pull requests, merges, deploys, or
-releases. Those responsibilities belong to Implement or Implement Next.
+releases. Those responsibilities belong to Implement.
 
 ## Planner task
 
@@ -33,7 +33,7 @@ An accepted creation or resume receipt with a stable task identity is enough to
 start work. The planner begins at `intake` in its first turn. Do not add a
 bootstrap-only turn, ask the planner to rediscover its task identity or
 effective profile, compare task metadata with the request, gate on title
-readback, or apply the shared legacy Implement task preflight and handoff.
+readback, or add an assigned-task preflight or handoff contract.
 Request a useful title when supported, but treat it as display metadata only.
 
 If the creation effect is genuinely ambiguous, inspect that same attempt once.
@@ -76,7 +76,7 @@ The Plan Set contains:
   edges, both acyclic;
 - resolved material questions and explicit assumptions;
 - review findings and dispositions when they materially changed the plan;
-- an implementation-neutral handoff that lets Implement or Implement Next
+- an implementation-neutral handoff that lets Implement
   derive technical work while preserving every Feature criterion and available
   Macro outcome.
 
@@ -98,7 +98,7 @@ outcomes and F-AC coverage. Cross-Feature Task-to-Task edges are invalid.
 For an existing-source revision, retain the exact Plan Set, Feature, Macro, and
 hosted issue identities. Apply the smallest semantic patch, increment the
 revision, preserve every unaffected field and executor-owned progress, and
-state what a later Implement or Implement Next run must reconsider. Never
+state what a later Implement run must reconsider. Never
 silently create a replacement plan.
 
 Use [plan.md](templates/plan.md) for the canonical plan,

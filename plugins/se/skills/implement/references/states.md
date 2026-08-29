@@ -1,270 +1,84 @@
-# Implement State Model
+# Implement States
 
-This reference is the canonical human-readable state model for `se:implement`.
-The workflow registry in `SKILL.md` remains the structural source of truth for
-nodes and edges. This reference owns the plain-language meaning of those nodes,
-persisted status/checkpoint values, external dispositions, runtime-only modes,
-and output labels.
-
-## How to read state
-
-These namespaces are related but not interchangeable:
-
-| Namespace | Question it answers | Persistence |
-| --- | --- | --- |
-| Workflow node | What is the orchestrator doing now? | Not necessarily persisted |
-| Status | Who owns the next action, or is this object finished? | Run or assignment row |
-| Checkpoint | What was the last durable recovery boundary? | Run or assignment row |
-| Feature-claim state | Does this run still own the Feature? | Feature-claim row |
-| Operation result | Did one reserved side effect occur? | Operation row |
-| Provider disposition | Does the exact PR HEAD satisfy hosted delivery policy? | External observation |
-| Runtime-only mode | What is live in the application or transient control plane? | Not ledger state |
-| Output label | How is verified delivery reported to the user? | Final report |
-
-Use `status @ checkpoint` when showing one persisted pair. The left side is the
-status and the right side is the checkpoint. For example:
-
-```text
-delivery-pending @ candidate-published
-delivery-ready @ final-verify
-```
-
-A checkpoint is historical recovery evidence. It never proves that a Worker,
-worktree, path claim, PR, review, check, or stack relationship is still current.
-Re-read live state before another side effect or dependent Worker bootstrap.
-
-## Canonical lifecycle
-
-The normal assignment path is:
-
-```text
-active @ worker-bootstrap
-  -> active @ native-review
-  -> delivery-pending @ candidate-published
-  -> delivery-ready @ final-verify
-```
-
-After every assignment reaches `delivery-ready @ final-verify`, the run moves
-through `active @ release-claims` and ends at `complete @ complete`.
-
-The bounded alternate paths are:
-
-- `deferred @ plan-question` when the user owns the next assignment decision;
-- `blocked @ <last-durable-checkpoint>` when required evidence, capability,
-  identity, or reconciliation is unavailable;
-- `active @ candidate-published` while the same Worker is resumed to repair or
-  rebase a previously published candidate.
-
-Do not use `reviewing` or `plan-question` as assignment statuses. Pre-publication
-native review is an active assignment at checkpoint `native-review`; a hosted
-finding repair is active at checkpoint `candidate-published`; a plan question
-is a deferred assignment at checkpoint `plan-question`.
+Implement owns a small transient workflow graph. It has no persisted run
+status, assignment status, checkpoint, effect journal, or delivery-state
+machine. On resume, the orchestrator re-enters the graph through `intake`,
+re-establishes ownership at `claim-repositories`, and derives the continuation
+at `reconcile` from externally owned evidence.
 
 ## Workflow nodes
 
-The workflow has 23 nodes. Node scope identifies whether the node coordinates
-the whole run, one assignment, or the current invocation.
-
-| Node | Scope | Description |
+| Node | Kind | Meaning |
 | --- | --- | --- |
-| `intake` | Run | Accept one or more exact caller-supplied parent Feature issue refs for implementation or resume. |
-| `source-preflight` | Run | Resolve only the supplied parent issues, verify each parent Feature semantic contract and Feature dependencies, and classify Macro projections as complete, partial, or absent without GitHub label or Issue Type metadata. |
-| `runtime-preflight` | Run | Verify repositories, destinations, required roles, required G-owned workflows, and each selected or default starting branch's refreshability. |
-| `prepare-run` | Run | Derive assignments, refreshed base snapshots, execution units, path envelopes, dependencies, and delivery topology. |
-| `schedule` | Run | Select the next runnable assignment, published-PR observation, or aggregate action. |
-| `delivery-gate` | Run | Decide which unfinished assignments are dependency-ready and safe to start from one current exact base snapshot. |
-| `worker-bootstrap` | Assignment | Create or resume the Feature Worker, accept an initial detached or attached checkout at the verified exact base, then establish and bind its Feature branch before content writes. |
-| `implement-validate` | Assignment | Derive technical units and T-AC; implement and stabilize the first unpublished draft through cheap checks, conditional advisory critique, integrated repair, and complete candidate-bound validation; or run complete final validation for a published repair. An unchanged published HEAD may proceed directly to final verification. |
-| `plan-question` | Assignment | Present one semantic conflict that cannot be resolved without changing outcome, scope, F-AC, or Feature dependencies. |
-| `candidate` | Assignment | Verify a clean committed candidate HEAD and its acceptance evidence; route an unpublished candidate to native review and a published repair directly to PR update. |
-| `native-review` | Assignment | Run exact-HEAD native review in the owning Feature Worker under verified local-only isolation before first PR publication. |
-| `review-decision` | Assignment | Before first publication, send a native-clean candidate to publication or return native findings for repair. |
-| `publish-pr` | Assignment | Push the exact candidate; create the draft PR after native review, or update the verified existing PR directly for a hosted repair. |
-| `stack-reconcile` | Assignment | Verify the immediate parent, base, ancestry, stack order, and link for a stacked PR. |
-| `candidate-published` | Assignment | Verify that PR publication and any required stack link match the exact candidate HEAD. |
-| `delivery-monitor` | Run | Observe ready transition, authoritative hosted review, CI, and stack drift for published assignments. |
-| `final-verify` | Assignment | Verify exact-HEAD F-AC/T-AC, review, CI, topology, Macro projection reporting, and source-derived closure-intent evidence. |
-| `assignment-blocked` | Assignment | Record a non-authority blocker while independent assignments continue. |
-| `assignment-deferred` | Assignment | Record a user-authority wait while independent assignments continue. |
-| `release-claims` | Run | Atomically release all Feature claims after every assignment is delivery-ready and operations are resolved. |
-| `deferred` | Invocation | Stop this invocation because all remaining work requires user authority; the run is resumable. |
-| `complete` | Run | Finish immutably after assignments are ready, claims are released, and operations are resolved. |
-| `blocked` | Invocation | Stop this invocation because required evidence or capability is unavailable; the run is resumable. |
+| `intake` | action | Resolve the exact selected Feature set, its body-backed dependencies, repositories, and visible home. |
+| `claim-repositories` | action | Atomically acquire or reuse repository ownership and bind one correlated visible orchestrator. |
+| `reconcile` | validation | Reconstruct current truth from Feature, Git, pull-request, review/CI, and task owners before another effect. |
+| `schedule` | decision | Compute the ready frontier and choose serial or bounded concurrent work. |
+| `deliver-feature` | action | Run one verified worker lane through implementation, validation, commit, standalone or stacked pull-request publication, ready transition, and exact-HEAD hosted review and CI convergence. Several ready lanes may occupy this node concurrently. |
+| `release-claims` | action | Release the exact whole repository group only for an authorized handoff or abandonment after quiescence is proved. |
+| `complete` | terminal | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, an explicitly requested ownership release completed. |
+| `deferred` | terminal | A material semantic decision or additional user authority is required. |
+| `blocked` | terminal | No safe transition remains because required capability, identity, ownership, evidence, or reconciliation is unavailable. |
 
-## Run state
+Workflow position is transient. None of these node IDs is stored in the
+repository registry, task metadata, branch names, or pull requests.
 
-### Run statuses
+## Transient selected-Feature disposition
 
-| Status | Description |
+| Disposition | Meaning |
 | --- | --- |
-| `active` | The orchestrator may schedule, monitor, reserve effects, or reconcile the run. |
-| `deferred` | This invocation ended because all remaining work requires explicit user authority; preserve claims and resume later. |
-| `blocked` | This invocation ended because required evidence, capability, identity, or reconciliation is unavailable; preserve claims and resume after the condition changes. |
-| `complete` | The run is immutable: every assignment is delivery-ready, claims are released, and operations are resolved. |
+| `delivery-required` | The selected Feature still requires its own implementation delta and a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and satisfies required validation and CI. |
+| `already-incorporated` | Current exact evidence proves the selected Feature's complete acceptance outcome is already present in its integration base. |
 
-### Run checkpoints
+An unmet dependency remains `delivery-required`; it never makes a selected
+Feature disappear from completion. If a selected Feature has no exclusive
+delta but is not proved already incorporated, defer for user direction rather
+than creating an empty pull request or excluding it as ineligible.
 
-| Checkpoint | Description |
-| --- | --- |
-| `prepare-run` | The run exists and orchestration preparation is the last durable boundary. |
-| `schedule` | The run has reconciled current assignments and may choose its next action. |
-| `release-claims` | Every assignment is `delivery-ready @ final-verify`; claim release is the next aggregate action. |
-| `complete` | Claims were released, operations were resolved, and aggregate completion was recorded. |
+## Persisted repository-claim facts
 
-### Canonical run pairs
-
-| Pair | Meaning |
-| --- | --- |
-| `active @ prepare-run` | Initial durable run state. |
-| `active @ schedule` | Normal orchestration and monitoring state. |
-| `active @ release-claims` | The run is ready to release its complete Feature claim set. |
-| `deferred @ deferred` | The invocation paused because all remaining work requires user authority. |
-| `blocked @ blocked` | The invocation stopped because all remaining work requires an external recovery condition. |
-| `complete @ complete` | Immutable successful terminal state. |
-
-Only `complete` is permanently terminal. `deferred` and `blocked` are terminal
-outcomes for the current invocation but remain resumable run statuses.
-
-## Assignment state
-
-### Assignment statuses
-
-| Status | Description |
-| --- | --- |
-| `active` | The Feature Worker or orchestrator owns an implementation, review, publication, repair, or rebase action. |
-| `deferred` | The assignment awaits explicit user authority; independent assignments may continue. |
-| `blocked` | The assignment cannot progress because required non-user evidence or capability is unavailable; independent assignments may continue. |
-| `delivery-pending` | The exact candidate is published, the Worker is inactive but resumable, and the orchestrator owns hosted monitoring. |
-| `delivery-ready` | Final exact-HEAD verification passed; the assignment may participate in aggregate claim release. |
-
-### Assignment checkpoints
-
-| Checkpoint | Description |
-| --- | --- |
-| `worker-bootstrap` | Worker identity, destination, worktree, established Feature branch, refreshed base branch, and exact base SHA are the last durable recovery boundary; the earlier task bootstrap may observe detached HEAD at that SHA. |
-| `native-review` | A committed candidate exists and pre-publication exact-HEAD native review is the last durable checkpoint; an applied `first-pr-publication` operation overrides its review-transport meaning while stack reconciliation is still pending. |
-| `plan-question` | One bounded product decision is recorded outside the ledger and awaits user authority. |
-| `candidate-published` | Publication readback and any required stack-link readback matched the exact candidate HEAD when checked. |
-| `final-verify` | Acceptance, review, CI, topology, minimal durable PR-body content, and registry-derived closure intent passed for the exact final HEAD; `closingIssuesReferences` is diagnostic only. |
-
-### Canonical assignment pairs
-
-| Pair | Meaning |
-| --- | --- |
-| `active @ worker-bootstrap` | The Worker owns implementation and validation. |
-| `active @ native-review` | Before first publication, the Worker owns native review, native-finding repair, or publication preparation. If `first-pr-publication` is already `applied`, this pair is only the coarse pre-stack durable checkpoint: hosted review is authoritative and native review must not restart. |
-| `active @ candidate-published` | A hosted finding repair or rebase resumed from the last published boundary after reacquiring the path claim; native review does not restart. |
-| `deferred @ plan-question` | The user owns the next product decision. |
-| `blocked @ <last-durable-checkpoint>` | A non-user blocker prevents progress; preserve the last trustworthy recovery boundary. |
-| `delivery-pending @ candidate-published` | Publication is verified; the orchestrator owns monitoring and the Worker does not poll. |
-| `delivery-ready @ final-verify` | The exact final HEAD satisfies the complete Implement delivery contract. |
-
-`candidate-published` is also the same-repository child-development trigger. It
-unlocks child bootstrap only when no applicable CI check on that exact parent
-HEAD is confirmed failing. Pending CI remains non-blocking; a confirmed failure
-may be exempt only by G-owned diagnosis that verifies it as exclusively
-infrastructure or flaky and unrelated to candidate correctness. The checkpoint
-does not assert hosted review, CI, mergeability, provider readiness, Feature
-completion, or merge. Any relevant HEAD, base, or stack-link drift invalidates
-the dependent evidence and requires live reconciliation.
-
-## Feature-claim states
-
-| State | Description |
-| --- | --- |
-| `active` | This run exclusively owns the canonical Feature ref. |
-| `released` | The owning run released the Feature after successful completion, or a scoped audited recovery retired the exact stale/foreign claim. |
-
-Deferred and blocked runs normally retain active claims. The aggregate release
-path still releases the complete claim set only from `active @ release-claims`,
-after every assignment is `delivery-ready @ final-verify` and every operation
-is resolved. Scoped recovery is the only exception and does not imply delivery
-completion.
-
-## Operation results
-
-| Result | Description | Completion effect |
+| State | Representation | Meaning |
 | --- | --- | --- |
-| `pending` | The effect is reserved but its outcome is not reconciled. Use this for a temporary inability to proceed. | Blocks claim release and completion. |
-| `applied` | The effect occurred and its receipt plus authoritative readback prove it. | Resolved and immutable. |
-| `not-applied` | Authoritative readback proves that the effect did not occur. | Resolved and immutable. |
-| `unknown` | An attempt may have occurred but its outcome is ambiguous; preserve receipt and readback evidence. | Blocks completion and may be refined once. |
-| `blocked` | The effect is definitively inapplicable for this exact action and subject, authoritative readback proves non-application, and the reservation must not be retried. | Resolved and immutable. |
+| `provisional` | A claim row whose `orchestrator_task_id` is null. | The immutable repository set is reserved, but task creation has not yet been reconciled and bound. |
+| `bound` | A claim row whose `orchestrator_task_id` is present. | One observed orchestrator task owns the complete repository set. |
+| unclaimed | No row for the repository. | No Implement orchestrator owns the repository on this host. This is absence, not a stored state. |
 
-Do not use operation result `blocked` for a temporary prerequisite, unavailable
-path claim, pending authority, or retryable provider condition. Leave that
-operation `pending` and resume the same reservation after the condition changes.
+Every row in one `claim_token` group has the same `home_project_key` and the
+same provisional or bound task value.
 
-## External provider-policy observations
+## Transient command dispositions
 
-Implement owns no provider-readiness disposition registry and never requests a
-delivery-status classification. Branch-protection, ruleset, mergeability-policy,
-merge-queue, auto-merge, or provider-policy observations supplied by another
-actor remain external report-only facts. They are never run statuses,
-assignment statuses, operation results, workflow-transition inputs, or
-completion evidence.
-
-## Runtime-only modes
-
-These values describe live application or transient control-plane state and are
-not stored as ledger statuses.
-
-| Domain | Mode | Description |
-| --- | --- | --- |
-| Task target | `control-plane` | The orchestrator has no repository/worktree binding and retains one authoritative observation per selected peer repository without a primary. |
-| Task target | `repository-bound` | A Feature Worker is bound to its exact repository, remote, base branch/SHA, head branch, isolated worktree, and path envelope. |
-| Native review isolation | `local-only` | Review may inspect the frozen local candidate but has no network, hosted-provider, repository-mutation, or Git-transport capability. |
-| Feature Worker | active | The Worker may execute only while its exact path envelope is held. |
-| Feature Worker | inactive but resumable | The Worker is preserved after candidate publication, performs no writes, and never polls its PR. |
-| Path claim | held | The assignment exclusively owns its normalized write envelope. |
-| Path claim | released | The assignment has no write authority; reacquire before repair or rebase. |
-| Delegation | `delegated-support` | At least one bounded helper task and usable result were independently observed and integrated. |
-| Delegation | `serial-fallback` | No helper result was integrated and the Feature Worker performed a selected support responsibility itself. |
-| Delegation | `unavailable` | The runtime could not provide optional delegation, and no support responsibility was selected or performed. |
-| Delegation | `unknown` | Delegation evidence was insufficient, no helper was claimed, and no support responsibility was selected or performed. |
-
-## Output labels
-
-Output labels summarize verified delivery. They are not persisted assignment
-statuses and never imply merge or post-merge closure.
-
-| Output | Description |
+| Disposition | Meaning |
 | --- | --- |
-| `standalone-ready` | A standalone PR is `delivery-ready @ final-verify` on its exact HEAD. |
-| `stack-ready` | A stacked PR is `delivery-ready @ final-verify`, and every lower parent in its selected chain is current and delivery-ready. |
-| `complete` | Every eligible Feature has one verified PR-ready output and aggregate reconciliation succeeded. |
-| `deferred` | All remaining work awaits explicit user authority. |
-| `blocked` | Required evidence, capability, identity, authority, or reconciliation remains unavailable. |
+| `acquired` | The complete unclaimed repository set was inserted provisionally. |
+| `reuse-bound` | The requested repositories already belong to the same bound claim; reuse that orchestrator. |
+| `reconcile-provisional` | The requested repositories already belong to the same provisional claim; determine whether task creation happened before retrying. |
+| `bound` | The complete provisional claim was attached to the independently observed invoking or separately created orchestrator task. |
+| `already-bound` | An idempotent bind observed that the same task already owns the complete claim. |
+| `released` | The complete claim group was removed after an authorized bound release or fenced provisional abandonment. |
 
-## Recovery rules
+These dispositions are command results, not persisted states. Errors such as a
+foreign claim, mixed ownership, repository-set expansion, binding conflict, or
+corrupt registry also are not states.
 
-- Treat ledger state as a recovery index, never as proof of live external state.
-- Re-read the authoritative plan, Worker, worktree, repository, PR, exact HEAD,
-  review, checks, and stack relationship on resume. Optional provider
-  diagnostics may be retained but never replace these required observations.
-- Reacquire the exact path envelope before resuming Worker writes.
-- Preserve `delivery-pending @ candidate-published` while monitoring remains
-  clean and the exact publication evidence is current.
-- Before verified first-PR publication readback, a candidate HEAD change
-  repeats validation and native review. Once the assignment-bound
-  `first-pr-publication` operation for the canonical Feature ref is `applied`
-  with a receipt and authoritative PR identity/HEAD readback, every later candidate
-  repeats affected validation, publication readback, hosted review, CI, and
-  final verification without native review, even when stack reconciliation has
-  not yet established `candidate-published`; complete validation is required
-  on the exact final HEAD.
-- Native review evidence is usable only with exact-candidate `local-only`
-  isolation proof. Missing isolation blocks launch; observed or ambiguous
-  network, hosted-provider, repository-mutation, or Git-transport access
-  discards the entire result and requires reconciliation before any bounded
-  replacement review.
-- A PR-body-only change invalidates only body readback. A base, parent, or
-  stack-link change invalidates only the affected integration and descendant
-  evidence. An interrupted hosted monitor resumes the same review lineage
-  without a duplicate request.
-- Persist `delivery-ready @ final-verify` only after all final requirements pass
-  for the same exact HEAD.
-- Retain Feature claims for ordinary deferred or blocked runs. Exceptional
-  scoped recovery may retire or supersede exact stale/foreign claims only with
-  authoritative ownership and recovery evidence, CAS revision matching, no
-  unresolved source effects, and an atomic applied audit operation.
+## Transient diagnostic observations
+
+| Observation | Meaning |
+| --- | --- |
+| `status=absent` | `doctor` observed no registry file and did not create one. |
+| `status=ok` | `doctor` verified the existing registry and its claim count. |
+| `database_state=absent` | `inspect` observed no registry file and returned no claims without creating one. |
+
+These observations report the database at command time. They are not persisted
+workflow state and do not authorize creation, binding, release, or repair.
+
+## External observations
+
+Task activity, worktree cleanliness, Feature dependencies, branches, commits,
+pull requests, review results, CI results, and merge state are observed from
+their current owners. A draft PR, a generic `not-requested` review observation,
+and absence of comments or review threads are non-terminal external evidence;
+completion requires a ready PR and terminal clean G-normalized hosted Codex
+review bound to the current full HEAD. Ready-transition receipts, explicit
+re-review receipts, and review observations must never be projected into this
+registry.

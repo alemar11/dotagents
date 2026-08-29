@@ -1,7 +1,0 @@
-interface:
-  display_name: "🛠️ Implement Next"
-  short_description: "Deliver Features with lightweight graph orchestration."
-  brand_color: "#6D28D9"
-  default_prompt: "Use $se:implement-next to implement these published Feature issues through visible tasks and standalone or stacked pull requests."
-policy:
-  allow_implicit_invocation: false

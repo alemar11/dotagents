@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "3.13.3",
+  "version": "4.0.0",
   "description": "Turn ideas into clear Feature plans, deliver them through reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Plan Features, deliver reviewed pull requests, and maintain project knowledge.",
-    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Idea captures proposals, and Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement remains the strict resumable delivery workflow with dedicated Feature Workers and exact-head checkpoints. Implement Next is an explicit pilot for lighter delivery: one visible graph orchestrator follows a small transient workflow graph, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implementation skills leave merge, deploy, release, and post-merge closure to the user.",
+    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Idea captures proposals, and Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -22,7 +22,7 @@
     "defaultPrompt": [
       "Use $se:learn to maintain durable repository knowledge, or $se:idea to save a proposal for later planning.",
       "Use $se:feature to turn related requests into Feature issues and Macro Tasks without writing code.",
-      "Use $se:implement for strict delivery, or $se:implement-next for lightweight reusable-worker delivery and PR stacks."
+      "Use $se:implement for lightweight reusable-worker delivery and standalone or stacked pull requests."
     ],
     "brandColor": "#BE185D"
   }

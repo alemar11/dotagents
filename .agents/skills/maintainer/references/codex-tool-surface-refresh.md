@@ -33,13 +33,10 @@ workers to a live task, or update unrelated skills.
 2. Compare the discovered surface against:
    - `plugins/se/skills/implement/SKILL.md`;
    - `plugins/se/skills/implement/references/orchestration.md`;
-   - `plugins/se/skills/implement/references/worker-execution.md` when Worker
-     lifecycle, delegation, or phase-completion behavior changes;
-   - `plugins/se/skills/implement/references/task-profile.md`;
-   - `plugins/se/skills/implement/references/run-state.md`;
-   - `plugins/se/skills/implement/references/review-delivery.md` and
-     `plugins/se/skills/implement/references/delivery-monitoring.md` when tool
-     changes affect authorization, proof, resumption, or closeout behavior.
+   - `plugins/se/skills/implement/references/repository-claims.md` when task
+     identity, orchestrator binding, or ownership recovery changes;
+   - `plugins/se/skills/implement/references/states.md` when lifecycle changes
+     affect workflow reconstruction or closeout behavior.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?
    - What creates a separate visible Codex App thread?

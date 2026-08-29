@@ -11,32 +11,16 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, Feature, legacy Implement, Implement Next, and Audit workflow graphs.
+  Idea, Feature, Implement, and Audit workflow graphs.
   Feature owns the textual Feature Plan Set, sibling Feature registry, and local
-  Macro Task graphs; Implement derives its technical execution units and strict
-  runtime graph from that durable set, while Implement Next uses a smaller
-  transient graph reconstructed from live evidence.
+  Macro Task graphs; Implement uses a small transient delivery graph
+  reconstructed from live evidence.
 - Every bundled skill owns `references/states.md`, a compact human-readable
   table that distinguishes workflow nodes from domain values, persisted
   statuses, checkpoints, modes, external observations, and output labels.
-- references/task-preflight.md and references/task-handoff.md are root-level
-  contracts for legacy Implement runs. Explicit invocation authorizes exactly
-  the required user-owned tasks without a second prompt and rejects subordinate
-  delegation as a required-role substitute. Implement's orchestrator is a
-  projectless control plane with one
-  authoritative observation per selected repository and no primary-repository
-  binding; Feature Workers remain fully repository/worktree bound. The
-  contracts also require an explicit, complete role-profile request
-  with no ambient
-  inheritance plus an authoritative, assignment-specific comparison between
-  requested and effective model/reasoning before normal task monitoring. They
-  freeze the applicable control-plane or repository-bound target and require the
-  assigned task to verify every required fact. Saved-project association,
-  ambient checkout, and project-root metadata are optional
-  diagnostics that are never compared or used as gates.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
-  Feature, Implement, and Implement Next hosted handoffs.
+  Feature, and Implement hosted handoffs.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title normalization, and local-path correction
   before every SE-hosted issue, comment, PR, or review write, plus one bounded
@@ -66,102 +50,7 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
-- task-handoff.md binds typed effective-role and execution-target observations
-  to orchestrator and Feature Worker task identity, then applies the
-  established SE Implement emoji-title grammar with authoritative readback and
-  at most one bounded correction before monitoring; titles remain display
-  metadata. Each task receives one flat semantic prompt with a best-effort
-  canonical-title hint; raw or escaped delegation envelopes are never nested.
-- skills/implement/ accepts one or more explicit GitHub parent Feature issue
-  references, verifies their authoritative Feature semantic contracts and
-  sibling dependency context, records local Macro projections as complete,
-  partial, or absent, and returns a
-  verified standalone or stacked PR topology. Its graph owns Feature-level
-  scheduling, derives technical execution units and assignment-scoped T-AC
-  criteria from each parent Feature plus available Macro context, creates one
-  observable user-owned orchestrator task, then one observable isolated Sol
-  Feature Worker task and one PR per
-  implementation-eligible Feature. Fresh runs create those tasks; validated
-  resumes reuse only their exact retained task identities. Runtime
-  guidance loads by role and phase: orchestration, Worker execution,
-  publication, and delivery monitoring remain separate contracts. Implement
-  may use bounded delegated support
-  assignments for code analysis, execution-unit assistance, validation, or
-  critique when delegation and capacity are observed; otherwise the parent
-  Worker continues serially. Implement selects exactly the parent Feature
-  issues supplied by the caller and never discovers, selects, validates, or
-  gates Features through GitHub labels or Issue Types. Sibling registries are
-  read for consistency and dependency evidence, not to expand the selected
-  implementation set. The caller may select a starting branch per
-  target repository; otherwise Implement uses that repository's provider
-  default. The orchestrator refreshes and freezes the selected branch's exact
-  upstream tip before each root worker wave and verifies every isolated
-  worktree against that base before implementation begins. The orchestrator has
-  no Git checkout or worktree binding and never invents a primary repository
-  for a multi-repository run. Before its first
-  candidate, the Worker owns its local phase through a semantic workflow
-  boundary, uses cheap changed-surface checks and a conditional
-  read-only invariant critic for materially risky drafts, consolidates that
-  pass before repairing it coherently, and defers complete validation until the
-  source and prerequisite HEADs are stable. The Worker then performs exact-HEAD
-  in-session review under verified local-only isolation with network,
-  GitHub/provider access, hosted operations, repository mutation, and Git
-  transport unavailable before first publication; after exact readback of the
-  first published PR, hosted review becomes authoritative and later fixes update the
-  same PR without rerunning native review. The workflow selectively
-  invalidates dependent evidence, handles stack reconciliation, and requires
-  complete validation plus clean hosted review on the same final exact HEAD.
-  Every same-repository Feature dependency is mandatory stack intent, while a
-  cross-repository dependency remains scheduling-only and standalone. A
-  stacked child may begin from its parent's verified `candidate-published`
-  exact HEAD before that parent is delivery-ready when no applicable
-  current-head CI check is confirmed failing. Pending CI is allowed; only a
-  G-diagnosed infrastructure or flaky failure unrelated to candidate
-  correctness may bypass a confirmed failure. The orchestrator centrally
-  monitors hosted review, CI, exact-head state, and stack drift through
-  material-delta observations. At each scheduling point it executes the sole
-  eligible authorized effect directly, retains arbitration when several
-  effects are eligible, and waits without a status relay when none is
-  eligible. Published Feature Workers remain inactive but resumable. Required
-  Orchestrator and Worker roles never fall back to subordinate in-task
-  delegation.
-  G owns PR publication and pairwise stack linking, while Send remains agnostic
-  about whether an explicit PR base participates in a stack. GitHub interaction is
-  mandatory end to end; there is no local-only or preview execution mode.
-  Final verification uses only the closed exact-head publication, hosted review,
-  CI or authoritative no-checks, clean-worktree/HEAD, body/closure-intent,
-  topology/stack, and acceptance evidence owned by the workflow. Implement
-  never invokes delivery-status or requests provider-policy classification;
-  externally supplied policy observations remain report-only and never grant
-  merge, auto-merge, bypass, or queue authority.
-  Feature acceptance criteria use stable bracketed IDs rather than Markdown
-  checkbox state; Feature Workers may derive T-AC criteria that specialize but
-  never replace or weaken F-AC, and bind both to the same final candidate HEAD.
-  Available Macro outcomes remain contextual evidence; missing Task
-  projections do not block when the parent semantic contract is sufficient.
-  The orchestrator aggregates evidence without rewriting the plan. The PR
-  closing set is derived independently for each Feature as its parent Feature
-  plus every verified existing associated local Macro Task; missing refs are
-  reported and never invented, while sibling Features and their Tasks are
-  never included. Semantic contradictions that require changing outcome,
-  scope, F-AC, or Feature dependencies are surfaced to the user; missing task
-  decomposition, acceptance specificity, and ordinary technical interpretation
-  remain Implement-owned. Native GitHub dependency state is diagnostic in
-  Implement and is never repaired or used to override the body-backed graph.
-  SE-authored PR bodies remain concise and durable: outcome summary, compact
-  validation command or check names, material operational notes when needed,
-  and canonical closing lines, without routine test counts or internal
-  delivery logs. Pre-publication native review uses the minimal supported
-  base-scoped mode inside its verified local-only isolation boundary, while
-  later candidates stay in the hosted review lineage;
-  publication runs from the reverified Feature Worker worktree rather than an
-  inherited or temporary directory.
-  Its SQLite WAL ledger stores exclusive Feature claims, durable checkpoints,
-  and side-effect idempotency. Incompatible ledgers retain explicit
-  drop-and-recreate instead of migrations; exact stale or foreign claims use a
-  scoped atomic CAS recovery with durable operation audit evidence and
-  idempotent retry.
-- skills/implement-next/ is the explicit lightweight delivery pilot. One visible
+- skills/implement/ is the explicit implementation entry point. One visible
   graph orchestrator follows a small transient workflow graph, owns an immutable
   selected repository set, and chooses serial or concurrent execution.
   Repository-bound workers are reusable lanes:
@@ -234,7 +123,7 @@ Its skills are deliberately separated by responsibility:
   updates and reads back the same issues. Any explicitly requested downstream
   handoff must reconcile before completion. Feature does not rehydrate or
   repair implementation execution units.
-- Idea, Feature, Implement, and Implement Next keep local control-plane records
+- Idea, Feature, and Implement keep local control-plane records
   separate from hosted artifacts and apply one shared portable-content gate
   immediately before each hosted write, including content returned by workers
   and tools.

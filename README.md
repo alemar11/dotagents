@@ -50,8 +50,7 @@ knowledge, and audits active work:
 | `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
-| `se:implement` | Deliver planned Features through reviewed pull requests and verify their final delivery state. |
-| `se:implement-next` | Pilot lightweight graph orchestration with reusable workers and standalone or stacked pull requests. |
+| `se:implement` | Deliver planned Features with lightweight graph orchestration, reusable workers, and standalone or stacked pull requests. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 ## Reusable Skills
@@ -113,26 +112,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `se:implement` accepts only caller-supplied published parent Feature issues
-  and treats each parent as the semantic contract. A fresh run creates one
-  observable projectless control-plane orchestrator with one verified
-  observation per selected repository and no primary-repository binding, plus
-  one observable repository-bound Worker task per Feature; a validated resume
-  reuses only those exact task identities. Subordinate in-task delegation never
-  substitutes for either required role. Implement tolerates and
-  reports partial or absent Macro Task projections, derives T-AC criteria without
-  weakening F-AC, conditionally consolidates material pre-candidate risks before
-  complete validation, refreshes exact starting-branch tips, runs first-PR
-  native review under verified local-only network/provider isolation, and
-  delivers one reviewed PR per Feature. Same-repository Feature dependencies become stacked
-  PR intent; cross-repository dependencies remain scheduling-only. The orchestrator uses
-  change-driven observations for exact-head publication, CI, hosted review, and
-  stack evidence, while published Workers remain inactive but resumable.
-  Delivery-status and provider policy are outside the completion path, and
-  merge, auto-merge, bypass, queue, release, and post-merge closure remain
-  outside Implement. Its SQLite WAL ledger stores only exclusive claims,
-  durable checkpoints, and idempotent effects, with scoped audited CAS recovery
-  for exact stale or foreign claims.
-- `se:implement-next` is the explicit lightweight delivery pilot. It places one
+  and treats each parent as the semantic contract. It places one
   visible graph orchestrator in the single involved project or a selected
   coordination project. The orchestrator follows a small transient execution
   graph, reuses repository-bound worker worktrees for serial Features, and adds
@@ -141,7 +121,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   cross-repository dependencies affect scheduling only. Its host-local SQLite
   registry atomically protects an immutable repository set and stores only
   repository ownership, while Features, workers, Git, pull requests, review,
-  and CI remain externally owned. It never merges, deploys, or releases.
+  and CI remain externally owned. Each stable exact-head pull request must be
+  ready rather than draft and have terminal clean hosted review plus required
+  validation and CI. Implement never merges, deploys, or releases.
 - `se:audit` runs only after explicit invocation and observes a frozen cohort of
   active SE sessions until terminal state or user stop. Complete coverage
   requires exhausting every authoritative continuation and host/project

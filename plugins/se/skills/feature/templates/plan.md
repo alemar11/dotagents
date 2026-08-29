@@ -21,7 +21,7 @@ The set contains genuinely independent Features and no container issue.
 
 Feature `blocked_by` references only another Feature in this registry and
 expresses a hard outcome dependency. A same-repository edge is stack intent for
-Implement or Implement Next; a cross-repository edge is scheduling-only.
+Implement; a cross-repository edge is scheduling-only.
 
 ## Source and boundary decisions
 
@@ -109,7 +109,7 @@ choice, or safe assumptions were sufficient.
 
 ## Implementation handoff
 
-<Describe the outcomes and evidence Implement or Implement Next must preserve.
+<Describe the outcomes and evidence Implement must preserve.
 Include same-repo stack and cross-repo scheduling intent, but do not prescribe
 code design, technical execution-unit IDs, allowed paths, waves, workers, or
 branches.>

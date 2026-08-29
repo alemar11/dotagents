@@ -1,7 +1,7 @@
 interface:
-  display_name: "🛠️ Implement Features"
-  short_description: "Create visible project tasks and deliver each Feature through a reviewed pull request."
-  brand_color: "#BE185D"
-  default_prompt: "Use $se:implement only for caller-supplied published parent Feature issues. Fresh runs create one visible projectless control-plane orchestrator and one repository-bound Worker per Feature; resumes reuse exact bound tasks. Load only the current role and phase contract. Workers own implementation through local-only exact-HEAD native review; the orchestrator owns ledger, publication reservations, and hosted monitoring. Relay only material deltas, preserve exact-HEAD and recovery evidence, stack same-repository dependencies, and never merge."
+  display_name: "🛠️ Implement"
+  short_description: "Deliver Features with lightweight graph orchestration."
+  brand_color: "#6D28D9"
+  default_prompt: "Use $se:implement to implement these published Feature issues through visible tasks and standalone or stacked pull requests."
 policy:
   allow_implicit_invocation: false

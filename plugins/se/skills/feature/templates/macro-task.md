@@ -28,7 +28,7 @@ use a vertical slice when the Feature outcome supports one.>
 ## Macro dependency
 
 - blocked_by: <Macro Task IDs owned by the same parent Feature or none>
-- dependency_semantics: planning-only; Implement or Implement Next may combine, reorder, or internalize the relation while preserving this outcome and its Feature criteria
+- dependency_semantics: planning-only; Implement may combine, reorder, or internalize the relation while preserving this outcome and its Feature criteria
 
 The body-backed Macro registry is semantic authority. Publication always
 attempts to mirror each listed edge as a native GitHub dependency between the
