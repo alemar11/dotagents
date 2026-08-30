@@ -46,6 +46,17 @@ class XcodeChangelogTests(unittest.TestCase):
                 self.entries, changelog.parse_target("27 beta 5")
             )
 
+    def test_numbered_beta_request_does_not_substitute_another_point_release(self) -> None:
+        point_release_entries = changelog.parse_index_entries(
+            "[Xcode 27.1 Beta 6 Release Notes]"
+            "(/documentation/Xcode-Release-Notes/xcode-27_1-release-notes)"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "No Xcode beta release notes"):
+            changelog.match_release_entry(
+                point_release_entries, changelog.parse_target("27.0 beta 6")
+            )
+
     def test_missing_beta_does_not_substitute_a_stable_release(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "No Xcode beta release notes"):
             changelog.match_release_entry(
@@ -89,10 +100,10 @@ class XcodeChangelogTests(unittest.TestCase):
         self.assertEqual(target.release_channel, changelog.BETA_CHANNEL)
         self.assertEqual(result.entry.title, "Xcode 27 Beta 6 Release Notes")
 
-    def test_active_prerelease_build_preserves_the_beta_channel(self) -> None:
+    def test_active_stable_build_suffix_remains_stable(self) -> None:
         info = changelog.XcodeInfo(
-            version="27.0",
-            build_version="18A123a",
+            version="16.0",
+            build_version="16A242d",
             developer_dir="/Applications/Xcode.app/Contents/Developer",
             app_path="/Applications/Xcode.app",
             resolution_errors=(),
@@ -100,7 +111,7 @@ class XcodeChangelogTests(unittest.TestCase):
 
         self.assertEqual(
             changelog.resolve_target(info, None).release_channel,
-            changelog.BETA_CHANNEL,
+            changelog.STABLE_CHANNEL,
         )
 
     def test_default_supplements_installed_notes_with_stable_and_beta(self) -> None:

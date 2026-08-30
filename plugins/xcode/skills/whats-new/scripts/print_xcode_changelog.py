@@ -226,14 +226,12 @@ def choose_same_major_fallback(
     if not same_major:
         return None
     if target.release_channel == BETA_CHANNEL:
+        if target.beta_iteration is not None:
+            return None
         beta_entries = [
             entry
             for entry in same_major
             if entry.release_channel == BETA_CHANNEL
-            and (
-                target.beta_iteration is None
-                or entry.beta_iteration == target.beta_iteration
-            )
         ]
         if beta_entries:
             return beta_entries[0]
@@ -411,8 +409,6 @@ def active_release_channel(info: XcodeInfo) -> str:
         and re.search(r"(?<![a-z])beta(?![a-z])", path.lower())
         for path in selected_paths
     ):
-        return BETA_CHANNEL
-    if info.build_version and re.search(r"[a-z]$", info.build_version):
         return BETA_CHANNEL
     return STABLE_CHANNEL
 

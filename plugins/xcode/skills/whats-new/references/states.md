@@ -20,5 +20,5 @@ runtime state or configuration.
 Beta iteration is matching metadata, not another release channel. Requested
 stable and beta lookups must remain on their requested channel. A numbered beta
 must match exactly. Active selection derives a beta channel from the selected
-Xcode application's path or prerelease build suffix because `xcodebuild` reports
-only the numeric version.
+Xcode application's path because `xcodebuild` reports only the numeric version
+and final Apple build identifiers can end in a lowercase letter.
