@@ -1,9 +1,9 @@
 ---
-name: xcode-changelog
+name: whats-new
 description: Resolve active, latest, or requested Xcode release notes from Apple official release-notes pages.
 ---
 
-# Xcode Changelog
+# Xcode What's New
 
 ## Goal
 
@@ -20,7 +20,7 @@ available release notes when that latest version is not installed.
   `python3 scripts/print_xcode_changelog.py`.
 - If you are invoking the skill from another repo, resolve the installed skill
   root first and run
-  `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py`.
+  `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py`.
 
 ## Trigger rules
 
@@ -33,14 +33,14 @@ available release notes when that latest version is not installed.
 ## Workflow
 
 1. Run the shipped helper for the active local Xcode:
-   `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py`.
+   `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py`.
    The default report prints the installed Xcode release notes and, when the
    latest available Apple release-note entry is not installed, appends those
    latest release notes too.
 2. If the user requested a specific version, run
-   `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py --version "<version label>"`.
+   `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py --version "<version label>"`.
 3. If the user asked which versions are available, run
-   `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py --list`.
+   `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py --list`.
 4. Share the single `Xcode` section printed by the script.
 5. Preserve the `Source:` URL lines in the final answer for traceability.
 6. If the script reports a normalized or fallback match, keep that explanation in the user-facing summary.

@@ -53,6 +53,15 @@ knowledge, and audits active work:
 | `se:implement` | Deliver planned Features with lightweight graph orchestration, reusable workers, and standalone or stacked pull requests. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
+Xcode is the repository's Apple developer-tools plugin. It preserves the
+official release-note resolver and adds safe launch guidance for Apple's native
+headless MCP server:
+
+| Skill | Purpose |
+| --- | --- |
+| `xcode:whats-new` | Resolve release notes for the active, latest, or a requested Xcode version. |
+| `xcode:mcp` | Safely launch and verify the Xcode-provided headless MCP server on attended Macs, unattended hosts, or explicitly isolated CI machines. |
+
 ## Reusable Skills
 
 | Skill | Purpose |
@@ -66,11 +75,10 @@ knowledge, and audits active work:
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Charts, Virtual, Store, DB, AI, CLI, and integrations. |
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
-| `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
-| `plugins-reload` | Explicitly refresh the repo-local G and SE plugin caches after source changes. |
+| `plugins-reload` | Explicitly refresh the repo-local G, SE, and Xcode plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
@@ -153,13 +161,15 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add xcode@alemar11
 ```
 
-If the `alemar11` marketplace is already registered, install G directly:
+If the `alemar11` marketplace is already registered, install the plugins directly:
 
 ```sh
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add xcode@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -169,15 +179,17 @@ of the GitHub source, then install the same plugin:
 codex plugin marketplace add /path/to/dotagents
 codex plugin add g@alemar11
 codex plugin add se@alemar11
+codex plugin add xcode@alemar11
 ```
 
-During local development, validate the changed plugin and reinstall each
-versioned plugins from the repository source. G has a dedicated helper; SE is
-reinstalled directly:
+During local development, validate each changed plugin and reinstall it from
+the repository source. G has a dedicated helper; SE and Xcode are reinstalled
+directly:
 
 ```sh
 plugins/g/projects/g/scripts/reinstall-local
 codex plugin add se@alemar11 --json
+codex plugin add xcode@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
@@ -188,6 +200,8 @@ codex plugin remove g@alemar11
 codex plugin add g@alemar11
 codex plugin remove se@alemar11
 codex plugin add se@alemar11
+codex plugin remove xcode@alemar11
+codex plugin add xcode@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old
@@ -198,7 +212,9 @@ codex plugin remove feature-flow@alemar11
 codex plugin add se@alemar11
 ```
 
-Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.
+Restart Codex or open a fresh task after installation so the bundled skills and
+connectors are discovered. Do not edit installed cache copies under
+`~/.codex/plugins/cache/`.
 
 ### Link Reusable Skills For Local Development
 
@@ -215,7 +231,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -249,7 +265,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill skill-cli-creator \
   --skill tanstack \
   --skill codex-changelog \
-  --skill xcode-changelog \
   --skill focus \
   --skill study \
   --skill postgres \

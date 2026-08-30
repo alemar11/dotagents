@@ -1,0 +1,5 @@
+interface:
+  display_name: "Xcode MCP"
+  short_description: "Launch Apple's native Xcode MCP server safely"
+  brand_color: "#0071E3"
+  default_prompt: "Use $xcode:mcp to inspect, launch, and verify Apple's native headless Xcode MCP server with permissions appropriate to this machine."

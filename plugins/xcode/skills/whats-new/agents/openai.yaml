@@ -1,0 +1,5 @@
+interface:
+  display_name: "Xcode What's New"
+  short_description: "Read current and requested Xcode release notes"
+  brand_color: "#147EFB"
+  default_prompt: "Use $xcode:whats-new to print Apple release notes for my active Xcode, look up a requested version, or list available Xcode release-note versions."
