@@ -17,8 +17,8 @@ the local `skills/tanstack/` skill.
 - Treat `skills/tanstack/` as one broad reusable skill surface for the TanStack
   portfolio.
 - Product-level references are stable routing units for AI, Charts, CLI,
-  Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table,
-  and Virtual.
+  Config, DB, Devtools, Form, Highlight, Hotkeys, Markdown, Pacer, Query,
+  Ranger, Router, Start, Store, Table, and Virtual.
 - `references/integration.md` owns cross-stack composition guidance.
 - `references/router.md`, `references/start.md`, and `references/cli.md` own
   dense workflow routing through local focused `references/*.md` files rather
@@ -76,6 +76,10 @@ surfaces when they exist.
    - `https://tanstack.com/intent/registry/%40tanstack__start-client-core`
    - `https://tanstack.com/intent/registry/%40tanstack__start-server-core`
    - `https://tanstack.com/intent/registry/%2540tanstack%252Fcli`
+   - `https://tanstack.com/intent/registry/%2540tanstack%252Fcharts`
+   - `https://tanstack.com/intent/registry/%2540tanstack%252Fhighlight`
+   - `https://tanstack.com/intent/registry/%2540tanstack%252Fmarkdown`
+   - `https://tanstack.com/intent/registry/%2540tanstack%252Ftable-core`
    - Use package pages and their skill pages to capture the current skill tree,
      current wording, and any version notes surfaced in the page content.
 3. TanStack Intent docs:
@@ -85,6 +89,9 @@ surfaces when they exist.
      staleness mechanics.
 4. Product docs on `latest` endpoints:
    - `https://tanstack.com/charts/latest/docs`
+   - `https://tanstack.com/hotkeys/latest/docs`
+   - `https://tanstack.com/markdown/latest/docs`
+   - `https://tanstack.com/highlight/latest/docs`
    - `https://tanstack.com/router/latest`
    - `https://tanstack.com/start/latest/docs`
    - `https://tanstack.com/cli/latest/docs`

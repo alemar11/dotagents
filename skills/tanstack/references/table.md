@@ -2,6 +2,11 @@
 
 Use this reference when a task involves `@tanstack/react-table`, headless table state, column definitions, row models, sorting, filtering, pagination, row selection, grouping, expansion, pinning, column visibility, or integrating tables with TanStack Virtual.
 
+The current official `latest` docs target TanStack Table v9. Inspect the
+installed major before using examples: v9 registers only the features and row
+models a table needs, while v8 applications should keep their existing API
+shape unless the task explicitly includes migration.
+
 ## What to Optimize For
 
 - Stable column definitions, accessors, and row IDs.
@@ -16,8 +21,10 @@ Use this reference when a task involves `@tanstack/react-table`, headless table 
    Decide which features are client-side row models and which are server-driven.
 2. Define columns carefully.
    Use stable accessors, IDs, headers, cells, and metadata; avoid recreating column definitions unnecessarily.
-3. Configure row models only for enabled features.
-   Add core, sorted, filtered, paginated, grouped, expanded, or faceted row models deliberately.
+3. Configure features and row models deliberately.
+   In v9, register only the feature plugins and row-model factories the table
+   uses. In v8, preserve the installed API rather than translating examples
+   mechanically from v9.
 4. Control state where needed.
    Sync table state to URL, server params, or app state only when product behavior requires it.
 5. Verify rendering and accessibility.
@@ -41,4 +48,7 @@ Use this reference when a task involves `@tanstack/react-table`, headless table 
 
 ## Verification
 
-Use current TanStack Table docs for column definitions, row models, feature state, controlled state, and framework adapter APIs. For large tables, also verify TanStack Virtual integration guidance.
+Use current TanStack Table docs and, when available for the installed package,
+its first-party Intent skills for feature registration, column definitions,
+row models, feature state, controlled state, migration, and framework adapter
+APIs. For large tables, also verify TanStack Virtual integration guidance.

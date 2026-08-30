@@ -21,8 +21,8 @@ umbrella reference map first, then jump to the focused reference that can reduce
 prompt weight or sharpen exact guidance.
 For standalone product work outside Query, Router, Start, or CLI, route to the
 matching product reference such as `form.md`, `table.md`,
-`charts.md`, `virtual.md`, `store.md`, `db.md`, `ai.md`,
-`pacer.md`, `devtools.md`, `config.md`, or
+`charts.md`, `hotkeys.md`, `markdown.md`, `highlight.md`, `virtual.md`,
+`store.md`, `db.md`, `ai.md`, `pacer.md`, `devtools.md`, `config.md`, or
 `ranger.md`.
 
 ## What to Optimize For

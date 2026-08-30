@@ -1,6 +1,6 @@
 ---
 name: tanstack
-description: Review or build TanStack apps across Query, Router, Start, Form, Table, Charts, Virtual, Store, DB, AI, CLI, and integrations.
+description: Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations.
 ---
 
 # TanStack
@@ -31,6 +31,9 @@ Use this skill to make TanStack decisions from the app's actual installed packag
 - Forms, typed fields, arrays, validation, React Hook Form migration: [references/form.md](references/form.md)
 - Tables, columns, row models, sorting, filtering, pagination: [references/table.md](references/table.md)
 - Charts, typed marks and channels, D3 scales, SVG or Canvas rendering, accessibility: [references/charts.md](references/charts.md)
+- Hotkeys, scopes, sequences, recording, key state, cross-platform display: [references/hotkeys.md](references/hotkeys.md)
+- Markdown parsing and HTML, React, or Octane rendering: [references/markdown.md](references/markdown.md)
+- Selective syntax highlighting, themes, SSR, and Markdown pipelines: [references/highlight.md](references/highlight.md)
 - Virtual lists, grids, dynamic measurement, overscan: [references/virtual.md](references/virtual.md)
 - Store, DB, AI, Config, Devtools, Pacer, Ranger: use the matching product reference from [references/README.md](references/README.md).
 

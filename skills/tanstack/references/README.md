@@ -11,7 +11,10 @@ Use this map after `$tanstack` triggers. Open only the smallest reference that m
 - `db.md`: client-first collections, live queries, sync adapters, and optimistic mutations.
 - `devtools.md`: centralized devtools panels, plugins, framework integration, and production-safe diagnostics.
 - `form.md`: typed fields, arrays, validation, custom errors, reactivity, resets, and React Hook Form migrations.
+- `highlight.md`: selective syntax highlighting, explicit language registration, themes, SSR, annotations, and Markdown pipelines.
+- `hotkeys.md`: cross-platform shortcuts, scopes, sequences, recording, key-state tracking, display formatting, and devtools.
 - `integration.md`: Query + Router + Start ownership, loader prefetch, and SSR hydration boundaries.
+- `markdown.md`: deterministic Markdown parsing and HTML, React, or Octane rendering with explicit extension and security boundaries.
 - `pacer.md`: debouncing, throttling, rate limiting, queuing, batching, and async control.
 - `query.md`: query keys, `queryOptions`, cache policy, invalidation, optimistic updates, and SSR-safe data flows.
 - `ranger.md`: headless single-range and multi-range sliders, custom steps, interpolation, drag behavior, and accessibility.
