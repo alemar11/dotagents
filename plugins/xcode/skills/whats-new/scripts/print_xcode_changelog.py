@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -14,6 +13,8 @@ INDEX_MARKDOWN_URL = (
 )
 APPLE_DOCS_BASE = "https://developer.apple.com"
 MARKDOWN_DOCS_BASE = "https://docs.developer.apple.com/tutorials/data"
+STABLE_CHANNEL = "stable"
+BETA_CHANNEL = "beta"
 
 
 @dataclass
@@ -29,7 +30,8 @@ class XcodeInfo:
 class ReleaseEntry:
     title: str
     version: str
-    is_beta: bool
+    release_channel: str
+    beta_iteration: int | None
     page_path: str
 
     @property
@@ -45,7 +47,8 @@ class ReleaseEntry:
 class TargetSpec:
     raw: str
     version: str | None
-    beta_requested: bool
+    release_channel: str
+    beta_iteration: int | None
     normalized_text: str
 
 
@@ -117,8 +120,8 @@ def get_active_xcode_info() -> XcodeInfo:
 
     try:
         output = run_command(["xcodebuild", "-version"])
-        version_match = re.search(r"^Xcode\s+([0-9]+(?:\.[0-9]+){0,2})$", output, re.M)
-        build_match = re.search(r"^Build version\s+(.+)$", output, re.M)
+        version_match = re.search(r"^Xcode\s+([0-9]+(?:\.[0-9]+){0,2})$", output, re.MULTILINE)
+        build_match = re.search(r"^Build version\s+(.+)$", output, re.MULTILINE)
         if version_match:
             version = version_match.group(1)
         else:
@@ -151,10 +154,12 @@ def get_active_xcode_info() -> XcodeInfo:
 def parse_index_entries(markdown: str) -> list[ReleaseEntry]:
     entry_pattern = re.compile(
         r"^\[(Xcode [^\]]+ Release Notes)\]\((/documentation/Xcode-Release-Notes/[^)]+)\)$",
-        re.M,
+        re.MULTILINE,
     )
     title_pattern = re.compile(
-        r"^Xcode ([0-9]+(?:\.[0-9]+){0,2})( Beta)? Release Notes$"
+        r"^Xcode (?P<version>[0-9]+(?:\.[0-9]+){0,2})"
+        r"(?: (?P<beta>Beta)(?: (?P<beta_iteration>[0-9]+))?)?"
+        r" Release Notes$"
     )
     entries: list[ReleaseEntry] = []
 
@@ -167,8 +172,15 @@ def parse_index_entries(markdown: str) -> list[ReleaseEntry]:
         entries.append(
             ReleaseEntry(
                 title=title,
-                version=title_match.group(1),
-                is_beta=bool(title_match.group(2)),
+                version=title_match.group("version"),
+                release_channel=(
+                    BETA_CHANNEL if title_match.group("beta") else STABLE_CHANNEL
+                ),
+                beta_iteration=(
+                    int(title_match.group("beta_iteration"))
+                    if title_match.group("beta_iteration")
+                    else None
+                ),
                 page_path=page_path,
             )
         )
@@ -181,10 +193,14 @@ def parse_index_entries(markdown: str) -> list[ReleaseEntry]:
 def parse_target(raw: str) -> TargetSpec:
     normalized_raw = normalize_space(raw)
     version_match = re.search(r"([0-9]+(?:\.[0-9]+){0,2})", normalized_raw)
+    beta_match = re.search(r"\bbeta(?:\s+([0-9]+))?\b", normalized_raw, re.IGNORECASE)
     return TargetSpec(
         raw=normalized_raw,
         version=version_match.group(1) if version_match else None,
-        beta_requested="beta" in normalized_raw.lower(),
+        release_channel=BETA_CHANNEL if beta_match else STABLE_CHANNEL,
+        beta_iteration=(
+            int(beta_match.group(1)) if beta_match and beta_match.group(1) else None
+        ),
         normalized_text=normalize_text_key(normalized_raw),
     )
 
@@ -209,33 +225,73 @@ def choose_same_major_fallback(
     same_major = [entry for entry in entries if entry.version.split(".")[0] == major]
     if not same_major:
         return None
-    if target.beta_requested:
-        beta_entries = [entry for entry in same_major if entry.is_beta]
+    if target.release_channel == BETA_CHANNEL:
+        beta_entries = [
+            entry
+            for entry in same_major
+            if entry.release_channel == BETA_CHANNEL
+            and (
+                target.beta_iteration is None
+                or entry.beta_iteration == target.beta_iteration
+            )
+        ]
         if beta_entries:
             return beta_entries[0]
-    stable_entries = [entry for entry in same_major if not entry.is_beta]
+        return None
+    stable_entries = [
+        entry for entry in same_major if entry.release_channel == STABLE_CHANNEL
+    ]
     if stable_entries:
         return stable_entries[0]
-    return same_major[0]
+    return None
 
 
 def choose_latest_fallback(
-    entries: list[ReleaseEntry], beta_requested: bool
+    entries: list[ReleaseEntry], release_channel: str
 ) -> ReleaseEntry:
-    if beta_requested:
-        return entries[0]
-    stable_entries = [entry for entry in entries if not entry.is_beta]
-    if stable_entries:
-        return stable_entries[0]
-    return entries[0]
+    matching_entries = [
+        entry for entry in entries if entry.release_channel == release_channel
+    ]
+    if matching_entries:
+        return matching_entries[0]
+    raise RuntimeError(f"No Xcode {release_channel} release notes are available.")
 
 
-def choose_latest_available_entry(entries: list[ReleaseEntry]) -> ReleaseEntry:
-    return entries[0]
+def choose_latest_stable_entry(entries: list[ReleaseEntry]) -> ReleaseEntry | None:
+    return next(
+        (
+            entry
+            for entry in entries
+            if entry.release_channel == STABLE_CHANNEL
+        ),
+        None,
+    )
 
 
-def is_same_release_entry(left: ReleaseEntry, right: ReleaseEntry) -> bool:
-    return left.page_path.lower() == right.page_path.lower()
+def choose_latest_beta_entry(entries: list[ReleaseEntry]) -> ReleaseEntry | None:
+    return next(
+        (entry for entry in entries if entry.release_channel == BETA_CHANNEL),
+        None,
+    )
+
+
+def choose_supplementary_entries(
+    entries: list[ReleaseEntry], primary_entry: ReleaseEntry
+) -> list[ReleaseEntry]:
+    candidates = (
+        choose_latest_stable_entry(entries),
+        choose_latest_beta_entry(entries),
+    )
+    supplementary: list[ReleaseEntry] = []
+    seen_paths = {primary_entry.page_path.lower()}
+
+    for entry in candidates:
+        if entry is None or entry.page_path.lower() in seen_paths:
+            continue
+        supplementary.append(entry)
+        seen_paths.add(entry.page_path.lower())
+
+    return supplementary
 
 
 def match_release_entry(
@@ -271,7 +327,12 @@ def match_release_entry(
             (
                 entry
                 for entry in entries
-                if entry.version == candidate and entry.is_beta == target.beta_requested
+                if entry.version == candidate
+                and entry.release_channel == target.release_channel
+                and (
+                    target.beta_iteration is None
+                    or entry.beta_iteration == target.beta_iteration
+                )
             ),
             None,
         )
@@ -287,7 +348,13 @@ def match_release_entry(
         (
             entry
             for entry in entries
-            if target.normalized_text and target.normalized_text in normalize_text_key(entry.title)
+            if target.normalized_text
+            and target.normalized_text in normalize_text_key(entry.title)
+            and entry.release_channel == target.release_channel
+            and (
+                target.beta_iteration is None
+                or entry.beta_iteration == target.beta_iteration
+            )
         ),
         None,
     )
@@ -299,9 +366,17 @@ def match_release_entry(
             attempted_versions=attempted_versions,
         )
 
-    fallback_entry = choose_same_major_fallback(
-        entries, target
-    ) or choose_latest_fallback(entries, target.beta_requested)
+    fallback_entry = choose_same_major_fallback(entries, target)
+    if fallback_entry is None and target.version:
+        if target.release_channel == BETA_CHANNEL:
+            requested_beta = target.raw or target.version
+            raise RuntimeError(
+                f"No Xcode beta release notes matched requested version: "
+                f"{requested_beta}."
+            )
+        fallback_entry = choose_latest_fallback(entries, target.release_channel)
+    elif fallback_entry is None:
+        fallback_entry = choose_latest_fallback(entries, target.release_channel)
     fallback_message = "No exact Xcode release notes matched the requested version."
     return MatchResult(
         entry=fallback_entry,
@@ -311,13 +386,44 @@ def match_release_entry(
     )
 
 
+def resolve_target(
+    info: XcodeInfo, requested_version: str | None
+) -> TargetSpec:
+    if requested_version:
+        return parse_target(requested_version)
+    if info.version:
+        channel = active_release_channel(info)
+        channel_suffix = " beta" if channel == BETA_CHANNEL else ""
+        return parse_target(f"{info.version}{channel_suffix}")
+
+    detail = (
+        f" {info.resolution_errors[0]}"
+        if info.resolution_errors
+        else ""
+    )
+    raise RuntimeError(f"Unable to resolve the active Xcode version.{detail}")
+
+
+def active_release_channel(info: XcodeInfo) -> str:
+    selected_paths = (info.developer_dir, info.app_path)
+    if any(
+        path
+        and re.search(r"(?<![a-z])beta(?![a-z])", path.lower())
+        for path in selected_paths
+    ):
+        return BETA_CHANNEL
+    if info.build_version and re.search(r"[a-z]$", info.build_version):
+        return BETA_CHANNEL
+    return STABLE_CHANNEL
+
+
 def clean_release_markdown(markdown: str) -> str:
-    markdown = re.sub(r"^<!--.*?-->\s*", "", markdown, flags=re.S)
+    markdown = re.sub(r"^<!--.*?-->\s*", "", markdown, flags=re.DOTALL)
     markdown = re.sub(
         r"\n---\n\nCopyright[\s\S]*$",
         "",
         markdown,
-        flags=re.I,
+        flags=re.IGNORECASE,
     )
     return markdown.strip()
 
@@ -352,11 +458,10 @@ def build_output(
     requested_version: str | None,
     match_result: MatchResult,
     body: str,
-    latest_entry: ReleaseEntry | None = None,
-    latest_body: str | None = None,
+    supplementary_releases: list[tuple[ReleaseEntry, str]] | None = None,
 ) -> str:
     lines: list[str] = []
-    include_latest = latest_entry is not None and latest_body is not None
+    supplementary_releases = supplementary_releases or []
 
     if requested_version:
         lines.append(f"Requested version: {requested_version}")
@@ -402,22 +507,37 @@ def build_output(
         ]
     )
 
-    if include_latest:
+    for entry, _ in supplementary_releases:
         lines.extend(
             [
-                f"Latest available release notes: {latest_entry.title}",
-                "Latest available version is not installed.",
-                f"Source: {latest_entry.source_url}",
-                "",
-                "## Installed Xcode Release Notes",
-                "",
-                body,
-                "",
-                "## Latest Available Xcode Release Notes",
-                "",
-                latest_body,
+                f"Latest {entry.release_channel} release notes: {entry.title}",
+                f"Source: {entry.source_url}",
             ]
         )
+
+    if supplementary_releases:
+        primary_heading = (
+            "Requested Xcode Release Notes"
+            if requested_version
+            else "Installed Xcode Release Notes"
+        )
+        lines.extend(
+            [
+                "",
+                f"## {primary_heading}",
+                "",
+                body,
+            ]
+        )
+        for entry, supplementary_body in supplementary_releases:
+            lines.extend(
+                [
+                    "",
+                    f"## Latest {entry.release_channel.title()} Xcode Release Notes",
+                    "",
+                    supplementary_body,
+                ]
+            )
     else:
         lines.extend(["", body])
 
@@ -426,7 +546,10 @@ def build_output(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Print Apple Xcode release notes for the active or requested version."
+        description=(
+            "Print Apple stable and beta Xcode release notes for the active "
+            "or requested version."
+        )
     )
     parser.add_argument(
         "--list",
@@ -435,7 +558,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--version",
-        help="Explicit Xcode version label to match, for example '26.5 beta' or '16.4'.",
+        help=(
+            "Explicit Xcode version label to match, for example '27 beta', "
+            "'27 beta 6', or '16.4'."
+        ),
     )
     return parser.parse_args()
 
@@ -452,16 +578,18 @@ def main() -> int:
         print(build_list_output(info, entries))
         return 0
 
-    target = parse_target(args.version) if args.version else None
-    if target is None and info.version:
-        target = parse_target(info.version)
-
-    match_result = match_release_entry(entries, target)
+    try:
+        target = resolve_target(info, args.version)
+        match_result = match_release_entry(entries, target)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
     release_body = clean_release_markdown(fetch_text(match_result.entry.markdown_url))
-    latest_entry = choose_latest_available_entry(entries) if not args.version else None
-    latest_body = None
-    if latest_entry and not is_same_release_entry(match_result.entry, latest_entry):
-        latest_body = clean_release_markdown(fetch_text(latest_entry.markdown_url))
+    supplementary_releases: list[tuple[ReleaseEntry, str]] = []
+    if not args.version:
+        for entry in choose_supplementary_entries(entries, match_result.entry):
+            supplementary_releases.append(
+                (entry, clean_release_markdown(fetch_text(entry.markdown_url)))
+            )
 
     print(
         build_output(
@@ -469,8 +597,7 @@ def main() -> int:
             args.version,
             match_result,
             release_body,
-            latest_entry,
-            latest_body,
+            supplementary_releases,
         )
     )
     return 0

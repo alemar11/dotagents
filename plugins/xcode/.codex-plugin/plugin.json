@@ -1,7 +1,7 @@
 {
   "name": "xcode",
-  "version": "1.0.0",
-  "description": "Read official Xcode release notes and safely launch Apple's native headless Xcode MCP server.",
+  "version": "1.1.0",
+  "description": "Read official stable and beta Xcode release notes and safely launch Apple's native headless Xcode MCP server.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -19,8 +19,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Xcode",
-    "shortDescription": "Read Xcode updates and launch its native MCP server.",
-    "longDescription": "Xcode bundles a What's New skill for official Apple release notes and an MCP skill for safely launching the Xcode-provided headless server on attended Macs, unattended hosts, and explicitly isolated CI machines.",
+    "shortDescription": "Read stable and beta Xcode updates and launch its native MCP server.",
+    "longDescription": "Xcode bundles a What's New skill for official Apple stable and beta release notes and an MCP skill for safely launching the Xcode-provided headless server on attended Macs, unattended hosts, and explicitly isolated CI machines.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [

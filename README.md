@@ -54,12 +54,12 @@ knowledge, and audits active work:
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 Xcode is the repository's Apple developer-tools plugin. It preserves the
-official release-note resolver and adds safe launch guidance for Apple's native
-headless MCP server:
+official stable and beta release-note resolver and adds safe launch guidance
+for Apple's native headless MCP server:
 
 | Skill | Purpose |
 | --- | --- |
-| `xcode:whats-new` | Resolve release notes for the active, latest, or a requested Xcode version. |
+| `xcode:whats-new` | Resolve release notes for the active Xcode plus the latest stable and beta versions, or for one requested version. |
 | `xcode:mcp` | Safely launch and verify the Xcode-provided headless MCP server on attended Macs, unattended hosts, or explicitly isolated CI machines. |
 
 ## Reusable Skills

@@ -1,16 +1,16 @@
 ---
 name: whats-new
-description: Resolve active, latest, or requested Xcode release notes from Apple official release-notes pages.
+description: Resolve active, latest stable and beta, or requested Xcode release notes from Apple official release-notes pages.
 ---
 
 # Xcode What's New
 
 ## Goal
 
-Resolve the active Xcode version, a user-requested version, or list the
-available Apple Xcode Release Notes entries. For active local Xcode reports,
-include the installed version's release notes and also include the latest
-available release notes when that latest version is not installed.
+Resolve the active Xcode version, a user-requested stable or beta version, or
+list the available Apple Xcode Release Notes entries. For active local Xcode
+reports, include the installed version's release notes plus the latest stable
+and latest beta notes when they are distinct from the installed entry.
 
 ## Runtime surface
 
@@ -30,15 +30,20 @@ available release notes when that latest version is not installed.
 - Use when the user asks which Xcode versions have release notes or wants the available Xcode release-note versions listed.
 - Prefer this skill over ad-hoc browsing when the task is to match the active Xcode or a named version to Apple’s official release notes.
 
+Before selecting a lookup path, read
+[references/states.md](references/states.md) for the canonical selection mode,
+release channel, and numbered-beta matching behavior.
+
 ## Workflow
 
 1. Run the shipped helper for the active local Xcode:
    `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py`.
-   The default report prints the installed Xcode release notes and, when the
-   latest available Apple release-note entry is not installed, appends those
-   latest release notes too.
+   The default report prints the installed Xcode release notes and appends the
+   latest stable and latest beta notes when those entries are different.
 2. If the user requested a specific version, run
    `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py --version "<version label>"`.
+   Use labels such as `26.6`, `27 beta`, or `27 beta 6`. A numbered beta must
+   match exactly; do not substitute stable notes for a missing beta.
 3. If the user asked which versions are available, run
    `python3 <xcode-whats-new-skill-root>/scripts/print_xcode_changelog.py --list`.
 4. Share the single `Xcode` section printed by the script.
@@ -55,7 +60,6 @@ available release notes when that latest version is not installed.
   the active Xcode via local tooling, supports `--version` for explicit
   lookups and `--list` for index listings, fetches Apple’s official Xcode
   Release Notes index from the markdown-backed documentation endpoint, matches
-  the best release-notes entry by title/version, and prints one `Xcode`
-  section with either the cleaned installed note body, the installed notes plus
-  latest available notes when the installed Xcode is behind, or the available
-  version list plus source URLs.
+  stable and numbered-beta titles by channel and version, and prints one
+  `Xcode` section with the requested notes, the installed notes plus distinct
+  latest stable and beta notes, or the available version list plus source URLs.
