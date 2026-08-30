@@ -82,6 +82,7 @@ headless MCP server:
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
+| `youtube` | Search YouTube videos and playlists, retrieve timestamped transcripts, and search spoken content across playlists. |
 
 ### TanStack References
 
@@ -231,7 +232,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
@@ -271,7 +272,8 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill plugins-reload \
   --skill skill-audit \
   --skill swift-api-design \
-  --skill swift-docc
+  --skill swift-docc \
+  --skill youtube
 ```
 
 Install one reusable skill globally for Codex:

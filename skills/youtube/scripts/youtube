@@ -1,0 +1,1471 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import html
+import json
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unicodedata
+import urllib.parse
+import xml.etree.ElementTree as ET
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+VERSION = "0.1.0"
+CACHE_SCHEMA_VERSION = "1.0.0"
+CACHE_ROOT = Path.home() / ".cache" / "dotagents" / "skills" / "youtube"
+DEFAULT_TIMEOUT_SECONDS = 180
+PREFLIGHT_TIMEOUT_SECONDS = 15
+
+EXIT_INVALID_ARGUMENTS = 2
+EXIT_DEPENDENCY = 3
+EXIT_EXTRACTION = 4
+EXIT_NO_TRANSCRIPT = 5
+EXIT_PARTIAL = 6
+
+VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+VIDEO_URL_PATTERNS = (
+    re.compile(r"(?:youtu\.be/|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{11})"),
+    re.compile(r"[?&]v=([A-Za-z0-9_-]{11})"),
+)
+
+
+class YoutubeCliError(RuntimeError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        exit_code: int = EXIT_EXTRACTION,
+        hint: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.exit_code = exit_code
+        self.hint = hint
+        self.details = details or {}
+
+
+@dataclass
+class CliResult:
+    payload: dict[str, Any]
+    exit_code: int = 0
+
+
+class YoutubeArgumentParser(argparse.ArgumentParser):
+    json_errors = False
+
+    def error(self, message: str) -> None:
+        if self.json_errors:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "command": "parse",
+                        "error": {
+                            "code": "invalid-arguments",
+                            "message": message,
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            raise SystemExit(EXIT_INVALID_ARGUMENTS)
+        super().error(message)
+
+
+def installation_hint() -> str:
+    return "Install it with brew install yt-dlp or uv tool install yt-dlp."
+
+
+def probe_ytdlp(explicit_path: str | None = None) -> dict[str, Any]:
+    candidate = explicit_path or shutil.which("yt-dlp")
+    if not candidate:
+        return {
+            "preflight_state": "missing",
+            "path": None,
+            "version": None,
+            "message": "yt-dlp is required but was not found.",
+            "hint": installation_hint(),
+        }
+
+    resolved = str(Path(candidate).expanduser().resolve())
+    try:
+        completed = subprocess.run(
+            [resolved, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=PREFLIGHT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {
+            "preflight_state": "broken",
+            "path": resolved,
+            "version": None,
+            "message": f"yt-dlp could not run: {exc}",
+            "hint": installation_hint(),
+        }
+
+    version = completed.stdout.strip()
+    if completed.returncode != 0 or not version:
+        diagnostic = (completed.stderr or completed.stdout).strip()
+        return {
+            "preflight_state": "broken",
+            "path": resolved,
+            "version": None,
+            "message": "yt-dlp did not report a usable version.",
+            "diagnostic": clip_text(diagnostic, 600) if diagnostic else None,
+            "hint": installation_hint(),
+        }
+
+    return {
+        "preflight_state": "ready",
+        "path": resolved,
+        "version": version,
+        "message": "yt-dlp is ready.",
+        "hint": None,
+    }
+
+
+def require_ytdlp(explicit_path: str | None = None) -> dict[str, Any]:
+    result = probe_ytdlp(explicit_path)
+    if result["preflight_state"] == "ready":
+        return result
+    code = (
+        "yt-dlp-missing" if result["preflight_state"] == "missing" else "yt-dlp-broken"
+    )
+    raise YoutubeCliError(
+        code,
+        result["message"],
+        exit_code=EXIT_DEPENDENCY,
+        hint=result.get("hint"),
+        details={
+            key: value
+            for key, value in result.items()
+            if key not in {"message", "hint"}
+        },
+    )
+
+
+def clip_text(value: str, limit: int) -> str:
+    compact = re.sub(r"\s+", " ", value).strip()
+    if len(compact) <= limit:
+        return compact
+    clipped = compact[: limit - 1].rsplit(" ", 1)[0]
+    return f"{clipped}…"
+
+
+def ytdlp_error(stderr: str, returncode: int) -> YoutubeCliError:
+    lowered = stderr.casefold()
+    diagnostic = clip_text(stderr, 900)
+    details = {"returncode": returncode, "diagnostic": diagnostic}
+    if "private video" in lowered or "sign in" in lowered or "login" in lowered:
+        return YoutubeCliError(
+            "authentication-required",
+            "YouTube requires authenticated access for this resource.",
+            hint="Retry only with explicit authorization and --cookies-from-browser BROWSER.",
+            details=details,
+        )
+    if "no subtitles" in lowered or "no automatic captions" in lowered:
+        return YoutubeCliError(
+            "no-transcript",
+            "No compatible transcript is available for this video.",
+            exit_code=EXIT_NO_TRANSCRIPT,
+            details=details,
+        )
+    if "unsupported url" in lowered or "invalid url" in lowered:
+        return YoutubeCliError(
+            "invalid-youtube-input",
+            "The supplied YouTube URL or ID is not supported.",
+            details=details,
+        )
+    return YoutubeCliError(
+        "yt-dlp-failed",
+        "yt-dlp could not complete the requested YouTube read.",
+        details=details,
+    )
+
+
+def run_ytdlp(
+    executable: str,
+    arguments: Sequence[str],
+    *,
+    cookies_from_browser: str | None = None,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
+    command = [executable, "--ignore-config", "--no-warnings"]
+    if cookies_from_browser:
+        command.extend(["--cookies-from-browser", cookies_from_browser])
+    command.extend(arguments)
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise YoutubeCliError(
+            "yt-dlp-timeout",
+            f"yt-dlp exceeded the {timeout}-second operation timeout.",
+        ) from exc
+    except OSError as exc:
+        raise YoutubeCliError(
+            "yt-dlp-execution-failed",
+            f"yt-dlp could not be executed: {exc}",
+            exit_code=EXIT_DEPENDENCY,
+            hint=installation_hint(),
+        ) from exc
+    if completed.returncode != 0:
+        raise ytdlp_error(completed.stderr or completed.stdout, completed.returncode)
+    return completed
+
+
+def run_ytdlp_json(
+    executable: str,
+    arguments: Sequence[str],
+    *,
+    cookies_from_browser: str | None = None,
+) -> dict[str, Any]:
+    completed = run_ytdlp(
+        executable,
+        arguments,
+        cookies_from_browser=cookies_from_browser,
+    )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise YoutubeCliError(
+            "yt-dlp-json-invalid",
+            "yt-dlp returned output that was not valid JSON.",
+            details={"diagnostic": clip_text(completed.stdout, 600)},
+        ) from exc
+    if not isinstance(payload, dict):
+        raise YoutubeCliError(
+            "yt-dlp-json-invalid",
+            "yt-dlp returned an unexpected JSON value.",
+        )
+    return payload
+
+
+def extract_video_id(value: str) -> str | None:
+    stripped = value.strip()
+    if VIDEO_ID_RE.fullmatch(stripped):
+        return stripped
+    for pattern in VIDEO_URL_PATTERNS:
+        match = pattern.search(stripped)
+        if match:
+            return match.group(1)
+    return None
+
+
+def canonical_video_url(video_id: str) -> str:
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def moment_url(video_id: str, start_seconds: float) -> str:
+    return f"https://youtu.be/{video_id}?t={max(0, int(start_seconds))}"
+
+
+def normalized_date(value: Any) -> str | None:
+    text = str(value or "")
+    if re.fullmatch(r"\d{8}", text):
+        return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+    return text or None
+
+
+def number_or_none(value: Any) -> int | float | None:
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value) if "." in str(value) else int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_video(entry: dict[str, Any]) -> dict[str, Any]:
+    video_id = str(entry.get("id") or entry.get("video_id") or "")
+    raw_url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+    if isinstance(raw_url, str) and raw_url.startswith(("http://", "https://")):
+        url = raw_url
+    else:
+        url = canonical_video_url(video_id) if video_id else None
+    return {
+        "video_id": video_id or None,
+        "title": html.unescape(str(entry.get("title") or "")) or None,
+        "channel": entry.get("channel")
+        or entry.get("uploader")
+        or entry.get("channel_title"),
+        "channel_id": entry.get("channel_id") or entry.get("uploader_id"),
+        "duration_seconds": number_or_none(entry.get("duration")),
+        "published_at": normalized_date(
+            entry.get("upload_date") or entry.get("release_date")
+        ),
+        "view_count": number_or_none(entry.get("view_count")),
+        "description": entry.get("description"),
+        "live_status": entry.get("live_status"),
+        "url": url,
+    }
+
+
+def normalize_for_search(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value.casefold())
+    without_marks = "".join(
+        char for char in decomposed if not unicodedata.combining(char)
+    )
+    return re.sub(r"\s+", " ", without_marks).strip()
+
+
+def query_tokens(query: str) -> list[str]:
+    return re.findall(r"\w+", normalize_for_search(query), flags=re.UNICODE)
+
+
+def text_matches(text: str, query: str, match_mode: str) -> bool:
+    normalized = normalize_for_search(text)
+    phrase = normalize_for_search(query)
+    tokens = query_tokens(query)
+    if match_mode == "phrase":
+        return bool(phrase) and phrase in normalized
+    if not tokens:
+        return False
+    if match_mode == "any":
+        return any(token in normalized for token in tokens)
+    return all(token in normalized for token in tokens)
+
+
+def normalize_segment_text(value: str) -> str:
+    text = value.replace("\u200b", " ").replace("\ufeff", " ")
+    return re.sub(r"\s+", " ", html.unescape(html.unescape(text))).strip()
+
+
+def deduplicate_segments(segments: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for raw in sorted(segments, key=lambda item: float(item["start_seconds"])):
+        text = normalize_segment_text(str(raw.get("text") or ""))
+        if not text:
+            continue
+        current = {
+            "start_seconds": round(float(raw.get("start_seconds") or 0.0), 3),
+            "duration_seconds": round(float(raw.get("duration_seconds") or 0.0), 3),
+            "text": text,
+        }
+        if not result:
+            result.append(current)
+            continue
+        previous = result[-1]
+        previous_text = normalize_for_search(previous["text"])
+        current_text = normalize_for_search(text)
+        close = current["start_seconds"] <= (
+            previous["start_seconds"] + previous["duration_seconds"] + 3.0
+        )
+        if current_text == previous_text:
+            previous["duration_seconds"] = round(
+                max(
+                    previous["duration_seconds"],
+                    current["start_seconds"]
+                    + current["duration_seconds"]
+                    - previous["start_seconds"],
+                ),
+                3,
+            )
+        elif close and current_text.startswith(previous_text):
+            previous["text"] = text
+            previous["duration_seconds"] = round(
+                current["start_seconds"]
+                + current["duration_seconds"]
+                - previous["start_seconds"],
+                3,
+            )
+        elif close and previous_text.startswith(current_text):
+            continue
+        else:
+            result.append(current)
+    return result
+
+
+def parse_srv1(path: Path) -> list[dict[str, Any]]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise YoutubeCliError(
+            "caption-parse-failed",
+            "The downloaded srv1 caption file could not be parsed.",
+        ) from exc
+    segments = []
+    for node in root.findall(".//text"):
+        text = "".join(node.itertext())
+        segments.append(
+            {
+                "start_seconds": float(node.attrib.get("start", "0") or 0),
+                "duration_seconds": float(node.attrib.get("dur", "0") or 0),
+                "text": text,
+            }
+        )
+    return deduplicate_segments(segments)
+
+
+def parse_json3(path: Path) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise YoutubeCliError(
+            "caption-parse-failed",
+            "The downloaded json3 caption file could not be parsed.",
+        ) from exc
+    segments = []
+    for event in payload.get("events", []):
+        pieces = [str(piece.get("utf8") or "") for piece in event.get("segs", [])]
+        text = "".join(pieces)
+        if not text.strip():
+            continue
+        segments.append(
+            {
+                "start_seconds": float(event.get("tStartMs", 0)) / 1000.0,
+                "duration_seconds": float(event.get("dDurationMs", 0)) / 1000.0,
+                "text": text,
+            }
+        )
+    return deduplicate_segments(segments)
+
+
+def available_caption_tracks(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    tracks: list[dict[str, Any]] = []
+    original_language = str(metadata.get("language") or "") or None
+    for source, field in (("manual", "subtitles"), ("automatic", "automatic_captions")):
+        collection = metadata.get(field) or {}
+        if not isinstance(collection, dict):
+            continue
+        has_explicit_original = any(
+            str(candidate_language).casefold().endswith("-orig")
+            or any(
+                isinstance(item, dict)
+                and "original" in str(item.get("name") or "").casefold()
+                for item in candidate_formats
+            )
+            for candidate_language, candidate_formats in collection.items()
+            if isinstance(candidate_formats, list)
+        )
+        for language, formats in collection.items():
+            if language == "live_chat" or not isinstance(formats, list):
+                continue
+            urls = [
+                str(item.get("url") or "") for item in formats if isinstance(item, dict)
+            ]
+            original_automatic = source == "automatic" and any(
+                "tlang" not in urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+                for url in urls
+                if url
+            )
+            name = next(
+                (
+                    str(item.get("name"))
+                    for item in formats
+                    if isinstance(item, dict) and item.get("name")
+                ),
+                str(language),
+            )
+            explicitly_original = (
+                str(language).casefold().endswith("-orig")
+                or "original" in name.casefold()
+            )
+            tracks.append(
+                {
+                    "language": str(language),
+                    "name": name,
+                    "caption_source": source,
+                    "is_generated": source == "automatic",
+                    "is_original": explicitly_original
+                    or (
+                        not has_explicit_original
+                        and (
+                            original_automatic
+                            or bool(
+                                original_language
+                                and str(language).casefold()
+                                == original_language.casefold()
+                            )
+                        )
+                    ),
+                    "formats": [
+                        {
+                            "ext": item.get("ext"),
+                            "name": item.get("name"),
+                            "url": item.get("url"),
+                        }
+                        for item in formats
+                        if isinstance(item, dict)
+                    ],
+                }
+            )
+    return tracks
+
+
+def language_matches(actual: str, requested: str) -> bool:
+    actual_normalized = actual.replace("_", "-").casefold()
+    requested_normalized = requested.replace("_", "-").casefold()
+    if actual_normalized == requested_normalized:
+        return True
+    return actual_normalized.split("-", 1)[0] == requested_normalized.split("-", 1)[0]
+
+
+def parse_languages(value: str) -> list[str]:
+    languages = [item.strip() for item in value.split(",") if item.strip()]
+    if not languages:
+        raise YoutubeCliError(
+            "invalid-languages",
+            "--languages must contain at least one language code or auto.",
+            exit_code=EXIT_INVALID_ARGUMENTS,
+        )
+    return languages
+
+
+def select_caption_track(
+    tracks: list[dict[str, Any]],
+    preferred_languages: Sequence[str],
+) -> dict[str, Any]:
+    explicit = [language for language in preferred_languages if language != "auto"]
+    if explicit:
+        for requested in explicit:
+            candidates = [
+                track
+                for track in tracks
+                if language_matches(track["language"], requested)
+            ]
+            manual = [
+                track for track in candidates if track["caption_source"] == "manual"
+            ]
+            if manual:
+                return manual[0]
+            if candidates:
+                original = [track for track in candidates if track["is_original"]]
+                return original[0] if original else candidates[0]
+    else:
+        original_manual = [
+            track
+            for track in tracks
+            if track["caption_source"] == "manual" and track["is_original"]
+        ]
+        if original_manual:
+            return original_manual[0]
+        manual = [track for track in tracks if track["caption_source"] == "manual"]
+        if manual:
+            return manual[0]
+        original_automatic = [
+            track
+            for track in tracks
+            if track["caption_source"] == "automatic" and track["is_original"]
+        ]
+        if original_automatic:
+            return original_automatic[0]
+        automatic = [
+            track for track in tracks if track["caption_source"] == "automatic"
+        ]
+        if automatic:
+            return automatic[0]
+    raise YoutubeCliError(
+        "no-transcript",
+        "No compatible transcript is available for the requested languages.",
+        exit_code=EXIT_NO_TRANSCRIPT,
+        details={
+            "requested_languages": list(preferred_languages),
+            "available_languages": [track["language"] for track in tracks],
+        },
+    )
+
+
+def selected_caption_format(track: dict[str, Any]) -> str:
+    extensions = [str(item.get("ext") or "") for item in track.get("formats", [])]
+    for preferred in ("srv1", "json3"):
+        if preferred in extensions:
+            return preferred
+    raise YoutubeCliError(
+        "caption-format-unsupported",
+        "The selected caption track has neither srv1 nor json3 data.",
+        exit_code=EXIT_NO_TRANSCRIPT,
+        details={"available_formats": sorted(set(filter(None, extensions)))},
+    )
+
+
+def video_metadata(
+    executable: str,
+    video: str,
+    *,
+    cookies_from_browser: str | None = None,
+) -> dict[str, Any]:
+    return run_ytdlp_json(
+        executable,
+        ["--skip-download", "--no-playlist", "--dump-single-json", "--", video],
+        cookies_from_browser=cookies_from_browser,
+    )
+
+
+def download_caption(
+    executable: str,
+    video: str,
+    video_id: str,
+    track: dict[str, Any],
+    *,
+    cookies_from_browser: str | None = None,
+) -> list[dict[str, Any]]:
+    caption_format = selected_caption_format(track)
+    if track["caption_source"] == "manual":
+        source_args = ["--write-subs", "--no-write-auto-subs"]
+    else:
+        source_args = ["--no-write-subs", "--write-auto-subs"]
+    with tempfile.TemporaryDirectory(prefix="dotagents-youtube-") as directory:
+        destination = Path(directory)
+        run_ytdlp(
+            executable,
+            [
+                "--skip-download",
+                "--no-playlist",
+                *source_args,
+                "--sub-langs",
+                track["language"],
+                "--sub-format",
+                caption_format,
+                "--paths",
+                str(destination),
+                "--output",
+                "%(id)s.%(ext)s",
+                "--",
+                video,
+            ],
+            cookies_from_browser=cookies_from_browser,
+        )
+        candidates = sorted(destination.glob(f"{video_id}*.{caption_format}"))
+        if not candidates:
+            candidates = sorted(destination.glob(f"*.{caption_format}"))
+        if not candidates:
+            raise YoutubeCliError(
+                "caption-download-missing",
+                "yt-dlp completed without producing the selected caption file.",
+            )
+        segments = (
+            parse_srv1(candidates[0])
+            if caption_format == "srv1"
+            else parse_json3(candidates[0])
+        )
+    if not segments:
+        raise YoutubeCliError(
+            "no-transcript",
+            "The selected caption track contained no spoken segments.",
+            exit_code=EXIT_NO_TRANSCRIPT,
+        )
+    return segments
+
+
+def cache_directory(video_id: str) -> Path:
+    return CACHE_ROOT / "transcripts" / video_id
+
+
+def cache_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9-]+", "-", value.casefold().replace("_", "-"))
+    return re.sub(r"-+", "-", slug).strip("-") or "unknown"
+
+
+def compatible_cached_transcript(
+    video_id: str,
+    preferred_languages: Sequence[str],
+) -> tuple[dict[str, Any], Path] | None:
+    directory = cache_directory(video_id)
+    if not directory.is_dir():
+        return None
+    records: list[tuple[dict[str, Any], Path]] = []
+    for path in directory.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("schema_version") != CACHE_SCHEMA_VERSION:
+            continue
+        if payload.get("video", {}).get("video_id") != video_id:
+            continue
+        records.append((payload, path))
+    if not records:
+        return None
+    explicit = [language for language in preferred_languages if language != "auto"]
+
+    def preference(record: tuple[dict[str, Any], Path]) -> tuple[int, float]:
+        transcript = record[0].get("transcript", {})
+        source = transcript.get("caption_source")
+        is_original = bool(transcript.get("is_original"))
+        if source == "manual" and is_original:
+            rank = 4
+        elif source == "manual":
+            rank = 3
+        elif source == "automatic" and is_original:
+            rank = 2
+        else:
+            rank = 1
+        return rank, record[1].stat().st_mtime
+
+    if explicit:
+        for requested in explicit:
+            matches = [
+                record
+                for record in records
+                if language_matches(
+                    record[0].get("transcript", {}).get("language", ""), requested
+                )
+            ]
+            if matches:
+                return max(matches, key=preference)
+        return None
+    return max(records, key=preference)
+
+
+def write_cache(payload: dict[str, Any]) -> Path:
+    video_id = payload["video"]["video_id"]
+    transcript = payload["transcript"]
+    directory = cache_directory(video_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    filename = f"{cache_slug(transcript['caption_source'])}-{cache_slug(transcript['language'])}.json"
+    destination = directory / filename
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=f".{filename}.",
+            delete=False,
+        ) as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            temporary_path = Path(handle.name)
+        os.replace(temporary_path, destination)
+    finally:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
+    return destination
+
+
+def get_transcript(
+    executable: str,
+    video: str,
+    *,
+    languages: Sequence[str],
+    refresh: bool,
+    no_cache: bool,
+    cookies_from_browser: str | None,
+) -> dict[str, Any]:
+    video_id_hint = extract_video_id(video)
+    if not refresh and not no_cache and video_id_hint:
+        cached = compatible_cached_transcript(video_id_hint, languages)
+        if cached:
+            payload, path = cached
+            result = dict(payload)
+            result["cache_state"] = "hit"
+            result["cache_path"] = str(path)
+            return result
+
+    metadata = video_metadata(
+        executable,
+        video,
+        cookies_from_browser=cookies_from_browser,
+    )
+    normalized_video = normalize_video(metadata)
+    video_id = normalized_video.get("video_id")
+    if not video_id:
+        raise YoutubeCliError(
+            "video-id-missing",
+            "yt-dlp did not resolve a stable YouTube video ID.",
+        )
+    if not refresh and not no_cache and video_id != video_id_hint:
+        cached = compatible_cached_transcript(video_id, languages)
+        if cached:
+            payload, path = cached
+            result = dict(payload)
+            result["cache_state"] = "hit"
+            result["cache_path"] = str(path)
+            return result
+
+    tracks = available_caption_tracks(metadata)
+    track = select_caption_track(tracks, languages)
+    source_video = normalized_video.get("url") or video
+    segments = download_caption(
+        executable,
+        source_video,
+        video_id,
+        track,
+        cookies_from_browser=cookies_from_browser,
+    )
+    payload = {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "video": normalized_video,
+        "transcript": {
+            "language": track["language"],
+            "name": track["name"],
+            "caption_source": track["caption_source"],
+            "is_generated": track["is_generated"],
+            "is_original": track["is_original"],
+            "segment_count": len(segments),
+            "segments": segments,
+        },
+    }
+    if no_cache:
+        result = dict(payload)
+        result["cache_state"] = "disabled"
+        result["cache_path"] = None
+        return result
+    path = write_cache(payload)
+    result = dict(payload)
+    result["cache_state"] = "refreshed" if refresh else "miss"
+    result["cache_path"] = str(path)
+    return result
+
+
+def list_playlist(
+    executable: str,
+    playlist: str,
+    *,
+    limit: int,
+    cookies_from_browser: str | None,
+) -> dict[str, Any]:
+    arguments = ["--flat-playlist"]
+    if limit > 0:
+        arguments.extend(["--playlist-end", str(limit)])
+    arguments.extend(["--dump-single-json", "--", playlist])
+    payload = run_ytdlp_json(
+        executable,
+        arguments,
+        cookies_from_browser=cookies_from_browser,
+    )
+    entries = [
+        normalize_video(entry)
+        for entry in payload.get("entries", [])
+        if isinstance(entry, dict)
+    ]
+    total_count = number_or_none(
+        payload.get("playlist_count") or payload.get("n_entries")
+    )
+    if isinstance(total_count, float):
+        total_count = int(total_count)
+    if limit > 0:
+        truncated = (
+            bool(total_count > len(entries))
+            if total_count is not None
+            else len(entries) >= limit
+        )
+    else:
+        truncated = False
+    return {
+        "playlist": {
+            "playlist_id": payload.get("id"),
+            "title": payload.get("title"),
+            "channel": payload.get("channel") or payload.get("uploader"),
+            "channel_id": payload.get("channel_id") or payload.get("uploader_id"),
+            "url": payload.get("webpage_url")
+            or payload.get("original_url")
+            or playlist,
+            "total_count": total_count,
+        },
+        "entries": entries,
+        "truncated": truncated,
+        "scope_state": "limited" if truncated else "complete",
+    }
+
+
+def search_segments(
+    segments: Sequence[dict[str, Any]],
+    query: str,
+    *,
+    match_mode: str,
+    max_matches: int,
+    video_id: str,
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    phrase = normalize_for_search(query)
+    tokens = query_tokens(query)
+    for index, segment in enumerate(segments):
+        start = float(segment["start_seconds"])
+        window: list[dict[str, Any]] = []
+        for following in segments[index : index + 6]:
+            if window and float(following["start_seconds"]) - start > 45:
+                break
+            window.append(following)
+        text = " ".join(str(item["text"]) for item in window)
+        if not text_matches(text, query, match_mode):
+            continue
+        normalized = normalize_for_search(text)
+        if phrase and phrase in normalized:
+            score = 100 + normalized.count(phrase)
+        else:
+            score = sum(normalized.count(token) for token in tokens)
+        end = max(
+            float(item["start_seconds"]) + float(item["duration_seconds"])
+            for item in window
+        )
+        candidates.append(
+            {
+                "start_seconds": round(start, 3),
+                "duration_seconds": round(max(0.0, end - start), 3),
+                "text": clip_text(text, 600),
+                "score": score,
+                "url": moment_url(video_id, start),
+            }
+        )
+    selected: list[dict[str, Any]] = []
+    for candidate in sorted(
+        candidates, key=lambda item: (-item["score"], item["start_seconds"])
+    ):
+        if any(
+            abs(candidate["start_seconds"] - kept["start_seconds"]) < 20
+            for kept in selected
+        ):
+            continue
+        selected.append(candidate)
+        if len(selected) >= max_matches:
+            break
+    return sorted(selected, key=lambda item: item["start_seconds"])
+
+
+def command_name(args: argparse.Namespace) -> str:
+    operation = getattr(args, "operation", None)
+    return f"{args.command}.{operation}" if operation else args.command
+
+
+def doctor_result(args: argparse.Namespace) -> CliResult:
+    probe = probe_ytdlp(args.yt_dlp)
+    return CliResult(
+        {
+            "ok": probe["preflight_state"] == "ready",
+            "command": "doctor",
+            "cli_version": VERSION,
+            "python_version": platform.python_version(),
+            "preflight_state": probe["preflight_state"],
+            "yt_dlp": {
+                "path": probe.get("path"),
+                "version": probe.get("version"),
+                "message": probe.get("message"),
+                "hint": probe.get("hint"),
+            },
+            "cache": {
+                "path": str(CACHE_ROOT),
+                "exists": CACHE_ROOT.exists(),
+                "created_by_doctor": False,
+            },
+            "network_required_for_reads": True,
+            "authentication_required_for_public_reads": False,
+        }
+    )
+
+
+def preflight_result(probe: dict[str, Any]) -> CliResult:
+    return CliResult(
+        {
+            "ok": True,
+            "command": "preflight",
+            "preflight_state": "ready",
+            "yt_dlp": {
+                "path": probe["path"],
+                "version": probe["version"],
+            },
+        }
+    )
+
+
+def videos_search_result(args: argparse.Namespace, executable: str) -> CliResult:
+    prefix = "ytsearchdate" if args.order == "date" else "ytsearch"
+    payload = run_ytdlp_json(
+        executable,
+        [
+            "--flat-playlist",
+            "--playlist-end",
+            str(args.limit),
+            "--dump-single-json",
+            "--",
+            f"{prefix}{args.limit}:{args.query}",
+        ],
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    results = [
+        normalize_video(entry)
+        for entry in payload.get("entries", [])
+        if isinstance(entry, dict)
+    ]
+    return CliResult(
+        {
+            "ok": True,
+            "command": "videos.search",
+            "query": args.query,
+            "order": args.order,
+            "result_state": "complete" if results else "empty",
+            "result_count": len(results),
+            "results": results,
+        }
+    )
+
+
+def playlists_list_result(args: argparse.Namespace, executable: str) -> CliResult:
+    result = list_playlist(
+        executable,
+        args.playlist,
+        limit=args.limit,
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    entries = result["entries"]
+    if args.query:
+        entries = [
+            entry
+            for entry in entries
+            if text_matches(
+                " ".join(
+                    str(entry.get(field) or "")
+                    for field in ("title", "channel", "description")
+                ),
+                args.query,
+                args.match,
+            )
+        ]
+    payload = {
+        "ok": True,
+        "command": "playlists.list",
+        "playlist": result["playlist"],
+        "query": args.query,
+        "match_mode": args.match if args.query else None,
+        "scope_state": result["scope_state"],
+        "truncated": result["truncated"],
+        "listed_count": len(result["entries"]),
+        "result_state": "complete" if entries else "empty",
+        "result_count": len(entries),
+        "results": entries,
+    }
+    return CliResult(payload)
+
+
+def transcripts_languages_result(
+    args: argparse.Namespace, executable: str
+) -> CliResult:
+    metadata = video_metadata(
+        executable,
+        args.video,
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    tracks = available_caption_tracks(metadata)
+    return CliResult(
+        {
+            "ok": True,
+            "command": "transcripts.languages",
+            "video": normalize_video(metadata),
+            "result_state": "complete" if tracks else "empty",
+            "result_count": len(tracks),
+            "tracks": [
+                {key: value for key, value in track.items() if key != "formats"}
+                | {
+                    "formats": sorted(
+                        {
+                            str(item.get("ext"))
+                            for item in track["formats"]
+                            if item.get("ext")
+                        }
+                    )
+                }
+                for track in tracks
+            ],
+        }
+    )
+
+
+def transcripts_get_result(args: argparse.Namespace, executable: str) -> CliResult:
+    payload = get_transcript(
+        executable,
+        args.video,
+        languages=parse_languages(args.languages),
+        refresh=args.refresh,
+        no_cache=args.no_cache,
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    return CliResult(
+        {
+            "ok": True,
+            "command": "transcripts.get",
+            "result_state": "complete",
+            **payload,
+        }
+    )
+
+
+def playlists_search_transcripts_result(
+    args: argparse.Namespace,
+    executable: str,
+) -> CliResult:
+    playlist_result = list_playlist(
+        executable,
+        args.playlist,
+        limit=args.max_videos,
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    matches = []
+    failures = []
+    languages = parse_languages(args.languages)
+    entries = playlist_result["entries"]
+    for index, video in enumerate(entries, 1):
+        video_id = video.get("video_id")
+        video_url = video.get("url")
+        print(
+            f"[{index}/{len(entries)}] transcript {video_id or video_url or 'unknown'}",
+            file=sys.stderr,
+        )
+        if not video_id or not video_url:
+            failures.append(
+                {
+                    "video": video,
+                    "error": {
+                        "code": "video-id-missing",
+                        "message": "Playlist entry has no stable video ID or URL.",
+                    },
+                }
+            )
+            continue
+        try:
+            transcript_payload = get_transcript(
+                executable,
+                video_url,
+                languages=languages,
+                refresh=args.refresh,
+                no_cache=args.no_cache,
+                cookies_from_browser=args.cookies_from_browser,
+            )
+        except YoutubeCliError as exc:
+            failures.append(
+                {
+                    "video": video,
+                    "error": error_object(exc),
+                }
+            )
+            continue
+        transcript_matches = search_segments(
+            transcript_payload["transcript"]["segments"],
+            args.query,
+            match_mode=args.match,
+            max_matches=args.max_matches_per_video,
+            video_id=video_id,
+        )
+        if transcript_matches:
+            matches.append(
+                {
+                    "video": transcript_payload["video"],
+                    "transcript": {
+                        "language": transcript_payload["transcript"]["language"],
+                        "caption_source": transcript_payload["transcript"][
+                            "caption_source"
+                        ],
+                        "cache_state": transcript_payload["cache_state"],
+                    },
+                    "matches": transcript_matches,
+                }
+            )
+    if failures:
+        result_state = "partial"
+    elif matches:
+        result_state = "complete"
+    else:
+        result_state = "empty"
+    payload = {
+        "ok": not failures,
+        "command": "playlists.search-transcripts",
+        "playlist": playlist_result["playlist"],
+        "query": args.query,
+        "match_mode": args.match,
+        "scope_state": playlist_result["scope_state"],
+        "truncated": playlist_result["truncated"],
+        "result_state": result_state,
+        "scanned_count": len(entries),
+        "matched_video_count": len(matches),
+        "failed_count": len(failures),
+        "results": matches,
+        "failures": failures,
+    }
+    return CliResult(payload, EXIT_PARTIAL if failures else 0)
+
+
+def render_human(payload: dict[str, Any], args: argparse.Namespace) -> None:
+    command = payload.get("command")
+    if command == "doctor":
+        print(f"youtube {payload['cli_version']}")
+        print(f"yt-dlp: {payload['preflight_state']}")
+        if payload["yt_dlp"].get("version"):
+            print(f"version: {payload['yt_dlp']['version']}")
+        elif payload["yt_dlp"].get("hint"):
+            print(payload["yt_dlp"]["hint"])
+        return
+    if command == "preflight":
+        print(f"yt-dlp {payload['yt_dlp']['version']} ({payload['yt_dlp']['path']})")
+        return
+    if command in {"videos.search", "playlists.list"}:
+        for video in payload["results"]:
+            print(
+                " | ".join(
+                    str(value or "")
+                    for value in (
+                        video.get("video_id"),
+                        video.get("title"),
+                        video.get("channel"),
+                        video.get("url"),
+                    )
+                )
+            )
+        return
+    if command == "transcripts.languages":
+        for track in payload["tracks"]:
+            print(
+                f"{track['language']} | {track['caption_source']} | "
+                f"original={str(track['is_original']).lower()} | {track['name']}"
+            )
+        return
+    if command == "transcripts.get":
+        for segment in payload["transcript"]["segments"]:
+            if args.timestamps:
+                print(
+                    f"[{format_timestamp(segment['start_seconds'])}] {segment['text']}"
+                )
+            else:
+                print(segment["text"], end=" ")
+        if not args.timestamps:
+            print()
+        return
+    if command == "playlists.search-transcripts":
+        for result in payload["results"]:
+            print(f"\n{result['video'].get('title')} — {result['video'].get('url')}")
+            for match in result["matches"]:
+                print(f"  [{format_timestamp(match['start_seconds'])}] {match['text']}")
+                print(f"  {match['url']}")
+        if payload["failures"]:
+            print(
+                f"\n{len(payload['failures'])} video(s) could not be searched.",
+                file=sys.stderr,
+            )
+
+
+def format_timestamp(seconds: float) -> str:
+    total = max(0, int(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def error_object(error: YoutubeCliError) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "code": error.code,
+        "message": str(error),
+    }
+    if error.hint:
+        payload["hint"] = error.hint
+    if error.details:
+        payload["details"] = error.details
+    return payload
+
+
+def emit_error(error: YoutubeCliError, *, command: str, json_mode: bool) -> None:
+    payload = {
+        "ok": False,
+        "command": command,
+        "error": error_object(error),
+    }
+    if json_mode:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"Error: {error}", file=sys.stderr)
+        if error.hint:
+            print(error.hint, file=sys.stderr)
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
+def nonnegative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be 0 or greater")
+    return parsed
+
+
+def bounded_search_limit(value: str) -> int:
+    parsed = positive_int(value)
+    if parsed > 50:
+        raise argparse.ArgumentTypeError("must not exceed 50")
+    return parsed
+
+
+def add_cookie_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--cookies-from-browser",
+        metavar="BROWSER",
+        help="Use an explicitly authorized local browser session for account-scoped content",
+    )
+
+
+def add_match_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--match",
+        choices=("all", "any", "phrase"),
+        default="all",
+        help="How normalized query terms must match (default: all)",
+    )
+
+
+def parser() -> YoutubeArgumentParser:
+    result = YoutubeArgumentParser(
+        prog="youtube",
+        description="Search YouTube and retrieve or search timestamped transcripts through yt-dlp.",
+    )
+    result.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+    result.add_argument(
+        "--json", action="store_true", help="Emit stable JSON to stdout"
+    )
+    result.add_argument(
+        "--yt-dlp", metavar="PATH", help="Use an explicit yt-dlp executable"
+    )
+    commands = result.add_subparsers(dest="command")
+
+    commands.add_parser(
+        "doctor", help="Inspect CLI and yt-dlp readiness without network access"
+    )
+    commands.add_parser(
+        "preflight", help="Require a runnable yt-dlp before any YouTube read"
+    )
+
+    videos = commands.add_parser("videos", help="Discover YouTube videos")
+    video_commands = videos.add_subparsers(dest="operation")
+    video_search = video_commands.add_parser("search", help="Search YouTube for videos")
+    video_search.add_argument("query")
+    video_search.add_argument("--limit", type=bounded_search_limit, default=10)
+    video_search.add_argument(
+        "--order", choices=("relevance", "date"), default="relevance"
+    )
+    add_cookie_option(video_search)
+
+    playlists = commands.add_parser(
+        "playlists", help="Inspect and search YouTube playlists"
+    )
+    playlist_commands = playlists.add_subparsers(dest="operation")
+    playlist_list = playlist_commands.add_parser(
+        "list", help="List and filter playlist videos"
+    )
+    playlist_list.add_argument("playlist")
+    playlist_list.add_argument("--limit", type=nonnegative_int, default=0)
+    playlist_list.add_argument("--query")
+    add_match_option(playlist_list)
+    add_cookie_option(playlist_list)
+
+    playlist_search = playlist_commands.add_parser(
+        "search-transcripts",
+        help="Search timestamped spoken content across playlist videos",
+    )
+    playlist_search.add_argument("playlist")
+    playlist_search.add_argument("query")
+    playlist_search.add_argument("--max-videos", type=nonnegative_int, default=50)
+    playlist_search.add_argument("--languages", default="auto")
+    playlist_search.add_argument(
+        "--max-matches-per-video", type=positive_int, default=3
+    )
+    playlist_search.add_argument("--refresh", action="store_true")
+    playlist_search.add_argument("--no-cache", action="store_true")
+    add_match_option(playlist_search)
+    add_cookie_option(playlist_search)
+
+    transcripts = commands.add_parser(
+        "transcripts", help="Inspect and retrieve video captions"
+    )
+    transcript_commands = transcripts.add_subparsers(dest="operation")
+    transcript_languages = transcript_commands.add_parser(
+        "languages",
+        help="List manual and automatic caption tracks",
+    )
+    transcript_languages.add_argument("video")
+    add_cookie_option(transcript_languages)
+
+    transcript_get = transcript_commands.add_parser(
+        "get", help="Retrieve one normalized transcript"
+    )
+    transcript_get.add_argument("video")
+    transcript_get.add_argument("--languages", default="auto")
+    transcript_get.add_argument(
+        "--timestamps",
+        action="store_true",
+        help="Include timestamps in human output; JSON always retains timing",
+    )
+    transcript_get.add_argument("--refresh", action="store_true")
+    transcript_get.add_argument("--no-cache", action="store_true")
+    add_cookie_option(transcript_get)
+    return result
+
+
+def dispatch(args: argparse.Namespace) -> CliResult:
+    if args.command == "doctor":
+        return doctor_result(args)
+    probe = require_ytdlp(args.yt_dlp)
+    executable = probe["path"]
+    if args.command == "preflight":
+        return preflight_result(probe)
+    if args.command == "videos" and args.operation == "search":
+        return videos_search_result(args, executable)
+    if args.command == "playlists" and args.operation == "list":
+        return playlists_list_result(args, executable)
+    if args.command == "playlists" and args.operation == "search-transcripts":
+        return playlists_search_transcripts_result(args, executable)
+    if args.command == "transcripts" and args.operation == "languages":
+        return transcripts_languages_result(args, executable)
+    if args.command == "transcripts" and args.operation == "get":
+        return transcripts_get_result(args, executable)
+    raise YoutubeCliError(
+        "command-required",
+        "Choose a complete command; run --help for the available surface.",
+        exit_code=EXIT_INVALID_ARGUMENTS,
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(argv if argv is not None else sys.argv[1:])
+    cli_parser = parser()
+    cli_parser.json_errors = "--json" in arguments
+    if not arguments:
+        cli_parser.print_help(sys.stderr)
+        return EXIT_INVALID_ARGUMENTS
+    try:
+        args = cli_parser.parse_args(arguments)
+        if not args.command:
+            raise YoutubeCliError(
+                "command-required",
+                "Choose a command; run --help for the available surface.",
+                exit_code=EXIT_INVALID_ARGUMENTS,
+            )
+        result = dispatch(args)
+    except YoutubeCliError as exc:
+        command = "parse"
+        if "args" in locals() and getattr(args, "command", None):
+            command = command_name(args)
+        emit_error(exc, command=command, json_mode="--json" in arguments)
+        return exc.exit_code
+
+    if args.json:
+        print(json.dumps(result.payload, ensure_ascii=False, indent=2))
+    else:
+        render_human(result.payload, args)
+    return result.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

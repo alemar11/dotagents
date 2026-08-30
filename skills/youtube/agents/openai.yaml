@@ -1,0 +1,7 @@
+interface:
+  display_name: "YouTube"
+  short_description: "Search YouTube and inspect timestamped transcripts"
+  icon_small: "./assets/youtube.svg"
+  icon_large: "./assets/youtube.svg"
+  brand_color: "#FF0033"
+  default_prompt: "Use $youtube to search YouTube or a playlist, retrieve the relevant timestamped transcripts, and answer from the spoken evidence."
