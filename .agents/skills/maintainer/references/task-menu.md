@@ -86,14 +86,7 @@ maintenance request needs to be routed to a concrete task.
    - Verify product-specific API and best-practice details against
      TanStack-owned docs before updating local runtime guidance.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-12. `refresh codex tool surface`
-   - Inspect the currently exposed Codex subagent and Codex App task tools,
-     including spawn, wait, send/resume/close, create-thread,
-     read/rename/archive/handoff, and related lifecycle operations.
-   - Compare App changes against `plugins/se/skills/implement/` and keep the
-     runtime path limited to visible App tasks and App-managed worktrees.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-13. `refresh okf spec`
+12. `refresh okf spec`
    - Check `skills/okf/assets/manifest.json` and the bundled official spec copy
      against `GoogleCloudPlatform/open-knowledge-format/SPEC.md`.
    - Refresh `skills/okf/assets/spec.md` and the manifest when stale.

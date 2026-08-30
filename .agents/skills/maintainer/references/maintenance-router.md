@@ -20,7 +20,6 @@ playbook dispatch rather than a second value registry.
 | `workflow-hardening` | Sessions, logs, tests, live failures, or repeated corrections expose connected drift | `workflow-family-hardening.md` |
 | `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package | `package-lifecycle.md` |
 | `codex-deps` | Codex-dependency or portability-boundary audit | `codex-dependency-audit.md` |
-| `codex-tool-surface` | Codex subagent or App task lifecycle surface changed | `codex-tool-surface-refresh.md` |
 | `refresh` | Explicit Swift-DocC, Swift API Design, or TanStack refresh | Matching refresh playbook named in `SKILL.md` |
 | `okf-spec` | Explicit OKF official-spec comparison or refresh | `okf-spec-refresh.md` |
 
@@ -43,9 +42,9 @@ playbook dispatch rather than a second value registry.
    stops for approval before mutation.
 6. Health audits resolve to `audit` and remain read-only. A generic maintenance
    run may consume their safe findings through `skill-upgrade.md`.
-7. Codex dependency, tool-surface, domain refresh, and OKF routes run only when
-   explicitly requested. Targeted `maintain okf` may run the stale check but
-   must not refresh the bundled spec without explicit refresh authority.
+7. Codex dependency, domain refresh, and OKF routes run only when explicitly
+   requested. Targeted `maintain okf` may run the stale check but must not
+   refresh the bundled spec without explicit refresh authority.
 8. Brand-new skills and plugins start with their creator workflow; Maintainer
    returns only for integration or later maintenance.
 
@@ -59,9 +58,8 @@ Run accepted categories in this order:
 4. `maintain`;
 5. `description-review`;
 6. `codex-deps`;
-7. `codex-tool-surface`;
-8. explicit `refresh` or `okf-spec`;
-9. `audit` and common closeout.
+7. explicit `refresh` or `okf-spec`;
+8. `audit` and common closeout.
 
 ## Task Isolation
 

@@ -55,7 +55,6 @@ only the branch references whose conditions match the routed request:
 | Swift API Design source refresh | [swift-api-design-refresh.md](references/swift-api-design-refresh.md) and [swift-api-design-runbook.md](references/swift-api-design-runbook.md) |
 | TanStack Intent coverage refresh | [tanstack-intent-refresh.md](references/tanstack-intent-refresh.md) |
 | TanStack skills coverage alignment | [tanstack-skills-alignment.md](references/tanstack-skills-alignment.md) |
-| Codex worker/thread tool-surface refresh | [codex-tool-surface-refresh.md](references/codex-tool-surface-refresh.md) |
 | OKF official-spec refresh | [okf-spec-refresh.md](references/okf-spec-refresh.md) and [okf-spec-runbook.md](references/okf-spec-runbook.md) |
 
 Before closeout, load [states.md](references/states.md), select every

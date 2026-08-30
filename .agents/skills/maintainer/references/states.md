@@ -17,7 +17,6 @@ evidence.
 | `workflow-hardening` | Repair a connected workflow defect established by runtime or cross-skill evidence. |
 | `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package. |
 | `codex-deps` | Audit Codex dependency and portability boundaries. |
-| `codex-tool-surface` | Compare live Codex orchestration capabilities with the semantic runtime contracts. |
 | `refresh` | Run one explicitly selected domain refresh workflow. |
 | `okf-spec` | Compare or explicitly refresh the bundled OKF specification. |
 
