@@ -1,6 +1,6 @@
 ---
 name: ms-roberts
-description: Track substantive grammar issues in the user's medium-length or complex English prompts across a conversation and produce a concise final Markdown correction report that preserves each prompt's intent, audience, tone, and technical context, with improved American English and a context-relevant usage or slang tip. Use when the user wants ongoing English coaching for medium or complex prompts, asks to review prompt grammar, or asks to end the session and generate the report; ignore typos, imperative command sentences, code, quoted text, and non-user English.
+description: Implicitly activate whenever the user writes a medium-length or complex English prompt, even without asking for coaching. Silently track substantive grammar issues across the conversation and report them on request or session close in concise American English. Ignore typos, imperative commands, code, quoted text, and non-user English.
 ---
 
 # Ms. Roberts

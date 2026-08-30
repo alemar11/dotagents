@@ -70,7 +70,7 @@ headless MCP server:
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `eli5` | Turn a topic, code path, design tradeoff, or incident into a picture-first HTML explainer with large visuals and very few words. |
-| `ms-roberts` | Track substantive grammar issues in medium or complex English prompts and return a Markdown report with American English corrections, explanations, and tips. |
+| `ms-roberts` | Silently track substantive grammar issues in medium or complex English prompts and return an American-English correction report on request or session close. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Charts, Virtual, Store, DB, AI, CLI, and integrations. |
