@@ -1,5 +1,0 @@
-interface:
-  display_name: "Codex Changelog"
-  short_description: "Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page."
-  brand_color: "#D1495B"
-  default_prompt: "Use $codex-changelog to print separate Codex CLI and Codex App changelog sections for my installed versions."

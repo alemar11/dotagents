@@ -74,7 +74,6 @@ headless MCP server:
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Charts, Virtual, Store, DB, AI, CLI, and integrations. |
-| `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
@@ -232,7 +231,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
@@ -265,7 +264,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill okf \
   --skill skill-cli-creator \
   --skill tanstack \
-  --skill codex-changelog \
   --skill focus \
   --skill study \
   --skill postgres \
