@@ -4,6 +4,9 @@ SE is a software-delivery workflow plugin for maintaining project knowledge,
 capturing Ideas, planning Features, delivering reviewed pull requests, and
 auditing active work without changing it.
 
+Idea, Feature, and Implement require the separately installed reusable `$g`
+skill for hosted Git and GitHub workflows. SE never installs that dependency.
+
 Its skills are deliberately separated by responsibility:
 
 - skills/feature/SKILL.md is the graph manifest and Mermaid overview.
@@ -110,7 +113,8 @@ Its skills are deliberately separated by responsibility:
   missing attempt or result does. Existing-source maintenance removes only
   prior SE-owned native edges explicitly retired from the revised plan and
   preserves foreign edges. Optional
-  label and native type classification may then use `g:github-tagger`. The
+  label and native type classification may then use the reusable G skill's
+  GitHub Tagger workflow. The
   tagger chooses the smallest relevant existing label set, including none, and
   zero or one available native type; Feature never presets `Feature`, `Task`,
   or any other metadata value. Classification never gates semantic publication.

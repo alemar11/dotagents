@@ -195,18 +195,19 @@ reintroduce a retired compatibility surface.
   a container issue, then reconciles each parent body in place with the final
   set registry and exact child mappings before readback. After identities are
   final, attempt every exact native Feature and same-parent Macro dependency
-  through `g:github-issues`, recording one verified, no-op, failed, unavailable,
-  or unknown result per edge. Existing-source maintenance also removes only
-  prior SE-owned native edges explicitly removed from the revised semantic
-  graph and preserves foreign edges. A missing attempt or result blocks; a
-  recorded native failure does not downgrade a complete semantic publication.
+  through G's GitHub Issues workflow, recording one verified, no-op, failed,
+  unavailable, or unknown result per edge. Existing-source maintenance also
+  removes only prior SE-owned native edges explicitly removed from the revised
+  semantic graph and preserves foreign edges. A missing attempt or result
+  blocks; a recorded native failure does not downgrade a complete semantic
+  publication.
   Any explicitly requested downstream handoff must also have a reconciled
   terminal result before completion. Classification
   is optional after semantic readback; when used, delegate label and native type
-  selection to `g:github-tagger` and never preselect metadata values. Preserve
-  the tagger's smallest-set policy: zero or more relevant labels and zero or one
-  relevant type, with empty selections valid. Classification never gates
-  completion. Preview is opt-in and must never be selected implicitly
+  selection to G's GitHub Tagger workflow and never preselect metadata values.
+  Preserve the tagger's smallest-set policy: zero or more relevant labels and
+  zero or one relevant type, with empty selections valid. Classification never
+  gates completion. Preview is opt-in and must never be selected implicitly
   when publish authority or G is unavailable.
 - Keep Audit strictly observational. Attribute SE use only from task-visible
   evidence, treat missing visibility as indeterminate, and never add task

@@ -134,8 +134,8 @@ Only after the default or explicit `run_mode=publish` is resolved, before its
 first hosted read or write, load
 [`../../references/codex-dependency-preflight.md`](../../references/codex-dependency-preflight.md)
 and complete its read-only availability gate. If the required G workflow is
-missing, disabled, malformed, or unresolvable, fail closed before hosted
-access; remediation is advisory and must never install, enable, refresh, or
+unavailable, malformed, or unresolvable, fail closed before hosted
+access; remediation is advisory and must never install, refresh, or
 substitute the dependency.
 
 This is a hard hosted-access barrier. Until the preflight produces verified

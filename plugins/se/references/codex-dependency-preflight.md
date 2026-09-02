@@ -1,8 +1,8 @@
 # SE G Dependency Preflight
 
 This reference owns the fail-closed availability gate for every SE handoff to
-the G-owned GitHub workflows. It is a runtime prerequisite, not a plugin
-installation or maintenance procedure.
+the G-owned GitHub workflows. It is a runtime prerequisite, not an installation
+or maintenance procedure.
 
 ## When to run
 
@@ -26,26 +26,24 @@ that the owner is available.
 
 Establish all of the following from the current host:
 
-- the Codex runtime can resolve the exact G plugin identity;
-- the exact repo-local G plugin identity `g@alemar11` is the one being
-  resolved;
-- that plugin is installed and enabled;
-- its declared source root is present and internally consistent;
-- every bundled G workflow required by the invoking SE path is present and
-  resolvable;
+- the reusable skill with canonical identity `g` is installed and resolvable;
+- its `SKILL.md`, routed workflow references, and shipped CLI are present and
+  internally consistent;
+- the G workflow required by the invoking SE path is reachable through `$g`;
 - the explicit handoff can be reached without using a compatibility alias.
 
 Do not infer availability from a display name, an installed cache directory,
-historical task output, or an unrelated GitHub connector. Do not require source
-and installed versions to match as part of this gate.
+historical task output, a retired plugin installation, or an unrelated GitHub
+integration. Do not require source and installed versions to match as part of
+this gate.
 
-For Idea, the required workflow set contains `$g:github-issues`. Every Feature
-hosted source read or publication, including maintenance, requires
-`$g:github-issues` for exact issue lifecycle operations. Check
-`$g:github-tagger` only when optional repository-owned classification is
-actually attempted; its absence or failure never blocks semantic publication.
-The Feature preview route for a new local source requires neither workflow
-because it performs no hosted access.
+For Idea, `$g` must route to its GitHub Issues workflow. Every Feature hosted
+source read or publication, including maintenance, requires that same workflow
+for exact issue lifecycle operations. Require G's GitHub Tagger workflow only
+when optional repository-owned classification is actually attempted; its
+absence or failure never blocks semantic publication. The Feature preview
+route for a new local source requires neither workflow because it performs no
+hosted access.
 
 For Implement, the required workflow set includes the G
 owners needed by the selected publication, review, CI, issue, local Git, and
@@ -57,17 +55,12 @@ workflow that owns the evidence being collected.
 
 ## Blocking outcomes
 
-Fail closed before hosted access and report the observed evidence using one of
-these lower-kebab outcomes:
+Fail closed before hosted access when the runtime capability inspection cannot
+be trusted, the reusable G skill is unavailable or malformed, a required
+workflow is not reachable, or the explicit handoff fails after local
+availability checks pass. Report the observed cause in prose and use the
+invoking SE workflow's canonical `blocked` terminal state.
 
-- `codex-runtime-error`: the host capability inspection cannot be trusted;
-- `plugin-missing`: the exact G plugin is not installed;
-- `plugin-disabled`: the exact plugin exists but is disabled;
-- `skill-unresolvable`: the plugin root or a required G workflow is missing or
-  malformed;
-- `codex-dependency-unresolved`: the explicit G handoff fails after local
-  availability checks pass.
-
-Never install, enable, refresh, remove, or substitute the dependency. A manual
+Never install, refresh, remove, or substitute the dependency. A manual
 remediation suggestion may be reported, but it is outside this workflow's
 authority. Never fall back to direct provider calls.

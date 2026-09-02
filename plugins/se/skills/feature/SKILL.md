@@ -190,7 +190,7 @@ Publish node owns the same check for hosted publication, hosted-content
 projection, parent/child issue operations, relationship and dependency
 attempts, exact readback, optional classification, existing-source updates,
 and any explicitly requested post-publication handoff. Provider transport
-details stay with the focused G skills. Immediately before every hosted write,
+details stay with the focused G workflows. Immediately before every hosted write,
 apply the canonical
 [hosted-content-safety.md](../../references/hosted-content-safety.md) contract.
 
@@ -213,7 +213,7 @@ complete.
 
 ## Skill Dependencies
 
-Any hosted source read or hosted write requires the installed `g@alemar11`
-workflows for GitHub issue operations and optional classification. A local
+Any hosted source read or hosted write requires the installed reusable `$g`
+skill for GitHub issue operations and optional classification. A local
 new-source preview needs no G workflow. This skill never installs, refreshes,
 or substitutes that dependency.

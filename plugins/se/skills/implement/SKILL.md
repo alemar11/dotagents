@@ -111,8 +111,9 @@ A fresh pull request created by G Send is an intermediate draft, not completed
 delivery. Once its exact HEAD, body, base, and stack topology are stable, make
 it ready through the focused G owner, independently read back that it is no
 longer draft at the same full HEAD, retain the typed ready-transition evidence,
-and use `$g:github-review-threads` to wait for the automatic initial Codex
-review. Do not post an explicit review request for that ready-triggered cycle.
+and use `$g`'s GitHub Review Threads workflow to wait for the automatic initial
+Codex review. Do not post an explicit review request for that ready-triggered
+cycle.
 
 Only a terminal clean G-normalized review bound to the current full HEAD can
 satisfy hosted review. `not-requested`, absent comments, zero review threads,
@@ -146,6 +147,6 @@ plain language and preserve the orchestrator for a legitimate resume.
 
 ## Skill Dependencies
 
-This skill requires the installed `g@alemar11` workflows that own its selected
+This skill requires the installed reusable `$g` skill, which owns its selected
 Git, GitHub, review, CI, and stacked-pull-request operations. It never installs,
-enables, refreshes, or substitutes that dependency.
+refreshes, or substitutes that dependency.
