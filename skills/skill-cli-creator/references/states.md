@@ -2,7 +2,7 @@
 
 This reference owns the derived host mode used while designing an embedded
 CLI. It is transient planning state and is not written into runtime config.
-The owner tree, shipped artifact, and optional maintenance project remain
+The owner tree, shipped artifact, and optional CLI project remain
 persistent filesystem state.
 
 ## Host mode

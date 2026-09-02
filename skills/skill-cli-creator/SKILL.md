@@ -72,16 +72,16 @@ the implementation workflow.
    change, add the API-backed, local/offline, or hybrid lane from
    `references/implementation-workflow.md`; a docs-only correction may validate
    only the documented artifact path and examples it changes.
-6. Update the owning docs with the artifact path, optional maintenance project,
+6. Update the owning docs with the artifact path, optional CLI project,
    version source, rebuild path, config path, and safe read/write boundaries.
 
 ## Invariants
 
 - `scripts/` contains the shipped runnable artifact used during normal
   execution.
-- `projects/<tool>/` is optional and maintenance-only; introduce it only when
-  the implementation benefits from a real project layout.
-- The shipped artifact, optional maintenance project, persistent config
+- `projects/<tool>/` is an optional, maintenance-only CLI project; introduce it
+  only when the implementation benefits from a real CLI project layout.
+- The shipped artifact, optional CLI project, persistent config
   namespace, runtime docs, and examples must share the same owner boundary.
 - Runtime examples use the owner-root-relative artifact or a resolved absolute
   installed path. Bare commands require a documented wrapper or `PATH` setup.

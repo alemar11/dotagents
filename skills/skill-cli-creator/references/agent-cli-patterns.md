@@ -89,11 +89,11 @@ The important rule is consistency. Do not mix many styles unless the product voc
 ## Runtime surface
 
 Run examples through `<artifact-path>` and keep the command contract stable
-across implementation changes. Artifact placement, maintenance-project,
-compiled-launcher, and semver rules live in
+across implementation changes. Artifact placement, CLI project layout,
+compiled launcher, and semver rules live in
 [embedded-cli-layout.md](embedded-cli-layout.md).
 
-## Working-project config
+## Workspace config
 
 Use the owner-aligned `config.toml` contract in
 [embedded-cli-layout.md](embedded-cli-layout.md). Command design must keep reads
@@ -243,6 +243,6 @@ Add a `CLI Maintenance` section in the owning runtime docs for every embedded CL
 - shipped CLI changes must update the implementation, rebuild the shipped artifact at `<artifact-path>` or platform binaries under `scripts/bin/`, and re-run `--help`, `--version`, and `--json doctor`
 - multi-OS compiled CLIs keep `<artifact-path>` as the stable launcher and document rebuild commands such as `projects/<tool>/scripts/install-runtime-binary`
 - compiled outputs in `target/`, `dist/`, virtualenvs, or similar paths are build intermediates rather than supported runtime entrypoints
-- project-local generated state should be ignored through `projects/<tool>/.gitignore`
+- generated state inside the CLI project should be ignored through `projects/<tool>/.gitignore`
 - the CLI follows semver from one declared version source of truth
 - when a bundled skill points to a plugin-shared CLI, introduce the execution context explicitly before the command, such as `From the plugin root, run ...`

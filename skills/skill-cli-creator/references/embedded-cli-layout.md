@@ -11,8 +11,10 @@ or plugin host.
     `<plugin-root>/skills/<skill>`
   - `host=plugin` and the CLI is shared by multiple bundled skills:
     `<plugin-root>`
-- `project root`: the consuming workspace or repository where local operator
+- `workspace root`: the consuming workspace or repository where local operator
   config is stored; this is distinct from the owner root.
+- `CLI project`: the optional complete source, build, and test project under
+  `projects/<tool>/` that produces or supports the shipped artifact.
 - `artifact path`: the owner-root-relative shipped runnable artifact, usually
   `scripts/<tool>` or `scripts/<tool>.<ext>`.
 - `public runtime noun`: optional shorthand such as `<tool>` only when the host
@@ -34,17 +36,17 @@ Do not use `%HOMEPATH%` alone because it does not include the drive.
 Keep one embedded-CLI doctrine for all hosts:
 
 - `scripts/` contains shipped runnable artifacts used during normal execution.
-- `projects/<tool>/` is the optional maintenance-only build project behind one
-  shipped CLI when a real project layout is needed.
-- Persisted working-project config follows the same owner boundary and keeps
+- `projects/<tool>/` is the optional maintenance-only CLI project behind one
+  shipped CLI when a complete project layout is needed.
+- Persisted workspace config follows the same owner boundary and keeps
   plugin identity explicit when the host is a plugin.
 - Normal runtime usage never runs from `dist/`, `target/`, virtualenv paths, or
   similar build outputs.
 
 The owner of the shipped artifact also owns:
 
-- the maintenance project
-- the persistent working-project config namespace
+- the CLI project
+- the persistent workspace config namespace
 - the runtime docs and examples
 
 Do not split ownership:
@@ -70,8 +72,8 @@ tests at the owner root, such as `<skill-root>/tests/` or
 `<plugin-root>/tests/<tool>/`. Do not add `projects/<tool>/` just to create a
 place for one source file, one version constant, or a small test module.
 
-Introduce `projects/<tool>/` only when the CLI needs a real maintenance
-project: multiple source modules, package metadata, lockfiles, generated build
+Introduce `projects/<tool>/` only when the CLI needs a complete CLI project:
+multiple source modules, package metadata, lockfiles, generated build
 outputs, compiled binaries, vendored fixtures, or dedicated build/install
 helpers.
 
@@ -80,22 +82,22 @@ helpers.
 For `host=skill`:
 
 - shipped artifact: `<skill-root>/scripts/<tool>`
-- maintenance project: `<skill-root>/projects/<tool>/`
-- working-project config: `<project-root>/.skills/<skill>/config.toml`
+- CLI project: `<skill-root>/projects/<tool>/`
+- workspace config: `<workspace-root>/.skills/<skill>/config.toml`
 
 For `host=plugin` when exactly one bundled skill owns the CLI:
 
 - shipped artifact: `<plugin-root>/skills/<skill>/scripts/<tool>`
-- maintenance project: `<plugin-root>/skills/<skill>/projects/<tool>/`
-- working-project config:
-  `<project-root>/.plugins/<plugin>/skills/<skill>/config.toml`
+- CLI project: `<plugin-root>/skills/<skill>/projects/<tool>/`
+- workspace config:
+  `<workspace-root>/.plugins/<plugin>/skills/<skill>/config.toml`
 
 For `host=plugin` when the CLI is intentionally shared by multiple bundled
 skills:
 
 - shipped artifact: `<plugin-root>/scripts/<tool>`
-- maintenance project: `<plugin-root>/projects/<tool>/`
-- working-project config: `<project-root>/.plugins/<plugin>/config.toml`
+- CLI project: `<plugin-root>/projects/<tool>/`
+- workspace config: `<workspace-root>/.plugins/<plugin>/config.toml`
 
 Default to the narrowest owner. Promote from skill-local ownership to
 plugin-root ownership only when the CLI is intentionally shared by multiple
@@ -140,15 +142,15 @@ Keep these invariants explicit in host docs and CLI docs:
   regardless of language.
 - Require `<artifact-path> --version` as part of the stable runtime surface.
 - Let the chosen CLI/tool name govern both `<artifact-path>` and
-  `projects/<tool>/` when a maintenance project exists.
+  `projects/<tool>/` when a CLI project exists.
 - Open `projects/<tool>/` only when it exists and you are fixing, improving,
   rebuilding, or extending the implementation behind `<artifact-path>`.
 - Keep script-native runnable artifacts entirely in `scripts/`; introduce
   `projects/<tool>/` only when the implementation grows enough to justify a real
-  maintenance project.
+  CLI project.
 - Keep manifests, lockfiles, dependency installs, caches, intermediate build
-  outputs, project-local test/build config, and source inside
-  `projects/<tool>/` when a real maintenance project exists.
+  outputs, test/build configuration, and source inside `projects/<tool>/` when
+  a CLI project exists.
 - If `projects/<tool>/` exists, keep CLI-specific tests inside that project.
 - Do not introduce host-root wrappers unless the user explicitly asks for that
   non-standard layout.
@@ -194,16 +196,16 @@ Never create config implicitly on install or on first read.
 
 Use one owner-aligned `config.toml` namespace, not one file per tool:
 
-- skill-owned: `<project-root>/.skills/<skill>/config.toml`
-- plugin-owned shared: `<project-root>/.plugins/<plugin>/config.toml`
+- skill-owned: `<workspace-root>/.skills/<skill>/config.toml`
+- plugin-owned shared: `<workspace-root>/.plugins/<plugin>/config.toml`
 - plugin-owned but local to one skill:
-  `<project-root>/.plugins/<plugin>/skills/<skill>/config.toml`
+  `<workspace-root>/.plugins/<plugin>/skills/<skill>/config.toml`
 
 Keep config-only directories explicit:
 
-- `<project-root>/.skills/<skill>/`
-- `<project-root>/.plugins/<plugin>/`
-- `<project-root>/.plugins/<plugin>/skills/<skill>/`
+- `<workspace-root>/.skills/<skill>/`
+- `<workspace-root>/.plugins/<plugin>/`
+- `<workspace-root>/.plugins/<plugin>/skills/<skill>/`
 
 Do not place helper scripts or implementation code there.
 

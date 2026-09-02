@@ -13,7 +13,8 @@ command -v cargo rustc node pnpm npm python3 uv || true
 Choose the least surprising toolchain:
 
 - Default to Rust when the embedded CLI needs a larger maintained
-  implementation and benefits from a real project under `projects/<tool>/`.
+  implementation and benefits from a complete CLI project under
+  `projects/<tool>/`.
 - Use TypeScript/Node when the official SDK, auth helper, browser automation
   library, or existing repo tooling is the reason the embedded CLI can be
   better.
@@ -86,7 +87,7 @@ Support the boring paths first, in this precedence order:
 
 1. Environment variable using the service's standard name, such as
    `GITHUB_TOKEN`.
-2. Project-local config under the owner-specific `config.toml` for repeated
+2. Workspace-local config under the owner-specific `config.toml` for repeated
    local use when env-only auth is painful.
 3. `--api-key` or a tool-specific token flag only for explicit one-off tests.
 
@@ -127,21 +128,21 @@ paired with a network request, export, docs page, or fixture.
 2. Sketch the command list in chat. Keep names short and shell-friendly.
 3. Scaffold the CLI inside the resolved owner. Use direct `scripts/<tool>` for
    simple script-native tools; use the two-surface layout only when a
-   maintenance project is justified: `scripts/` for runtime and
-   `projects/<tool>/` for the maintenance-only build project.
+   CLI project is justified: `scripts/` for runtime and `projects/<tool>/` for
+   the maintenance-only CLI project.
 4. Add or wire the single semver source of truth before the CLI contract is
    considered complete.
 5. Expose the shipped runnable artifact under `scripts/` and treat outputs in
    `target/`, `dist/`, virtualenvs, or similar locations as build intermediates.
 6. Put tests with the maintained source: owner-root `tests/` for direct
    `scripts/<tool>` implementations, or `projects/<tool>/tests/` when a
-   maintenance project exists.
+   CLI project exists.
 7. If the runtime produces a compiled executable, copy, install, or generate
    that executable into `scripts/`. For multi-OS support, install platform
    binaries into `scripts/bin/` and keep `scripts/<tool>` as the launcher.
-8. Inspect which project-local generated directories the chosen runtime creates
-   and add or update `projects/<tool>/.gitignore` only for generated paths that
-   should remain uncommitted.
+8. Inspect which generated directories the chosen runtime creates inside the
+   CLI project and add or update `projects/<tool>/.gitignore` only for paths
+   that should remain uncommitted.
 9. Create config only through explicit init/login/configure flows. Do not write
    config during reads or health checks.
 10. Smoke test against `<artifact-path>`.
@@ -238,8 +239,8 @@ Prefer:
 - `tsup`, `tsx`, or `tsc` using the owner's convention
 
 Keep the shipped runnable artifact in `scripts/` and use `projects/<tool>/` for
-the full Node maintenance project when the tool becomes multi-file. If the Node
-tool is bundled or compiled, do not run it from `dist/` during normal execution.
+the full Node CLI project when the tool becomes multi-file. If the Node tool is
+bundled or compiled, do not run it from `dist/` during normal execution.
 
 Use `package.json` as the default semver source of truth and wire `--version` to
 that version. Keep `package.json`, lockfiles, dependency installs, local caches,
@@ -266,9 +267,9 @@ Keep small Python runnable artifacts directly in `scripts/`. Introduce
 module. Do not treat virtualenv paths or external build directories as supported
 runtime entrypoints.
 
-When the Python project has packaging metadata, use that manifest as the semver
-source of truth; otherwise keep one explicit version constant or file and wire
-`--version` to it.
+When the Python CLI project has packaging metadata, use that manifest as the
+semver source of truth; otherwise keep one explicit version constant or file
+and wire `--version` to it.
 
 If `projects/<tool>/` exists, keep Python test modules under
 `projects/<tool>/tests/` by default. Ignore `.venv/`, `.uv-cache/`,
@@ -304,7 +305,7 @@ Add a `CLI Maintenance` section to owning runtime docs. Require that section to:
 - mention the version source of truth and that shipped CLI changes follow semver
 - state that compiled outputs in `target/`, `dist/`, virtualenvs, or similar
   build locations are intermediates, not supported runtime entrypoints
-- keep project-local ignore rules in `projects/<tool>/.gitignore`
+- keep generated-path ignore rules in `projects/<tool>/.gitignore`
 - define the bump policy explicitly:
   - major for breaking CLI contract changes
   - minor for backward-compatible new features or meaningful additions
