@@ -19,6 +19,10 @@ link_path() {
   label="$3"
 
   if [ -L "$target_path" ]; then
+    if [ "$(readlink "$target_path")" = "$source_path" ]; then
+      echo "KEEP $label -> $target_path"
+      return 2
+    fi
     rm -f "$target_path"
   elif [ -e "$target_path" ]; then
     echo "SKIP $label -> $target_path already exists (not a symlink)"
@@ -54,6 +58,7 @@ prune_stale_repo_skill_links
 
 skill_count=0
 skill_linked_count=0
+skill_kept_count=0
 skill_skip_count=0
 
 for skill_dir in "$SKILLS_SOURCE_DIR"/*; do
@@ -67,10 +72,15 @@ for skill_dir in "$SKILLS_SOURCE_DIR"/*; do
   if link_path "$skill_dir" "$target_path" "$skill_name"; then
     skill_linked_count=$((skill_linked_count + 1))
   else
-    skill_skip_count=$((skill_skip_count + 1))
+    link_result=$?
+    if [ "$link_result" -eq 2 ]; then
+      skill_kept_count=$((skill_kept_count + 1))
+    else
+      skill_skip_count=$((skill_skip_count + 1))
+    fi
   fi
 done
 
 echo
 echo "Completed."
-echo "Skills processed: $skill_count, linked: $skill_linked_count, skipped: $skill_skip_count"
+echo "Skills processed: $skill_count, linked: $skill_linked_count, kept: $skill_kept_count, skipped: $skill_skip_count"
