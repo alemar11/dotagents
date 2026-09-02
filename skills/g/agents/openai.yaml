@@ -1,8 +1,8 @@
 interface:
   display_name: "G"
-  short_description: "Manage Git and GitHub workflows safely"
+  short_description: "Manage Git, GitHub, and Projects workflows safely"
   brand_color: "#24292F"
-  default_prompt: "Use $g to handle this Git or GitHub workflow safely."
+  default_prompt: "Use $g to handle this Git or GitHub workflow, including Projects, safely."
 
 policy:
   allow_implicit_invocation: true

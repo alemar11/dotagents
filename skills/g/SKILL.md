@@ -1,6 +1,6 @@
 ---
 name: g
-description: Manage requested Git and GitHub work, including commits, pull requests, issues, Actions, reviews, releases, repository triage, stars, and stacked branches. Use for explicit Git or GitHub tasks or when a request crosses those domains; do not invoke merely because the current directory is a Git repository.
+description: Manage requested Git and GitHub work, including commits, pull requests, issues, Projects, Actions, reviews, releases, repository triage, stars, and stacked branches. Use for explicit Git or GitHub tasks or when a request crosses those domains; do not invoke merely because the current directory is a Git repository.
 ---
 
 # G
@@ -25,6 +25,7 @@ maintenance-only source and never a runtime entrypoint.
 | Repository issue and pull-request queues | [Repository triage](references/workflows/github-repository-triage/workflow.md) |
 | Infer issue labels/types or propose taxonomy | [GitHub tagger](references/workflows/github-tagger/workflow.md) |
 | Exact issue lifecycle or relationship work | [GitHub issues](references/workflows/github-issues/workflow.md) |
+| GitHub Projects, fields, project items, links, or templates | [GitHub Projects](references/workflows/github-projects/workflow.md) |
 | Investigate an issue, pull request, or proposed fix | [GitHub investigation](references/workflows/github-investigation/workflow.md) |
 | Inspect Actions or diagnose/fix CI | [GitHub Actions](references/workflows/github-actions/workflow.md) |
 | Inspect exact-head pull-request delivery readiness | [Delivery status](references/workflows/github-delivery-status/workflow.md) |
@@ -47,9 +48,9 @@ direct GitHub CLI or shipped-CLI provider call, also read
 - Use direct `git` for local repository work. Use authenticated `gh`, either
   directly or through `<skill-root>/scripts/g`, for every GitHub provider
   operation.
-- Preserve exact repository, branch, commit, issue, pull-request, release, and
-  review-thread identity across transport changes. Treat display text as
-  supporting evidence rather than identity.
+- Preserve exact repository, branch, commit, issue, pull-request, project,
+  project-item, release, and review-thread identity across transport changes.
+  Treat display text as supporting evidence rather than identity.
 - Distinguish the requested operation, its immediate receipt, and independently
   observed state. After an ambiguous remote response, reconcile once through
   an exact read; never replay a mutation blindly.

@@ -50,7 +50,7 @@ for Apple's native headless MCP server:
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `eli5` | Turn a topic, code path, design tradeoff, or incident into a picture-first HTML explainer with large visuals and very few words. |
-| `g` | Route requested Git and GitHub work through one reusable skill using direct `git`, authenticated `gh`, its shipped CLI, and the complete `projects/g` source tree. |
+| `g` | Route requested Git and GitHub work, including GitHub Projects, through one reusable skill using direct `git`, authenticated `gh`, its shipped CLI, and the complete `projects/g` source tree. |
 | `ms-roberts` | Silently track substantive grammar issues in medium or complex English prompts and return an American-English correction report on request or session close. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |

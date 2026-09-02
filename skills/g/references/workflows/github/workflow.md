@@ -47,6 +47,7 @@ Use the `<skill-root>` resolved by the active G entrypoint.
 | Issue and PR queue triage for one or more repositories | the `github-repository-triage` workflow |
 | Content-based issue classification or explicit read-only taxonomy proposals | the `github-tagger` workflow |
 | GitHub issue lifecycle and relationships | the `github-issues` workflow |
+| GitHub Projects, fields, items, repository/team links, or templates | the `github-projects` workflow |
 | Evidence-backed technical review of an issue, PR, or proposed fix | the `github-investigation` workflow |
 | Actions inspection or explicit CI repair | the `github-actions` workflow |
 | Exact-head PR delivery readiness, merge policy, rulesets, checks, queue, and automation state | the `github-delivery-status` workflow |
@@ -63,5 +64,7 @@ if the work crosses domains.
   wrapper contract and maintenance commands.
 - [`../github-stack/workflow.md`](../github-stack/workflow.md): stack-level routing,
   lifecycle, and recovery guidance.
+- [`../github-projects/workflow.md`](../github-projects/workflow.md): GitHub
+  Projects lifecycle, identity, authorization, and recovery guidance.
 - [`../../network-execution.md`](../../network-execution.md):
   shell network and authentication boundaries.
