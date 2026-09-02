@@ -1,8 +1,8 @@
 interface:
   display_name: "Plugins Reload"
-  short_description: "Refresh local G, SE, and Xcode plugin caches"
+  short_description: "Refresh local SE and Xcode plugin caches"
   brand_color: "#0D9488"
-  default_prompt: "Use $plugins-reload to refresh the repo-local G, SE, and Xcode plugins after validating source changes."
+  default_prompt: "Use $plugins-reload to refresh the repo-local SE and Xcode plugins after validating source changes."
 
 policy:
   allow_implicit_invocation: false

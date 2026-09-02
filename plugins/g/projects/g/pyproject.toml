@@ -1,8 +1,0 @@
-[project]
-name = "g-cli"
-version = "2.16.3"
-requires-python = ">=3.11"
-description = "Shared G plugin CLI"
-
-[tool.unittest]
-start-directory = "tests"

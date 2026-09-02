@@ -21,26 +21,6 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 
 ## Repo-Local Plugins
 
-G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps, and direct `git` for local repository work. It bundles:
-
-| Skill | Purpose |
-| --- | --- |
-| `g:github` | Handle general or mixed GitHub requests through the appropriate focused workflows. |
-| `g:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
-| `g:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
-| `g:github-tagger` | Classify one issue against existing metadata or explicitly analyze a repository and its issues to propose minimal new labels and organization issue types without mutation. |
-| `g:github-issues` | Manage GitHub issue lifecycle, attachments, metadata, relationships, and dry-runs. |
-| `g:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
-| `g:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
-| `g:github-delivery-status` | Inspect exact-head pull-request delivery readiness, merge policy, rulesets, checks, queue, and automation state without mutating GitHub. |
-| `g:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
-| `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
-| `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `g:send` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
-| `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
-| `g:versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
-| `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
-
 SE is the repository's software-delivery workflow plugin. It turns ideas into
 Feature plans, delivers them through reviewed pull requests, maintains project
 knowledge, and audits active work:
@@ -70,6 +50,7 @@ for Apple's native headless MCP server:
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `eli5` | Turn a topic, code path, design tradeoff, or incident into a picture-first HTML explainer with large visuals and very few words. |
+| `g` | Route requested Git and GitHub work through one reusable skill using direct `git`, authenticated `gh`, its shipped CLI, and the complete `projects/g` source tree. |
 | `ms-roberts` | Silently track substantive grammar issues in medium or complex English prompts and return an American-English correction report on request or session close. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -77,7 +58,7 @@ for Apple's native headless MCP server:
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
 | `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
-| `plugins-reload` | Explicitly refresh the repo-local G, SE, and Xcode plugin caches after source changes. |
+| `plugins-reload` | Explicitly refresh the repo-local SE and Xcode plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
@@ -116,7 +97,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   not the default.
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
-- The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires both `$g:github-issues` and `$g:github-tagger`, while no SE skill installs G automatically.
+- The G-dependent SE skills run a read-only skill preflight before their first required `$g` handoff and fail closed when G is unavailable. Feature publication requires G's GitHub Issues workflow and may use its GitHub Tagger workflow; no SE skill installs G automatically.
 - `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `se:implement` accepts only caller-supplied published parent Feature issues
@@ -154,12 +135,14 @@ Project-local skills are repository-specific and are not included in reusable in
 ### Use Repo-Local Plugins
 
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
+SE's hosted workflows require the reusable `g` skill. Install or link
+`skills/g` using the reusable-skill instructions below before using those
+workflows; SE does not install it automatically.
 
 Register the `alemar11` marketplace from GitHub, then install the required plugins:
 
 ```sh
 codex plugin marketplace add alemar11/dotagents --ref main
-codex plugin add g@alemar11
 codex plugin add se@alemar11
 codex plugin add xcode@alemar11
 ```
@@ -167,7 +150,6 @@ codex plugin add xcode@alemar11
 If the `alemar11` marketplace is already registered, install the plugins directly:
 
 ```sh
-codex plugin add g@alemar11
 codex plugin add se@alemar11
 codex plugin add xcode@alemar11
 ```
@@ -177,17 +159,14 @@ of the GitHub source, then install the same plugin:
 
 ```sh
 codex plugin marketplace add /path/to/dotagents
-codex plugin add g@alemar11
 codex plugin add se@alemar11
 codex plugin add xcode@alemar11
 ```
 
 During local development, validate each changed plugin and reinstall it from
-the repository source. G has a dedicated helper; SE and Xcode are reinstalled
-directly:
+the repository source:
 
 ```sh
-plugins/g/projects/g/scripts/reinstall-local
 codex plugin add se@alemar11 --json
 codex plugin add xcode@alemar11 --json
 ```
@@ -196,8 +175,6 @@ For a Git-backed marketplace checkout, refresh the marketplace before reinstalli
 
 ```sh
 codex plugin marketplace upgrade alemar11
-codex plugin remove g@alemar11
-codex plugin add g@alemar11
 codex plugin remove se@alemar11
 codex plugin add se@alemar11
 codex plugin remove xcode@alemar11
@@ -231,7 +208,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/g skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
@@ -260,6 +237,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill code-wiki \
   --skill crusty \
   --skill eli5 \
+  --skill g \
   --skill ms-roberts \
   --skill okf \
   --skill skill-cli-creator \

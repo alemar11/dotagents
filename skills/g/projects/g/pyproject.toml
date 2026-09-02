@@ -1,0 +1,8 @@
+[project]
+name = "g-cli"
+version = "3.0.0"
+requires-python = ">=3.11"
+description = "Standalone G skill CLI"
+
+[tool.unittest]
+start-directory = "tests"

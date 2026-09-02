@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Review Threads"
-  short_description: "Address pull request feedback and review threads"
-  brand_color: "#9333EA"
-  default_prompt: "Use $g:github-review-threads to inspect pull request review threads, implement and validate selected fixes, and reply or resolve threads only when explicitly requested."

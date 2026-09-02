@@ -1,0 +1,65 @@
+# GitHub Releases
+
+Before any shell command that may contact GitHub or a package registry, read
+and follow [Network execution](../../network-execution.md).
+
+## Transport
+
+Use authenticated `gh` for every GitHub provider read and write. Use file-backed
+`gh api --input` requests whenever a mutation includes a curated title, body,
+or other free-form provider text.
+
+Before the first provider-facing direct `gh` or shared CLI operation, load
+[`../../gh-dependency-preflight.md`](../../gh-dependency-preflight.md)
+and require its host and authentication checks.
+
+
+## Role
+
+Handle release work with direct `git`, `gh release`, and registry/package
+commands. This workflow is scriptless by design.
+
+Use this workflow for release readiness, tag checks, generated or curated notes,
+release-description improvements, release asset inspection, draft or published
+GitHub Releases, and package availability confirmation.
+
+## Workflow
+
+1. Confirm the repository and default branch.
+2. Inspect tags and existing releases before creating anything.
+3. Accept an exact tag from the caller. When the `versioning` workflow selected it, retain
+   that workflow's verified target and comparison range; do not recalculate its
+   SemVer policy inside this provider-primitive workflow.
+4. Compare the intended version against package manifests or changelog files
+   only when that repository maintains them and the operation is not the
+   application-code-blind versioning controller.
+5. Treat release creation, tag creation, description updates, asset upload,
+   publishing, and deletion
+   as mutations that require explicit user authorization. For a requested
+   write without that authorization, resolve `mutation_mode=dry-run` and return
+   the proposed command or draft release notes only.
+6. Resolve the requested action to
+   `release_operation=inspect|create-tag|draft|publish|update-notes|upload-asset|delete`.
+   Omit `mutation_mode` for `inspect`; for a write-shaped operation, resolve
+   `mutation_mode=apply|dry-run` before using `gh release create
+   --generate-notes` or another mutating command.
+7. Apply these creation defaults:
+   - `create a release` first produces the exact notes preview, then asks for
+     approval and creates a draft with `release_operation=draft`;
+   - an explicit `create and publish` request resolves directly to
+     `release_operation=publish` and `mutation_mode=apply`; it skips the notes
+     preview and draft stage without skipping readiness or verification;
+   - creating a draft is itself a mutation and still requires approval.
+8. For `release_operation=update-notes`, inspect the existing title and body,
+   prepare the exact replacement or diff, obtain approval, update only the
+   authorized text fields, and verify exact readback. Direct create-and-publish
+   authority does not carry over to a later notes update.
+9. After a mutation, verify the resulting tag, GitHub Release, notes, asset
+   state, and any package registry availability requested by the user.
+
+## References
+
+- `workflows.md`: release, tag, notes, and asset workflows.
+- `../../states.md`: release lifecycle and transient planning states.
+- `package-checks.md`: registry availability checks.
+- `../../options.md`: shared canonical G options.
