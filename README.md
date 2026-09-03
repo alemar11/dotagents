@@ -68,9 +68,7 @@ for Apple's native headless MCP server:
 | Skill | Purpose |
 | --- | --- |
 | `codex-cli` | Launch one complete prompt in a separate Codex CLI task with Sol/Terra/Luna selection and model-aware reasoning. |
-| `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
-| `eli5` | Turn a topic, code path, design tradeoff, or incident into a picture-first HTML explainer with large visuals and very few words. |
 | `ms-roberts` | Silently track substantive grammar issues in medium or complex English prompts and return an American-English correction report on request or session close. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -115,7 +113,6 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   focused investigation, 3 for a multi-dimensional comparison, and 4–5 only
   for broad investigations with genuinely independent tracks; five is a cap,
   not the default.
-- `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires both `$g:github-issues` and `$g:github-tagger`, while no SE skill installs G automatically.
 - `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
@@ -232,16 +229,16 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/code-wiki skills/crusty skills/eli5 skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli
 ```
 
-Replace `skills/code-wiki` with any path listed in the reusable skills table.
+Replace `skills/codex-cli` with any path listed in the reusable skills table.
 
 ### Install Reusable Skills With `npx skills`
 
@@ -258,9 +255,7 @@ Install all reusable skills globally for Codex:
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-cli \
-  --skill code-wiki \
   --skill crusty \
-  --skill eli5 \
   --skill ms-roberts \
   --skill okf \
   --skill skill-cli-creator \
@@ -278,9 +273,9 @@ npx skills add alemar11/dotagents -a codex -g -y \
 Install one reusable skill globally for Codex:
 
 ```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill code-wiki
+npx skills add alemar11/dotagents -a codex -g -y --skill codex-cli
 ```
 
-Replace `code-wiki` with any skill name from the reusable skills table. Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
+Replace `codex-cli` with any skill name from the reusable skills table. Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
 
 Restart Codex after installing or updating skills.

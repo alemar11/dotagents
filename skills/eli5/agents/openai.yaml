@@ -1,5 +1,0 @@
-interface:
-  display_name: "ELI5"
-  short_description: "Turn complex topics into simple visual explainers."
-  brand_color: "#F59E0B"
-  default_prompt: "Use $eli5 to explain this topic with big visuals and very few words."

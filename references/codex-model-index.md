@@ -18,7 +18,6 @@ active runtime.
 | [`$se:feature`](../plugins/se/skills/feature/SKILL.md) | `gpt-5.6-sol` | `high` | One visible Feature Plan planner and reducer. The profile is passed explicitly once at task creation or resume; the accepted stable receipt starts Intake without post-effect profile readback, self-attestation, title reconciliation, or execution-target gating. Optional read-only helpers are subordinate and fall back to serial planner work. |
 | [`$se:implement`](../plugins/se/skills/implement/SKILL.md) | `configured/default` | `configured/default` | One visible graph orchestrator in the single involved project or the caller-selected coordination project; the skill intentionally inherits the configured profile unless the caller explicitly overrides it. |
 | [`$se:implement`](../plugins/se/skills/implement/SKILL.md) | `configured/default` | `configured/default` | Reusable repository-bound worker lanes in isolated worktrees; the orchestrator chooses serial reuse or concurrent lanes without selecting a fixed profile. |
-| [`$code-wiki`](../skills/code-wiki/SKILL.md) | `configured/default` | `configured/default` | May use Codex subagents for parallel read-only repository study when the active runtime policy permits delegation; the skill does not select a profile. |
 
 Remote Codex review requests or skills that merely execute in the current task
 without owning a model/reasoning profile are not separate rows unless they gain
