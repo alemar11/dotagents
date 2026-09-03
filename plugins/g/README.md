@@ -2,8 +2,8 @@
 
 G is the repository-local Git and GitHub workflow plugin. It uses direct Git
 for local repository work, the GitHub connector for supported provider
-operations, authenticated `gh` for connector gaps, and the official
-`github/gh-stack` extension for stacked pull requests.
+operations, authenticated `gh` for connector gaps and GitHub Projects, and the
+official `github/gh-stack` extension for stacked pull requests.
 
 ## Bundled skills
 
@@ -14,6 +14,7 @@ operations, authenticated `gh` for connector gaps, and the official
 | `g:github-repository-triage` | Inspect issue and pull-request queues read-only. |
 | `g:github-tagger` | Classify one issue against existing metadata or propose missing taxonomy read-only. |
 | `g:github-issues` | Manage exact issue lifecycle, metadata, attachments, and relationships. |
+| `g:github-projects` | Manage GitHub Projects, fields, items, links, templates, and lifecycle. |
 | `g:github-investigation` | Investigate issues, pull requests, root causes, and fix quality from repository evidence. |
 | `g:github-actions` | Inspect, diagnose, or explicitly repair GitHub Actions failures. |
 | `g:github-delivery-status` | Inspect exact-head provider delivery readiness without mutation. |

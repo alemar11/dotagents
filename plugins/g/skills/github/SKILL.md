@@ -56,6 +56,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | Issue and PR queue triage for one or more repositories | `$g:github-repository-triage` |
 | Content-based issue classification or explicit read-only taxonomy proposals | `$g:github-tagger` |
 | GitHub issue lifecycle and relationships | `$g:github-issues` |
+| GitHub Projects, fields, items, repository/team links, or templates | `$g:github-projects` |
 | Evidence-backed technical review of an issue, PR, or proposed fix | `$g:github-investigation` |
 | Actions inspection or explicit CI repair | `$g:github-actions` |
 | Exact-head PR delivery readiness, merge policy, rulesets, checks, queue, and automation state | `$g:github-delivery-status` |
@@ -72,5 +73,7 @@ if the work crosses domains.
   wrapper contract and maintenance commands.
 - [`../github-stack/SKILL.md`](../github-stack/SKILL.md): stack-level routing,
   lifecycle, and recovery guidance.
+- [`../github-projects/SKILL.md`](../github-projects/SKILL.md): GitHub Projects
+  lifecycle, identity, authorization, and recovery guidance.
 - [`../../references/network-execution.md`](../../references/network-execution.md):
   shell network and authentication boundaries.

@@ -21,7 +21,7 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 
 ## Repo-Local Plugins
 
-G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps, and direct `git` for local repository work. It bundles:
+G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps and GitHub Projects, and direct `git` for local repository work. It bundles:
 
 | Skill | Purpose |
 | --- | --- |
@@ -30,6 +30,7 @@ G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub 
 | `g:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
 | `g:github-tagger` | Classify one issue against existing metadata or explicitly analyze a repository and its issues to propose minimal new labels and organization issue types without mutation. |
 | `g:github-issues` | Manage GitHub issue lifecycle, attachments, metadata, relationships, and dry-runs. |
+| `g:github-projects` | Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. |
 | `g:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
 | `g:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
 | `g:github-delivery-status` | Inspect exact-head pull-request delivery readiness, merge policy, rulesets, checks, queue, and automation state without mutating GitHub. |

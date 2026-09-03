@@ -29,6 +29,9 @@ package and its shared artifact.
   requested read-only proposals for missing labels and organization issue
   types. It delegates exact issue mutations to `skills/github-issues/` and
   never mutates taxonomy from proposal mode.
+- `skills/github-projects/` owns user- and organization-owned GitHub Projects,
+  their fields, items, links, templates, and lifecycle. It uses direct `gh`
+  rather than adding Projects commands to the shared G artifact.
 - `skills/<name>/` owns only its narrow provider-primitive contract and local
   adapters or reference summaries.
 
@@ -62,6 +65,10 @@ unversioned, or belongs to another repository.
   operations. One operation owns one directed blocked-issue/blocker edge,
   supports cross-repository blockers by URL, and verifies both `blockedBy` and
   reciprocal `blocking` readback. Composing planners own why the edge exists.
+- Keep GitHub Projects operations in `github-projects`. Preserve exact owner,
+  project, field, option, iteration, item, and content identities; keep
+  free-form provider text in reviewed GraphQL request files; and verify every
+  mutation independently before continuing with dependent operations.
 - Do not duplicate the attachment upload transport in a skill or add another
   Git/GitHub transport. Do not move issue or pull-request publication policy
   into the shared helper. Preserve explicit authority for every GitHub

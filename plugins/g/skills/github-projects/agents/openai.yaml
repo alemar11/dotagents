@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Projects"
+  short_description: "Manage GitHub Projects, fields, and items"
+  brand_color: "#8250DF"
+  default_prompt: "Use $g:github-projects to inspect or manage a GitHub Project, its fields, items, links, templates, and lifecycle."

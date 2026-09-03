@@ -12,6 +12,8 @@ Load this reference:
 - before the first provider-facing operation through direct `gh` or
   `<plugin-root>/scripts/g` in any focused G skill;
 - before any stack command, in addition to the host and authentication checks;
+- before any GitHub Projects operation, in addition to the host,
+  authentication, capability, and scope checks below;
 - immediately before a direct `gh` fallback in `github-issues`, after a
   connector gap has been established.
 
@@ -54,6 +56,32 @@ do not diagnose or change credentials from a restricted-network failure.
 `doctor` is read-only. Authentication proof does not authorize a GitHub
 mutation; retain the mutation authority owned by the focused G skill.
 
+## GitHub Projects checks
+
+Before a Projects operation, verify that the installed CLI exposes the required
+Projects command instead of inferring support from its version number:
+
+```sh
+gh project --help
+gh project <required-command> --help
+```
+
+For the active `github.com` account, inspect authentication without displaying
+the token:
+
+```sh
+gh auth status --active --hostname github.com --json hosts \
+  --jq '.hosts["github.com"][] | select(.active == true) | {state, scopes}'
+```
+
+Require exactly one active successful account. A pure Projects read requires
+`read:project` or `project`; a Projects mutation requires `project`. If the
+required scope or command is unavailable, stop before the requested Projects
+read or mutation and report the missing capability. Suggest
+`gh auth refresh -s project` as manual remediation for a missing write scope,
+but never run it without explicit authorization because it changes the local
+authentication grant.
+
 ## gh-stack checks
 
 Before any stack command, run:
@@ -82,3 +110,5 @@ codes when the shared artifact returns them, including `gh_missing`,
 `process_spawn_failed`, `extension_missing`, `extension_conflict`, and
 `extension_unverified`. Do not classify provider failures from ad hoc stderr
 text or claim that credentials are invalid from an inconclusive network result.
+For Projects, distinguish a missing command or scope from a provider rejection
+after an operation was attempted.
