@@ -7,7 +7,6 @@ description: Inspect GitHub Actions checks and logs, read repository workflow pe
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Role
 
@@ -20,13 +19,11 @@ passed.
 
 ## Transport and CLI
 
-Prefer the GitHub connector for supported workflow, job, log, artifact, status,
-and rerun operations. Use `gh` for unsupported or external checks. An authorized
-write may fall back automatically only for the same operation and repository
-after `gh` authentication and access verification; report the fallback.
+Use authenticated `gh`, directly or through the shared CLI, for workflow, job,
+log, artifact, status, and rerun operations. Follow exact provider URLs when an
+external check must be inspected outside GitHub Actions.
 
-Before the first provider-facing connector fallback or shared CLI command,
-load
+Before the first provider-facing `gh` or shared CLI command, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
 and require its host and authentication checks.
 
@@ -43,7 +40,6 @@ value:
 ```
 
 The CLI uses `gh`, emits stable JSON envelopes, and writes no implicit config.
-It cannot invoke connector tools.
 
 For release workflows that create pull requests, branches, or tags, run the
 read-only permissions preflight before authoring the workflow. It checks the
@@ -78,7 +74,7 @@ local test alone, or edit code during an inspection-only request.
 
 ## References
 
-- `references/workflows.md`: connector and `gh` CI workflows.
+- `references/workflows.md`: GitHub CLI CI workflows.
 - `references/configuration.md`: repository Actions settings, workflow
   permissions, and the read-only permissions preflight.
 - `references/states.md`: canonical `g ci inspect` result summaries.

@@ -1,8 +1,7 @@
 # GitHub Tagger Provider Reads
 
-Read this reference only after a connector gap requires direct `gh` and the
-shared GitHub CLI dependency preflight has succeeded. These commands are
-read-only and do not authorize later mutations.
+Read this reference after the shared GitHub CLI dependency preflight has
+succeeded. These commands are read-only and do not authorize later mutations.
 
 ## Resolve The Target
 

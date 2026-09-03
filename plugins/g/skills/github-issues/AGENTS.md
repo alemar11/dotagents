@@ -6,9 +6,9 @@ canonical option ownership in the plugin-level references.
 
 ## Maintenance boundaries
 
-- Use the official GitHub connector for supported operations and the shared
-  `scripts/g` artifact only for documented connector gaps and typed
-  verification. Do not create a second issue transport here.
+- Use authenticated `gh` for provider operations and the shared `scripts/g`
+  artifact for its typed operations. Do not create a second issue transport
+  here.
 - Preserve the separation between issue lifecycle mechanics and repository-wide
   triage, investigation, review, Actions, release, or submission workflows.
 - Keep content-based selection of existing labels and native issue types, plus

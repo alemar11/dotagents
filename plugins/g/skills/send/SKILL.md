@@ -7,18 +7,17 @@ description: Send local work to GitHub. Use when the user explicitly requests th
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Role
 
-Publish local work from a checkout. This skill composes bundled G
-skills, direct `git`, the shared CLI, and connector-backed PR operations:
+Publish local work from a checkout. This skill composes bundled G skills,
+direct `git`, the shared CLI, and authenticated `gh` PR operations:
 
 - Use `$g:git-commit` for staging and commit authoring.
 - Use `<plugin-root>/scripts/g publish preflight` for structured local
-  readiness and `publish open --title-file --body-file` for new PRs. Use the
-  connector for supported existing-PR lifecycle operations. Do not put PR
-  title or body text in argv or a shell string.
+  readiness and `publish open --title-file --body-file` for new PRs. Use a
+  file-backed `gh api --input` request for existing-PR title or body changes.
+  Do not put PR title or body text in argv or a shell string.
 - When the publish path is selected, load
   [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
   before the first `gh`-dependent command. The shared reference owns the
@@ -28,8 +27,8 @@ skills, direct `git`, the shared CLI, and connector-backed PR operations:
   or `$g:github-review-threads` only for focused follow-up GitHub work.
 
 Resolve `<plugin-root>` as two directories above the directory containing this
-`SKILL.md`. The CLI cannot invoke connector tools; it uses direct `git` and
-authenticated `gh` for its preflight and fallback commands.
+`SKILL.md`. The CLI uses direct `git` and authenticated `gh` for its preflight
+and provider commands.
 
 If there is no local work to publish, or the request is only GitHub issue
 hygiene such as creating, commenting on, labeling, or closing issues, do not run

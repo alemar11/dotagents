@@ -7,18 +7,15 @@ description: Triage GitHub repositories read-only. Use for detailed issue and pu
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads. Use the
-read-only portfolio scanner for multiple explicit repositories, and use direct
-`gh` reads only for connector gaps after authentication and access
-verification. Report every fallback. This skill never performs GitHub writes
-or automatically falls back between write transports; route every
-write-shaped request to its owning skill.
+Use authenticated `gh` for provider reads. Use the read-only portfolio scanner
+for multiple explicit repositories and direct `gh` for one-repository detail.
+This skill never performs GitHub writes; route every write-shaped request to
+its owning skill.
 
-Before the first provider-facing direct `gh` or shared CLI fallback, load
+Before the first provider-facing direct `gh` or shared CLI operation, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
 and require its host and authentication checks.
 
@@ -62,9 +59,9 @@ per-repository failures, and writes no implicit config.
    - When the user identifies one repository, use the detailed queue path.
    - When the user identifies multiple repositories or supplies a repo file,
      require explicit `owner/repo` identities and use the comparative scan.
-2. For one repository, confirm context with the connector, or use
-   `gh repo view --json nameWithOwner,url` when local context or fallback is
-   needed. Gather open issues and PRs, inspect only the items needed for the
+2. For one repository, confirm context with
+   `gh repo view --json nameWithOwner,url`. Gather open issues and PRs, inspect
+   only the items needed for the
    queue question, and group them by blocker, stale item, ready-for-review,
    CI/review need, or follow-up owner.
 3. For multiple repositories, run

@@ -65,7 +65,6 @@ def doctor() -> dict[str, object]:
             },
             "repository": {"inside_worktree": bool(root and root.returncode == 0), "root": root.stdout.strip() if root and root.returncode == 0 else None},
             "gh_stack": gh_stack,
-            "connector": {"availability": "model-runtime-only", "cli_access": False},
         },
     }
 
@@ -92,6 +91,4 @@ def doctor_text(payload: dict[str, object], heading: str | None = None) -> str:
             f"repository: {'ok' if checks['repository']['inside_worktree'] else 'not detected'}",
         ]
     )
-    if "connector" in checks:
-        lines.append("connector: model-runtime-only")
     return "\n".join(lines)

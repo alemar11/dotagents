@@ -51,10 +51,17 @@ If the installed `gh` version rejects a JSON field such as `issueType`,
 
 ## Create Issues
 
-Create issues through the structured GitHub connector. The current `gh issue
-create` surface requires the free-form title in argv, so it is not an allowed
-fallback. If the connector is unavailable, fail closed; do not invent an issue
-CLI or interpolate the title into a shell command.
+Create each issue through a reviewed JSON request file so its title and body
+never enter argv:
+
+```bash
+gh api --method POST repos/<owner>/<repo>/issues \
+  --input <absolute-request-json>
+```
+
+The request file contains the exact `title`, optional complete `body`, and any
+exact existing labels supported by the operation. Apply an issue type or parent
+relationship separately when the REST create endpoint does not support it.
 
 Generated Markdown bodies are untrusted shell input. Do not place them inside
 double-quoted shell strings, `echo`, command substitutions, or unquoted heredocs
@@ -77,9 +84,10 @@ tracker before retrying. Reuse the created issue numbers and retry only missing
 or incorrect operations; do not rerun the full create sequence from local
 assumptions.
 
-Supply the exact repository, structured title/body, optional issue type, labels,
-and parent relationship to the connector. Verify the returned issue number and
-URL, then read the exact target back before claiming its text is verified.
+Supply the exact repository and reviewed request file to `gh api`. Verify the
+returned issue number and URL, apply any separately requested type or parent
+relationship, then read the exact target back before claiming its text is
+verified.
 
 After creating or editing an issue type, verify with `issueType`; `type` is not
 a valid JSON field for `gh issue view`:
@@ -205,17 +213,21 @@ gh issue edit <number-or-url> --remove-label "<label>"
 ```
 
 Create labels only when the user or calling workflow explicitly requested a
-new label. Use the structured GitHub connector because `gh label create`
-requires free-form name and description text in argv. If connector label
-creation is unavailable, fail closed.
+new label. Put the exact name, color, and optional description in a reviewed
+JSON request file and create it without placing those fields in argv:
+
+```bash
+gh api --method POST repos/<owner>/<repo>/labels \
+  --input <absolute-request-json>
+```
 
 Do not create other labels unless the user or tracker configuration explicitly
 asks for new taxonomy.
 
 ## Parent And Sub-Issues
 
-Prefer creating child issues with the parent relationship already set through
-the same structured connector issue-creation operation.
+Create the child issue first, then attach the exact parent relationship through
+the native operation below and verify both identities.
 
 Attach or remove existing relationships only when explicitly requested:
 

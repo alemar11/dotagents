@@ -55,6 +55,7 @@ class HealthContractTests(unittest.TestCase):
         self.assertEqual(gh["authentication_status"], expected)
         self.assertEqual(gh["authenticated"], expected == "verified")
         self.assertEqual(payload["provider_ready"], expected == "verified")
+        self.assertNotIn("connector", checks)
 
     def test_structured_success_is_verified_even_when_command_is_nonzero(self) -> None:
         payload = self.doctor_for(

@@ -1,9 +1,9 @@
 # G
 
 G is the repository-local Git and GitHub workflow plugin. It uses direct Git
-for local repository work, the GitHub connector for supported provider
-operations, authenticated `gh` for connector gaps and GitHub Projects, and the
-official `github/gh-stack` extension for stacked pull requests.
+for local repository work, authenticated `gh` directly or through its bundled
+G CLI for GitHub provider operations, and the official `github/gh-stack`
+extension for stacked pull requests. It has no GitHub connector dependency.
 
 ## Bundled skills
 

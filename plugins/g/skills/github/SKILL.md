@@ -7,13 +7,12 @@ description: Handle general or mixed GitHub work. Use when a request crosses iss
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 Before the first provider-facing direct `gh` or `<plugin-root>/scripts/g`
 operation, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md).
-Connector-only paths skip the gate; stack operations additionally require the
-exact `github/gh-stack` readiness check owned by that reference.
+Stack operations additionally require the exact `github/gh-stack` readiness
+check owned by that reference.
 
 ## Role
 
@@ -23,15 +22,12 @@ skill and keep that skill's authority and safety rules intact.
 
 ## Transport
 
-- Prefer the required GitHub connector for supported remote reads and writes.
-- Use `gh` for connector gaps or when a connector call fails. A write may fall
-  back automatically only when the original write was authorized, the target
-  repository and operation are identical, and provider authentication plus
-  repository access succeed. Report the transport switch.
+- Use authenticated `gh` for every GitHub provider read and write, either
+  directly or through `<plugin-root>/scripts/g`.
 - Use direct `git` for local status, diffs, staging, commits, branches, hooks,
   tests, and pushes.
-- The shared CLI at `<plugin-root>/scripts/g` uses `gh`; it cannot invoke
-  connector tools or access the GitHub App token.
+- The shared CLI at `<plugin-root>/scripts/g` uses the same authenticated `gh`
+  session as direct GitHub CLI commands.
 - Use `<plugin-root>/scripts/g stack ...` for the GitHub stacked-PR CLI
   boundary. It wraps the official `github/gh-stack` extension, checks the
   extension before invoking it, and never installs the agent skill. Run

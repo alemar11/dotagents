@@ -201,13 +201,16 @@ Close out by saying explicitly:
 
 ## Existing PR
 
-Read the existing PR including its body and base, then use the structured
-GitHub connector for title/body edits. G does not expose `publish edit`,
-and `gh pr edit` requires the free-form title in argv.
+Read the existing PR including its body and base. For title or body edits,
+write the complete reviewed request object to an absolute JSON file and send
+it through `gh api --input`; do not use `gh pr edit` with free-form text in
+argv.
 
 ```bash
 gh pr view <number> --repo <owner/repo> \
   --json number,title,body,url,isDraft,headRefName,headRepositoryOwner,baseRefName
+gh api --method PATCH repos/<owner>/<repo>/pulls/<number> \
+  --input <absolute-request-json>
 ```
 
 Verify `headRefName` and the head repository still match the preflight before

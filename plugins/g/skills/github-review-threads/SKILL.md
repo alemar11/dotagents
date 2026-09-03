@@ -7,7 +7,6 @@ description: Handle GitHub pull request review threads from feedback through ver
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Role
 
@@ -19,10 +18,10 @@ review observations, reconciliation, or resolution results.
 
 ## Transport and CLI
 
-Prefer the GitHub connector for thread-aware listing and resolution state. For
-provider text, use only a structured connector mutation whose exact target can
-be read back, or the typed file-backed G commands below. Never place a
-title, body, description, reply, or review text in argv or a shell string.
+Use the typed G commands below, backed by authenticated `gh`, for thread-aware
+listing, resolution state, and mutations. Keep provider text file-backed and
+require exact readback. Never place a title, body, description, reply, or
+review text in argv or a shell string.
 
 Before the first provider-facing shared CLI command, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
@@ -50,7 +49,7 @@ The CLI validates absolute regular non-symlink UTF-8 files, sends JSON to `gh
 api --input -`, emits byte counts and SHA-256 fingerprints instead of text, and
 verifies provider identity, target, response text, and an optional Git
 worktree fingerprint. It writes no implicit config.
-It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
+Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
@@ -142,7 +141,7 @@ interpreting them here.
 
 ## References
 
-- `references/workflows.md`: feedback, reply, resolution, and fallback flows.
+- `references/workflows.md`: feedback, reply, resolution, and direct-command flows.
 - `references/states.md`: feedback, review, reconciliation, and resolution
   states.
 - `references/script-summary.md`: shared `g reviews` contract.

@@ -7,14 +7,11 @@ description: Manage the authenticated GitHub user's stars and star lists. Use to
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+Use `<plugin-root>/scripts/g stars`, backed by authenticated `gh`, for every
+provider read and write in this skill.
 
 Before the first provider-facing shared CLI operation, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)

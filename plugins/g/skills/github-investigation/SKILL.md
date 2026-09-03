@@ -7,14 +7,11 @@ description: Investigate a GitHub issue, pull request, or proposed fix using rep
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+Use authenticated `gh`, directly or through the shared CLI, for every GitHub
+provider read and write.
 
 Before the first provider-facing direct `gh` or shared CLI fallback, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
@@ -46,8 +43,8 @@ threads.
 Resolve `<plugin-root>` as two directories above the directory containing this
 `SKILL.md` before invoking the shared CLI.
 
-Prefer connector-backed PR or issue context plus local repo evidence over web
-browsing. Use `gh` for connector gaps and local branch discovery:
+Prefer exact `gh` PR or issue context plus local repository evidence over web
+browsing. Use direct `gh` for provider and branch discovery:
 
 ```bash
 gh issue view <number> --json number,title,state,author,body,comments,labels,updatedAt,url

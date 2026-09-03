@@ -10,7 +10,7 @@ and `references/workflows.md`.
   lifecycle to `$g:github-issues`, and review follow-up to the focused
   review skill. Do not duplicate those transports here.
 - `scripts/g publish` owns structured local preflight and PR creation;
-  connector-backed operations own supported existing-PR lifecycle changes.
+  file-backed authenticated `gh` operations own existing-PR lifecycle changes.
 - `scripts/g stack link` owns the explicit two-PR stack relationship; Send
   publishes one branch/PR and never infers or invokes that relationship. Send
   retains ownership of the current branch push, PR body, draft-state

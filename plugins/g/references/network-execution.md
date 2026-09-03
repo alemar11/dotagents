@@ -8,14 +8,12 @@ permission; bundled skills should link here instead of restating it.
 
 | Operation | Execution rule |
 | --- | --- |
-| GitHub connector call | Use the connector directly. Shell escalation does not apply. |
 | Local-only command | Keep it sandboxed. This includes local `git` status, diff, log, staging, commit, repository snapshots, help, and version checks. |
-| Network-bearing shell command | Use the runtime's scoped network permission or sandbox-escalation control from the outset for the exact command. This includes `gh`; remote `git` operations such as fetch, pull, push, and `ls-remote`; registry checks or publication; and any `scripts/g` subcommand that invokes `gh`. |
+| Network-bearing shell command | Use the runtime's narrowest network-enabled execution context from the outset for the exact command family. This includes `gh`; remote `git` operations such as fetch, pull, push, and `ls-remote`; registry checks or publication; and any `scripts/g` subcommand that invokes `gh`. |
 
-In Codex, run a network-bearing shell command with
-`sandbox_permissions=require_escalated`. Keep the approval scope to the
-smallest useful command family; never request blanket unrestricted access to
-`github.com`. The shipped G CLI does not and cannot elevate itself.
+Keep the network scope to the smallest useful command family; never request
+blanket unrestricted access to `github.com`. The shipped G CLI does not and
+cannot grant itself network access.
 
 Network permission changes where the command executes, not what the user has
 authorized. Read-only permission does not authorize a write. Pushes, comments,

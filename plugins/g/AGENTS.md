@@ -8,7 +8,7 @@ package and its shared artifact.
 ## Ownership map
 
 - `.codex-plugin/plugin.json` owns plugin identity, discovery metadata, bundled
-  skill exposure, and the plugin version.
+  skill exposure, dependency-free provider declaration, and the plugin version.
 - `scripts/g` is the shipped shared artifact. Its maintenance source,
   tests, build, and version-alignment rules live in
   `projects/g/AGENTS.md`.
@@ -73,6 +73,9 @@ unversioned, or belongs to another repository.
   Git/GitHub transport. Do not move issue or pull-request publication policy
   into the shared helper. Preserve explicit authority for every GitHub
   mutation.
+- Keep GitHub provider access independent from app connectors. Bundled skills
+  use authenticated `gh` directly or through `scripts/g`; the plugin manifest
+  must not declare a GitHub app dependency.
 - Treat plugin caches as verification surfaces, never editable sources.
 
 ## Validation

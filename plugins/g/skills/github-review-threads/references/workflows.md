@@ -180,11 +180,10 @@ body, and `review_operation=comment` for another discussion comment. Use the
 typed `reviews request` operation for automated-review requests. Caller-specific
 authorization and phase fields must be normalized before this boundary.
 
-## Fallback Direct Commands
+## Direct Commands
 
-Use direct `gh` only for a genuinely file-backed operation. If no file-backed
-fallback exists, require the structured GitHub connector and fail closed.
-State the fallback reason in the response.
+Use direct `gh` only for a genuinely file-backed operation. If no safe
+file-backed operation exists, fail closed and report the unavailable operation.
 
 ```bash
 gh pr comment <number> --repo <owner/repo> --body-file <message-file>

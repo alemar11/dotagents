@@ -99,11 +99,17 @@ notes:
 gh release create <tag> --draft --generate-notes --verify-tag
 ```
 
-For hand-written release names or notes, use the structured GitHub connector.
-An existing genuinely file-backed `gh --notes-file` operation is allowed only
-when no other free-form field is placed in argv. If the required field has no
-safe connector or file-backed surface, fail closed; do not add a release
-mutation command to G in this refinement.
+For a hand-written release name or notes, write the complete reviewed release
+request to an absolute JSON file and create it through the releases endpoint:
+
+```bash
+gh api --method POST repos/<owner>/<repo>/releases \
+  --input <absolute-request-json>
+```
+
+Include the exact `tag_name`, `name`, `body`, and requested lifecycle fields in
+the file. A high-level `gh release create --notes-file` operation is safe only
+when no other free-form field would enter argv.
 
 ## Direct Create And Publish
 
@@ -116,8 +122,8 @@ This shortcut does not relax any target checks. Require the exact existing tag,
 verify the notes range, reject duplicate releases, preserve prerelease state,
 and perform provider readback. It never authorizes creation of a missing tag.
 For an explicitly selected historical stable tag, force the result not to be
-latest. Prefer the structured GitHub connector for curated title and body
-fields; use `gh release create --generate-notes --verify-tag` only when the
+latest. Use the file-backed releases API for curated title and body fields; use
+`gh release create --generate-notes --verify-tag` only when the
 provider-generated title and body are accepted without free-form refinement.
 
 Publishing an existing draft is also `release_operation=publish` and requires
@@ -139,11 +145,19 @@ Use `release_operation=update-notes` for an existing release description:
    prerelease, latest, discussion, and asset state unless separately requested.
 5. Read the release back and require the returned title and body to match.
 
-Use the structured GitHub connector when available. A genuinely file-backed
-CLI update is an allowed fallback when the body is the only free-form field:
+When the body is the only free-form field, use:
 
 ```bash
 gh release edit <tag> --notes-file <absolute-release-notes-file>
+```
+
+For a title update, or a combined title and body update, resolve the release id
+from the exact tag, place only the authorized replacement fields in a reviewed
+JSON request file, and use:
+
+```bash
+gh api --method PATCH repos/<owner>/<repo>/releases/<release-id> \
+  --input <absolute-request-json>
 ```
 
 Published immutable releases may still accept title and notes changes, but do

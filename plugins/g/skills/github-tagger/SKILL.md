@@ -7,7 +7,6 @@ description: Classify one existing GitHub issue with available labels and at mos
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Role
 
@@ -49,12 +48,11 @@ names or issue type, skip classification and route directly to that skill.
 
 ## Transport
 
-Prefer the required GitHub connector for supported reads. Use direct `gh` only
-for a connector gap and only after loading
-[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
-immediately before the fallback, then read
-[Provider reads](references/provider-reads.md). Report every fallback and
-distinguish an empty catalog from a catalog that could not be read.
+Use authenticated `gh` for provider reads. Before the first provider operation,
+load
+[`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md),
+then read [Provider reads](references/provider-reads.md). Distinguish an empty
+catalog from a catalog that could not be read.
 
 This skill performs no direct write transport. Route each authorized
 `add-label` or `set-type` operation to `$g:github-issues`, then independently
@@ -184,8 +182,8 @@ read the issue back before reporting success.
 - `references/taxonomy-proposals.md`: repository and issue-corpus evidence,
   gap tests, proposal shapes, and the no-write boundary. Read only for an
   explicit taxonomy proposal.
-- `references/provider-reads.md`: read-only `gh` fallbacks for the target issue,
-  label catalog, and organization type catalog. Read only for a connector gap.
+- `references/provider-reads.md`: read-only `gh` operations for the target issue,
+  label catalog, and organization type catalog.
 - `references/states.md`: canonical transient dispositions and external-state
   boundaries. Read before applying or returning a result.
 - `../../references/options.md`: shared canonical G invocation fields.

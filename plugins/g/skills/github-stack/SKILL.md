@@ -7,7 +7,6 @@ description: Manage stacked branches and dependent pull requests through the G s
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Role
 

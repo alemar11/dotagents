@@ -1,9 +1,8 @@
 # G to gh Runtime Preflight
 
 This reference owns the scoped, fail-closed readiness gate for G operations
-that use the GitHub CLI. It is not a global requirement for connector-only
-operations and it must not install, update, or replace `gh` or an extension
-without explicit authorization.
+that use the GitHub CLI. It must not install, update, or replace `gh` or an
+extension without explicit authorization.
 
 ## Load condition
 
@@ -13,13 +12,10 @@ Load this reference:
   `<plugin-root>/scripts/g` in any focused G skill;
 - before any stack command, in addition to the host and authentication checks;
 - before any GitHub Projects operation, in addition to the host,
-  authentication, capability, and scope checks below;
-- immediately before a direct `gh` fallback in `github-issues`, after a
-  connector gap has been established.
+  authentication, capability, and scope checks below.
 
-Connector-only reads and writes do not load this gate. The gate must finish
-before the dependent command, GitHub mutation, push, stack operation, or
-extension installation.
+The gate must finish before the dependent command, GitHub mutation, push,
+stack operation, or extension installation.
 
 ## Host CLI checks
 
@@ -33,11 +29,11 @@ gh --version
 
 Require an executable path and a successful, usable version result. Record the
 resolved path and version as diagnostic evidence only. Do not infer CLI
-availability from a connector, a plugin cache, or an installed extension.
+availability from a plugin cache or an installed extension.
 
 If the executable is missing, cannot run, or returns unusable version output,
-stop with a CLI-missing or CLI-runtime blocker. Do not substitute a connector
-for an explicitly `gh`-owned operation and do not install or update the CLI
+stop with a CLI-missing or CLI-runtime blocker. No alternative GitHub provider
+transport is defined by this plugin; do not install or update the CLI
 automatically.
 
 ## Authentication checks

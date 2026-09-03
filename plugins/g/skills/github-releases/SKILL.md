@@ -7,14 +7,12 @@ description: Manage GitHub releases. Use to inspect, plan, draft, publish, impro
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+Use authenticated `gh` for every GitHub provider read and write. Use file-backed
+`gh api --input` requests whenever a mutation includes a curated title, body,
+or other free-form provider text.
 
 Before the first provider-facing direct `gh` or shared CLI operation, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)

@@ -7,22 +7,15 @@ description: Manage individual GitHub issues and their lifecycle. Use when the e
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
-Connector calls and local-only commands do not use shell escalation.
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes.
-Use `gh` or the shipped attachment uploader for connector gaps. An authorized
-connector write may fall back automatically only when the operation and
-repository are identical, `gh` authentication and access succeed, and the
-transport switch is reported. A
-connector gap is safe for direct `gh` when the operation contains only exact
-provider identities, as with native issue dependencies, or when every
-free-form provider field is genuinely file-backed. Otherwise fail closed.
-When a connector gap requires direct `gh`, load
+Use authenticated `gh` for every provider read and write. Use high-level `gh`
+commands when every free-form provider field is file-backed; otherwise use a
+reviewed JSON request through `gh api --input`. Use the shipped attachment
+uploader for binary uploads. Before the first provider operation, load
 [`../../references/gh-dependency-preflight.md`](../../references/gh-dependency-preflight.md)
-immediately before that fallback. Connector-only operations do not require the
-CLI gate.
+and require its host and authentication checks.
 
 Resolve `<plugin-root>` as two directories above the directory containing this
 `SKILL.md`. For every attachment upload, use only:
@@ -47,15 +40,14 @@ handles GitHub Issues lifecycle mechanics.
 
 ## Core Rules
 
-- Prefer connector issue tools for supported operations. Use direct `gh` only
-  for a connector gap whose free-form provider text is genuinely file-backed;
-  otherwise fail closed. Use the shipped `attachment upload` command as the
-  only attachment transport; never reproduce its token or HTTP logic.
+- Use authenticated `gh` directly or through file-backed `gh api --input`
+  requests. Use the shipped `attachment upload` command as the only attachment
+  transport; never reproduce its token or HTTP logic.
 - Confirm repository context before mutation, using the current checkout or an
   explicit `--repo <owner>/<repo>`.
-- Send issue titles and other free-form fields through the structured GitHub
-  connector. Use `gh --body-file` only for operations whose every free-form
-  field is genuinely file-backed.
+- Keep issue titles, bodies, label descriptions, comments, and other free-form
+  fields out of argv. Use a body-file flag when the command supports one;
+  otherwise send an exact reviewed JSON request with `gh api --input`.
 - Create temporary `--body-file` inputs outside checkout-owned artifact paths
   and remove them after mutation unless the user or calling workflow explicitly
   provides a persistent body-file or local mirror path.

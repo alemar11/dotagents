@@ -21,7 +21,7 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 
 ## Repo-Local Plugins
 
-G is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps and GitHub Projects, and direct `git` for local repository work. It bundles:
+G is the repo-local Git and GitHub workflow plugin. It uses authenticated `gh`, directly or through its bundled G CLI, for remote operations and direct `git` for local repository work. It has no GitHub connector dependency. It bundles:
 
 | Skill | Purpose |
 | --- | --- |
