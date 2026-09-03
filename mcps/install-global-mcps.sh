@@ -21,7 +21,6 @@ Default MCPs:
   XcodeBuildMCP    npx -y xcodebuildmcp@latest mcp
   discourse        npx -y @discourse/mcp@latest
   HopperMCPServer  /Applications/Hopper Disassembler.app/Contents/MacOS/HopperMCPServer
-  chrome-devtools  npx -y chrome-devtools-mcp@latest --isolated, installed disabled
 
 Codex-bundled MCPs such as node_repl are intentionally not installed here.
 EOF
@@ -192,8 +191,6 @@ elif [ -x "$hopper_server" ]; then
 else
   echo "HopperMCPServer executable not found: $hopper_server"
 fi
-
-install_disabled_stdio_mcp chrome-devtools npx -y chrome-devtools-mcp@latest --isolated
 
 echo
 echo "Installed external MCP entries:"

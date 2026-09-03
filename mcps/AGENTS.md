@@ -20,9 +20,6 @@ itself.
 - Keep the script idempotent: leave existing entries, including their current
   `enabled` state, unchanged by default. Replace entries only when the user
   passes `--force`.
-- Install `chrome-devtools` as disabled only when the entry is missing or when
-  `--force` is used. Do not change the enabled state of an existing entry during
-  a normal install.
 
 ## Maintenance
 - When adding an MCP, document its exact `codex mcp add` command in
