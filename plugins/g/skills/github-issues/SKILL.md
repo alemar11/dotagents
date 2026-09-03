@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Manage individual GitHub issues and their lifecycle. Use when the exact content, attachment, label, type, comment, state, native dependency, or relationship change is already decided; use $g:github-tagger when labels or type must be inferred or missing taxonomy must be proposed, and $g:github-repository-triage for repository-wide queues.
+description: Manage specific GitHub issue content, attachments, metadata, comments, state, relationships, and native dependencies. Use $g:github-tagger when labels or type must be inferred, and $g:github-repository-triage for queues.
 ---
 
 # GitHub Issues

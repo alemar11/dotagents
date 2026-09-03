@@ -1,6 +1,6 @@
 ---
 name: github-delivery-status
-description: Inspect a pull request's complete GitHub delivery state read-only, including exact HEAD, mergeability, merge-state policy, required checks and reviews, branch protection, rulesets, bypass evidence, merge queue, auto-merge, review threads, and closing references. Use when deciding whether a PR is provider-ready, needs a manual merge action, is pending, blocked, conflicting, or cannot be classified safely.
+description: Inspect one pull request's exact-head GitHub delivery readiness read-only, including mergeability, policy, required checks and reviews, unresolved threads, queue, and automation state.
 ---
 
 # GitHub Delivery Status

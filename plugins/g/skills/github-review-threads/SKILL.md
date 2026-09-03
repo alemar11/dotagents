@@ -1,6 +1,6 @@
 ---
 name: github-review-threads
-description: Handle GitHub pull request review threads from feedback through verified fixes. Use to check or wait for automated reviews, inspect unresolved feedback, implement selected changes, or explicitly reply and resolve threads.
+description: Handle hosted pull-request review feedback by checking or waiting for automated reviews, inspecting threads, and implementing verified fixes. Reply to or resolve threads only when explicitly requested.
 ---
 
 # GitHub Review Threads

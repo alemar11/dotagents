@@ -1,6 +1,6 @@
 ---
 name: versioning
-description: Distinguish versions and Git tags from GitHub Releases, apply the shared SemVer and release-line convention, operate or author approval-gated release-tag Actions, select existing release tags, and plan safe legacy-tag migrations.
+description: Apply shared SemVer, Git-tag, and release-line conventions; select tags, plan safe legacy-tag aliases, and operate or author approval-gated release-tag Actions. Use $g:github-releases for Release content and publication.
 ---
 
 # Versioning

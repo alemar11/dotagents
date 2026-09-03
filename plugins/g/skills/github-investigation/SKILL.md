@@ -1,6 +1,6 @@
 ---
 name: github-investigation
-description: Investigate a GitHub issue, pull request, or proposed fix using repository evidence. Use to understand behavior, find the root cause, evaluate whether a fix is sound, and identify remaining risk; use $g:github-review-threads for hosted review feedback.
+description: Investigate a GitHub issue, pull request, or proposed fix using repository evidence. Use for root-cause and fix-quality analysis; use $g:github-review-threads for hosted review feedback.
 ---
 
 # GitHub Investigation

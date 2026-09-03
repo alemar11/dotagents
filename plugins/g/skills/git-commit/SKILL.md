@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Create or push Git commits with explicit staging. Use for regular commits, targeted fixups, amend-fixups, push-only requests, or commit-and-push; use $g:send when the user also wants a pull request.
+description: Create or push Git commits with explicit staging. Use for commit-only, commit-and-push, push-only, fixup, or amend-fixup requests; use $g:send when a pull request is required.
 ---
 
 # Git Commit

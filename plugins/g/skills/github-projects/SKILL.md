@@ -1,6 +1,6 @@
 ---
 name: github-projects
-description: Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. Use for user- or organization-owned Projects; use other G skills for issue or pull-request content outside Project membership and fields.
+description: Manage user- or organization-owned GitHub Projects, fields, items, links, templates, and lifecycle. Use focused G skills for issue or pull-request content outside Project membership and fields.
 ---
 
 # GitHub Projects

@@ -1,6 +1,6 @@
 ---
 name: github-releases
-description: Manage GitHub releases. Use to inspect, plan, draft, publish, improve, or validate releases, tags, release notes, assets, and packages.
+description: Manage GitHub Release content and lifecycle, including notes, assets, packages, drafting, publication, and validation. Use $g:versioning for new versions, tags, release lines, or tag workflows.
 ---
 
 # GitHub Releases

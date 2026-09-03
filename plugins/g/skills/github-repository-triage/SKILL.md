@@ -1,6 +1,6 @@
 ---
 name: github-repository-triage
-description: Triage GitHub repositories read-only. Use for detailed issue and pull request queues in one repository or explicit multi-repository summaries of blockers, CI, releases, and next actions; route content-based metadata selection or taxonomy proposals to $g:github-tagger and exact mutations to $g:github-issues.
+description: Inspect issue and pull-request queues in one or more GitHub repositories read-only, summarizing blockers and next actions. Use focused G skills for investigation, classification, or mutation.
 ---
 
 # GitHub Repository Triage

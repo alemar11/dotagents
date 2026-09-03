@@ -1,6 +1,6 @@
 ---
 name: send
-description: Send local work to GitHub. Use when the user explicitly requests the complete flow to confirm scope, commit, push the branch, include caller-provided resolved issue references for automatic closure, and open or update one pull request without changing its draft state.
+description: Commit and push scoped local changes, then open or update one pull request without changing its draft state. Use when PR publication is requested; resolved-issue references remain caller-supplied.
 ---
 
 # Send

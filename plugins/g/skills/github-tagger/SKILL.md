@@ -1,6 +1,6 @@
 ---
 name: github-tagger
-description: Classify one existing GitHub issue with available labels and at most one native issue type, or explicitly analyze a repository and its issues to propose missing label and issue-type taxonomy. Use when metadata must be inferred from evidence; use $g:github-issues when an exact metadata mutation is already decided.
+description: Classify one existing issue using available labels and at most one native type, or explicitly propose missing repository labels and organization issue types read-only. Use $g:github-issues for decided mutations.
 ---
 
 # GitHub Tagger
