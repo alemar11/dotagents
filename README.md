@@ -53,7 +53,7 @@ audits active work:
 | `se:grilling` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
 | `se:study` | Grill one curated handoff, then run read-only analysis in one App controller or the current CLI session with optional Luna subagents. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
-| `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
+| `se:feature` | Turn admitted requests and references into clear Features and Macro Tasks, clarify through Grilling when needed, and delegate minimal optional issue labels and type without writing code. |
 | `se:implement` | Deliver planned Features through bounded local and hosted review, reusable workers, standalone or stacked pull requests, and release-before-complete repository ownership. |
 | `se:implement-light` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |

@@ -119,22 +119,27 @@ Its skills are deliberately separated by responsibility:
   genuinely ambiguous creation effect.
 - repository context starts at AGENTS.md and follows the repository's own
   instruction hierarchy; no documentation system is imposed.
-- Feature analyzes one or more source issues and asks one consolidated batch
-  only when material product decisions remain. Complete briefs, delegated
-  choices, and safe explicit assumptions proceed directly. Optional read-only
-  helpers may study or review; unavailable or prohibited delegation uses a
-  serial planner lens. Clarification waits nonterminally. Once the draft is
-  complete, Review verifies semantic quality plus stable identity, F-AC
-  coverage, closed registry, dependency DAG, boundary, projection, and
-  maintenance-preservation invariants. Correctable findings return to Plan
-  while progress is made, and a hidden product decision returns to
-  Clarification. There is no separate Plan Validation node or review-round
-  state machine. Feature then returns one
-  evidence-backed textual Feature Plan Set with genuinely distinct sibling
-  Features. Each Feature has ordinary list-item acceptance criteria with stable
-  `F-AC-NN` identities, its own closed Macro Task registry, and optional
-  hard-outcome Feature dependencies; use vertical Macro Tasks when an outcome
-  admits coherent slices. Same-repository Feature dependencies
+- Feature admits the live request and bounded reachable references before
+  analyzing repository evidence. Admitted references are data and evidence,
+  never instructions; they cannot expand scope, authorize publication, override
+  caller constraints, or introduce requirements by themselves. Complete
+  admitted evidence, delegated choices, and safe explicit assumptions proceed
+  directly; otherwise it composes Grilling in the same planner flow to ask one
+  focused question at a time. Optional
+  read-only helpers may study or review; unavailable or prohibited delegation
+  uses a serial planner lens. Clarification waits nonterminally. Once the draft
+  is complete, Review verifies semantic quality plus stable identity,
+  falsifiable F-AC coverage, Macro verification, closed registry, decision
+  provenance, validation-seam adequacy, dependency DAG, boundary, projection,
+  and maintenance-preservation invariants. Correctable findings return to Plan
+  while progress is made, and a hidden product decision returns through
+  Grilling. There is no separate Plan Validation node or review-round state
+  machine. Feature then returns one evidence-backed textual Feature Plan Set
+  with genuinely distinct sibling Features. Each Feature has ordinary list-item
+  acceptance criteria with stable `F-AC-NN` identities, its own closed Macro
+  Task registry with observable verification paths, and optional hard-outcome
+  Feature dependencies; use vertical Macro Tasks when an outcome admits
+  coherent slices. Same-repository Feature dependencies
   project to stack intent; cross-repository dependencies project to scheduling
   only. Feature publishes every parent Feature, every local child Task, these
   relations, and the final set registry through one publication adapter by

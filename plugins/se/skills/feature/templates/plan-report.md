@@ -16,15 +16,17 @@
 
 ## Macro Task registries
 
-| parent_feature_id | macro_task_id | child Task issue | F-AC refs | blocked_by | status |
-| --- | --- | --- | --- | --- | --- |
-| <feature-id> | <macro-id> | <hosted identity or proposed preview ref> | <F-AC refs> | <same-parent Macro IDs or none> | <ready or blocked> |
+| parent_feature_id | macro_task_id | child Task issue | F-AC refs | observable verification | blocked_by | status |
+| --- | --- | --- | --- | --- | --- | --- |
+| <feature-id> | <macro-id> | <hosted identity or proposed preview ref> | <F-AC refs> | <observable path or integrated-verification rationale> | <same-parent Macro IDs or none> | <ready or blocked> |
 
 ## Planning evidence
 
 - sources and repository context:
+- input provenance and decision authority:
 - boundary and consolidation decisions:
 - acceptance criteria by Feature:
+- validation seams:
 - material questions and answers:
 - accepted assumptions and risks:
 - review method, findings, and dispositions:

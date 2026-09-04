@@ -20,6 +20,14 @@ assignment, or a separate PR boundary.
 <Describe the coherent outcome or vertical slice this Macro Task represents;
 use a vertical slice when the Feature outcome supports one.>
 
+## Observable verification
+
+<Describe the observable behavior or evidence this Macro enables. Prefer a
+demoable or independently observable path. If verification is integrated with
+another Macro, name that outcome and explain why this Macro has no separate
+observable path. This is planning evidence, not a test command or execution
+instruction.>
+
 ## Scope and criteria
 
 - scope: <macro boundary>

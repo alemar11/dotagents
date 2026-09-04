@@ -25,9 +25,9 @@ Implement; a cross-repository edge is scheduling-only.
 
 ## Source and boundary decisions
 
-| source | interpretation | feature_id | source_disposition |
-| --- | --- | --- | --- |
-| <source> | <evidence-backed interpretation> | <member> | <consolidated, separated, revised, or out-of-scope> |
+| source | provenance | interpretation | feature_id | source_disposition |
+| --- | --- | --- | --- | --- |
+| <source> | <directive, proposal, evidence, context, prior-contract, or reference> | <evidence-backed interpretation> | <member> | <consolidated, separated, revised, or out-of-scope> |
 
 <Explain why each residual outcome is one Feature or a distinct sibling.>
 
@@ -62,18 +62,23 @@ outcome, usable landing state, and ownership boundary.>
 #### Feature acceptance criteria
 
 - [F-AC-01] <unique observable success criterion>
+  falsifier: <observation that would prove the criterion false>
 - [F-AC-02] <unique observable success criterion>
+  falsifier: <observation that would prove the criterion false>
 
 F-AC identities are durable contract identifiers, not execution checkboxes.
+Every new-behavior criterion must be falsifiable and false before the Feature's
+work. Record preservation of an existing invariant separately as a preservation
+obligation; it never substitutes for evidence of the new Feature delta.
 
 #### Macro Task registry
 
 - parent_feature_id: `<feature_id>`
 - macro_task_registry_revision: <monotonic revision>
 
-| parent_feature_id | macro_task_id | macro outcome | scope | F-AC refs | blocked_by | macro_status | child_issue_ref |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `<feature_id>` | macro-01 | <coherent outcome or vertical slice> | <boundary> | <F-AC-01> | <same-parent Macro IDs or none> | <ready or blocked> | <hosted identity or proposed preview ref> |
+| parent_feature_id | macro_task_id | macro outcome | observable_verification | scope | F-AC refs | blocked_by | macro_status | child_issue_ref |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `<feature_id>` | macro-01 | <coherent outcome or vertical slice> | <observable path or integrated-verification rationale> | <boundary> | <F-AC-01> | <same-parent Macro IDs or none> | <ready or blocked> | <hosted identity or proposed preview ref> |
 
 The registry is closed, covers every F-AC, adds no scope, and contains only
 same-parent Macro dependencies. Macro edges are planning context, not technical
@@ -87,7 +92,9 @@ execution or PR boundaries.
 
 #### Validation intent
 
-- <observable behavioral, integration, or operational evidence>
+- evidence: <observable behavioral, integration, or operational evidence>
+  validation_seam: <highest practical existing or proposed seam, or defer-to-implementation>
+  seam_rationale: <why the seam is sufficient and why it is existing, new, or deferred>
 
 ## Questions and decisions
 
@@ -96,6 +103,7 @@ choice, or safe assumptions were sufficient.
 
 - question: <material decision>
   status: <open, resolved, or assumption>
+  provenance: <user-decision, delegated-choice, source-issue, codebase-evidence, idea-source, existing-plan, or assumption>
   recommendation: <recommended answer>
   answer: <answer or assumption>
   evidence: <source>
@@ -105,7 +113,7 @@ choice, or safe assumptions were sufficient.
 - review_result: <clean, revision-required, clarification-required, or blocked>
 - review_method: <independent-helper or serial-lens>
 - material_findings: <findings and dispositions or none>
-- structural_checks: <identity, F-AC coverage, registries, DAGs, boundaries, projections, maintenance preservation>
+- structural_checks: <identity, falsifiable F-AC coverage, Macro verification, registries, DAGs, boundaries, provenance, validation seams, projections, maintenance preservation>
 
 ## Implementation handoff
 

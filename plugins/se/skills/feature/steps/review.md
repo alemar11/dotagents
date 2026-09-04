@@ -14,7 +14,7 @@ outputs:
   - review_result
   - review_findings
   - planner_dispositions
-  - material_question_batch
+  - clarification_brief
   - clarification_context
   - publication_ready_plan
 transitions:
@@ -44,12 +44,17 @@ Review the original intent, evidence, decisions, assumptions, and plan. Verify:
 
 - stable Plan Set, Feature, F-AC, Macro, and revision identities;
 - genuine sibling boundaries and absence of a container Feature;
-- observable, non-duplicative F-ACs with monotonic high-water marks;
+- observable, non-duplicative, falsifiable F-ACs with monotonic high-water
+  marks, including the observation that would prove each one false and separate
+  treatment of new-behavior evidence from invariant preservation;
 - complete F-AC coverage by closed, nontechnical Macro registries;
+- an observable verification path or explicit integrated-verification rationale
+  for every Macro;
 - no Macro scope expansion and only same-parent Macro edges;
 - acyclic Feature and Macro graphs;
 - correct repository mapping and stack-versus-scheduling semantics;
-- complete source provenance, risk, validation, and implementation handoff;
+- complete decision and source provenance, risk, validation-seam adequacy, and
+  implementation handoff;
 - preservation of hosted identities, unaffected content, and executor-owned
   progress for existing-source revisions;
 - complete preview or hosted projection mappings for every planned artifact.

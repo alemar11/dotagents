@@ -10,7 +10,7 @@ persisted current node.
 | --- | --- | --- |
 | `intake` | action | Resolve the source route, affected repositories, authority, and exact create or revision scope. |
 | `analysis` | action | Gather repository and problem evidence, identify material decisions, and prepare bounded planning inputs. |
-| `clarification` | decision | Present one consolidated material question batch and wait nonterminally for answers. |
+| `clarification` | action | Compose Grilling in the Feature planner flow and wait nonterminally for a refined or best-supported handoff. |
 | `plan` | action | Converge genuine Feature boundaries and draft the complete Plan Set, F-ACs, Macro registries, and dependency graphs. |
 | `review` | validation | Review semantic quality and deterministic structural invariants, then revise, clarify, publish, or block. |
 | `publish` | action | Freeze a local preview or publish and read back the semantic GitHub projection. |
@@ -25,6 +25,10 @@ persisted current node.
 | `run_mode` | `publish`, `preview` | Selects durable GitHub projection or a local non-durable result. Preview must be explicit. |
 | `plan_status` | `draft`, `awaiting-input`, `ready`, `preview`, `published`, `blocked` | Reports the observed Plan Set outcome; it is not a persisted workflow state. |
 | `question_status` | `open`, `resolved`, `assumption` | Records whether a material question waits, was answered, or was safely retained as an assumption. |
+| `planning_readiness` | `ready`, `clarification-required`, `blocked` | Reports whether Analysis can continue to Plan, must compose Grilling, or cannot responsibly continue. |
+| `input_role` | `directive`, `proposal`, `evidence`, `context`, `prior-contract`, `reference` | Records the admitted authority of one reachable planning input; roles do not persist as a queue. |
+| `decision_provenance` | `user-decision`, `delegated-choice`, `source-issue`, `codebase-evidence`, `idea-source`, `existing-plan`, `assumption` | Records the authority behind a material assertion or decision. |
+| `grilling_outcome` | `refined`, `user-stopped`, `blocked` | Reports the delegated clarification result; only `refined` is automatically planning-ready. |
 | `feature_status` | `ready`, `blocked` | Reports whether one Feature contract is usable for an implementation workflow. |
 | `macro_status` | `ready`, `blocked` | Reports whether one Macro projection is usable planning context. |
 | `source_disposition` | `consolidated`, `separated`, `revised`, `out-of-scope` | Records how one source maps into the final sibling Feature set. |
