@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from typing import Any
+
+from .integrity import FULL_SHA_PATTERN, SHA256_PATTERN as FINGERPRINT_PATTERN
+from .integrity import fingerprint as _fingerprint
 
 
 REPLY_SCHEMA = "g-review-thread-reply:v1"
 RESOLUTION_SCHEMA = "g-review-thread-resolution:v1"
 REPLY_STATUSES = {"replied", "recovered"}
 RESOLUTION_STATUSES = {"resolved", "recovered", "already-resolved"}
-FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 NODE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_=-]+$")
 
 REPLY_FIELDS = {
@@ -52,14 +51,6 @@ RESOLUTION_FIELDS = {
     "observed_at",
     "status",
 }
-
-
-def _canonical_json(value: dict[str, Any]) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def _fingerprint(value: dict[str, Any]) -> str:
-    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
 def _positive_int(value: object, field: str) -> int:

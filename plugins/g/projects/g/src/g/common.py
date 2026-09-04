@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from . import __version__
-
-REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
+from .repository import REPO_PATTERN, normalize_remote
 
 
 @dataclass(frozen=True)
@@ -121,15 +120,6 @@ def checked(
             details=details,
         )
     return result
-
-
-def normalize_remote(value: str) -> str | None:
-    repo = re.sub(r"^git@[^:]+:", "", value.strip())
-    repo = re.sub(r"^https?://[^/]+/", "", repo)
-    repo = re.sub(r"^ssh://[^/]+/", "", repo)
-    repo = re.sub(r"^git://[^/]+/", "", repo)
-    repo = re.sub(r"\.git$", "", repo).rstrip("/")
-    return repo if REPO_PATTERN.fullmatch(repo) else None
 
 
 def resolve_repo(value: str | None = None, cwd: Path | None = None) -> dict[str, Any]:

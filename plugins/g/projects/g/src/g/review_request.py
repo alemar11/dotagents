@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from .integrity import FULL_SHA_PATTERN, SHA256_PATTERN as FINGERPRINT_PATTERN
+from .integrity import canonical_json as _canonical_json
+from .integrity import text_fingerprint as _sha256
 from .review_mutation import ReservationError, marker_operation_id, operation_id_for_request, operation_marker
 
 
@@ -31,8 +32,6 @@ RECEIPT_FIELDS = {
     "provider_identity_fingerprint",
     "status",
 }
-FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 REQUEST_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 TRIGGER_PATTERN = re.compile(r"(?i)@codex\s+review\b")
 MARKER_PREFIX = f"<!-- {REQUEST_SCHEMA}"
@@ -67,14 +66,6 @@ class ParsedRequest:
     request_fingerprint: str | None = None
     body_fingerprint: str | None = None
     operation_id: str | None = None
-
-
-def _sha256(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def _canonical_json(value: dict[str, Any]) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def validate_full_head(raw: str) -> str:

@@ -7,10 +7,16 @@ one-use marker.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from typing import Any
+
+from .integrity import (
+    FULL_SHA_PATTERN as FULL_SHA_RE,
+    SHA256_PATTERN as FINGERPRINT_RE,
+    canonical_json,  # noqa: F401 - compatibility re-export
+    fingerprint,
+    text_fingerprint,  # noqa: F401 - compatibility re-export
+)
 
 
 RESERVATION_SCHEMA = "g-review-provider-mutation:v1"
@@ -51,8 +57,6 @@ TRANSPORTS = {
     "review-resolution": {"tool": "g", "domain": "reviews", "operation": "resolve", "method": "GRAPHQL"},
 }
 OPERATION_MARKER_SCHEMA = RESERVATION_SCHEMA
-FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 OPERATION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 REQUEST_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -67,18 +71,6 @@ MARKER_RE = re.compile(
 
 class ReservationError(ValueError):
     """Raised when a reservation packet is not canonical."""
-
-
-def canonical_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def fingerprint(value: Any) -> str:
-    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
-
-
-def text_fingerprint(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def operation_id_for_request(

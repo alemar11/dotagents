@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import re
 from typing import Any
+
+from .integrity import FULL_SHA_PATTERN, SHA256_PATTERN as FINGERPRINT_PATTERN
+from .integrity import fingerprint as canonical_fingerprint
+from .integrity import text_fingerprint
 
 
 TERMINAL_EVIDENCE_SCHEMA = "g-terminal-provider-evidence:v1"
 TERMINAL_EVIDENCE_STATUSES = {"verified"}
 TERMINAL_EVIDENCE_OUTCOMES = {"clean", "findings", "error"}
-FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 TERMINAL_EVIDENCE_FIELDS = {
     "schema",
     "status",
@@ -38,16 +37,6 @@ TERMINAL_EVIDENCE_FIELDS = {
     "verified_at",
     "receipt_fingerprint",
 }
-
-
-def canonical_fingerprint(value: object) -> str:
-    encoded = json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def provider_identity_fingerprint(provider: str, actor: str) -> str:
@@ -105,7 +94,7 @@ def build_terminal_evidence_receipt(
         "artifact_created_at": str(artifact["created_at"]),
         "provider_actor": actor,
         "provider_identity_fingerprint": provider_identity_fingerprint(provider, actor),
-        "body_fingerprint": hashlib.sha256(str(artifact["body"]).encode("utf-8")).hexdigest(),
+        "body_fingerprint": text_fingerprint(str(artifact["body"])),
         "reviewed_head_token": str(artifact["reviewed_head_token"]),
         "resolved_head_sha": head_sha,
         "outcome": str(artifact["outcome"]),

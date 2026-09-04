@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from . import __version__
+from .integrity import FULL_SHA_PATTERN as HEAD_RE
+from .integrity import SHA256_PATTERN as SHA256_RE
+from .integrity import fingerprint
 from .review_request import validate_receipt
 from .review_thread import validate_reply_receipt, validate_resolution_receipt
 from .terminal_evidence import validate_terminal_evidence_receipt
@@ -35,9 +36,7 @@ OUTCOMES = {
     "reconcile-terminal": frozenset({"clean-verified", "findings-verified"}),
 }
 STATUSES = frozenset({"completed", "failed", "ambiguous", "blocked"})
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 OPERATION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
-HEAD_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$")
 UTC_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 LEGAL_STATUS_OUTCOME = {
@@ -55,14 +54,6 @@ LEGAL_STATUS_OUTCOME = {
 
 class OperationError(ValueError):
     """Strict operation protocol rejection."""
-
-
-def canonical_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def fingerprint(value: Any) -> str:
-    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
 def _exact(value: Any, fields: set[str], name: str) -> dict[str, Any]:

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from datetime import datetime, timezone
 from typing import Any
+
+from .integrity import FULL_SHA_PATTERN as FULL_SHA_RE
+from .integrity import SHA256_PATTERN as SHA256_RE
+from .integrity import fingerprint as _fingerprint
 
 
 READY_TRIGGER_SCHEMA = "g-codex-ready-trigger:v1"
@@ -26,20 +28,12 @@ READY_TRIGGER_FIELDS = {
     "trigger_fingerprint",
 }
 
-FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$")
 UTC_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
 class ReadyReviewError(ValueError):
     """Strict ready-trigger evidence rejection."""
-
-
-def _fingerprint(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    ).hexdigest()
 
 
 def _timestamp(value: Any, name: str) -> datetime:

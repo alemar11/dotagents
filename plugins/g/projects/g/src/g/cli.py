@@ -33,7 +33,7 @@ def parser() -> Parser:
     repo_sub = repo.add_subparsers(dest="verb", required=True)
     repo_resolve = repo_sub.add_parser("resolve", help="Resolve owner/repo from an argument or origin.")
     repo_resolve.add_argument("--repo")
-    repo_snapshot = repo_sub.add_parser("snapshot", help="Fingerprint the current Git HEAD and porcelain worktree state.")
+    repo_sub.add_parser("snapshot", help="Fingerprint the current Git HEAD and porcelain worktree state.")
     attachment_parser = commands.add_parser(
         "attachment",
         help="Upload files for publication in GitHub issue or pull request content.",

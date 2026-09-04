@@ -1,20 +1,28 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
-import re
-import subprocess
 import sys
-import zipfile
 from pathlib import Path
-from shutil import which
-from typing import Any, Iterable, Sequence
+from shutil import which  # noqa: F401 - injected into ci_provider for compatibility tests
+from typing import Any, Sequence
 
 
 from . import __version__ as VERSION
 from .health import doctor as shared_doctor, doctor_text
-REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
+from .ci_output import (
+    extract_failure_snippet,
+    extract_job_id,
+    extract_log_from_job_archive,
+    extract_run_id,
+    is_log_pending_message,
+    normalize_field,
+    parse_available_fields,
+    render_results,
+    tail_lines,
+)
+from .ci_types import GhResult, InspectionError
+from . import ci_provider
 
 FAILURE_CONCLUSIONS = {
     "failure",
@@ -33,28 +41,10 @@ FAILURE_STATES = {
 
 FAILURE_BUCKETS = {"fail"}
 
-FAILURE_MARKERS = (
-    "error",
-    "fail",
-    "failed",
-    "traceback",
-    "exception",
-    "assert",
-    "panic",
-    "fatal",
-    "timeout",
-    "segmentation fault",
-)
-
 DEFAULT_MAX_LINES = 160
 DEFAULT_CONTEXT_LINES = 30
 ACTIONS_API_VERSION = "2022-11-28"
 CI_COMMANDS = ("inspect", "permissions")
-PENDING_LOG_MARKERS = (
-    "still in progress",
-    "log will be available when it is complete",
-)
-
 RUN_METADATA_FIELDS = [
     "conclusion",
     "status",
@@ -88,47 +78,68 @@ FALLBACK_CHECK_FIELDS = [
 ]
 
 
-class InspectionError(Exception):
-    def __init__(self, message: str, exit_code: int = 1):
-        super().__init__(message)
-        self.message = message
-        self.exit_code = exit_code
-
-
-class GhResult:
-    def __init__(self, returncode: int, stdout: str, stderr: str):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
+def _ci_backend() -> Any:
+    return sys.modules[__name__]
 
 
 def run_gh_command(args: Sequence[str], cwd: Path | None) -> GhResult:
-    process = subprocess.run(
-        ["gh", *args],
-        cwd=cwd,
-        text=True,
-        capture_output=True,
-    )
-    return GhResult(process.returncode, process.stdout, process.stderr)
+    return ci_provider.run_gh_command(args, cwd, backend=_ci_backend())
 
 
 def run_gh_command_raw(args: Sequence[str], cwd: Path | None) -> tuple[int, bytes, str]:
-    process = subprocess.run(
-        ["gh", *args],
-        cwd=cwd,
-        capture_output=True,
-    )
-    return process.returncode, process.stdout, process.stderr.decode(errors="replace")
+    return ci_provider.run_gh_command_raw(args, cwd, backend=_ci_backend())
 
 
 def run_git_command(args: Sequence[str], cwd: Path | None) -> GhResult:
-    process = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        text=True,
-        capture_output=True,
+    return ci_provider.run_git_command(args, cwd, backend=_ci_backend())
+
+
+def find_git_root(start: Path | None = None) -> Path | None:
+    return ci_provider.find_git_root(start, backend=_ci_backend())
+
+
+def fetch_actions_endpoint(endpoint: str, repo_root: Path | None) -> dict[str, Any]:
+    return ci_provider.fetch_actions_endpoint(
+        endpoint, repo_root, backend=_ci_backend()
     )
-    return GhResult(process.returncode, process.stdout, process.stderr)
+
+
+def inspect_actions_permissions(*, repo: str, repo_root: Path | None) -> dict[str, Any]:
+    return ci_provider.inspect_actions_permissions(
+        repo=repo, repo_root=repo_root, backend=_ci_backend()
+    )
+
+
+def ensure_gh_available(cwd: Path | None) -> None:
+    return ci_provider.ensure_gh_available(cwd, backend=_ci_backend())
+
+
+def validate_repo_reference(repo: str) -> str:
+    return ci_provider.validate_repo_reference(repo, backend=_ci_backend())
+
+
+def normalize_remote_url(remote: str | None) -> str | None:
+    return ci_provider.normalize_remote_url(remote, backend=_ci_backend())
+
+
+def resolve_repo_from_checkout(repo_root: Path) -> str:
+    return ci_provider.resolve_repo_from_checkout(repo_root, backend=_ci_backend())
+
+
+def resolve_repo_context(
+    repo_ref: str | None, *, allow_non_project: bool
+) -> tuple[str, Path | None]:
+    return ci_provider.resolve_repo_context(
+        repo_ref, allow_non_project=allow_non_project, backend=_ci_backend()
+    )
+
+
+def append_repo_flag(args: list[str], repo: str) -> list[str]:
+    return ci_provider.append_repo_flag(args, repo, backend=_ci_backend())
+
+
+def resolve_pr(pr_value: str | None, repo: str, repo_root: Path | None) -> str:
+    return ci_provider.resolve_pr(pr_value, repo, repo_root, backend=_ci_backend())
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -185,7 +196,11 @@ def emit_doctor(json_mode: bool) -> int:
 
 
 def emit_success(data: object, command: list[str]) -> None:
-    print(json.dumps({"ok": True, "version": VERSION, "command": command, "data": data}, indent=2))
+    print(
+        json.dumps(
+            {"ok": True, "version": VERSION, "command": command, "data": data}, indent=2
+        )
+    )
 
 
 def emit_error(exc: InspectionError, command: list[str]) -> None:
@@ -269,186 +284,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     return exit_code
 
 
-def find_git_root(start: Path | None = None) -> Path | None:
-    result = run_git_command(["rev-parse", "--show-toplevel"], cwd=start or Path.cwd())
-    if result.returncode != 0:
-        return None
-    return Path(result.stdout.strip())
-
-
-def fetch_actions_endpoint(endpoint: str, repo_root: Path | None) -> dict[str, Any]:
-    result = run_gh_command(
-        [
-            "api",
-            endpoint,
-            "--method",
-            "GET",
-            "--header",
-            "Accept: application/vnd.github+json",
-            "--header",
-            f"X-GitHub-Api-Version: {ACTIONS_API_VERSION}",
-        ],
-        cwd=repo_root,
-    )
-    if result.returncode != 0:
-        message = (result.stderr or result.stdout or "").strip()
-        raise InspectionError(message or f"gh api failed for {endpoint}.", 1)
-    try:
-        data = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        raise InspectionError(f"Unable to parse GitHub Actions permissions JSON: {exc}", 1) from exc
-    if not isinstance(data, dict):
-        raise InspectionError("GitHub Actions permissions endpoint returned an unexpected JSON shape.", 1)
-    return data
-
-
-def inspect_actions_permissions(*, repo: str, repo_root: Path | None) -> dict[str, Any]:
-    ensure_gh_available(repo_root)
-    actions = fetch_actions_endpoint(f"repos/{repo}/actions/permissions", repo_root)
-    workflow = fetch_actions_endpoint(f"repos/{repo}/actions/permissions/workflow", repo_root)
-
-    actions_enabled = actions.get("enabled")
-    default_workflow_permissions = workflow.get("default_workflow_permissions")
-    can_approve = workflow.get("can_approve_pull_request_reviews")
-    if not isinstance(actions_enabled, bool):
-        raise InspectionError("GitHub Actions permissions response omitted the enabled flag.", 1)
-    if default_workflow_permissions not in {"read", "write"}:
-        raise InspectionError("GitHub Actions permissions response has an invalid default permission value.", 1)
-    if not isinstance(can_approve, bool):
-        raise InspectionError("GitHub Actions workflow permissions response omitted the PR approval flag.", 1)
-
-    if not actions_enabled:
-        repository_gate = "blocked"
-        warning = "The workflow may be written, but GitHub Actions is disabled and cannot run until it is enabled."
-    elif not can_approve:
-        repository_gate = "blocked"
-        warning = "The workflow may be written, but its pull-request operation will not work until the repository setting is enabled."
-    else:
-        repository_gate = "enabled"
-        warning = None
-
-    return {
-        "repository": repo,
-        "actions_enabled": actions_enabled,
-        "default_workflow_permissions": default_workflow_permissions,
-        "can_approve_pull_request_reviews": can_approve,
-        "pull_requests_write": {
-            "repository_gate": repository_gate,
-            "workflow_declaration": {
-                "contents": "read",
-                "pull-requests": "write",
-            },
-            "effective": "not-verifiable-before-workflow-run",
-        },
-        "workflow_authoring": {
-            "status": "allowed-with-warning" if warning else "ready",
-            "warning": warning,
-        },
-        "contents_write_required_for": ["branch", "tag"],
-        "limitations": [
-            "The repository API exposes the Actions setting and workflow defaults, not the effective token permissions of a future workflow.",
-            "The workflow must declare pull-requests: write explicitly; use contents: write when it creates branches or tags.",
-            "A missing or forbidden API response can reflect token scope, plan, account, organization, or enterprise policy.",
-        ],
-    }
-
-
-def ensure_gh_available(cwd: Path | None) -> None:
-    if which("gh") is None:
-        raise InspectionError("gh is not installed or not on PATH.", 127)
-    result = run_gh_command(["auth", "status"], cwd=cwd)
-    if result.returncode == 0:
-        return
-    message = (result.stderr or result.stdout or "").strip()
-    raise InspectionError(message or "gh not authenticated.", 1)
-
-
-def validate_repo_reference(repo: str) -> str:
-    value = repo.strip()
-    if not REPO_PATTERN.fullmatch(value):
-        raise InspectionError(f"Invalid --repo value '{repo}'. Use owner/repo.", 64)
-    return value
-
-
-def normalize_remote_url(remote: str | None) -> str | None:
-    if not remote:
-        return None
-    repo = re.sub(r"^git@[^:]+:", "", remote)
-    repo = re.sub(r"^https?://[^/]+/", "", repo)
-    repo = re.sub(r"^ssh://[^/]+/", "", repo)
-    repo = re.sub(r"^git://[^/]+/", "", repo)
-    repo = re.sub(r"\.git$", "", repo)
-    repo = repo.rstrip("/")
-    if REPO_PATTERN.fullmatch(repo):
-        return repo
-    return None
-
-
-def resolve_repo_from_checkout(repo_root: Path) -> str:
-    result = run_git_command(["remote", "get-url", "origin"], cwd=repo_root)
-    if result.returncode != 0:
-        raise InspectionError("No origin remote found. Pass --repo <owner/repo>.", 4)
-    repo = normalize_remote_url(result.stdout.strip())
-    if repo is None:
-        raise InspectionError(
-            f"Could not resolve owner/repo from git remote: {result.stdout.strip()}",
-            5,
-        )
-    return repo
-
-
-def resolve_repo_context(
-    repo_ref: str | None,
-    *,
-    allow_non_project: bool,
-) -> tuple[str, Path | None]:
-    repo_root = find_git_root()
-    if repo_ref:
-        repo = validate_repo_reference(repo_ref)
-        if repo_root is None and not allow_non_project:
-            raise InspectionError(
-                "No git repository detected. Pass --allow-non-project with --repo <owner/repo>.",
-                3,
-            )
-        return repo, repo_root
-    if repo_root is None:
-        raise InspectionError(
-            "No git repository detected. Pass --repo <owner/repo> for non-project operations.",
-            3,
-        )
-    return resolve_repo_from_checkout(repo_root), repo_root
-
-
-def append_repo_flag(args: list[str], repo: str) -> list[str]:
-    return [*args, "--repo", repo]
-
-
-def resolve_pr(pr_value: str | None, repo: str, repo_root: Path | None) -> str:
-    if pr_value:
-        if pr_value.startswith("http://") or pr_value.startswith("https://"):
-            match = re.search(r"/pull/(\d+)", pr_value)
-            if match:
-                return match.group(1)
-        return pr_value
-
-    result = run_gh_command(
-        append_repo_flag(["pr", "view", "--json", "number"], repo),
-        cwd=repo_root,
-    )
-    if result.returncode != 0:
-        message = (result.stderr or result.stdout or "").strip()
-        raise InspectionError(message or "Error: unable to resolve PR.", 1)
-    try:
-        data = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        raise InspectionError(f"Error: unable to parse PR JSON: {exc}", 1) from exc
-
-    number = data.get("number")
-    if not number:
-        raise InspectionError("Error: no PR number found. Provide --pr explicitly.", 1)
-    return str(number)
-
-
 def inspect_pr_failures(
     *,
     repo: str,
@@ -492,7 +327,9 @@ def inspect_pr_failures(
     return payload, 1
 
 
-def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[str, Any]]:
+def fetch_checks(
+    pr_value: str, repo: str, repo_root: Path | None
+) -> list[dict[str, Any]]:
     fallback_field_sets = [PRIMARY_CHECK_FIELDS, FALLBACK_CHECK_FIELDS]
     index = 0
     result: GhResult | None = None
@@ -501,7 +338,9 @@ def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[
     while index < len(fallback_field_sets):
         fields = fallback_field_sets[index]
         result = run_gh_command(
-            append_repo_flag(["pr", "checks", pr_value, "--json", ",".join(fields)], repo),
+            append_repo_flag(
+                ["pr", "checks", pr_value, "--json", ",".join(fields)], repo
+            ),
             cwd=repo_root,
         )
         if result.returncode == 0:
@@ -509,7 +348,9 @@ def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[
 
         message = (result.stderr or result.stdout or "").strip()
         available_fields = parse_available_fields(message)
-        discovered_fields = [field for field in FALLBACK_CHECK_FIELDS if field in available_fields]
+        discovered_fields = [
+            field for field in FALLBACK_CHECK_FIELDS if field in available_fields
+        ]
         if discovered_fields:
             discovered_tuple = tuple(discovered_fields)
             if discovered_tuple not in seen_field_sets:
@@ -520,7 +361,9 @@ def fetch_checks(pr_value: str, repo: str, repo_root: Path | None) -> list[dict[
     if result is None or result.returncode != 0:
         if confirm_empty_check_rollup(pr_value, repo, repo_root):
             return []
-        message = (result.stderr or result.stdout or "").strip() if result is not None else ""
+        message = (
+            (result.stderr or result.stdout or "").strip() if result is not None else ""
+        )
         if index > 1:
             raise InspectionError(
                 "Error: gh pr checks failed and no compatible field list succeeded.",
@@ -617,36 +460,20 @@ def analyze_check(
         return base
 
     base["status"] = "ok"
-    base["logSnippet"] = extract_failure_snippet(log_text, max_lines=max_lines, context=context)
+    base["logSnippet"] = extract_failure_snippet(
+        log_text, max_lines=max_lines, context=context
+    )
     base["logTail"] = tail_lines(log_text, max_lines)
     return base
 
 
-def extract_run_id(url: str) -> str | None:
-    if not url:
-        return None
-    for pattern in (r"/actions/runs/(\d+)", r"/runs/(\d+)"):
-        match = re.search(pattern, url)
-        if match:
-            return match.group(1)
-    return None
-
-
-def extract_job_id(url: str) -> str | None:
-    if not url:
-        return None
-    match = re.search(r"/actions/runs/\d+/job/(\d+)", url)
-    if match:
-        return match.group(1)
-    match = re.search(r"/job/(\d+)", url)
-    if match:
-        return match.group(1)
-    return None
-
-
-def fetch_run_metadata(run_id: str, repo: str, repo_root: Path | None) -> dict[str, Any] | None:
+def fetch_run_metadata(
+    run_id: str, repo: str, repo_root: Path | None
+) -> dict[str, Any] | None:
     result = run_gh_command(
-        append_repo_flag(["run", "view", run_id, "--json", ",".join(RUN_METADATA_FIELDS)], repo),
+        append_repo_flag(
+            ["run", "view", run_id, "--json", ",".join(RUN_METADATA_FIELDS)], repo
+        ),
         cwd=repo_root,
     )
     if result.returncode != 0:
@@ -699,7 +526,9 @@ def fetch_run_log(run_id: str, repo: str, repo_root: Path | None) -> tuple[str, 
 
 def fetch_job_log(job_id: str, repo: str, repo_root: Path | None) -> tuple[str, str]:
     endpoint = f"/repos/{repo}/actions/jobs/{job_id}/logs"
-    returncode, stdout_bytes, stderr = run_gh_command_raw(["api", endpoint], cwd=repo_root)
+    returncode, stdout_bytes, stderr = run_gh_command_raw(
+        ["api", endpoint], cwd=repo_root
+    )
     if returncode != 0:
         message = (stderr or "").strip() or "gh api job logs failed"
         return "", message
@@ -708,138 +537,6 @@ def fetch_job_log(job_id: str, repo: str, repo_root: Path | None) -> tuple[str, 
     if parse_error:
         return "", parse_error
     return log_text, ""
-
-
-def extract_log_from_job_archive(payload: bytes) -> tuple[str, str]:
-    if not payload:
-        return "", "Job logs endpoint returned empty payload."
-    if not zipfile.is_zipfile(io.BytesIO(payload)):
-        return payload.decode(errors="replace"), ""
-
-    try:
-        with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
-            names = [name for name in archive.namelist() if not name.endswith("/")]
-            if not names:
-                return "", "Job logs archive contains no files."
-            best_text = ""
-            for name in names:
-                raw = archive.read(name)
-                if not raw:
-                    continue
-                text = raw.decode(errors="replace")
-                if len(text) <= len(best_text):
-                    continue
-                best_text = text
-            if not best_text.strip():
-                return "", f"Job logs archive is empty or unreadable; entries: {', '.join(names)}"
-            return best_text, ""
-    except (zipfile.BadZipFile, KeyError, ValueError) as exc:
-        return "", f"Unable to parse job log archive: {exc}"
-
-
-def normalize_field(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip().lower()
-
-
-def parse_available_fields(message: str) -> list[str]:
-    if "Available fields:" not in message:
-        return []
-    fields: list[str] = []
-    in_block = False
-    for line in message.splitlines():
-        if "Available fields:" in line:
-            in_block = True
-            _, suffix = line.split(":", 1)
-            value = suffix.strip()
-            if value:
-                fields.extend(field.strip() for field in value.split(",") if field.strip())
-            continue
-        if not in_block:
-            continue
-        value = line.strip()
-        if not value or value.startswith("Available fields:"):
-            continue
-        fields.append(value)
-    return fields
-
-
-def is_log_pending_message(message: str) -> bool:
-    lowered = message.lower()
-    return any(marker in lowered for marker in PENDING_LOG_MARKERS)
-
-
-def extract_failure_snippet(log_text: str, max_lines: int, context: int) -> str:
-    lines = log_text.splitlines()
-    if not lines:
-        return ""
-    marker_index = find_failure_index(lines)
-    if marker_index is None:
-        return "\n".join(lines[-max_lines:])
-
-    start = max(0, marker_index - context)
-    end = min(len(lines), marker_index + context + 1)
-    window = lines[start:end]
-    if len(window) > max_lines:
-        window = window[-max_lines:]
-    return "\n".join(window)
-
-
-def find_failure_index(lines: Sequence[str]) -> int | None:
-    for index in range(len(lines) - 1, -1, -1):
-        lowered = lines[index].lower()
-        if any(marker in lowered for marker in FAILURE_MARKERS):
-            return index
-    return None
-
-
-def tail_lines(text: str, max_lines: int) -> str:
-    if max_lines <= 0:
-        return ""
-    lines = text.splitlines()
-    return "\n".join(lines[-max_lines:])
-
-
-def render_results(payload: dict[str, Any]) -> str:
-    repo = str(payload.get("repo") or "")
-    pr = str(payload.get("pr") or "")
-    results = list(payload.get("results") or [])
-    if payload.get("summary") == "no_checks":
-        return f"PR #{pr} in {repo}: no checks configured or reported.\n"
-    if not results:
-        return f"PR #{pr} in {repo}: no failing checks detected.\n"
-
-    lines = [f"PR #{pr} in {repo}: {len(results)} failing checks analyzed."]
-    for result in results:
-        lines.append("-" * 60)
-        lines.append(f"Check: {result.get('name', '')}")
-        if result.get("detailsUrl"):
-            lines.append(f"Details: {result['detailsUrl']}")
-        if result.get("status"):
-            lines.append(f"Status: {result['status']}")
-        run_meta = result.get("run", {})
-        if run_meta.get("url"):
-            lines.append(f"Run URL: {run_meta['url']}")
-        if result.get("jobId"):
-            lines.append(f"Job ID: {result['jobId']}")
-        if result.get("note"):
-            lines.append(f"Note: {result['note']}")
-        if result.get("error"):
-            lines.append(f"Error fetching logs: {result['error']}")
-            continue
-        snippet = result.get("logSnippet") or ""
-        if snippet:
-            lines.append("Failure snippet:")
-            lines.append(indent_block(snippet))
-        else:
-            lines.append("No snippet available.")
-    lines.append("-" * 60)
-    return "\n".join(lines) + "\n"
-
-
-def indent_block(text: str, prefix: str = "  ") -> str:
-    return "\n".join(f"{prefix}{line}" for line in text.splitlines())
 
 
 if __name__ == "__main__":

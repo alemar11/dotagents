@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -12,7 +11,8 @@ from typing import Any
 
 from . import __version__ as VERSION
 from .health import doctor as shared_doctor, doctor_text
-REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
+from .repository import is_repo_reference
+
 ISSUE_LIST_FIELDS = "number,title,author,labels,createdAt,updatedAt,url"
 PR_LIST_FIELDS = "number,title,author,isDraft,reviewDecision,mergeStateStatus,statusCheckRollup,createdAt,updatedAt,url"
 RUN_LIST_FIELDS = "status,conclusion,workflowName,displayTitle,headBranch,url,createdAt,updatedAt"
@@ -56,7 +56,7 @@ def gh_json(args: list[str]) -> object:
 
 def validate_repo(repo: str) -> str:
     value = repo.strip()
-    if not REPO_PATTERN.fullmatch(value):
+    if not is_repo_reference(value):
         raise PortfolioError(f"Invalid repository '{repo}'. Use owner/repo.", code="invalid_arguments", exit_code=64)
     return value
 
