@@ -19,18 +19,30 @@ The classification is an execution fact, not user preference or durable
 configuration. Do not ask the user to choose when authoritative runtime
 context already identifies the surface.
 
+## Session exposure
+
+Surface identity and session exposure are separate execution facts. Each App
+or CLI invocation is backed by a host runtime, and that host determines which
+plugin capabilities, skills, and tools are exposed to the current session.
+Installation or enablement state, source resolvability, or feature availability
+does not establish current-session exposure. An unavailable session capability
+does not identify the surface.
+
+Classify the surface before any capability preflight. After classification,
+the invoking skill's selected branch may verify that its required session
+capabilities are exposed and reachable. If that check fails, preserve the
+classified surface and apply the selected branch's failure behavior; never
+reclassify or substitute the other surface.
+
 ## Evidence boundary
 
 Do not infer the surface from any of these signals alone:
 
 - current working directory, shell, terminal, or operating system;
-- availability or absence of a particular task, delegation, or UI capability;
+- availability or absence of a plugin, skill, tool, task, delegation, or UI
+  capability, including any current-session availability result;
 - environment variables, process names, executable paths, or cached settings;
 - repository files, prompt wording, previous runs, or user recollection.
-
-Capability checks happen only after classification and remain owned by the
-invoking skill's selected surface branch. A missing capability never changes
-`codex-app` into `codex-cli` or the reverse.
 
 When the result is `unresolved`, the invoking skill decides whether its work
 can proceed without a known surface. It must not guess, silently choose a

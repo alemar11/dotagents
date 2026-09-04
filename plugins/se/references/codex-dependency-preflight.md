@@ -4,6 +4,12 @@ This reference owns the fail-closed availability gate for every SE handoff to
 the G-owned GitHub workflows. It is a runtime prerequisite, not a plugin
 installation or maintenance procedure.
 
+This gate is surface-agnostic. It must not classify App versus CLI or infer a
+surface from any dependency result. A consumer that separately needs surface
+classification must use the
+[Codex runtime surface contract](codex-runtime-surface.md); passing or failing
+this gate never changes that authoritative result.
+
 ## When to run
 
 For Learn, do not load this gate: Learn is local-repository-only and has no
@@ -33,11 +39,16 @@ Establish all of the following from the current host:
 - its declared source root is present and internally consistent;
 - every bundled G workflow required by the invoking SE path is present and
   resolvable;
-- the explicit handoff can be reached without using a compatibility alias.
+- the explicit handoff is exposed to and reachable from the current session
+  without using a compatibility alias.
 
-Do not infer availability from a display name, an installed cache directory,
-historical task output, or an unrelated GitHub connector. Do not require source
-and installed versions to match as part of this gate.
+Installed and enabled state plus source resolvability are necessary local
+evidence, not proof of current-session reachability. Do not infer full
+availability from those facts alone, a display name, an installed cache
+directory, historical task output, or an unrelated GitHub connector. Do not
+require source and installed versions to match as part of this gate. When local
+checks pass but the current session cannot reach the explicit handoff, report
+`codex-dependency-unresolved`.
 
 For Idea, the required workflow set contains `$g:github-issues`. Every Feature
 hosted source read or publication, including maintenance, requires
