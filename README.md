@@ -49,6 +49,7 @@ knowledge, and audits active work:
 | Skill | Purpose |
 | --- | --- |
 | `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
+| `se:grilling` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
 | `se:implement` | Deliver planned Features with lightweight graph orchestration, reusable workers, and standalone or stacked pull requests. |
@@ -75,7 +76,7 @@ for Apple's native headless MCP server:
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
-| `study` | Orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers; never write code or edit project files. |
+| `study` | Start with interactive handoff grilling, then orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
 | `plugins-reload` | Explicitly refresh the repo-local G, SE, and Xcode plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
@@ -114,10 +115,17 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   focused investigation, 3 for a multi-dimensional comparison, and 4–5 only
   for broad investigations with genuinely independent tracks; five is a cap,
   not the default.
+- `study` also requires `$se:grilling`, which uses `$se:learn` for a read-only
+  Project Context pass. The visible Study orchestrator asks the user one
+  question with a recommended answer per turn and cannot plan workers until the
+  handoff is confirmed or the user stops grilling.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires both `$g:github-issues` and `$g:github-tagger`, while no SE skill installs G automatically.
 - `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
+- `se:grilling` is read-only and explicit or parent-composed. It depends on
+  `$se:learn` for context inspection, returns a transient refined handoff, and
+  never creates tasks or captures durable knowledge automatically.
 - `se:implement` accepts only caller-supplied published parent Feature issues
   and treats each parent as the semantic contract. It places one
   visible graph orchestrator in the single involved project or a selected

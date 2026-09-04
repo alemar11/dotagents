@@ -1,8 +1,9 @@
 # SE
 
 SE is a software-delivery workflow plugin for maintaining project knowledge,
-capturing Ideas, planning Features, delivering reviewed pull requests, and
-auditing active work without changing it.
+sharpening topics through interactive grilling, capturing Ideas, planning
+Features, delivering reviewed pull requests, and auditing active work without
+changing it.
 
 Its skills are deliberately separated by responsibility:
 
@@ -11,7 +12,7 @@ Its skills are deliberately separated by responsibility:
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Idea, Feature, Implement, and Audit workflow graphs.
+  Grilling, Idea, Feature, Implement, and Audit workflow graphs.
   Feature owns the textual Feature Plan Set, sibling Feature registry, and local
   Macro Task graphs; Implement uses a small transient delivery graph
   reconstructed from live evidence.
@@ -47,6 +48,12 @@ Its skills are deliberately separated by responsibility:
   optional localization memory, topics, and ADRs; authorized hierarchy updates
   move subproject-only material to its local owner. Learn can also be invoked
   explicitly as `se:learn`.
+- skills/grilling/ is the explicit or parent-composed interactive refinement
+  entry point. It reads the applicable Project Context through Learn, asks one
+  focused question with a concrete recommended answer per turn, challenges
+  assumptions and tradeoffs, and returns a transient refined handoff. It never
+  writes repository knowledge, creates tasks, or delegates work. Invoke it
+  explicitly as `se:grilling`; Study may compose it before planning workers.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
   exhausts every authoritative continuation or host/project partition before
   claiming complete inventory, deduplicates stable task identities, freezes an

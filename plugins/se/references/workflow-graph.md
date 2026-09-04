@@ -1,8 +1,8 @@
 # SE Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE
-workflows. It applies to Learn, Idea, Feature, Implement, and
-Audit without turning every skill into the same implementation graph.
+workflows. It applies to Learn, Grilling, Idea, Feature, Implement, and Audit
+without turning every skill into the same implementation graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 hosted shape. This reference owns workflow structure only.
@@ -10,7 +10,8 @@ Feature owns Feature Plan Set semantics, Feature identities, Feature-level
 planning dependencies, and the durable local Macro Task projections. Implement
 owns scheduling interpretation and a small transient delivery graph whose
 position is reconstructed from live evidence.
-Learn, Idea, and Audit own their skill-specific registries and branch details.
+Learn, Grilling, Idea, and Audit own their skill-specific registries and branch
+details.
 
 Every SE skill routes to `references/states.md`. The skill registry remains the
 structural source of truth for nodes and edges; the state reference explains
@@ -103,7 +104,7 @@ as the source of truth. Explanatory prose may clarify a condition but must not
 add an unregistered edge.
 
 Feature keeps its planning step files and registry as its local source of truth.
-Learn, Idea, Implement, and Audit keep their registries in their
+Learn, Grilling, Idea, Implement, and Audit keep their registries in their
 SKILL.md files while branch-specific details remain in routed references.
 
 ## Common terminal meanings
@@ -120,6 +121,9 @@ complete and blocked terminal contract. Learn uses all four meanings. Idea
 uses reported, deferred, complete, and blocked.
 Implement uses complete, deferred, and blocked.
 Audit uses reported and blocked.
+Grilling uses complete for a confirmed refined handoff, reported for a
+user-stopped best-effort handoff, and blocked when responsible questioning
+cannot continue.
 
 ## Authority and side effects
 

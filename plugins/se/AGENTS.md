@@ -1,8 +1,8 @@
 # SE Plugin Maintenance
 
-plugins/se/ is the repository's graph-first workflow package. Learn, Idea,
-Feature, Implement, and Audit expose distinct workflow surfaces; Feature owns
-the repository-scoped textual Feature Plan Set graph.
+plugins/se/ is the repository's graph-first workflow package. Learn, Grilling,
+Idea, Feature, Implement, and Audit expose distinct workflow surfaces; Feature
+owns the repository-scoped textual Feature Plan Set graph.
 Keep SE as the sole active owner of these workflow contracts; do not
 reintroduce a retired compatibility surface.
 
@@ -28,6 +28,10 @@ reintroduce a retired compatibility surface.
   capture, localization, Code Review Rules, concise AGENTS.md Project Context
   pointer reconciliation, and AGENTS.md compaction proposals and its workflow
   registry; its references own branch-specific detail.
+- skills/grilling/SKILL.md owns explicit or composed, read-only, one-question-
+  at-a-time handoff refinement. It composes Learn only for initial context
+  inspection and returns a refined transient handoff without task creation,
+  delegation, or automatic durable capture.
 - skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
   node registry, Feature Plan Set, Feature identity, Feature-level dependency,
   and local Macro Task contracts, material-question routing, optional read-only
@@ -235,7 +239,7 @@ reintroduce a retired compatibility surface.
 - Validate that every table-owned registry row matches its declared field order
   and arity, every registered local node exists, every local transition targets
   a registered node, and every step has the standard front matter.
-- Validate Learn and Idea registry/projection reconciliation, terminal
+- Validate Learn, Grilling, and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
   root-first monorepo routing, local context ownership and migration,
@@ -310,6 +314,10 @@ reintroduce a retired compatibility surface.
 - Validate Learn front matter, UI metadata, routed references, implicit
   hard-rule selection, setup-first capture, monorepo root/local ownership and
   migration, and the absence of retired compatibility surfaces.
+- Validate Grilling front matter, explicit-only UI metadata, Learn-first
+  read-only context inspection, one-question-per-turn interaction with a
+  concrete recommended answer, refined handoff output, and the absence of
+  writes, task creation, or delegation.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
 - Scan Learn sources for direct provider or tracker access, task/profile

@@ -1,7 +1,7 @@
 interface:
   display_name: "Study"
-  short_description: "Plan or research read-only with up to five workers."
-  default_prompt: "Use $study to plan, research, or analyze in an exact saved local project with one shared visual run tag, an absolute five-worker cap, no nested Study runs or project edits, and one visible Markdown-summary orchestrator."
+  short_description: "Grill a handoff, then study with up to five workers."
+  default_prompt: "Use $study to refine my handoff through $se:grilling, then run read-only analysis in the exact saved local project."
   brand_color: "#0E7490"
 policy:
   allow_implicit_invocation: false

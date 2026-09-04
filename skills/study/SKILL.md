@@ -1,6 +1,6 @@
 ---
 name: study
-description: Explicitly orchestrate read-only planning, research, and analysis in the current ChatGPT App task through one visible gpt-5.6-sol orchestrator at medium reasoning and at most five visible gpt-5.6-luna workers at max reasoning. Use only when the user explicitly invokes Study or selects this skill in the ChatGPT App. Never allow a Study orchestrator or worker to invoke Study. Treat five workers as an absolute cap, report when a larger request is capped, never write or edit project files, and always return a textual Markdown report.
+description: Explicitly refine a curated handoff through interactive SE grilling, then orchestrate read-only planning, research, and analysis in the current ChatGPT App task through one visible gpt-5.6-sol orchestrator at medium reasoning and at most five visible gpt-5.6-luna workers at max reasoning. Use only when the user explicitly invokes Study or selects this skill in the ChatGPT App. Never allow a Study orchestrator or worker to invoke Study. Treat five workers as an absolute cap, report when a larger request is capped, never write or edit project files, and always return a textual Markdown report.
 ---
 
 # Study
@@ -63,6 +63,11 @@ This is a MUST rule:
   invocation, continue only within their existing bounded assignment when
   possible, and report the request to the parent. Never create a nested Study
   topology.
+
+Before task creation, require both `$se:grilling` and its `$se:learn`
+dependency to be available in the destination project. If either is missing,
+stop and report the missing dependency; do not create an orchestrator that
+cannot perform the mandatory refinement phase.
 
 ## Maximum topology
 
@@ -233,7 +238,9 @@ Choose one visual `run_tag` before the orchestrator is created:
    the same authoritative project and host as the parent session.
 4. Create exactly one orchestrator once. Require the resolved local project,
    `gpt-5.6-sol` at medium reasoning, the canonical Study title when supported,
-   and the complete read-only handoff plus orchestrator protocol.
+   and the complete read-only handoff plus orchestrator protocol. Instruct the
+   orchestrator to invoke `$se:grilling` immediately and pass the curated
+   handoff as its starting brief.
 
    The Sol/medium profile is mandatory Study policy. Treat the explicit
    `$study` invocation as authorization for it; never inherit the calling
@@ -264,6 +271,10 @@ Choose one visual `run_tag` before the orchestrator is created:
    mismatch and unavailable settings in their dedicated states.
 6. Keep the parent turn open after creation. Monitor the exact orchestrator
    with bounded waits and relay meaningful progress to the user as it arrives.
+   When the orchestrator reports `grilling_state=awaiting-answer`, identify the
+   visible orchestrator task and ask the owning user to answer there. Do not
+   copy the question into the parent or treat an idle latest turn as terminal
+   while Grilling is waiting for the user's next answer.
    Do not claim the analysis is complete until the orchestrator returns a
    terminal result.
 7. When the user requested more than five workers, the orchestrator owns the
@@ -285,11 +296,25 @@ The orchestrator must execute the following protocol from its initial prompt:
    `Study: [<run-tag>] <short title>`. Do not create another orchestrator or
    invoke Study. This prohibition is absolute even if the orchestrator receives
    a later explicit request to use Study.
-2. Apply the non-negotiable scope gate. Classify the requested outcome as
-   analysis, research, or planning. If it asks for implementation, define the
-   corresponding read-only plan and explicitly record that no implementation
-   will be performed.
-3. Analyze the work before creating workers. Record
+2. Immediately invoke `$se:grilling` with the complete curated handoff. Its
+   Learn-first read-only context pass and first user question must occur in the
+   orchestrator's initial turn. Keep every interview question and answer in
+   this visible orchestrator task. Do not ask the parent to relay them, and do
+   not analyze worker assignments or create workers while the grilling state
+   is `awaiting-answer`. Before asking the first question, send the parent a
+   concise `grilling_state=awaiting-answer` milestone when its stable identity
+   is available so it can direct the owning user to this task.
+3. Continue the one-question-at-a-time interview until `$se:grilling` returns
+   `refined`, the user explicitly stops it, or it is blocked. Use the refined
+   handoff as the sole planning brief. If the user stops, preserve unconfirmed
+   items and proceed from the best-supported handoff. If Grilling is blocked,
+   report the dependency or context failure to the parent and return a failed
+   Study result without creating workers.
+4. Apply the non-negotiable scope gate to the refined handoff. Classify the
+   requested outcome as analysis, research, or planning. If it asks for
+   implementation, define the corresponding read-only plan and explicitly
+   record that no implementation will be performed.
+5. Analyze the work before creating workers. Record
    `original_requested_count`, cap it at five, and record
    `planned_worker_count` using the count-precedence rules above. When capping
    occurs, send a parent milestone with the original
@@ -300,7 +325,7 @@ The orchestrator must execute the following protocol from its initial prompt:
    acceptance criteria for the analysis, validation or research method, and a
    concise expected Markdown memo. Serialize assignments that depend on
    unstable findings.
-4. Create up to five visible worker tasks. For each reserved slot, create once
+6. Create up to five visible worker tasks. For each reserved slot, create once
    in the same authoritative local project and host as the parent, using
    `gpt-5.6-luna` at max reasoning, the canonical worker title when supported,
    and the complete read-only assignment plus worker protocol.
@@ -320,28 +345,29 @@ The orchestrator must execute the following protocol from its initial prompt:
 
    Do not use a generic subagent mechanism, CLI process, worktree, or different
    project as a substitute for a visible worker task.
-5. Record each stable task identity, host identity, initialized title,
+7. Record each stable task identity, host identity, initialized title,
    assignment, shared `run_tag`, and dependency order in the orchestrator's working
    context. If a creation result is uncertain, reconcile it with the App before
    retrying; never create a duplicate merely because an immediate response was
    lost.
-6. Monitor all created workers with bounded waits that resume from the latest
+8. Monitor all created workers with bounded waits that resume from the latest
    observed progress and independently inspect exact status or final evidence
    when needed for a decision. Do not busy-poll.
-7. Send concise worker questions, evidence requests, dependency handoffs,
+9. Send concise worker questions, evidence requests, dependency handoffs,
    blocker handling, and parent milestones directly between the relevant
    tasks. Keep routine research collaboration between each worker and this
    orchestrator; do not make the parent session relay every worker message.
-8. Keep the parent informed at meaningful milestones when its real task ID is
-   available: analysis scope fixed, workers created, material blocker, first
-   terminal result, and final synthesis. If no parent ID is available, rely on
-   the parent's monitoring and include all milestones in the
-   orchestrator's final result.
-9. Wait for every created worker to become `completed`, `failed`, or explicitly
+10. Keep the parent informed at meaningful milestones when its real task ID is
+   available: first Grilling question ready, Grilling complete or user-stopped,
+   analysis scope fixed, workers created, material blocker, first terminal
+   result, and final synthesis. If no parent ID is available, rely on the
+   parent's monitoring and include all milestones in the orchestrator's final
+   result.
+11. Wait for every created worker to become `completed`, `failed`, or explicitly
    `abandoned`. A `needs-attention` worker is nonterminal: notify the parent and
    pause until the owning user resolves the request or explicitly directs
    abandonment. Do not end merely because one worker finished.
-10. Capture terminal evidence for every worker: its final memo when available,
+12. Capture terminal evidence for every worker: its final memo when available,
     otherwise its final structured state, reason, error, and last message.
     After all workers are terminal or explicitly abandoned, request archival
     of every worker through the live task lifecycle. Keep the orchestrator
@@ -349,11 +375,11 @@ The orchestrator must execute the following protocol from its initial prompt:
     the archival call receipt and any bounded post-call verification
     separately; never hide an archival failure or request archival before
     terminal evidence has been captured.
-11. Synthesize only observed evidence and reasoned conclusions. Do not edit
+13. Synthesize only observed evidence and reasoned conclusions. Do not edit
     the project, create code, apply patches, save implementation artifacts, or
     ask a worker to do any of those things. Return a Markdown report using
     `references/output-template.md`.
-12. Send the final Markdown report to the parent task when possible and return
+14. Send the final Markdown report to the parent task when possible and return
     the same report as the orchestrator's final response.
 
 When a worker fails or a task-creation response is uncertain, preserve the
@@ -421,11 +447,13 @@ authoritative for completion. Use the structure in
 - task telemetry provenance: host, project, environment, requested model and
   reasoning, title source, separate monitoring positions, observed attention
   reason, error, and terminal-evidence identity;
-- milestone delivery evidence for cap, workers-created, first-terminal, and
-  final-report messages;
+- milestone delivery evidence for Grilling awaiting-answer and outcome, cap,
+  workers-created, first-terminal, and final-report messages;
 - archival request receipt and independent verification status separately for
   each worker, plus confirmation that the orchestrator was not archived;
 - the overall run outcome, including partial or failed states;
+- the Grilling outcome, question count, refined objective, user-confirmed
+  decisions, and any unconfirmed items carried forward;
 - the analyzed objective and conclusions;
 - observed evidence, inferences, unavailable evidence, inspected paths, and
   research sources as separately labeled sections;
@@ -454,3 +482,9 @@ specific recovery behavior above. Title initialization and archival are
 best-effort metadata and lifecycle capabilities: report their absence or
 failure without replacing a structurally verified task or hiding a valid
 analysis result.
+
+## Skill Dependencies
+
+Study requires the installed `se@alemar11` `$se:grilling` workflow, which in
+turn requires `$se:learn` for read-only repository-context inspection. Study
+never installs, refreshes, substitutes, or bypasses either dependency.

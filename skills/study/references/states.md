@@ -9,6 +9,7 @@ reasoning, turn status, and archival state are external observations.
 ## Contents
 
 - [Capacity mode](#capacity-mode)
+- [Grilling state](#grilling-state)
 - [Orchestrator setup state](#orchestrator-setup-state)
 - [Title state](#title-state)
 - [Worker slot state](#worker-slot-state)
@@ -26,6 +27,22 @@ reasoning, turn status, and archival state are external observations.
 The source is `exact-request` for an explicit five-worker request,
 `capped-request` when a larger request is normalized to five, and
 `orchestrator-selected` when an unspecified request justifies five workers.
+
+## Grilling state
+
+The visible orchestrator completes this mandatory phase before worker planning.
+
+| Value | Meaning | Effect |
+| --- | --- | --- |
+| `not-started` | The orchestrator has not begun Grilling. | Initial state only. |
+| `awaiting-answer` | Grilling asked exactly one current question and needs the owning user's answer. | Nonterminal; create no workers. |
+| `refined` | The user confirmed the refined handoff. | Continue to scope analysis and worker planning. |
+| `user-stopped` | The user ended Grilling before confirmation. | Continue from the best-supported handoff and preserve unconfirmed items. |
+| `blocked` | Grilling or its Learn context dependency could not run responsibly. | Create no workers and report overall outcome `failed`. |
+
+Question count, answers, the refined handoff, and unconfirmed items are run data
+rather than state fields. A task waiting for the next interview answer remains
+nonterminal even when its last visible response contains a question.
 
 ## Orchestrator setup state
 
@@ -165,3 +182,7 @@ never be presented as the authoritative overall outcome. Orchestrator
 required preflight fails before creation begins, setup remains `not-started`
 and the terminal overall outcome is `failed`; otherwise `not-started` is only
 the initial nonterminal setup state.
+
+Grilling `not-started` and `awaiting-answer` are also nonterminal and cannot
+produce an overall Study outcome. Grilling `blocked` maps to `failed` before
+worker creation; `refined` and `user-stopped` allow Study to continue.

@@ -16,6 +16,8 @@
 - **Settings evidence source:** `<independent task telemetry or unavailable>`
 - **Orchestrator task state:** `<authoritatively observed external state or not-applicable>`
 - **Orchestrator state reason:** `<reason>`
+- **Grilling outcome:** `<not-started/refined/user-stopped/blocked>`
+- **Grilling question count:** `<count>`
 - **Original requested worker count:** `<count or unspecified>`
 - **Planned worker count after cap:** `<0-5>`
 - **Created worker count:** `<0-5 stable task identities>`
@@ -36,6 +38,12 @@ Summarize the answer and the most important conclusion in a few sentences.
 ## Objective
 
 State the question, planning goal, or research target that Study analyzed.
+
+## Refined handoff
+
+Summarize the user-confirmed objective, scope, non-goals, constraints,
+decisions, success criteria, evidence expectations, and any unconfirmed items
+carried forward after Grilling. Do not reproduce the raw interview transcript.
 
 ## Observations
 
