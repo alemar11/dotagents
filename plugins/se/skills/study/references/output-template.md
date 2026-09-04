@@ -1,15 +1,15 @@
 # Study Analysis Report
 
-Include the common sections below, then exactly one surface-specific controller
-section and exactly one matching worker ledger. Omit inapplicable App fields
-from CLI reports rather than filling the report with placeholders.
+Include the common sections below, exactly one surface-specific controller
+section, and the shared subagent ledger when workers were planned. Omit
+inapplicable App fields from CLI reports rather than filling the report with
+placeholders.
 
 ## Scope
 
 - **Mode:** Read-only planning, research, or analysis
 - **Study surface:** `<app-task/cli-session>`
-- **Worker transport:** `<app-task/subagent/none>`
-- **Shared run tag:** `[<run-tag>]`
+- **Worker transport:** `<subagent/none>`
 - **Controller location:** `<separate visible App Study task/current CLI session>`
 - **Controller profile:** `<gpt-5.6-sol / medium/current CLI profile inherited or unavailable>`
 - **Grilling outcome:** `<refined/user-stopped/blocked>`
@@ -28,7 +28,7 @@ from CLI reports rather than filling the report with placeholders.
 
 Include this section only for `study_surface=app-task`.
 
-- **Requested controller title:** `Study: [<run-tag>] <short title>`
+- **Requested controller title:** `🕵️ Study: <short title>`
 - **Observed controller title:** `<observed title or unavailable>`
 - **Title request/fallback evidence:** `<evidence>`
 - **App title state:** `<title-verified/title-unverified/title-drift/not-applicable>`
@@ -39,8 +39,6 @@ Include this section only for `study_surface=app-task`.
 - **Profile evidence source:** `<authoritative observation or unavailable>`
 - **Controller task state and reason:** `<observed state / reason>`
 - **Parent monitoring outcome:** `<final report returned/blocker>`
-- **Worker archival requests:** `<accepted/partial/failed/unavailable/not-applicable>`
-- **Independent archival verification:** `<confirmed/unavailable/failed/not-applicable>`
 - **Controller remains unarchived:** `<yes/no>`
 
 ## CLI controller
@@ -99,39 +97,28 @@ claim.
 
 Describe proposed next steps without writing or editing implementation code.
 
-## Worker slot ledger
+## Subagent slot ledger
 
 Include every planned slot. When `planned_worker_count=0`, state that no slots
 were reserved.
 
-| Slot | Transport | Assignment | Slot state | Stable identity | Creation evidence or error | Requested profile | Profile evidence | Execution state | State reason | Terminal evidence | Key result |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Worker N |  |  |  |  |  | `gpt-5.6-luna / max` |  |  |  |  |  |
+| Slot | Parent controller | Assignment | Slot state | Stable subagent identity | Parent lineage and creation evidence or error | Working-directory context | Requested profile | Profile evidence | Execution state | State reason | Terminal evidence | Key result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Worker N |  |  |  |  |  |  | `gpt-5.6-luna / max` |  |  |  |  |  |
 
 List `not-started`, `creation-failed`, `structural-verification-failed`,
 `settings-drift`, and `unresolved-setup` slots even when no stable worker
 identity exists. Never correlate an uncertain identity through title, label,
-assignment text, run tag, or timing.
+assignment text, or timing.
 
-## App task telemetry ledger
+## App controller telemetry
 
-Include this section only for `study_surface=app-task`. Include the controller
-and every stable App worker task.
+Include this section only for `study_surface=app-task`. It contains only the
+single visible Study controller; subagents belong in the shared ledger above.
 
-| Task | Requested title | Observed title and source | App title state | Stable identity | Host | Project/execution | Requested profile | Profile evidence | Task state | State reason or attention evidence | Error | Terminal evidence | Archive request | Archive verification |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Controller |  |  |  |  |  |  | `gpt-5.6-sol / medium` |  |  |  |  |  | not-requested | not-applicable |
-| Worker N |  |  |  |  |  |  | `gpt-5.6-luna / max` |  |  |  |  |  |  |  |
-
-## CLI subagent ledger
-
-Include this section only for `study_surface=cli-session`. Include every stable
-subagent; App title, task, saved-project, and archival fields do not belong in
-this ledger.
-
-| Slot | Stable subagent identity | Parent lineage evidence | Working-directory context | Requested profile | Profile evidence | Execution state | State reason or attention evidence | Error | Terminal evidence | Key result |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Worker N |  |  |  | `gpt-5.6-luna / max` |  |  |  |  |  |  |
+| Task | Requested title | Observed title and source | App title state | Stable identity | Host | Project/execution | Requested profile | Profile evidence | Task state | State reason or attention evidence | Error | Terminal evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Controller |  |  |  |  |  |  | `gpt-5.6-sol / medium` |  |  |  |  |  |
 
 ## Worker results
 

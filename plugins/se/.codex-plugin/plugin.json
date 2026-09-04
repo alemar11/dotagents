@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "4.2.1",
+  "version": "4.2.4",
   "description": "Refine and study ideas, turn them into clear Feature plans, deliver reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Refine ideas, run studies, plan Features, and deliver changes.",
-    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, and Study composes both before orchestrating a read-only investigation in a separate App task or the current CLI session. Idea captures proposals, while Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
+    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, and Study composes both before orchestrating a read-only investigation in one visible App controller or the current CLI session with optional native subagents. Idea captures proposals, while Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [

@@ -60,12 +60,13 @@ Its skills are deliberately separated by responsibility:
   planning workers.
 - skills/study/ is the explicit-only read-only investigation entry point. It
   builds one curated handoff and immediately composes Grilling. In Codex App it
-  continues in one separate visible Sol/medium task with up to five visible
-  Luna/max workers in the same saved local project. In Codex CLI it keeps the
-  current session and profile as controller and uses up to five native
-  Luna/max subagents. Because Study, Grilling, and Learn ship together, it does
-  not run a cross-package dependency preflight. Invoke it explicitly as
-  `se:study`.
+  continues in one separate visible Sol/medium controller task; in Codex CLI it
+  keeps the current session and profile as controller. On either surface it
+  uses zero workers for focused analysis and may delegate substantial,
+  independent evidence work to up to five native Luna/max subagents. It never
+  creates additional visible App worker tasks. Because Study, Grilling, and
+  Learn ship together, it does not run a cross-package dependency preflight.
+  Invoke it explicitly as `se:study`.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
   exhausts every authoritative continuation or host/project partition before
   claiming complete inventory, deduplicates stable task identities, freezes an

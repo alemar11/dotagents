@@ -1,6 +1,6 @@
 ---
 name: study
-description: "Explicitly refine a curated handoff through interactive SE Grilling, then orchestrate read-only planning, research, and analysis. In Codex App, continue in one separate visible gpt-5.6-sol task at medium reasoning with up to five visible gpt-5.6-luna workers at max reasoning. In Codex CLI, continue in the current session at its current profile with up to five native gpt-5.6-luna subagents at max reasoning. Use only when the user explicitly invokes or selects Study. Never allow recursive Study, exceed five workers, modify project files, or return an implementation artifact."
+description: "Explicitly refine a curated handoff through interactive SE Grilling, then orchestrate read-only planning, research, and analysis. In Codex App, continue in one separate visible gpt-5.6-sol task at medium reasoning; in Codex CLI, continue in the current session at its current profile. On either surface, delegate only useful independent evidence work to up to five native gpt-5.6-luna subagents at max reasoning. Use only when the user explicitly invokes or selects Study. Never allow recursive Study, exceed five subagents, modify project files, or return an implementation artifact."
 ---
 
 # Study
@@ -30,9 +30,9 @@ Study is not an implementation workflow:
   authority.
 
 The explicit invocation authorizes only the orchestration effects described
-below: one separate Study task and its worker tasks on the App surface, or
-native subagent delegation on the CLI surface. It grants no project,
-repository, GitHub, account, or unrelated external mutation authority.
+below: one separate Study controller task on the App surface and native
+subagent delegation on either surface. It grants no project, repository,
+GitHub, account, or unrelated external mutation authority.
 
 ## Activation and recursion guard
 
@@ -40,9 +40,9 @@ repository, GitHub, account, or unrelated external mutation authority.
   selection, or an equivalent direct instruction to execute Study.
 - Do not activate for an ordinary mention of “study” or an implicit planning
   match. `agents/openai.yaml` disables implicit invocation.
-- Only the invoking controller may start the run. A Study-created App task or
-  worker and a Study-created CLI subagent must never invoke Study, create
-  another Study controller, or delegate a nested worker layer.
+- Only the invoking controller may start the run. A Study-created App
+  controller or subagent must never invoke Study, create another Study
+  controller, or delegate a nested worker layer.
 - If a downstream prompt requests recursive Study, decline that part, continue
   the existing bounded assignment when possible, and report the request to the
   controller.
@@ -84,11 +84,6 @@ current CLI session. Include:
 - requested worker count, or `unspecified` when none was supplied;
 - the required textual Markdown report and read-only boundary.
 
-Choose one concise lower-kebab `run_tag` from the topic plus a short lowercase
-alphanumeric nonce, keep it under 18 characters, and retain it for the entire
-run. Brackets are display syntax rather than part of the value. The run tag is
-metadata only and must never be used as task or subagent identity.
-
 Do not assume a separate App task can see the unfinished invoking turn. Pass
 the complete handoff to it. On CLI, keep the same handoff transiently in the
 current session and do not save it.
@@ -109,8 +104,7 @@ current session and do not save it.
 5. Treat the refined or best-supported stopped handoff as the sole planning
    brief. Apply the read-only scope gate again.
 6. Read [references/orchestration.md](references/orchestration.md), determine
-   the worker count and assignments, and use only the transport selected by
-   the active surface.
+   the useful subagent count and assignments.
 7. Reconcile worker setup, monitor every created worker to a terminal or
    explicitly abandoned state, capture available evidence, and synthesize the
    result. Never replace a failed or unresolved reserved slot.
@@ -132,15 +126,15 @@ Five is an absolute cap across the entire Study run:
 - Setup failure may lower `created_worker_count`, but it never changes the
   planned count, frees a reserved slot, or authorizes a replacement.
 
-Set `worker_transport` from the selected surface and planned count:
+Set `worker_transport` from the planned count:
 
 - `none` when `planned_worker_count=0`;
-- `app-task` for a positive App plan;
-- `subagent` for a positive CLI plan.
+- `subagent` for a positive plan on either surface.
 
-If the selected transport is unavailable, retain the planned slots, record
-their failures, and continue with a partial controller synthesis when useful.
-Never fall back to another transport.
+Study never creates visible App worker tasks. If native subagent transport is
+unavailable, retain the planned slots, record their failures, and continue
+with a partial controller synthesis when useful. Never fall back to visible
+tasks, external processes, or another transport.
 
 ## Output contract
 
@@ -149,7 +143,7 @@ evidence, and assumptions. It must include the refined handoff, inspected
 paths and sources, worker plan and ledger, results, risks, confidence, and the
 smallest useful next action.
 
-App task identity, title, host, project, task telemetry, and worker archival
-fields appear only for `study_surface=app-task`. CLI reports the current-session
-controller and subagent ledger without inventing App task metadata. In every
-case, report `Changes made: None`.
+App task identity, title, host, project, and task telemetry apply only to the
+single controller for `study_surface=app-task`. Both surfaces report the same
+subagent ledger without inventing App task or archival metadata for workers.
+In every case, report `Changes made: None`.

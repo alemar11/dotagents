@@ -1,14 +1,14 @@
 # Study State Contract
 
 This reference is the canonical owner of Study's surface, capacity, Grilling,
-App controller setup, App title, worker slot, worker execution, archival, and
-overall outcome states.
+App controller setup, App controller title, subagent slot, subagent execution,
+and overall outcome states.
 
 All Study state is transient in the active controller context. Study owns no
-persisted checkpoint or ledger. App task identity and lifecycle are external
-App observations; CLI subagent identity and lifecycle are external CLI
-observations. Requested settings, receipts, and observed settings remain
-separate facts.
+persisted checkpoint or ledger. App controller task identity and lifecycle are
+external App observations; subagent identity and lifecycle are external
+runtime observations on both surfaces. Requested settings, receipts, and
+observed settings remain separate facts.
 
 ## Contents
 
@@ -19,7 +19,6 @@ separate facts.
 - [App title state](#app-title-state)
 - [Worker slot state](#worker-slot-state)
 - [Worker execution state](#worker-execution-state)
-- [App archival state](#app-archival-state)
 - [Overall outcome](#overall-outcome)
 
 ## Surface and transport
@@ -27,13 +26,14 @@ separate facts.
 | Field | Allowed values | Meaning |
 | --- | --- | --- |
 | `study_surface` | `app-task`, `cli-session` | `app-task` continues in a separate visible App controller; `cli-session` keeps the invoking CLI session as controller. |
-| `worker_transport` | `app-task`, `subagent`, `none` | Positive App plans use visible tasks, positive CLI plans use native subagents, and zero-worker plans use `none`. |
+| `worker_transport` | `subagent`, `none` | Every positive plan uses native subagents; zero-worker plans use `none`. Study never creates visible App worker tasks. |
 
 The shared
 [Codex runtime surface contract](../../../references/codex-runtime-surface.md)
 determines `study_surface`; it is not user preference or durable configuration.
-Once selected, it does not change during the run. Transport failure never
-selects another value.
+Once selected, it does not change during the run. The surface selects
+controller placement, not worker transport. Transport failure never selects
+another value.
 
 ## Capacity mode
 
@@ -88,8 +88,8 @@ only because CLI intentionally inherits the current session profile.
 
 ## App title state
 
-`app_title_state` is best-effort metadata for stable App controller and worker
-tasks. It is `not-applicable` for CLI controllers and subagents.
+`app_title_state` is best-effort metadata for the stable App controller task.
+It is `not-applicable` for the CLI controller and every subagent.
 
 | Value | Meaning | Effect |
 | --- | --- | --- |
@@ -104,8 +104,7 @@ reconstruction, or repeated renaming.
 ## Worker slot state
 
 Reserve every planned slot before creation and never renumber, free, or reuse
-it. The same state vocabulary applies to visible App worker tasks and CLI
-subagents.
+it. The same state vocabulary applies to native subagents on both surfaces.
 
 | Value | Meaning | Allowed next states |
 | --- | --- | --- |
@@ -113,7 +112,7 @@ subagents.
 | `pending-setup` | The creation effect or stable worker identity remains uncertain. | `created`, `creation-failed`, `structural-verification-failed`, `settings-drift`, `unresolved-setup` |
 | `created` | A stable worker identity exists and structural verification passed. | Terminal slot state |
 | `creation-failed` | Authoritative evidence proves no worker exists, including an unavailable selected transport. | Terminal slot state |
-| `structural-verification-failed` | A real worker exists, but required App placement or CLI parent lineage cannot be established. | Terminal slot state |
+| `structural-verification-failed` | A real subagent exists, but its active controller lineage cannot be established. | Terminal slot state |
 | `settings-drift` | A real worker exists and observed model or reasoning differs from Luna/max. | Terminal slot state |
 | `unresolved-setup` | Bounded reconciliation cannot determine whether a worker exists. | Terminal slot state |
 
@@ -124,7 +123,7 @@ Apply these rules:
 - An uncertain effect sets `pending-setup`, stops later creation, and permits
   at most three bounded authoritative reconciliation observations.
 - A provisional identity does not increment `created_worker_count`.
-- A stable App task with only a title warning remains `created`.
+- A stable subagent with unavailable profile telemetry may remain `created`.
 - Structural failure or observed profile drift preserves the stable identity,
   stops later creation, and never creates a replacement.
 - Failed reconciliation sets `unresolved-setup`; later slots stay
@@ -134,8 +133,7 @@ Apply these rules:
 
 ## Worker execution state
 
-Track every stable App task or CLI subagent in exactly one
-`worker_execution_state`.
+Track every stable subagent in exactly one `worker_execution_state`.
 
 | Value | Meaning | Terminal |
 | --- | --- | --- |
@@ -152,30 +150,6 @@ prose alone. Preserve the last known state and raw error for
 `monitoring-unavailable`; missing telemetry is never completion evidence.
 Resume only after authoritative observation recovers. Only the user may direct
 abandonment of a worker that requires attention.
-
-## App archival state
-
-Archival applies only to App worker tasks after terminal evidence is captured.
-It is never requested for the App controller. All archival fields are
-`not-applicable` for CLI runs.
-
-Per-worker `app_archival_request_state` values are:
-
-| Value | Meaning |
-| --- | --- |
-| `accepted` | The request was accepted; this alone does not prove archived state. |
-| `failed` | The request returned a definitive failure. |
-| `unavailable` | The App cannot request archival for that worker. |
-| `not-applicable` | The worker is a CLI subagent or is not eligible for archival. |
-
-Aggregate fields are:
-
-| Field | Allowed values | Meaning |
-| --- | --- | --- |
-| `worker_archival_requests` | `accepted`, `partial`, `failed`, `unavailable`, `not-applicable` | Aggregate of eligible App worker request receipts; CLI always uses `not-applicable`. |
-| `independent_archival_verification` | `confirmed`, `unavailable`, `failed`, `not-applicable` | Independent result for requested App archival; CLI always uses `not-applicable`. |
-
-Omission from a recent-task view is not independent archive proof.
 
 ## Overall outcome
 

@@ -74,10 +74,11 @@ folder.
   owns the shared curated handoff, surface routing, read-only boundary, worker
   cap, and report contract. It composes bundled Grilling, which reads context
   through Learn, before any worker planning. Its `app-runtime.md` reference
-  owns separate App task placement, parent monitoring, visible workers, and
-  archival; `cli-runtime.md` owns same-session control and native subagents;
-  `orchestration.md` owns shared selection, assignments, monitoring, synthesis,
-  and failure handling; `states.md` owns the cross-surface state vocabulary.
+  owns separate App controller placement and parent monitoring;
+  `cli-runtime.md` owns same-session control; `orchestration.md` owns shared
+  native-subagent selection, assignments, setup, monitoring, synthesis, and
+  failure handling; `states.md` owns the cross-surface state vocabulary. Study
+  never creates additional visible App worker tasks.
 - skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
   node registry, Feature Plan Set, Feature identity, Feature-level dependency,
   and local Macro Task contracts, material-question routing, optional read-only
@@ -370,8 +371,10 @@ folder.
   the shared Codex surface contract, the shared curated handoff, immediate
   surface-local Grilling,
   App-only Sol/medium controller placement, inherited CLI controller settings,
-  Luna/max worker transports, the five-worker cap, no-replacement behavior,
-  model index ownership, surface-aware reporting, and read-only outcomes.
+  shared native Luna/max subagents, zero-worker focused analysis, the
+  five-worker cap, no-replacement behavior, absence of visible App worker
+  tasks, model index ownership, surface-aware reporting, and read-only
+  outcomes.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
 - Scan Learn sources for direct provider or tracker access, task/profile

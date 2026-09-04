@@ -1,8 +1,8 @@
 # Study CLI Runtime
 
 Read this reference only when `study_surface=cli-session`. It owns same-session
-control, current-directory context, immediate Grilling, and native subagent
-delegation.
+control, current-directory context, immediate Grilling, and surface-specific
+subagent context.
 
 ## Current-session controller
 
@@ -23,37 +23,13 @@ Continue the interview in this session until its state is `refined`,
 After a refined or stopped handoff, apply the shared worker planning rules in
 [orchestration.md](orchestration.md).
 
-The CLI branch has no App controller task identity, requested title, host or
-saved-project task placement, App task telemetry, or App archival lifecycle.
-Mark those state fields `not-applicable` internally and omit their report
-sections.
+The CLI branch has no App controller task identity, requested title, host,
+saved-project task placement, or App task telemetry. Mark those state fields
+`not-applicable` internally and omit their report sections.
 
-## Native subagents
+## Subagent context
 
-For each positive planned slot, create one native subagent under the current
-CLI controller:
-
-- Request `gpt-5.6-luna` with `max` reasoning explicitly.
-- Keep the assignment in the current working-directory context.
-- Supply the fixed `run_tag`, slot number, refined handoff slice, read-only
-  boundary, evidence expectations, result shape, and recursion prohibition.
-- Record the stable subagent identity and lineage returned by the current
-  runtime. A label or assignment text is never identity.
-
-Use only native subagents. If that transport is unavailable, a creation request
-fails, or setup remains unresolved, retain the reserved slot and its failure.
-Do not switch to an App task, external CLI process, or another delegation
-mechanism. Never create a replacement beyond the reserved slot.
-
-Monitor created subagents through the current session until each is
-`completed`, `failed`, or explicitly `abandoned`. Capture the final memo when
-available; otherwise record the terminal state, reason, error, and last
-authoritative evidence. Profile telemetry may be recorded when exposed, but
-missing telemetry is not a reason to invent a value or claim independent
-verification.
-
-Subagents have no App task title or archival fields. Keep their result ledger
-in the current session and synthesize there. When one or more requested slots
-fail, the controller may still perform direct read-only analysis and return a
-`partial` result. It must not silently lower the planned count or describe
-controller-only work as a successful worker result.
+After Grilling is refined or stopped, apply the shared native-subagent contract
+in [orchestration.md](orchestration.md). Every subagent remains under the
+current CLI controller lineage and uses the current working-directory context.
+Subagents have no App task title, saved-project placement, or archival fields.

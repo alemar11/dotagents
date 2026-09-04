@@ -1,9 +1,9 @@
 # Study Orchestration
 
 Read this reference after Grilling returns `refined` or `user-stopped`. It owns
-the shared worker-selection, assignment, monitoring, synthesis, and failure
-policy for both Study surfaces. Surface references own transport-specific
-setup and lifecycle behavior.
+the shared subagent selection, assignment, setup, monitoring, synthesis, and
+failure policy for both Study surfaces. Surface references own only controller
+placement and the subagent's surface-specific working context.
 
 ## Capacity selection
 
@@ -22,11 +22,15 @@ exactly. Normalize any larger request to five, disclose the cap before
 creation, and retain both counts in the report.
 
 For `original_requested_count=unspecified`, choose the smallest count that
-gives every worker a distinct, bounded evidence surface:
+keeps the controller efficient and gives every subagent a substantial,
+distinct evidence surface:
 
-- zero when no meaningful independent split exists;
-- one or two for a focused question, one repository or source family, or one
-  or two separable investigation surfaces;
+- zero for a focused question or any investigation the controller can inspect
+  directly without substantial context noise;
+- one only when a single large or noisy evidence surface benefits materially
+  from context isolation;
+- two for two genuinely independent repositories, source families, or
+  investigation surfaces;
 - three for a genuinely multi-dimensional comparison, such as local contract,
   external subject, and comparative fit;
 - four or five only for broad work with four or five independent tracks, such
@@ -49,17 +53,35 @@ Reserve every planned slot before creation and number it once from 1 through
 - evidence and acceptance expectations;
 - dependencies on other assignments, if any;
 - a concise Markdown memo shape;
-- the read-only boundary, fixed Luna/max profile, slot number, and `run_tag`;
+- the read-only boundary, fixed Luna/max profile, and slot number;
 - an absolute prohibition on invoking Study or creating child workers.
 
 Assignments should be mutually distinct and collectively sufficient. Serialize
 only those that truly depend on an earlier unstable finding. Workers report to
 the active Study controller, not directly to another worker.
 
+## Native subagent setup
+
+For each positive planned slot, create one native subagent under the active
+Study controller:
+
+- Request `gpt-5.6-luna` with `max` reasoning explicitly.
+- Keep the assignment in the controller's working-directory context.
+- Supply the slot number, refined handoff slice, read-only boundary, evidence
+  expectations, concise Markdown memo shape, and recursion prohibition.
+- Record the stable subagent identity and parent lineage returned by the
+  runtime. A label or assignment text is never identity.
+
+Use only native subagents. If that transport is unavailable, a creation request
+fails, or setup remains unresolved, retain the reserved slot and its failure.
+Do not create a visible App worker task, start an external process, or switch
+transport. Never create a replacement beyond the reserved slot.
+
 ## Setup and no-replacement policy
 
-Set `worker_transport` from the active surface before creation. One reserved
-slot permits at most one creation request unless authoritative reconciliation
+Set `worker_transport` to `subagent` for every positive plan. Study never
+creates visible App worker tasks. One reserved slot permits at most one
+creation request unless authoritative reconciliation
 proves that the request had no effect and the same slot can safely complete
 its original attempt.
 
@@ -68,12 +90,12 @@ For each slot:
 1. Treat the immediate result as setup evidence, not proof beyond what it
    actually establishes.
 2. Bind the slot only to a stable worker identity. Never correlate by title,
-   label, prompt preview, assignment text, run tag, or timing.
+   label, prompt preview, assignment text, or timing.
 3. A definitive failure proving no worker exists sets `creation-failed` and
    permits later reserved slots to proceed.
 4. An uncertain effect sets `pending-setup`. Reconcile it through at most three
    bounded authoritative observations. Stop later creation until it resolves.
-5. A stable worker in the wrong structural context sets
+5. A stable subagent outside the active controller lineage sets
    `structural-verification-failed`; observed Luna/max drift sets
    `settings-drift`. Preserve the identity, create no replacement, and stop
    later creation.
@@ -81,8 +103,8 @@ For each slot:
    `not-started` with reason `creation-halted-after-uncertain-slot`.
 
 A failed, drifted, unresolved, or abandoned slot is never freed, renumbered,
-or replaced. Never start a second controller or a second worker layer to make
-up capacity.
+or replaced. Never start a second controller, visible worker task, external
+worker process, or second subagent layer to make up capacity.
 
 If a positive planned transport is unavailable before any creation request,
 mark every reserved slot `creation-failed` with the shared transport blocker.
@@ -124,4 +146,5 @@ Use these overall outcomes:
   phase or failed App controller setup.
 
 Read [output-template.md](output-template.md) immediately before reporting and
-include only the branch-specific sections selected by `study_surface`.
+include only the controller section selected by `study_surface` plus the
+shared subagent ledger.
