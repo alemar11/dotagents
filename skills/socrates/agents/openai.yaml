@@ -1,0 +1,7 @@
+interface:
+  display_name: "Socrates"
+  short_description: "🏛️ Practice recent code one question at a time."
+  default_prompt: "Use $socrates to test my understanding of the engineering work we just completed through one evidence-grounded question at a time."
+  brand_color: "#8B5CF6"
+policy:
+  allow_implicit_invocation: true

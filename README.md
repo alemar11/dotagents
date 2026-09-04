@@ -70,6 +70,7 @@ for Apple's native headless MCP server:
 | `codex-cli` | Launch one complete prompt in a separate Codex CLI task with Sol/Terra/Luna selection and model-aware reasoning. |
 | `crusty` | Self-contained skeptical critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `ms-roberts` | Silently track substantive grammar issues in medium or complex English prompts and return an American-English correction report on request or session close. |
+| `socrates` | Turn recent engineering work into short, opt-in Socratic exercises with one evidence-grounded question at a time. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations. |
@@ -229,7 +230,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
@@ -257,6 +258,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-cli \
   --skill crusty \
   --skill ms-roberts \
+  --skill socrates \
   --skill okf \
   --skill skill-cli-creator \
   --skill tanstack \
