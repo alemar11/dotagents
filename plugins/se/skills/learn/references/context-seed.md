@@ -24,10 +24,11 @@ Project Context entry point for this repository.
   established.
 ```
 
-Scoped contexts remain optional and require evidence and authority for durable
-scoped content. Every additional Git repository explicitly selected by a
-composed setup follows the same mandatory root-context rule; repositories
-outside that scope remain untouched.
+During explicit monorepo setup, verified first-class subproject boundaries are
+enough to create minimal local `AGENTS.md` and `CONTEXT.md` routing surfaces.
+Rich local content remains evidence-gated. Every additional Git repository
+explicitly selected by a composed setup follows the same mandatory root-context
+rule; repositories outside that scope remain untouched.
 
 ## Evidence threshold
 
@@ -53,11 +54,12 @@ repo behavior. Leave agent operating rules in `AGENTS.md` and keep feature
 metadata contracts with their consuming feature workflows.
 
 For a detected monorepo, verified repository structure is enough evidence for
-stable scope routing in the mandatory root `CONTEXT.md`. It is not evidence for
-richer vocabulary, behavioral rules, or scoped context files. Routing tables
-may use `—` for context pointers when repository structure proves the route
-but durable evidence does not support creating the child or scoped context
-file.
+stable scope routing in the mandatory root `CONTEXT.md`. During explicit full
+setup or hierarchy update, stable first-class subproject boundaries also
+support minimal local `AGENTS.md` and `CONTEXT.md` files. Structure alone is not
+evidence for richer vocabulary, behavioral rules, local topics, ADRs, or
+translation guidance. Routing tables may use `—` when a candidate scope is not
+yet established as a first-class context owner.
 
 ## Seed shape
 
@@ -88,7 +90,7 @@ verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 ## What to avoid
 
 - Full architecture inventories or file trees.
-- Scoped context files that merely repeat the root context.
+- Subproject context files that merely repeat the root context.
 - Repeating command lists already owned by AGENTS.md or README files.
 - Copying agent operating instructions that should remain in `AGENTS.md`.
 - Recording translation or localization rules that belong in `TRANSLATION.md`.

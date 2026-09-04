@@ -238,7 +238,8 @@ reintroduce a retired compatibility surface.
 - Validate Learn and Idea registry/projection reconciliation, terminal
   reachability, and the absence of outgoing transitions from terminal nodes.
 - Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
-  read-first routing, evolution-rule projection, and no-dangling-pointer rule.
+  root-first monorepo routing, local context ownership and migration,
+  evolution-rule projection, and no-dangling-pointer rule.
 - Validate Feature Plan Set graph reachability, genuinely distinct sibling
   Feature boundaries, Feature registry coverage, Feature-level acyclic
   planning relations, each closed local Macro Task registry, same-parent-only
@@ -306,8 +307,9 @@ reintroduce a retired compatibility surface.
 - Check that the marketplace path and plugin metadata point to this package.
 - Scan for retired delivery-skill identifiers and removed legacy task contracts
   before handoff.
-- Validate Learn front matter, UI metadata, routed references, explicit-only
-  invocation, and the absence of retired compatibility surfaces.
+- Validate Learn front matter, UI metadata, routed references, implicit
+  hard-rule selection, setup-first capture, monorepo root/local ownership and
+  migration, and the absence of retired compatibility surfaces.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
 - Scan Learn sources for direct provider or tracker access, task/profile

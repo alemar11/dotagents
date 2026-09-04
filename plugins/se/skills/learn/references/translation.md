@@ -28,8 +28,8 @@ support is visible, do not create `TRANSLATION.md` and do not add an
 Place `TRANSLATION.md` beside the relevant `CONTEXT.md`:
 
 - repository root: root `TRANSLATION.md` for shared localization rules;
-- scoped monorepo context: scoped `TRANSLATION.md` beside the selected scoped
-  `CONTEXT.md` when that scope has independent localization rules.
+- first-class monorepo subproject: local `TRANSLATION.md` beside the selected
+  subproject `CONTEXT.md` when it has independent localization rules.
 
 Use product vocabulary from the neighboring `CONTEXT.md`; do not duplicate the
 project glossary here. `CONTEXT.md` may include a one-line pointer to this file

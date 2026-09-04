@@ -17,7 +17,7 @@ Normally ask no questions. When a question is required:
 - ask a follow-up only for a selected custom or split choice that remains
   unresolved.
 
-Do not expose terms such as `memory-owning root`, `scoped route`, or
+Do not expose terms such as `context-owning scope`, `scoped route`, or
 `translation memory` in the
 user-facing question. Canonical fields and values belong in the resulting
 configuration and completion report, not in the first-time-user prompt.
@@ -68,7 +68,7 @@ decision history.
 >
 > - They should share the main project context (Recommended when no distinct
 >   rules are evident)
-> - Each should have its own context
+> - Each should have its own local context tree
 > - Only one of them needs its own context
 
 If only one needs its own context, ask which named project. If separate
@@ -76,10 +76,12 @@ ownership is selected but its path boundary remains unclear, ask:
 
 > Which folders belong to `<project-name>`?
 
-The skill decides whether the available evidence can populate a scoped
-`CONTEXT.md`. Never ask the user to judge evidence sufficiency. Root
-`CONTEXT.md` creation remains mandatory for every root selected by authorized
-setup.
+The skill decides whether the available evidence supports first-class
+subproject ownership. During explicit monorepo setup, each selected first-class
+subproject receives a minimal local `AGENTS.md` and `CONTEXT.md`; local
+`project-context/` and `TRANSLATION.md` are created only when supported content
+exists. Never ask the user to judge evidence sufficiency. Root `CONTEXT.md`
+creation remains mandatory for every Git root selected by authorized setup.
 
 ## Overlapping Project Ownership
 

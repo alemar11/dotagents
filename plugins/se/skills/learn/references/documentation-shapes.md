@@ -55,6 +55,49 @@ not copy a topic file's full body or reproduce the complete ADR index there.
 Use `—` for a scoped row whose context file is not yet created, and inspect the
 owned paths directly rather than creating a dangling pointer.
 
+## Subproject CONTEXT.md
+
+Every first-class subproject context links back to the root and contains only a
+scope delta:
+
+```markdown
+# Accounting Context
+
+Repository context: [`../../CONTEXT.md`](../../CONTEXT.md)
+
+Scope: `apps/accounting/`
+
+## Project Purpose Delta
+
+Purpose or non-goals unique to this subproject.
+
+## Glossary
+
+Only subproject-specific terms.
+
+## Durable Rules And Boundaries
+
+Only contextual rules that do not need to be active for every task.
+
+## Context Files
+
+| File | Read when | Owner |
+| --- | --- | --- |
+| [`ledger-workflow.md`](project-context/ledger-workflow.md) | Changing ledger workflows | Accounting team |
+
+## ADR Index
+
+See [`project-context/adr/index.md`](project-context/adr/index.md).
+
+## Open Questions
+
+- Explicit unresolved local question.
+```
+
+Omit unsupported sections. Do not repeat shared root content. The local
+`project-context/` is created only with its first topic or accepted local ADR;
+the local `TRANSLATION.md` is created only with evidenced localization rules.
+
 ## Topic File
 
 Every generated `project-context/<topic>.md` starts with:
@@ -95,8 +138,8 @@ Create `project-context/adr/index.md` with the first accepted ADR:
 | [`ADR-0001`](ADR-0001-descriptive-name.md) | Accepted | Short decision summary. |
 ```
 
-Keep the index canonical and concise. Add one row per ADR, preserve stable
-links, and do not duplicate full ADR bodies in `CONTEXT.md`.
+Keep each root or subproject index canonical and concise. Add one row per ADR,
+preserve stable links, and do not duplicate full ADR bodies in `CONTEXT.md`.
 
 ## ADR
 
@@ -123,6 +166,7 @@ What was decided.
 What this enables, costs, or rules out.
 ```
 
-Only accepted, load-bearing decisions belong here. If a new decision
-contradicts an existing ADR, surface the conflict instead of silently
-overwriting it.
+Only accepted, load-bearing decisions belong here. Store cross-project
+decisions in the root ADR tree and subproject-only decisions in the local ADR
+tree. If a new decision contradicts an existing root or local ADR, surface the
+conflict instead of silently overwriting it.

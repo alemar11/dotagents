@@ -31,7 +31,7 @@ Its skills are deliberately separated by responsibility:
 - skills/idea/references/idea-source.md owns the typed transient handoff from
   Idea capture to later Feature Intake; it never adds an automatic runtime
   dependency between the skills.
-- skills/learn/ is the explicit repository-knowledge entry point and owns a
+- skills/learn/ is the repository-knowledge entry point and owns a
   workflow registry for scope, evidence, confirmation, apply, and verification.
   Every invocation locally preflights the applicable AGENTS.md chain and
   CONTEXT.md routing; when authorized, it reconciles one concise pointer that
@@ -39,8 +39,14 @@ Its skills are deliberately separated by responsibility:
   It performs only authorized local-repository context changes and maintains
   evidence-backed Project Context, ADRs, localization memory, Code Review
   Rules, and proposal-first AGENTS.md compaction without external preflight,
-  tracker, publication, task, or worker behavior. Invoke it explicitly as
-  se:learn.
+  tracker, publication, task, or worker behavior. Explicit requests to
+  remember, save, or preserve a hard repository rule select Learn
+  automatically; when minimal project context is missing, Learn creates it
+  before capturing the rule. In monorepos, the root owns shared knowledge while
+  evidenced first-class subprojects may own local `AGENTS.md`, `CONTEXT.md`,
+  optional localization memory, topics, and ADRs; authorized hierarchy updates
+  move subproject-only material to its local owner. Learn can also be invoked
+  explicitly as `se:learn`.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
   exhausts every authoritative continuation or host/project partition before
   claiming complete inventory, deduplicates stable task identities, freezes an

@@ -54,35 +54,42 @@ ownership ambiguous.
 
 ### 1. Inspect existing context
 
-- Resolve the current memory-owning root and read its `CONTEXT.md` first when
-  it exists. During authorized setup/bootstrap, create or update it at every
-  memory-owning root selected by the setup scope, even when evidence supports
+- Resolve the selected Git root and read its root `CONTEXT.md` first when it
+  exists. During authorized setup/bootstrap, create or update it at every
+  selected Git root, even when evidence supports
   only a minimal entry point with explicit unknowns. Outside setup/bootstrap,
   use repository evidence and create it only with authorized durable content.
   Explicit user scope or a durable linked Feature Plan set authorizes
   repository identities. A composed cross-repository caller supplies candidate
   local Git roots separately, verifies each root against one authorized
   identity, and runs this workflow independently in each verified repository.
-  Also inspect the relevant
-  `project-context/adr/` tree, `README.md`, project docs, product specs, issue
+  Also inspect the relevant root and local `project-context/adr/` trees,
+  `README.md`, project docs, product specs, issue
   templates, and nearby source or tests that define the vocabulary already in
   use.
 - When a selected repository's root `CONTEXT.md` contains
   `## Scoped Contexts`, select every non-overlapping row matched by the
   affected paths or accepted product identities, then read each available
-  scoped `CONTEXT.md`. The repository root remains applicable after selection.
+  subproject `CONTEXT.md` and applicable `AGENTS.md`. The repository root
+  remains applicable after selection.
   For a matched row without a context file,
   inspect its owned paths directly and create the scoped file only when
   authorized evidence supports durable scope-specific content.
 - Stop and ask only when scoped routes overlap or ownership remains
   indeterminate. Do not guess, and do not mistake legitimate cross-scope work
   for routing ambiguity.
+- During explicit monorepo setup or hierarchy update, identify evidenced
+  first-class subprojects using stable product, service, application,
+  deployment, documentation, build, or ownership boundaries. Create or update
+  a minimal local `AGENTS.md` and `CONTEXT.md` for each selected first-class
+  subproject even when richer local knowledge is sparse. Do not create a local
+  tree for every workspace package or incidental directory.
 - Prefer updating an existing relevant file over creating a new one.
 - During authorized setup/bootstrap, ensure root `CONTEXT.md` exists before
   completion even when no durable term or rule is yet established. Outside
   setup/bootstrap, create it when an authorized durable term or rule needs a
   home. For a verified monorepo, create the minimal root routing surface before
-  creating any scoped context.
+  creating any subproject context.
 - If no suitable authorized destination exists, defer capture and name the
   missing file or surface explicitly.
 
@@ -104,17 +111,22 @@ names appear synonymous, resolve whether they are aliases or distinct concepts.
 ### 3. Update the smallest durable surface
 
 - Add or revise shared glossary entries, routing, and explicit unknowns in root
-  `CONTEXT.md`; put only scope-specific deltas in the selected scoped
+  `CONTEXT.md`; put only scope-specific deltas in the selected subproject
   `CONTEXT.md`.
-- Add conditional workflow or behavioral detail to a flat
-  `project-context/<topic>.md` file with a title, scope, `Read when` condition,
-  and owner/update logic, then add or update its `CONTEXT.md` index row.
+- Add conditional workflow or behavioral detail to the owning root or
+  subproject's flat `project-context/<topic>.md` file with a title, scope,
+  `Read when` condition, and owner/update logic, then add or update that owner's
+  `CONTEXT.md` index row.
 - Keep `CONTEXT.md` as the entry point and index; do not duplicate the topic
   file's full body there.
-- Add an ADR beneath the memory-owning root's `project-context/adr/` only for an
-  accepted, load-bearing decision future agents would otherwise reopen. Create
-  or update `project-context/adr/index.md` in the same change; never create
-  nested scoped `project-context/` directories.
+- Add an ADR beneath root `project-context/adr/` for a cross-project decision or
+  beneath the selected subproject's `project-context/adr/` for a local decision,
+  only when the accepted load-bearing decision would otherwise be reopened.
+  Create or update the owning `project-context/adr/index.md` in the same change.
+- During an authorized hierarchy update, move existing subproject-only material
+  from root surfaces into the local owner. Update root routes, indexes,
+  backlinks, and relative links; remove the old copy only after verifying the
+  new owner, and never duplicate normative guidance.
 - Leave unresolved questions explicit rather than smoothing them over.
 - Use project vocabulary and link durable repo sources such as source files,
   tests, schemas, project docs, or ADRs when available.

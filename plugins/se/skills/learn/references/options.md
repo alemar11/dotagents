@@ -27,22 +27,25 @@ Write authority is derived from the current request or an explicit caller
 handoff and is reported as result data.
 
 The `AGENTS.md` Project Context pointer/evolution check is a derived preflight
-fact for every explicit Learn invocation. It is not a selectable
+fact for every Learn invocation. It is not a selectable
 `memory_slice`, does not create durable configuration, and does not grant
 write authority.
 
-`durable-capture` is always proposal-first for a direct invocation. It selects
-the former correction/preference workflow but does not imply a write.
+`durable-capture` is proposal-first unless the user explicitly asks to
+remember, save, or preserve a specific durable item and its repository scope
+and destination are unambiguous. That direct request is write authority for the
+scoped item and any required minimal Learn bootstrap; the selected slice remains
+`durable-capture`.
 
 ## Derived Context
 
 `execution_context` is factual output derived from the current Git repository
 and selected surfaces:
 
-1. `fresh-setup`: no established context surface exists at the selected Git
-   repository root;
-2. `existing-project-bootstrap`: a context surface exists and the selected
-   domain slice needs its first accepted population;
+1. `fresh-setup`: no established root context exists at the selected Git root,
+   or a selected first-class subproject has no local context tree yet;
+2. `existing-project-bootstrap`: a root or selected subproject context exists
+   and the selected domain slice needs its first accepted population;
 3. `current-project`: established context is being read or updated.
 
 Do not let a caller select or override this classification.
@@ -68,8 +71,9 @@ Do not let a caller select or override this classification.
   request; ordinary code review and general AGENTS maintenance do not select it.
 - `agents-compaction` is selected only for an explicit chain-size review or
   compaction request. Crossing a threshold alone never selects it.
-- A direct `durable-capture` request cannot return `captured` until the user
-  affirmatively approves the exact target and wording.
+- A direct `durable-capture` request cannot return `captured` without either an
+  explicit save/remember/preserve instruction for an unambiguous scoped item or
+  affirmative approval of the exact target and wording.
 - `capture_outcome=captured` requires every accepted item and named target to be
   reconciled and verified. Any unresolved item or target returns `deferred`.
 - `capture_mode=defer-to-caller` permits only `deferred` or

@@ -1,6 +1,6 @@
 ---
 name: learn
-description: "Capture and maintain durable repository knowledge, including project context, decisions, localization guidance, and code review rules. Use only for explicit knowledge-maintenance requests and make only authorized local changes."
+description: "Capture and maintain durable repository knowledge, including project context, hard rules, decisions, localization guidance, and code review rules. Use when the user explicitly asks to remember, save, or preserve a repository rule or other durable knowledge; make only authorized local changes."
 ---
 
 # Learn Project Context
@@ -14,10 +14,12 @@ context:
   and the exact ## Code Review Rules section in the closest applicable
   AGENTS.md;
 - root-first routing through CONTEXT.md;
-- conditional topic files and accepted ADRs under one repository-level
-  project-context/ directory;
+- conditional topic files and accepted ADRs under the nearest context-owning
+  root or first-class monorepo subproject;
 - optional TRANSLATION.md sidecars when localization rules are evidenced;
 - confirmed durable corrections, preferences, and accepted decisions;
+- explicit requests to remember, save, or preserve an always-active or "hard"
+  repository rule;
 - explicit, proposal-first compaction of an applicable AGENTS.md chain.
 
 The skill owns repository knowledge only. Tracker routing, issue metadata,
@@ -53,6 +55,20 @@ that pointer as a companion local change. In review, proposal, or otherwise
 read-only work, report the exact pointer change without writing it. This
 preflight derives run facts; it never grants write authority or changes the
 selected memory slice.
+
+For an explicit request to remember, save, or preserve a specific repository
+rule, select `durable-capture` even when the user does not name Learn. Treat the
+request itself as capture authority when the rule, repository scope, and
+narrowest destination are unambiguous. If the repository root or selected
+first-class subproject lacks its required `CONTEXT.md` or canonical Project
+Context pointer, include the smallest evidence-backed bootstrap prerequisite in
+the same authorized run, following the `setup-bootstrap` semantics without
+changing the selected memory slice:
+create or repair the root-first context chain and pointers, then capture the
+rule in the closest applicable `AGENTS.md`. Do not turn this prerequisite into
+`full-setup`, create empty topic or ADR trees, or widen the repository scope.
+When wording, scope, destination, or a conflict remains material, show the exact
+proposal and wait for confirmation before either setup or capture.
 
 When an authorized context-bearing run carries accepted landed changes that
 alter shared purpose, vocabulary, durable project rules, boundaries, stable
@@ -109,9 +125,18 @@ flowchart TD
 | project-context/adr/ADR-*.md | Accepted load-bearing decisions and consequences. | No |
 | TRANSLATION.md | Evidence-backed localization and language conventions beside its owning context. | No |
 
-Keep topic files flat and lowercase. project-context/adr/ is the only initial
-subdirectory. Scoped CONTEXT.md files and optional sidecars may exist in
-monorepos, but they never create nested project-context/ directories.
+Keep topic files flat and lowercase. `project-context/adr/` is the only initial
+subdirectory within each context-owning scope. In a monorepo, the Git root owns
+shared rules, context, routing, and cross-project decisions. Each evidenced
+first-class subproject may own a local `AGENTS.md`, `CONTEXT.md`, optional
+`TRANSLATION.md`, and `project-context/` for subproject-only knowledge. Do not
+create this tree for incidental folders or packages without an independent
+product, service, build, deployment, documentation, or ownership boundary.
+
+During an authorized monorepo setup or update, classify existing knowledge by
+scope. Keep shared material at the repository root; create or update local
+subproject surfaces and move subproject-only material there. Update root routes,
+indexes, and links in the same change, and do not leave normative duplicates.
 
 AGENTS.md is the source of always-active normative rules. A topic file may
 contain conditional detail, but it must not replace a rule that applies to
@@ -121,7 +146,7 @@ every task.
 
 | memory_slice | Owns |
 | --- | --- |
-| domain-memory | Root/scoped context routing, topic setup, ADR setup, inline update, implementation closeout, or periodic review. |
+| domain-memory | Root/subproject context routing, topic setup, ADR setup, inline update, implementation closeout, or periodic review. |
 | durable-capture | Manual capture of a confirmed correction, preference, rule, localization convention, or accepted decision. |
 | translation-memory | Localization memory only. |
 | agents-pointers | Preflight and maintain the concise Project Context pointer and evolution rule in the applicable AGENTS.md; detect missing, stale, duplicated, or over-copied routing. |
@@ -141,8 +166,10 @@ Resolve authority from the current request and caller data:
 - inspection, review, proposal, dry-run, or indirect suggestion: read-only;
 - explicit setup, initialize, update, or refresh: write only the selected
   surfaces in the requested repository scope;
-- direct durable-capture: propose the exact target, section, wording, and
-  before/after block, then wait for affirmative confirmation before writing;
+- direct durable-capture: an explicit request to remember, save, or preserve a
+  specific rule or other durable item authorizes the unambiguous scoped write;
+  otherwise propose the exact target, section, wording, and before/after block,
+  then wait for affirmative confirmation before writing;
 - a composed domain-memory handoff: write only when the caller supplies
   accepted durable knowledge, named targets, and explicit capture authority;
 - agents-compaction: always show measurement and the before/after proposal;
@@ -165,6 +192,11 @@ local context write; otherwise it remains a reported proposal.
   or path proximity. Reject extra or unmatched roots.
 - During authorized setup/bootstrap, create or update root CONTEXT.md at every
   selected Git root, even when only a minimal entry point is supported.
+- During authorized full monorepo setup or hierarchy update, create or update a
+  minimal local `AGENTS.md` and `CONTEXT.md` for every evidenced first-class
+  subproject in scope. Create its `project-context/` only when local topic or ADR
+  content exists, and create `TRANSLATION.md` only when localization is
+  evidenced or explicitly confirmed.
 - Create TRANSLATION.md only when localization support or durable translation
   rules are evidenced or explicitly confirmed. Do not create empty ADR trees.
 - Put accepted load-bearing decisions in ADRs, not in a growing AGENTS.md.
@@ -198,16 +230,18 @@ defaults leave a material ambiguity.
 ## Workflow
 
 1. Resolve the smallest memory_slice, its operation when required, the
-   repository scope, and the caller's authority.
-2. Inspect the applicable AGENTS.md chain, root CONTEXT.md, matched scoped
+   repository scope, the caller's authority, and whether minimal setup must
+   precede the selected capture.
+2. Inspect the applicable AGENTS.md chain, root CONTEXT.md, matched subproject
    contexts, indexed topics, relevant ADRs, and only the evidence needed for
    the selected operation.
 3. Draft the exact intended targets, wording, evidence, unknowns, and links.
 4. For inspection, review, proposal, or dry-run work, transition to reported.
-   For a durable write, transition to confirm and show the exact target,
-   section, wording, and before/after block. Never turn a proposal into an
-   apply operation because the user did not object.
-5. After affirmative confirmation, apply only the selected surfaces. Read
+   For a durable write without direct scoped authority, transition to confirm
+   and show the exact target, section, wording, and before/after block. Never
+   turn a proposal into an apply operation because the user did not object.
+5. After direct scoped authority or affirmative confirmation, apply only the
+   selected surfaces, performing any required minimal setup before capture. Read
    targets back, verify links and indexes, scan for duplicate normative
    wording, run git diff --check, and transition to complete or blocked.
    Report the capture result separately from the knowledge data.

@@ -1,7 +1,7 @@
 interface:
   display_name: "🗂️ Learn Project Context"
-  short_description: "Maintain durable project knowledge and decisions."
+  short_description: "Remember project rules and durable knowledge."
   brand_color: "#C2410C"
-  default_prompt: "Use $se:learn to capture or update durable repository knowledge, decisions, localization guidance, or code review rules. Change only the requested local knowledge surfaces and confirm uncertain facts before preserving them."
+  default_prompt: "Use $se:learn to remember a hard repository rule or update durable project knowledge, setting up the minimal local context first when needed."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

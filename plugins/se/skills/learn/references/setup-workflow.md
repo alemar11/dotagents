@@ -19,7 +19,7 @@ review:
 - execution context: `fresh-setup`, `existing-project-bootstrap`, or
   `current-project` (derived in the exact
   precedence from `options.md`, not a stored key or option)
-- root/scoped context routing
+- root/subproject context routing and context owners
 - translation memory decision
 - `AGENTS.md` setup block state, including its owner, read-first pointer,
   evolution guidance, and duplicate/over-copy status
@@ -52,10 +52,11 @@ Editable sections:
 For each selected setup section, show the current value first, then
 `keep-current` and the relevant alternatives:
 
-- `domain-memory`: show the current root `CONTEXT.md`, indexed topic files,
-  scoped routes, and centralized ADR root. Refresh those
+- `domain-memory`: show the current root `CONTEXT.md`, first-class subproject
+  context owners, indexed topic files, scoped routes, and applicable root or
+  local ADR roots. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
-  update root `CONTEXT.md` at every memory-owning root selected by the setup
+  update root `CONTEXT.md` at every selected Git root in the setup
   scope. Do not present or persist a domain-layout enum.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
 - `agents-pointers`: create a missing canonical pointer block, refresh stale or
@@ -63,8 +64,9 @@ For each selected setup section, show the current value first, then
   while preserving unrelated instructions.
 - `code-review-rules`: inspect, propose, or update the exact Code Review Rules
   section in the closest applicable `AGENTS.md`.
-- `durable-capture`: show the candidate, scope, exact destination, and wording;
-  direct capture always waits for affirmative confirmation.
+- `durable-capture`: show the candidate, scope, exact destination, and wording
+  when a material ambiguity requires confirmation; an unambiguous explicit
+  save/remember/preserve request supplies direct scoped authority.
 - `agents-compaction`: show the applicable chain measurement and before/after
   proposal; never apply a compaction from threshold detection alone.
 
@@ -82,25 +84,27 @@ prompt.
 
 ## Invocation Preflight
 
-Run this local preflight for every explicit Learn invocation, before the
+Run this local preflight for every Learn invocation, before the
 selected branch. It is derived run state, not a second `memory_slice`:
 
-1. Resolve the actual root-to-target `AGENTS.md` chain. The repository-root
-   `AGENTS.md` is the canonical owner for the root `CONTEXT.md` pointer unless
-   repository evidence explicitly assigns that pointer to another applicable
-   file. Do not copy the same managed block into every file in the chain.
+1. Resolve the actual root-to-target `AGENTS.md` chain. Repository-root
+   `AGENTS.md` owns the root `CONTEXT.md` pointer. Each evidenced first-class
+   subproject may own one additional managed block in its local `AGENTS.md`
+   pointing to local `CONTEXT.md` while preserving root-first routing. Do not
+   copy the same managed block into every file in the chain.
 2. Read the root `CONTEXT.md` first when it exists, then follow its scoped
    routes and indexes as required by the selected operation. If it does not
    exist, distinguish an authorized setup that will create it from a missing
    surface that must be reported.
-3. Inspect the canonical `## Agent skills` / `### Domain memory` block and
-   classify it as `current`, `missing`, `stale`, `duplicated`, or
-   `not-applicable`. `stale` includes a missing read-first instruction, a
+3. Inspect each applicable canonical `## Agent skills` / `### Domain memory`
+   block and classify it as `current`, `missing`, `stale`, `duplicated`, or
+   `not-applicable`. `stale` includes a missing root-first instruction, a
    missing evolution rule, stale paths, or copied conditional detail.
-4. When `CONTEXT.md` exists, or authorized setup will create it, draft the
-   canonical block below. If the block is missing or stale and the current run
-   already authorizes the relevant local context write, reconcile it as a
-   companion change. Otherwise report the exact target and before/after block.
+4. When an owning `CONTEXT.md` exists, or authorized setup will create it,
+   draft the appropriate root or subproject block below. If a block is missing
+   or stale and the current run already authorizes the relevant local context
+   write, reconcile it as a companion change. Otherwise report the exact target
+   and before/after block.
 5. If the root context is absent and no authorized setup creates it, do not add
    a dangling pointer merely because `AGENTS.md` was inspected.
 
@@ -115,21 +119,42 @@ decisions belong in an indexed ADR, and agent operating rules remain in
 `AGENTS.md`. Do not infer a context update from file churn alone; require
 repository evidence or an accepted decision.
 
+## Setup-First Durable Capture
+
+For an explicit request to remember, save, or preserve a specific repository
+rule, inspect setup before capture. Learn is minimally ready when the selected
+Git root has root `CONTEXT.md` and the selected context-owning scope has an
+applicable canonical Project Context pointer whose target and evolution
+guidance are current. A first-class subproject rule also requires its local
+`CONTEXT.md` and local pointer.
+
+When either surface is absent or stale, treat minimal setup as a prerequisite,
+not as a separate user-selected slice or `full-setup`. Under direct scoped
+capture authority, create or repair only the minimal evidence-backed root
+context chain and canonical pointers, then write the rule to the closest
+applicable `AGENTS.md`. Do not create empty topic files, ADR trees, translation
+sidecars, or unrelated subproject contexts. If the rule, repository scope,
+destination, wording, or a conflict is materially ambiguous, draft setup and
+capture together and wait for confirmation; after approval, apply and verify
+setup before capture.
+
 ## Decision Defaults
 
 - Do not define durable worker assignments, worker-count limits, or scheduled
   checks in project context.
 - Read root `CONTEXT.md` first when it exists. During authorized domain
-  setup/bootstrap, always create or update it at every memory-owning root
-  selected by the setup scope. Populate only evidence-backed purpose,
+  setup/bootstrap, always create or update it at every Git root selected by the
+  setup scope. Populate only evidence-backed purpose,
   vocabulary, rules, boundaries, and routing. When richer evidence is absent,
   keep a minimal entry point and state the missing knowledge explicitly rather
   than inventing it.
 - For a verified monorepo, use repository evidence for root scope routing.
-  Create scoped contexts only when durable evidence and authority support their
-  content. Every additional Git repository explicitly selected by a composed
-  setup follows the mandatory root-context rule; repositories outside that
-  scope remain untouched.
+  During explicit full setup or hierarchy update, create minimal local
+  `AGENTS.md` and `CONTEXT.md` surfaces for every evidenced first-class
+  subproject in scope. Create local topics, ADRs, and translation files only
+  when durable evidence and authority support their content. Every additional
+  Git repository explicitly selected by a composed setup follows the mandatory
+  root-context rule; repositories outside that scope remain untouched.
 - Recommend enabled translation memory only when localization support and
   durable translation rules are confirmed by evidence or the user.
 
@@ -147,7 +172,10 @@ Before writing, show only applicable items from this list:
 - AGENTS chain measurement and section classification when compaction is selected;
 - intended root `CONTEXT.md` creation or update, including evidence-backed
   content, stable routing, and any explicit unknowns;
-- intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
+- intended subproject `AGENTS.md` and `CONTEXT.md` owners, or why root-only
+  routing is sufficient;
+- existing root material to keep shared or move into a subproject, with index
+  and link updates;
 - intended `TRANSLATION.md`, or why localization memory should not be written;
 - intended ADR drafts, if any.
 
@@ -165,21 +193,29 @@ For an explicit setup or update request:
   block limited to accepted invariant, consequence, and safe path; preserve
   unrelated instructions and keep evidence, evaluation matrices, and
   provenance in the run report or Project Context references.
-- Create or update root and scoped `CONTEXT.md` through
+- Create or update root and subproject `CONTEXT.md` through
   `references/domain-modeling.md`. During authorized setup/bootstrap, ensure
-  root `CONTEXT.md` exists at every memory-owning root selected by the setup
-  scope before writing any scoped context or completing setup.
+  root `CONTEXT.md` exists at every selected Git root in the setup scope before
+  writing any subproject context or completing setup. During
+  authorized full monorepo setup or hierarchy update, also create or update the
+  local `AGENTS.md` and `CONTEXT.md` for every evidenced first-class subproject
+  in scope.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
-- For durable capture, write only after the direct user confirms the exact
-  target and wording, unless a composed caller supplies accepted knowledge,
-  named targets, and inline capture authority.
+- For durable capture, write after an explicit save/remember/preserve request
+  supplies unambiguous scoped authority, after the user confirms the exact
+  target and wording, or when a composed caller supplies accepted knowledge,
+  named targets, and inline capture authority. Apply required minimal setup
+  before the capture write.
 - For compaction, keep mandatory rules in `AGENTS.md`, create flat topic files
   only after approval, and update the `CONTEXT.md` index in the same change.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
-- Do not duplicate moved project context in both `AGENTS.md` and the routed
-  `CONTEXT.md` or `project-context/` target.
+- Move subproject-only material to its local owner during an authorized
+  hierarchy update, update root routes and indexes, verify the new target, and
+  only then remove the old copy.
+- Do not duplicate moved project context in root and local `AGENTS.md`,
+  `CONTEXT.md`, or `project-context/` targets.
 
 ## AGENTS.md Pointer Block
 
@@ -206,10 +242,26 @@ load-bearing decisions to indexed ADRs. Keep always-active agent rules in
 [one-line summary of supported localization memory]. See `<path-to-TRANSLATION.md>`.
 ```
 
-Keep this block concise and manage only the `Domain memory` entry. Do not paste
+For a first-class subproject's local `AGENTS.md`, use this local variant and
+resolve `<relative-root-context>` from the subproject directory:
+
+```markdown
+## Agent skills
+
+### Domain memory
+
+Read the repository-root [`CONTEXT.md`](<relative-root-context>) first, then
+this subproject's `CONTEXT.md`. Maintain shared purpose, vocabulary, rules,
+boundaries, routing, and cross-project decisions at the repository root;
+maintain only subproject-specific deltas, local topics, and local ADRs here.
+Keep always-active subproject rules in this `AGENTS.md`; exclude tentative
+plans, secrets, raw logs, and duplicated root guidance.
+```
+
+Keep each block concise and manage only its `Domain memory` entry. Do not paste
 project vocabulary, workflow procedures, implementation policy, localization
 rules, worker-dispatch rules, context seed material, or conditional topic
-content into `AGENTS.md`. The block is a compact pointer/evolution projection;
+content into `AGENTS.md`. Each block is a compact pointer/evolution projection;
 the full capture contract remains in the routed Learn references. The invoking
 implementation workflow owns its session worker questions, checkpoint,
 dispatch, and ledger progress record.
@@ -228,7 +280,9 @@ Summarize only the applicable fields:
 - AGENTS chain files, byte totals, threshold classification, and moved sections
   when compaction was selected;
 - settings reviewed and changed;
-- root/scoped context routing;
+- root/subproject context routing and context owners;
+- root material kept shared and subproject-only material moved, including
+  updated indexes and links;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
 - `AGENTS.md` Project Context pointer owner and state, including whether the
