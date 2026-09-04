@@ -1,6 +1,6 @@
 ---
 name: tanstack
-description: Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations.
+description: Review, build, debug, and migrate TanStack applications using Query, Router, Start, Form, Table, Virtual, and related packages, including cross-stack data loading, caching, routing, SSR, and hydration.
 ---
 
 # TanStack

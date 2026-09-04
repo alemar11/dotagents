@@ -1,7 +1,7 @@
 interface:
   display_name: "TanStack"
-  short_description: "Review or build TanStack apps across core products and integrations."
+  short_description: "Build and review TanStack apps with Query, Router, and Start."
   icon_small: "./assets/tanstack-small.svg"
   icon_large: "./assets/tanstack.png"
   brand_color: "#0F172A"
-  default_prompt: "Use $tanstack to review or implement TanStack data, routing, UI, content, tooling, and cross-stack patterns with focused references."
+  default_prompt: "Use $tanstack to build, debug, or review TanStack Query, Router, Start, Form, Table, Virtual, and cross-stack data-loading patterns."
