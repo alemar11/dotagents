@@ -57,7 +57,7 @@ class RepositoryClaimsTests(unittest.TestCase):
         version = subprocess.run(
             [str(CLI), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "4.2.5")
+        self.assertEqual(version.stdout.strip(), "4.2.6")
         result = self.run_cli("doctor")[1]["result"]
         self.assertEqual(result["status"], "absent")
         self.assertFalse(self.directory.exists())
@@ -268,6 +268,57 @@ class RepositoryClaimsTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid-input")
         self.assertNotIn(CLAIM_A, process.stdout)
         self.assertNotIn(CLAIM_A, process.stderr)
+        self.assertEqual(process.stderr, "")
+        self.assertFalse(self.directory.exists())
+
+    def test_parser_failures_are_structured_and_read_only(self) -> None:
+        cases = (
+            (),
+            ("unknown-command",),
+            ("acquire",),
+            ("acquire", "--home-project-key"),
+            ("doctor", "--unknown-option"),
+            ("doctor", "--json"),
+        )
+        for arguments in cases:
+            with self.subTest(arguments=arguments):
+                process = subprocess.run(
+                    [
+                        str(CLI),
+                        "--json",
+                        "--db",
+                        str(self.database),
+                        *arguments,
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(process.returncode, 2)
+                self.assertEqual(process.stderr, "")
+                self.assertEqual(
+                    json.loads(process.stdout)["error"]["code"], "invalid-input"
+                )
+                self.assertFalse(self.directory.exists())
+
+        malformed_json = subprocess.run(
+            [
+                str(CLI),
+                "--json=invalid",
+                "--db",
+                str(self.database),
+                "doctor",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(malformed_json.returncode, 2)
+        self.assertEqual(malformed_json.stderr, "")
+        self.assertEqual(
+            json.loads(malformed_json.stdout)["error"]["code"], "invalid-input"
+        )
+        self.assertFalse(self.directory.exists())
 
     def test_command_receipts_never_disclose_fencing_token(self) -> None:
         acquired = self.acquire()

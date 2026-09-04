@@ -1,6 +1,6 @@
 ---
 name: study
-description: "Explicitly refine a curated handoff through interactive SE Grilling, then orchestrate read-only planning, research, and analysis. In Codex App, continue in one separate visible gpt-5.6-sol task at medium reasoning; in Codex CLI, continue in the current session at its current profile. On either surface, delegate only useful independent evidence work to up to five native gpt-5.6-luna subagents at max reasoning. Use only when the user explicitly invokes or selects Study. Never allow recursive Study, exceed five subagents, modify project files, or return an implementation artifact."
+description: "Orchestrate a read-only SE study that refines a curated handoff through Grilling and delegates bounded evidence work when useful. Use when the user explicitly invokes or selects Study for research, analysis, investigation, or planning; never modify project files or recurse."
 ---
 
 # Study

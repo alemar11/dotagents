@@ -16,18 +16,17 @@ the condition for every declared edge.
 | claim-repositories | reconcile | The complete claim is independently acquired or reused, correlated to one stable orchestrator identity, bound, and read back. |
 | claim-repositories | blocked | Claim overlap, provisional task effects, binding, or orchestrator identity cannot be reconciled safely. |
 | reconcile | schedule | At least one selected Feature remains unfinished and current authoritative evidence supports another scheduling decision. |
-| reconcile | release-claims | The caller explicitly requested handoff or abandonment and every task created by the orchestrator is independently quiescent. |
-| reconcile | complete | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, its authoritative Feature contract and current intended base match the immutable contract identity and full base SHA reviewed locally, it has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and it passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base, and no explicit release is pending. |
+| reconcile | release-claims | Final delivery evidence is admissible, or handoff/abandonment is explicitly authorized; every worker and reviewer is stopped, no mutation remains outstanding, and the bound orchestrator is ready to make exact whole-group release its final external effect. |
 | reconcile | deferred | Safe continuation requires a material semantic decision or additional user authority. |
-| reconcile | blocked | Required capability, identity, ownership, or effect evidence remains unavailable or ambiguous, or the candidate-review repair budget is exhausted without a clean result. |
+| reconcile | blocked | Required capability, identity, ownership, receipt, cleanup, review, or effect evidence remains unavailable or ambiguous, or the Feature-wide review-revision budget is exhausted. |
 | schedule | deliver-feature | One or more dependency-ready Features are not already assigned to an independently observed active lane and have verified bases, topology, trustworthy worker targets, and reconciled candidate-review evidence indicating implementation, repair, review preparation, or publication work. |
 | schedule | reconcile | No new assignment should start because only active lanes remain or until a bounded authoritative refresh observes a material Git, pull-request, review, CI, task, or Feature change. |
 | schedule | deferred | The only responsible continuation requires a material user decision or authority. |
 | schedule | blocked | Unfinished work has no responsible ready, refresh, or user-decision path. |
 | deliver-feature | review-candidate | A worker returns a stable locally committed Feature candidate at an exact base and full HEAD with all required validation passing and no clean current candidate review. |
 | deliver-feature | reconcile | A worker returns exact published completion, partial progress that is not ready for candidate review, correction, or blocker evidence; concurrent returns reconcile independently. |
-| review-candidate | reconcile | The fresh independent reviewer returns a clean, findings, or indeterminate result bound to an immutable snapshot of the exact candidate base and full HEAD, or cannot establish the required execution or remaining review-cycle budget. `reconcile` alone chooses the next terminal or nonterminal edge. |
-| release-claims | complete | Exact whole-group release is independently verified. |
+| review-candidate | reconcile | Candidate Review returns one admissible receipt or exact execution, cleanup, identity, or budget failure evidence. `reconcile` alone chooses the next edge. |
+| release-claims | complete | Exact whole-group release and subsequent unclaimed readback are verified while admissible final delivery or authorized handoff/abandonment evidence is retained. |
 | release-claims | blocked | Release cannot be proved exact and safe. |
 
 `schedule -> reconcile` is a change-driven wait loop, not a busy poll. Terminal
@@ -153,20 +152,12 @@ implementation state.
 
 After implementation and required validation, the worker locally commits the
 stable candidate and becomes quiescent with a clean worktree. It returns its
-exact base and full HEAD. Enter
-`review-candidate` under [candidate-review.md](candidate-review.md) before the
-first push. Every reviewer result returns to `reconcile`: findings schedule the
-same worker for repair and revalidation, while a clean unchanged result
-schedules that worker to publish. Immediately before publication, ready
-transition, or completion, reread the authoritative Feature contract, intended
-base tip, and candidate HEAD and require all three to match the reviewed
-contract identity and full SHAs. Any contract edit, repair, base-tip drift,
-rebase, restack, or other candidate change invalidates the result and requires
-a fresh review before the next push.
-
-Candidate review is independent, local, read-only, and scoped to the complete
-Feature delta. It is not the hosted review described below and cannot satisfy
-that later gate.
+exact base and full HEAD. Enter `review-candidate` under
+[candidate-review.md](candidate-review.md) before the first push. Admit only
+its complete current receipt. A clean result returns the same worker for
+publication; findings return it for repair or rebuttal; execution, cleanup,
+identity, and budget failures follow that reference's closed recovery rules.
+Candidate Review never satisfies the later hosted gate.
 
 ## Pull-request graph
 
@@ -207,25 +198,72 @@ stable, the assigned worker must:
    for the automatic initial Codex review without posting an explicit request;
 3. return to `reconcile` with the exact normalized review and CI evidence.
 
-An existing ready PR may proceed only with terminal clean G-normalized review
-evidence for its current full HEAD. If no valid initial ready-transition
-lineage can be reconstructed and no current clean result exists, use one
-G-owned explicit review request and its bound wait for that HEAD; never convert
-the PR back to draft merely to retrigger automatic review.
+Use one total 30-minute G-owned wait for each ready or explicit-request
+lineage. If no valid initial ready lineage can be reconstructed, use G-owned
+read-only reconciliation; block when it cannot recover the exact lineage.
+Never substitute an explicit request or toggle the PR back to draft. Resume the
+same receipt and deadline after interruption.
 
-Review findings return the same trustworthy worker to `deliver-feature` for a
-focused repair and required validation. The repaired local commit must pass a
-fresh independent candidate review before publication to the existing PR. A
-changed full HEAD also invalidates the prior hosted review and requires one new
-G-owned explicit re-review request and bound wait after push. Pending or
-timed-out review remains unfinished work; reconcile and resume the same lineage
-without another ready transition or duplicate request. `not-requested`, absent
-comments, zero review threads, draft-only review, stale evidence, provider
-failure, and ambiguous correlation never satisfy `reconcile -> complete`.
+Project the terminal result into one Implement-owned
+`hosted_review_acceptance`:
+
+- G terminal `clean` for the exact HEAD produces `provider-clean`.
+- For G terminal `findings`, classify every finding through G. An `actionable`
+  code change returns the same worker for one budgeted repair, required
+  validation, a new commit, and Candidate Review before push. An `actionable`
+  evidence response follows the unchanged-HEAD rebuttal path below.
+  `needs-user-decision` routes to `deferred`. For evidence-response
+  `actionable`, `already-addressed`, `informational`, or `obsolete`, retain G's
+  evidence, post G-owned evidence replies to addressable findings authorized by
+  this delivery, and retain the disposition for findings without an addressable
+  thread. Resolve only a G-admitted actionable finding after its implemented
+  fix and verified reply; never resolve a no-change disposition. Then spend one
+  review-driven revision on a fresh local Candidate Review of the unchanged
+  HEAD that explicitly evaluates the rebuttal. If it is clean and no code
+  change or user decision remains, produce `adjudicated-clean` without an empty
+  commit or another hosted request.
+
+A changed candidate uses one new full HEAD, invalidates both review gates, and
+requires one fresh explicit hosted re-review lineage after Candidate Review and
+push. If another repair or rebuttal would exceed revision ordinal `2`, route to
+`blocked` without changing the candidate.
+
+`pending-at-deadline`, provider failure, request-correlation failure, or
+ambiguous evidence routes to resumable `blocked` with the claim and exact
+lineage retained. A stale result returns to `reconcile` to inspect the current
+PR and candidate; it never authorizes a duplicate request. `not-requested`,
+absence of comments, zero threads, or draft-only evidence is not hosted
+acceptance.
+
+Before final delivery proof, independently reread the actual PR HEAD, ready
+state, base branch, body identity, and standalone or immediate-parent stack
+topology. Require those facts to match the reviewed contract, candidate
+receipt, and published intent, plus required validation and CI. Accept only
+`provider-clean` or `adjudicated-clean`, and report which one occurred.
+Provider-only PR base, body, or topology drift suspends hosted acceptance. If
+authoritative readback restores every reviewed value while the contract, base
+tip, candidate HEAD, tree, and delta remain unchanged, the prior exact-state
+evidence is admissible; otherwise a new supported review lineage is required.
 
 These receipts and observations remain external delivery evidence available
 from G, GitHub, and task history. Do not persist them in the repository-claims
 registry or add a delivery-state machine.
+
+## Completion and claim release
+
+When every selected Feature has admissible final delivery evidence or is
+proved already incorporated, stop and observe every worker and reviewer. No
+task except the bound orchestrator may remain able to mutate a repository or
+hosted target, and no request, push, reply, resolution, or wait may be
+outstanding. The orchestrator then makes exact whole-group claim release its
+last external effect, inspects every selected repository as unclaimed, and
+enters `complete`. A release or readback failure enters `blocked` and never
+claims successful completion.
+
+For handoff or abandonment performed by another invocation, independently
+observe the old orchestrator stopped as well as every task it created before
+release. `blocked` and `deferred` delivery results retain their claim for a
+legitimate resume.
 
 Before every handoff to a G-owned workflow, the orchestrator or worker making
 that handoff runs the shared
@@ -255,10 +293,12 @@ worktree remain trustworthy. Create a replacement lane only when the old lane
 is unavailable or unsafe and current Git state is independently understood.
 Replacing a worker does not replace the orchestrator or alter the claim.
 
-For an ambiguous task or provider effect, inspect current authoritative state
-once. Continue from a proved effect, retry only after proved non-application,
-and stop on unresolved ambiguity. Do not introduce an operation journal to
-make an uncertain effect appear known.
+For an ambiguous task or non-G provider effect, inspect current authoritative
+state once. Continue from a proved effect, retry only after proved
+non-application, and stop on unresolved ambiguity. For a G-managed review
+operation, use its owned journal reconciliation and never create a replacement
+mutation when it reports missing, conflicting, ambiguous, or owner-required
+recovery. Do not introduce another operation journal.
 
 A worker may replace an invalid or unavailable evidence command with a
 platform-correct command when outcome, scope, acceptance criteria,

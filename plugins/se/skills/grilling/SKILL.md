@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: "Run a focused, one-question-at-a-time interview that challenges assumptions and refines a topic or supplied handoff using current repository context. Use after an explicit $se:grilling request or when a parent workflow requires interactive handoff refinement."
+description: "Run a focused, one-question-at-a-time interview that challenges assumptions and refines a topic or supplied handoff using current repository context. Use when the user explicitly invokes $se:grilling or an SE parent workflow requires interactive handoff refinement."
 ---
 
 # Grilling

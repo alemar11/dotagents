@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "4.2.5",
+  "version": "4.2.6",
   "description": "Refine and study ideas, turn them into clear Feature plans, deliver reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Refine ideas, run studies, plan Features, and deliver changes.",
-    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, and Study composes both before orchestrating a read-only investigation in one visible App controller or the current CLI session with optional native subagents. Idea captures proposals, while Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, requires an independent local adversarial candidate review before publication, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
+    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, and Study composes both before orchestrating a read-only investigation in one visible App controller or the current CLI session with optional native subagents. Idea captures proposals, while Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, requires bounded independent local adversarial candidate review plus exact-head hosted Codex review, and produces standalone or same-repository stacked pull requests without an execution ledger. Successful delivery releases its tiny host-local repository claim before completion. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -19,6 +19,8 @@
       "Write"
     ],
     "websiteURL": "https://github.com/alemar11/dotagents",
+    "privacyPolicyURL": "https://github.com/alemar11/dotagents",
+    "termsOfServiceURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $se:grilling to sharpen a topic, $se:study to investigate it, or $se:learn to preserve knowledge.",
       "Use $se:feature to turn related requests into Feature issues and Macro Tasks without writing code.",

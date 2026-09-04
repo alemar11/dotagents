@@ -16,8 +16,8 @@ at `reconcile` from externally owned evidence.
 | `schedule` | decision | Compute the ready frontier and choose serial or bounded concurrent work. |
 | `deliver-feature` | action | Run one verified worker lane through implementation, validation, and a stable local commit; after clean candidate review, resume the same lane for standalone or stacked pull-request publication, ready transition, and exact-HEAD hosted review and CI convergence. Several ready lanes may occupy this node concurrently. |
 | `review-candidate` | validation | Run a fresh independent read-only adversarial review of one complete locally committed Feature delta with the required fixed profile. Several independently scheduled candidates may occupy this node concurrently. |
-| `release-claims` | action | Release the exact whole repository group only for an authorized handoff or abandonment after quiescence is proved. |
-| `complete` | terminal | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, its authoritative Feature contract and current intended base match the immutable contract identity and full base SHA reviewed locally, it has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and it passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, an explicitly requested ownership release completed. |
+| `release-claims` | action | After successful delivery or authorized handoff/abandonment, prove all other actors quiescent, make exact whole-group release the orchestrator's final external effect, and read back every repository as unclaimed. |
+| `complete` | terminal | Exact whole-group release is verified and retained evidence proves either successful delivery of every selected Feature or completion of the requested handoff/abandonment. |
 | `deferred` | terminal | A material semantic decision or additional user authority is required. |
 | `blocked` | terminal | No safe transition remains because required capability, identity, ownership, evidence, or reconciliation is unavailable. |
 
@@ -28,7 +28,7 @@ repository registry, task metadata, branch names, or pull requests.
 
 | Disposition | Meaning |
 | --- | --- |
-| `delivery-required` | The selected Feature still requires its own implementation delta and a current exact-HEAD pull request that is ready rather than draft, whose authoritative Feature contract and intended base match the immutable contract identity and full base SHA reviewed locally, that has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and that satisfies required validation and CI. |
+| `delivery-required` | The selected Feature still requires its own implementation delta and a current ready exact-HEAD pull request whose actual base, body, and standalone or stack topology match the reviewed intent, with an admissible candidate-review receipt, accepted hosted review, required validation, and CI. |
 | `already-incorporated` | Current exact evidence proves the selected Feature's complete acceptance outcome is already present in its integration base. |
 
 An unmet dependency remains `delivery-required`; it never makes a selected
@@ -48,6 +48,40 @@ These values are transient reviewer results, not workflow nodes or persisted
 claim state. Their meanings are canonical here; the operational review contract
 only produces and consumes them. Any content, ancestry, base, or full-HEAD
 change invalidates them.
+
+## Transient candidate-review execution dispositions
+
+| `candidate_review_execution_disposition` | Meaning |
+| --- | --- |
+| `completed` | The independently identified reviewer execution ended and returned an admissible result for its exact snapshot. |
+| `not-executed` | Authoritative evidence proves the reviewer never began; one retry of the identical snapshot is permitted after cleanup. |
+| `interrupted` | The reviewer began but did not return an admissible result; block unless that exact attempt can be recovered. |
+| `ambiguous` | Available evidence cannot establish whether or how the reviewer executed; never launch a replacement blindly. |
+
+## Transient candidate-review checkout dispositions
+
+| `candidate_review_checkout_disposition` | Meaning |
+| --- | --- |
+| `not-created` | Authoritative evidence proves no review checkout or worktree registration was created. |
+| `removed` | The exact temporary checkout and its worktree registration were removed and absence was verified. |
+| `cleanup-failed` | Cleanup was attempted but the exact checkout or registration remains; report its path and block. |
+| `unknown` | Cleanup or current path identity cannot be established safely; preserve the target and block. |
+
+Candidate-review receipts use `review_revision_ordinal` `0`, `1`, or `2`.
+Ordinal `0` is the initial candidate; `1` and `2` are the only permitted local
+or hosted review-driven repair or rebuttal revisions. A proved non-execution
+retry keeps the same ordinal.
+
+## Transient hosted-review acceptance
+
+| `hosted_review_acceptance` | Meaning |
+| --- | --- |
+| `provider-clean` | G returned terminal clean hosted Codex evidence for the exact current HEAD and lineage. |
+| `adjudicated-clean` | G returned terminal findings, but every finding has G-owned disposition evidence, required evidence replies are verified, no code change or user decision remains, and a fresh clean local review accepted the rebuttal on the unchanged HEAD. No-change dispositions remain unresolved when G prohibits resolution. |
+
+`adjudicated-clean` is never reported as a clean provider verdict. G-owned
+review states and feedback dispositions retain their own names and meanings;
+this field is only Implement's completion projection.
 
 ## Persisted repository-claim facts
 
@@ -89,13 +123,12 @@ workflow state and do not authorize creation, binding, release, or repair.
 ## External observations
 
 Task activity, worktree cleanliness, Feature dependencies, branches, commits,
-candidate-review results, pull requests, hosted-review results, CI results, and
-merge state are observed from their current owners. Candidate review is valid
-only for its immutable Feature-contract and candidate snapshots, exact base,
-and full HEAD. A draft PR, a generic `not-requested`
-hosted-review observation, and absence of comments or review threads are
-non-terminal external evidence; completion requires a ready PR plus clean
-candidate review bound to the current Feature contract, intended base, and full
-HEAD plus a clean hosted review bound to that HEAD. Candidate-review
-results, ready-transition receipts, explicit re-review receipts, and hosted
-review observations must never be projected into this registry.
+candidate-review receipts, pull requests, hosted-review results, CI, and merge
+state are observed from their current owners. Candidate review is valid only
+for its immutable contract, repository, base, candidate, tree, delta, profile,
+execution, and cleanup evidence. Final delivery also requires current actual PR
+HEAD, ready state, base branch, body identity, and standalone or stack topology.
+A draft PR, generic `not-requested`, absence of comments or threads, pending
+deadline, stale evidence, provider failure, and ambiguous correlation are not
+hosted acceptance. Review receipts and observations must never be projected
+into the repository registry.

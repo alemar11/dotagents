@@ -1,6 +1,6 @@
 ---
 name: idea
-description: "Save a concrete proposal from the current conversation as an Idea for future Feature planning. Use only when the user explicitly asks to save or preview an Idea; ordinary brainstorming is not captured automatically."
+description: "Capture a concrete proposal from the current conversation as an Idea for future Feature planning. Use when the user explicitly asks to save, publish, or preview an Idea; never capture ordinary brainstorming automatically."
 ---
 
 # Idea Capture

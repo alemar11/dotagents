@@ -1,82 +1,127 @@
 # Implement Candidate Review
 
-Load this reference before entering `review-candidate`. It owns the independent
-local reviewer topology, candidate identity, reviewer profile, finding
-contract, convergence, and recovery. [states.md](states.md) solely owns the
-candidate-review disposition values and meanings. Hosted pull-request review
-remains owned by G and is a separate later gate.
+Load this reference before `review-candidate`. It owns reviewer independence,
+the transient receipt, immutable target, fixed profile, checkout lifecycle, and
+the Feature-wide review-revision budget. [states.md](states.md) owns every
+Implement disposition value. G owns the separate hosted review lifecycle.
 
-## Candidate and reviewer
+## Candidate and checkout
 
-Enter only after the assigned worker has implemented the Feature, passed its
-required validation, locally committed the stable candidate, become quiescent,
-and proved its worktree clean. Bind the
-review to the verified repository, intended base branch and full base SHA,
-candidate branch and full HEAD, complete Feature delta, an immutable content
-identity for the exact authoritative Feature contract, applicable repository
-instructions, and validation evidence. Review the whole Feature delta rather
-than only the last worker turn or most recent commit.
+Enter only after the assigned worker has passed required validation, committed
+the stable Feature candidate, become quiescent, and proved its worktree clean.
+Bind the review to the exact Feature-contract content identity, repository,
+intended base branch and full base SHA, candidate branch and full HEAD,
+candidate tree identity, complete Feature delta, repository instructions, and
+validation evidence.
 
-Materialize a fresh isolated review checkout whose tree is exactly the locally
-committed candidate HEAD and whose intended base resolves to the bound full
-base SHA. Prove it clean before review. Start one fresh local noninteractive
-Codex reviewer execution for that immutable snapshot. It must be independent
-of the implementation worker's conversation, read-only in the isolated review
-checkout, and unable to edit the candidate or perform Git or hosted mutations.
-Request `gpt-5.6-sol` with `xhigh` reasoning explicitly. If the runtime cannot
-establish the local reviewer capability, isolation, read-only boundary,
-requested profile, clean snapshot, or exact target, produce `indeterminate`
-instead of substituting a same-context self-review or a different profile.
+Candidate Review owns one unique detached temporary checkout outside the
+candidate worktree. Materialize it at the bound candidate HEAD, resolve its
+intended base to the bound full SHA, and prove its tree clean before launch.
+The reviewer must be unable to edit the candidate or perform Git or hosted
+mutations.
 
-Several independent candidates may be reviewed concurrently only when the
-orchestrator already authorized their worker lanes. Each reviewer is bound to
-one repository, base, Feature, and full candidate HEAD.
+Start one fresh local noninteractive Codex reviewer execution for that snapshot.
+It must be independent of the implementation worker's conversation and request
+`gpt-5.6-sol` with `xhigh` reasoning explicitly. Never substitute a same-context
+self-review or another profile.
 
-## Adversarial review contract
+After any attempt, independently observe the reviewer stopped, verify the
+checkout's cleanliness and identities when it was created, remove it, and prove
+the temporary path and worktree registration are gone. Cleanup is required even
+after launch failure, interruption, findings, or an indeterminate result. If
+cleanup fails or remains uncertain, retain the exact path in the result and
+block completion rather than deleting an ambiguous target.
 
-Act as a skeptical shipment reviewer. Inspect the candidate and its relevant
-code paths for material correctness risks, hidden assumptions, authorization
-or permission errors, data loss or corruption, concurrency, retries and
-idempotency, migration and compatibility hazards, rollback and partial failure,
-degraded dependencies, and missing observability. Apply only lenses relevant
-to the actual change; do not manufacture findings to satisfy the posture.
+Several candidates may be reviewed concurrently only when the orchestrator
+already authorized their independent worker lanes. Each checkout and reviewer
+remains bound to one repository, Feature, base, and candidate HEAD.
 
-Return one transient `candidate_review_disposition` defined canonically in
-[states.md](states.md). Do not redefine or extend its values here.
+## Transient receipt
 
-Order findings by severity. Each finding identifies the concrete failure mode,
-affected file and tight line range when available, supporting evidence,
-confidence, and a focused recommendation. Keep the review read-only; it never
-fixes its own findings.
+Return one `candidate-review-receipt-v1` in task history with every field below.
+It is an evidence artifact, not a persisted checkpoint.
 
-## Convergence and invalidation
+| field | requirement |
+| --- | --- |
+| `receipt_version` | Exact value `candidate-review-receipt-v1`. |
+| `feature_contract_identity` | Immutable content identity of the authoritative Feature contract reviewed. |
+| `repository_key` | Canonical repository identity used by the owning claim. |
+| `base_branch` | Intended integration or immediate stack-parent branch. |
+| `base_sha` | Full reviewed base SHA. |
+| `candidate_branch` | Exact Feature candidate branch. |
+| `candidate_head` | Full reviewed candidate HEAD. |
+| `candidate_tree_identity` | Immutable identity of the complete reviewed candidate tree. |
+| `reviewer_execution_identity` | Independently observed identity of the fresh reviewer execution, or exact `not-created` only when non-creation is authoritative. |
+| `reviewer_model` | Exact value `gpt-5.6-sol`. |
+| `reviewer_reasoning` | Exact value `xhigh`. |
+| `review_revision_ordinal` | `0` for the initial candidate; `1` or `2` for a review-driven repair or rebuttal revision. |
+| `execution_attempt_ordinal` | `1`, or `2` only when an ordinal-1 receipt for the same immutable review target proves `not-executed`. |
+| `execution_disposition` | One canonical `candidate_review_execution_disposition`. |
+| `pre_review_snapshot` | Cleanliness plus exact base, HEAD, tree, and delta evidence before launch, or exact `not-created` only when checkout non-creation is authoritative. |
+| `candidate_review_disposition` | One canonical local review disposition. Use `indeterminate` when execution did not yield an admissible verdict. |
+| `findings` | Severity-ordered findings, or an empty list. |
+| `post_review_snapshot` | Exact checkout state observed after the attempt, or explicit evidence that no checkout existed. |
+| `checkout_cleanup_disposition` | One canonical `candidate_review_checkout_disposition`, with the retained path when cleanup was not proved. |
 
-Every result returns to `reconcile`. A `clean` result lets `schedule` return the
-same trustworthy worker to `deliver-feature` for publication. `findings` return
-that worker for focused repair, full invalidated validation, and a new local
-commit; the changed full HEAD requires another fresh candidate review.
-`indeterminate` blocks unless authoritative evidence can resolve the same
-review attempt without inventing a verdict.
+`reconcile` rejects a missing field, noncanonical value, mismatched identity,
+unproved execution independence, dirty snapshot, or cleanup result other than
+`removed` or `not-created`. Present absence alone never proves `not-created`.
+`completed` requires a concrete execution identity and an otherwise admissible
+result. `not-executed`, `interrupted`, and `ambiguous` require local disposition
+`indeterminate`; attempt `2` additionally requires the matching attempt-1
+receipt. A valid receipt never contains a claim token.
 
-The worker may rebut a finding with concrete repository evidence, but a fresh
-independent review of the unchanged or repaired candidate must accept that
-evidence before publication. Permit at most two repair or rebuttal cycles after
-the initial review for one selected Feature, counting both changed and
-unchanged candidates. Reconstruct the count from task history on resume. If the
-budget is exhausted without `clean`, preserve the review's actual disposition
-and return separate exhaustion evidence for `reconcile` to route to `blocked`;
-never reset the budget by changing the finding or HEAD.
+## Adversarial result
 
-After review, independently prove that the isolated checkout stayed clean and
-still resolves the bound full base and candidate HEAD. Any Feature-contract
-content, candidate content, ancestry, base-tip, or full-HEAD change invalidates
-the result. Immediately before publication, ready transition, and completion,
-verify that the current authoritative Feature contract, intended base tip, and
-candidate HEAD still equal the reviewed contract identity and full SHAs. A
-resume with an already-published candidate still requires a current clean
-candidate review before Implement can complete; subsequent hosted findings and
-repairs create a new HEAD that must pass candidate review again before push.
+Act as a skeptical shipment reviewer. Inspect the complete Feature delta and
+relevant paths for material correctness, hidden assumptions, authorization or
+permission errors, data loss, concurrency, retries and idempotency, migration
+and compatibility hazards, rollback and partial failure, degraded dependencies,
+and missing observability. Apply only relevant lenses.
 
-Candidate-review prompts, results, and profile evidence remain transient in
-task history. Never add them to the repository-claims registry or treat them
-as a persisted workflow checkpoint.
+Each finding identifies the concrete failure mode, affected file and tight line
+range when available, supporting evidence, confidence, and focused
+recommendation. The reviewer never fixes its own findings.
+
+## Execution recovery
+
+A `completed` execution returns its admitted local disposition to `reconcile`.
+A provably `not-executed` first attempt may retry once against the identical
+snapshot after cleanup is proved; that retry keeps the same revision ordinal
+and does not consume review-revision budget. A second `not-executed` result
+blocks.
+
+An `interrupted` or `ambiguous` execution blocks unless authoritative evidence
+can recover the result of that exact attempt. Never launch a replacement merely
+because no admissible result is visible. Cleanup failure or uncertainty blocks
+regardless of the execution disposition.
+
+## Revision convergence
+
+The initial stable candidate uses revision ordinal `0`. Permit at most two
+review-driven repair or rebuttal revisions for one selected Feature across
+local and hosted review combined. Batch all findings addressed by one worker
+return into one revision. A code repair, a local rebuttal review of unchanged
+code, or a hosted-finding rebuttal review each advances the ordinal once;
+infrastructure retries do not.
+
+Local `findings` return the same worker for focused repair or evidence-backed
+rebuttal, invalidated validation, and a new independent review. `clean` permits
+publication only while all receipt identities remain current. If another
+review-driven revision is required after ordinal `2`, preserve the last result
+and return budget-exhaustion evidence to `reconcile -> blocked`.
+
+Reconstruct ordinals from admissible task-history receipts on resume. Never
+reset the budget by changing a finding, HEAD, worker, or reviewer.
+
+## Invalidation
+
+Any Feature-contract content, candidate content, ancestry, base-tip, full-HEAD,
+tree, or complete-delta change invalidates the receipt. Immediately before
+publication, ready transition, final delivery proof, and claim release, require
+the authoritative contract, intended base branch and tip, candidate HEAD, tree,
+and effective delta to equal the receipt. A changed hosted-review repair must
+pass Candidate Review again before push.
+
+Receipts, prompts, paths, and ordinals remain transient in task history. Never
+add them to repository claims or treat them as current workflow position.

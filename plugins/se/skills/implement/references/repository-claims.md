@@ -49,6 +49,9 @@ Its relevant operations are:
   from its original fenced acquisition context.
 
 Use `--help`, command help, and JSON output rather than inferring arguments.
+In JSON mode, every argument-parser or runtime failure returns one structured
+error envelope with exit code `2`, writes no stderr, and creates no registry for
+an invalid request. Help and version remain ordinary successful output.
 The CLI owns schema, transaction, permission, and error details. `acquire`,
 `bind`, and `release` read the exact fencing token from protected standard input;
 never place it in process arguments, environment variables, command text, or a
@@ -96,23 +99,34 @@ unclear.
 ## Release and recovery
 
 Release is always for the exact complete token group. A bound release requires
-the matching orchestrator task identity. `--abandon-provisional` requires the
-original fencing token and asserts that task creation was never attempted or
-that its exact attempted effect is authoritatively terminal as not applied.
-Queued, active, interrupted, or ambiguous creation cannot be abandoned. Lost
-provisional fencing context fails closed for manual inspection; it never
-becomes an inferred release. There is no partial release, force release, token
+the matching orchestrator task identity and is permitted only as that
+orchestrator's final external effect after successful delivery, or after an
+explicitly authorized handoff or abandonment. Preserve the final outcome
+evidence across release and inspect every selected repository as unclaimed
+before reporting completion. A failed or ambiguous release or readback blocks;
+it never becomes inferred success.
+
+`--abandon-provisional` requires the original fencing token and asserts that
+task creation was never attempted or that its exact attempted effect is
+authoritatively terminal as not applied. Queued, active, interrupted, or
+ambiguous creation cannot be abandoned. Lost provisional fencing context fails
+closed for manual inspection. There is no partial release, force release, token
 expansion, repair command, or automatic takeover.
 
-For a stale bound owner, first inspect the recorded task and current Git and
-GitHub state. Reuse the task when safe. Before any bound release, independently
-observe the orchestrator and every worker it created as stopped and unable to
-perform further repository or hosted effects. Queued, active, interrupted, or
-unknown actors retain the claim. If the user explicitly abandons or hands off a
-quiescent run, release using its exact binding and report that the registry no
-longer protects the old orchestrator. Corruption blocks mutation; preserve the
-database for manual inspection rather than guessing a repair.
+For successful delivery, first prove every worker and candidate reviewer
+stopped and every Git, GitHub, review, and CI mutation terminal. The bound
+orchestrator may remain active only to perform and verify its final release; it
+must perform no later external effect. For release by another invocation during
+handoff or abandonment, independently observe the old orchestrator and every
+task it created as stopped and unable to perform further repository or hosted
+effects.
 
-The registry may remain claimed while work is blocked because that
-orchestrator is still the single resumable owner. This is intentional
+For a stale bound owner, first inspect the recorded task and current Git and
+GitHub state. Reuse the task when safe. Queued, active, interrupted, or unknown
+actors retain the claim. Corruption blocks mutation; preserve the database for
+manual inspection rather than guessing a repair.
+
+The registry remains claimed while delivery is blocked or deferred because
+that orchestrator is still the single resumable owner. A successfully delivered
+run never retains ownership after verified completion. Claim retention is
 serialization, not execution progress.

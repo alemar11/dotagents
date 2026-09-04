@@ -53,7 +53,7 @@ pull requests, maintains project knowledge, and audits active work:
 | `se:study` | Grill one curated handoff, then run read-only analysis in one App controller or the current CLI session with optional Luna subagents. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
-| `se:implement` | Deliver planned Features with lightweight graph orchestration, reusable workers, and standalone or stacked pull requests. |
+| `se:implement` | Deliver planned Features through bounded local and hosted review, reusable workers, standalone or stacked pull requests, and release-before-complete repository ownership. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 Xcode is the repository's Apple developer-tools plugin. It preserves the
@@ -137,9 +137,12 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   registry atomically protects an immutable repository set and stores only
   repository ownership, while Features, workers, Git, pull requests, review,
   and CI remain externally owned. Each stable exact-head pull request must be
-  preceded by a clean independent local Sol/xhigh adversarial candidate review,
-  then be ready rather than draft and have terminal clean hosted review plus
-  required validation and CI. Implement never merges, deploys, or releases.
+  preceded by an admissible independent local Sol/xhigh adversarial review,
+  then be ready rather than draft with current base/body/topology evidence,
+  accepted exact-head hosted review, required validation, and CI. Review-driven
+  revisions are bounded across both gates. Successful delivery releases the
+  complete repository claim before completion. Implement never merges,
+  deploys, or releases.
 - `se:audit` runs only after explicit invocation and observes a frozen cohort of
   active SE sessions until terminal state or user stop. Complete coverage
   requires exhausting every authoritative continuation and host/project

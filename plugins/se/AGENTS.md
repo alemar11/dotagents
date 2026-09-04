@@ -96,11 +96,15 @@ folder.
   conditions, Feature-graph scheduling, repository claims, and its intentionally
   minimal state vocabulary.
 - skills/implement/references/candidate-review.md owns candidate-review runtime
-  operations; skills/implement/references/states.md solely owns its state names
-  and meanings. G continues to own the separate hosted review lifecycle.
+  operations, its transient receipt, immutable checkout lifecycle, execution
+  recovery, and the Feature-wide review-revision budget;
+  skills/implement/references/states.md solely owns its state names and
+  meanings. G continues to own the separate hosted review lifecycle.
 - skills/implement/scripts/repository-claims is the shipped host-local
   repository-ownership CLI. Its schema and version constants are runtime
   sources of truth; focused tests live under skills/implement/tests/.
+- test_all.py is the package discovery aggregator for the executable claims and
+  runtime-alignment suites; it owns no behavior tests.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,
   workflow registry, preview/publish routing, and the capture-only terminal
   boundary. Its references own the canonical body, Idea source handoff, and
@@ -181,8 +185,11 @@ folder.
 - Keep the repository-claims registry to one ownership table for the immutable
   selected repository set. It has no workflow nodes, Features, workers, Git or
   PR state, review state, CI state, TTL, heartbeat, forced release, or stale-owner
-  recovery. Only the bound orchestrator uses its fencing token, and release is
-  exact, whole-group, explicitly authorized, and quiescence-gated.
+  recovery. Only the bound orchestrator uses its fencing token. Blocked and
+  deferred runs retain ownership; successful delivery makes exact whole-group
+  release the orchestrator's final external effect after every other actor and
+  mutation is quiescent. Handoff or abandonment still requires explicit
+  authority.
 - Keep Feature independent from Implement task and claim handling. Its
   controller creates or resumes one planner task with `gpt-5.6-sol` and
   `high` passed explicitly, then starts Intake in the planner's first turn.
@@ -207,19 +214,24 @@ folder.
   reference, their value registry in `references/states.md`, and the indexed
   profile projection synchronized without duplicating those contracts here.
 - Keep pull-request review exact-head and hosted. A newly published draft is an
-  intermediate state. Once the candidate is stable, make the PR ready, read back
-  the same full HEAD and non-draft state, and wait for the automatic hosted
-  review. Findings return to the same trustworthy worker; a repaired HEAD updates
-  the same PR and uses one explicit hosted re-review request. Reconcile ambiguous
-  transitions or requests before retry and never toggle draft state to create a
-  review lineage.
-- Keep Implement completion closed to a current exact-head PR that is ready,
-  clean independent candidate review, terminal clean hosted review, required
-  validation and CI, and correct standalone or stacked topology, or
-  authoritative evidence that the Feature is already incorporated into its
-  integration base. A caller-required draft PR defers completion. Merge,
-  deploy, release, issue closure, destructive recovery, and unrelated cleanup
-  remain outside invocation authority.
+  intermediate state. Once the candidate is stable, make the PR ready, read
+  back its full HEAD, actual base, body identity, and topology, and wait once for
+  the automatic hosted review. A Feature permits only two review-driven repair
+  or rebuttal revisions across local and hosted review combined. Actionable
+  findings return to the same trustworthy worker; a repaired HEAD updates the
+  same PR and uses one explicit hosted re-review request. Evidence-backed
+  non-actionable findings require G disposition and a fresh local rebuttal
+  review, never an empty commit. Reconcile ambiguous transitions or requests
+  before retry and never toggle draft state or duplicate a same-head request.
+- Keep Implement completion closed to a current ready exact-head PR whose
+  actual base, body, and standalone or stacked topology match reviewed intent,
+  with an admissible independent candidate-review receipt, required validation
+  and CI, and either provider-clean hosted evidence or explicitly reported
+  adjudicated-clean evidence; alternatively require proof that the Feature is
+  already incorporated into its integration base. Complete only after exact
+  whole-group claim release and unclaimed readback. A caller-required draft PR
+  defers completion. Merge, deploy, release, issue closure, destructive
+  recovery, and unrelated cleanup remain outside invocation authority.
 - Feature requests its planner title when supported but never reads, corrects,
   or gates on it. Implement titles are useful diagnostics but never identity or
   correctness evidence.
@@ -319,9 +331,11 @@ folder.
   exact selected-Feature scope, body-backed dependency scheduling, visible
   orchestrator placement, serial worker reuse, bounded concurrent lanes,
   same-repository stacks, cross-repository scheduling, mandatory independent
-  candidate review with Sol/xhigh and exact-base/full-HEAD invalidation,
-  exact-head ready and hosted-review convergence, resume reconstruction through
-  `reconcile`, claim conflicts, and mutation boundaries.
+  candidate review with Sol/xhigh, receipt admission, checkout cleanup,
+  exact-base/full-HEAD invalidation, the shared two-revision budget,
+  provider-clean or adjudicated-clean hosted acceptance, actual PR topology,
+  completion-time claim release, resume reconstruction through `reconcile`,
+  claim conflicts, and mutation boundaries.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's workflow
   registry, transition conditions, and Mermaid projection agree while every
@@ -354,8 +368,10 @@ folder.
   traversal before complete coverage, explicit partial coverage at capped or
   untraversable boundaries, evidence classifications, and prohibited mutation
   behavior.
-- Run the Implement repository-claims CLI help, version, read-only absent
-  doctor, and focused standard-library tests. Validate atomic overlap rollback,
+- Run `python3 -m unittest discover -s plugins/se -v` and require the package
+  aggregator to execute both Implement repository-claims and runtime-alignment
+  suites. Also run CLI help, version, and read-only absent doctor. Validate
+  structured read-only parser failures, atomic overlap rollback,
   same-token acquisition reuse, immutable repository sets, exact whole-group
   bind and release, corruption detection, file permissions, and the absence of
   WAL, TTL, heartbeat, force-release, and execution-state storage.
@@ -363,8 +379,11 @@ folder.
   scope, workflow-graph traversal, visible orchestrator placement,
   orchestrator-owned concurrency, serial worker reuse, same-repository stacks,
   cross-repository scheduling, candidate-review clean/findings/indeterminate
-  paths, profile enforcement, review invalidation, resume reconstruction
-  through `reconcile`, claim conflict behavior, and mutation boundaries.
+  paths, receipt admission, profile enforcement, checkout cleanup, one proved
+  non-execution retry, the combined review-revision budget, actionable and
+  adjudicated hosted findings, wait and provider failures, final PR topology,
+  completion-time claim release, blocked/deferred claim retention, resume
+  reconstruction through `reconcile`, claim conflicts, and mutation boundaries.
 - Check that the marketplace path and plugin metadata point to this package.
 - Scan for retired delivery-skill identifiers and removed legacy task contracts
   before handoff.

@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Observe active SE sessions and report workflow problems, regressions, and improvement opportunities without changing their work. Use only after an explicit $se:audit request."
+description: "Observe active SE sessions and report workflow problems, regressions, and improvement opportunities without changing their work. Use when the user explicitly invokes $se:audit to monitor a frozen cohort."
 ---
 
 # Audit SE Sessions
@@ -210,6 +210,13 @@ through independently established session identities and SE handoffs. Several
 Implement workers may occupy `deliver-feature` concurrently after one
 `schedule` decision, and their independently reviewed candidates may occupy
 `review-candidate` concurrently before returning to `reconcile`.
+
+For an Implement `complete` claim, require observed
+`reconcile -> release-claims -> complete`, exact whole-group unclaimed readback,
+and retained final delivery or authorized handoff/abandonment evidence. For
+delivery, verify that actual PR base and topology match reviewed intent and
+distinguish `provider-clean` from explicitly reported `adjudicated-clean` hosted
+acceptance. A blocked or deferred Implement run may correctly retain its claim.
 
 A conforming run may still support `graph-design-improvement` when repeated
 loops, ambiguous ownership, weak stopping rules, or unavoidable evidence gaps

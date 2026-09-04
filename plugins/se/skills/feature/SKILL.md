@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Turn one or more related requests into an evidence-backed Feature Plan Set with stable acceptance criteria, coherent Macro Tasks, and explicit dependency intent. Use for new planning or bounded maintenance, publish by default, and never implement code."
+description: "Turn related requests into an evidence-backed Feature Plan Set with stable acceptance criteria, coherent Macro Tasks, and explicit dependency intent. Use when the user explicitly requests new SE Feature planning or bounded Plan Set maintenance; publish by default and never implement code."
 ---
 
 # Feature Planning
