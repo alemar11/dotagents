@@ -1,6 +1,6 @@
 {
   "name": "xcode",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Read official stable and beta Xcode release notes and safely launch Apple's native headless Xcode MCP server.",
   "author": {
     "name": "alemar11",
@@ -29,6 +29,8 @@
       "Write"
     ],
     "websiteURL": "https://github.com/alemar11/dotagents",
+    "privacyPolicyURL": "https://github.com/alemar11/dotagents",
+    "termsOfServiceURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $xcode:whats-new to show what's new in my active Xcode.",
       "Use $xcode:mcp to launch Apple's native Xcode MCP server safely."
