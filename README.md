@@ -77,7 +77,7 @@ for Apple's native headless MCP server:
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
-| `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
+| `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, pgmq, or pg_durable patterns. |
 | `plugins-reload` | Explicitly refresh the repo-local G, SE, and Xcode plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |

@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns.
+description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, pgmq, or pg_durable patterns.
 ---
 
 # Postgres
@@ -9,8 +9,8 @@ description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migration
 
 Use this skill to connect to Postgres, run SQL, inspect schemas, review query
 performance, design tables and indexes, work with common PostGIS, pgvector,
-pg_cron, or pg_durable patterns, select SQL supported by the target PostgreSQL
-major, and manage migration release flow through the shipped
+pg_cron, pgmq, or pg_durable patterns, select SQL supported by the target
+PostgreSQL major, and manage migration release flow through the shipped
 `scripts/postgres` launcher in the skill package.
 
 ## Runtime surface
@@ -143,6 +143,9 @@ its syntax or behavior.
   embeddings, vector indexes, similarity search, or retrieval tasks.
 - pg_cron guidance: load `references/extensions/pg-cron.md` only for periodic
   SQL, database maintenance, retention, rollup, or in-database scheduling tasks.
+- pgmq guidance: load `references/extensions/pgmq.md` only for database-backed
+  message queues, visibility timeouts, asynchronous workers, or transactional
+  enqueue patterns.
 - pg_durable guidance: load `references/extensions/pg-durable.md` only for
   asynchronous workflow, retry, schedule, signal, or durable-job tasks.
 - SQL capability router and version-selection rules:
