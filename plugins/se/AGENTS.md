@@ -1,10 +1,45 @@
 # SE Plugin Maintenance
 
 plugins/se/ is the repository's graph-first workflow package. Learn, Grilling,
-Idea, Feature, Implement, and Audit expose distinct workflow surfaces; Feature
-owns the repository-scoped textual Feature Plan Set graph.
+Study, Idea, Feature, Implement, and Audit expose distinct workflow surfaces;
+Feature owns the repository-scoped textual Feature Plan Set graph.
 Keep SE as the sole active owner of these workflow contracts; do not
 reintroduce a retired compatibility surface.
+
+## Agent skills
+
+### Domain memory
+
+Read the repository-root [`CONTEXT.md`](../../CONTEXT.md) first, then this
+subproject's `CONTEXT.md`. Maintain shared purpose, vocabulary, rules,
+boundaries, routing, and cross-project decisions at the repository root;
+maintain only subproject-specific deltas, local topics, and local ADRs here.
+Keep always-active subproject rules in this `AGENTS.md`; exclude tentative
+plans, secrets, raw logs, and duplicated root guidance.
+
+## Shared references
+
+`references/` is the canonical home for SE contracts consumed by multiple
+bundled skills. It is a shared ownership boundary, not a general documentation
+folder.
+
+- Put a contract in `references/` only when its vocabulary, protocol, safety
+  boundary, gate, or other behavior genuinely applies to at least two SE
+  skills and needs one canonical owner. Keep skill-specific selection,
+  topology, state, templates, and branch detail under
+  `skills/<skill>/references/`. (Codex learning)
+- Every shared reference must have one entry in the ownership map below, name
+  its scope and authority, and be routed explicitly from each consumer at the
+  point where it must be read. Consumers cross-reference the owner instead of
+  copying or summarizing its doctrine. (Codex learning)
+- When editing a shared reference, update every affected consumer route,
+  state owner, metadata or documentation surface, and focused validator in the
+  same change; then scan for duplicated doctrine, stale routes, and dangling
+  links. (Codex learning)
+- Load and use a shared reference only when its consumer's declared read
+  condition applies. If the behavior becomes specific to one skill, move it
+  to that skill's `references/` directory and remove the obsolete shared
+  ownership and routes. (Codex learning)
 
 ## Ownership map
 
@@ -17,6 +52,9 @@ reintroduce a retired compatibility surface.
   expectations. It does not own Idea hosted metadata or Feature Plan semantics.
 - references/codex-dependency-preflight.md owns the fail-closed availability
   gate before any SE workflow uses a required G-owned GitHub workflow.
+- references/codex-runtime-surface.md owns the shared, read-only App-versus-CLI
+  classification used by surface-aware SE skills. Keep capability checks in
+  the selected skill branch and never use them as surface evidence.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title-artifact normalization, and local-path
   correction before every hosted write produced by Idea, Feature, or Implement,
@@ -32,6 +70,14 @@ reintroduce a retired compatibility surface.
   at-a-time handoff refinement. It composes Learn only for initial context
   inspection and returns a refined transient handoff without task creation,
   delegation, or automatic durable capture.
+- skills/study/SKILL.md owns explicit-only read-only Study orchestration. It
+  owns the shared curated handoff, surface routing, read-only boundary, worker
+  cap, and report contract. It composes bundled Grilling, which reads context
+  through Learn, before any worker planning. Its `app-runtime.md` reference
+  owns separate App task placement, parent monitoring, visible workers, and
+  archival; `cli-runtime.md` owns same-session control and native subagents;
+  `orchestration.md` owns shared selection, assignments, monitoring, synthesis,
+  and failure handling; `states.md` owns the cross-surface state vocabulary.
 - skills/feature/SKILL.md owns the workflow graph manifest, Mermaid overview,
   node registry, Feature Plan Set, Feature identity, Feature-level dependency,
   and local Macro Task contracts, material-question routing, optional read-only
@@ -239,8 +285,9 @@ reintroduce a retired compatibility surface.
 - Validate that every table-owned registry row matches its declared field order
   and arity, every registered local node exists, every local transition targets
   a registered node, and every step has the standard front matter.
-- Validate Learn, Grilling, and Idea registry/projection reconciliation, terminal
-  reachability, and the absence of outgoing transitions from terminal nodes.
+- Validate Learn, Grilling, and Idea registry/projection reconciliation,
+  terminal reachability, and the absence of outgoing transitions from terminal
+  nodes.
 - Validate Learn's invocation preflight, canonical AGENTS.md pointer shape,
   root-first monorepo routing, local context ownership and migration,
   evolution-rule projection, and no-dangling-pointer rule.
@@ -318,6 +365,13 @@ reintroduce a retired compatibility surface.
   read-only context inspection, one-question-per-turn interaction with a
   concrete recommended answer, refined handoff output, and the absence of
   writes, task creation, or delegation.
+- Validate Study front matter, explicit-only UI metadata, bundled Grilling
+  composition without a cross-package dependency preflight, routing through
+  the shared Codex surface contract, the shared curated handoff, immediate
+  surface-local Grilling,
+  App-only Sol/medium controller placement, inherited CLI controller settings,
+  Luna/max worker transports, the five-worker cap, no-replacement behavior,
+  model index ownership, surface-aware reporting, and read-only outcomes.
 - Scan Idea sources for direct provider access, durable-memory routing, model
   profile selection, and dependencies on the other plugin's Idea surface.
 - Scan Learn sources for direct provider or tracker access, task/profile

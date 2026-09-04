@@ -42,14 +42,15 @@ G is the repo-local Git and GitHub workflow plugin. It uses authenticated `gh`, 
 | `g:versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
 | `g:audit` | Monitor active sessions using G skills and return a prioritized read-only report. |
 
-SE is the repository's software-delivery workflow plugin. It turns ideas into
-Feature plans, delivers them through reviewed pull requests, maintains project
-knowledge, and audits active work:
+SE is the repository's software-delivery workflow plugin. It refines and
+studies ideas, turns them into Feature plans, delivers them through reviewed
+pull requests, maintains project knowledge, and audits active work:
 
 | Skill | Purpose |
 | --- | --- |
 | `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
 | `se:grilling` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
+| `se:study` | Grill one curated handoff, then run read-only analysis in a separate App task or the current CLI session with up to five Luna workers. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
 | `se:implement` | Deliver planned Features with lightweight graph orchestration, reusable workers, and standalone or stacked pull requests. |
@@ -76,7 +77,6 @@ for Apple's native headless MCP server:
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build apps with TanStack libraries across data, routing, UI, content, tooling, and integrations. |
 | `focus` | Create a focused new Codex task from a compact handoff of the latest substantive discussion. |
-| `study` | Start with interactive handoff grilling, then orchestrate read-only planning, research, or analysis through one Sol task and up to five Luna workers. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and apply version-aware SQL, PostGIS, pgvector, pg_cron, or pg_durable patterns. |
 | `plugins-reload` | Explicitly refresh the repo-local G, SE, and Xcode plugin caches after source changes. |
 | `skill-audit` | Audit installed Codex skills and plugins from historical evidence or live App task monitoring with defect annotations. |
@@ -97,28 +97,29 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `study` requires an exact saved local project and the ChatGPT App task tools,
-  keeps its orchestrator and workers there without worktrees, and is strictly
-  read-only: it returns a Markdown analysis instead of writing code. Five is
-  an absolute worker cap; larger requests are capped and reported automatically.
-  One shared visual run tag links the orchestrator and worker titles while real
-  thread IDs remain the only identity and recovery keys.
-  After capturing terminal results, it requests archival of completed, failed,
-  or explicitly abandoned workers, then leaves the orchestrator open as the
-  single visible summary task. Neither the
-  orchestrator nor a worker may ever invoke Study or create a nested Study run.
-  Study passes Sol/medium and Luna/max explicitly at creation. It inspects the
-  live creation declaration for title support, uses creation-time titles when
-  available, and otherwise applies the verified fallback after a real task ID
-  is returned.
+- `se:study` builds one curated handoff, starts Grilling immediately, and then
+  runs a strictly read-only investigation on the active Codex surface. In the
+  App it creates one separate visible Sol/medium controller plus visible
+  Luna/max workers in the exact saved local project without worktrees. In the
+  CLI the current session and its current profile remain the controller, while
+  workers are native Luna/max subagents in the current working-directory
+  context. It never substitutes one surface's transport for the other.
+  Five is an absolute worker cap; larger requests are capped and reported
+  automatically. A shared run tag links App task titles and worker assignments,
+  while stable task or subagent identities remain the only identity and
+  recovery keys. App-only title, task telemetry, parent monitoring, and worker
+  archival do not apply to CLI runs. Neither a controller nor a worker may
+  invoke Study recursively or create another worker layer.
   When no worker count is specified, Study normally chooses 1–2 workers for a
   focused investigation, 3 for a multi-dimensional comparison, and 4–5 only
   for broad investigations with genuinely independent tracks; five is a cap,
   not the default.
-- `study` also requires `$se:grilling`, which uses `$se:learn` for a read-only
-  Project Context pass. The visible Study orchestrator asks the user one
-  question with a recommended answer per turn and cannot plan workers until the
-  handoff is confirmed or the user stops grilling.
+- `se:study`, `$se:grilling`, and `$se:learn` ship together in the SE plugin.
+  Study invokes its sibling Grilling workflow directly, which uses Learn for a
+  read-only Project Context pass. The separate App Study task or current CLI
+  session asks the user one question with a recommended answer per turn and
+  cannot plan workers until the handoff is confirmed or the user stops
+  grilling.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires both `$g:github-issues` and `$g:github-tagger`, while no SE skill installs G automatically.
 - `se:idea` traverses a graph-first in-memory capture workflow and publishes to GitHub by default; an explicitly requested preview stays entirely local. Its durable output is the hosted issue, not project memory, and its optional idea-source handoff remains transient.
@@ -238,7 +239,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/study skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-cli skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/focus skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:

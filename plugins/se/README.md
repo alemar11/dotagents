@@ -1,9 +1,9 @@
 # SE
 
 SE is a software-delivery workflow plugin for maintaining project knowledge,
-sharpening topics through interactive grilling, capturing Ideas, planning
-Features, delivering reviewed pull requests, and auditing active work without
-changing it.
+sharpening topics through interactive grilling, running read-only studies,
+capturing Ideas, planning Features, delivering reviewed pull requests, and
+auditing active work without changing it.
 
 Its skills are deliberately separated by responsibility:
 
@@ -22,6 +22,9 @@ Its skills are deliberately separated by responsibility:
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
+- references/codex-runtime-surface.md owns shared read-only classification of
+  the current Codex App or CLI surface. Surface-aware skills route from that
+  result instead of defining local detection heuristics.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title normalization, and local-path correction
   before every SE-hosted issue, comment, PR, or review write, plus one bounded
@@ -53,7 +56,16 @@ Its skills are deliberately separated by responsibility:
   focused question with a concrete recommended answer per turn, challenges
   assumptions and tradeoffs, and returns a transient refined handoff. It never
   writes repository knowledge, creates tasks, or delegates work. Invoke it
-  explicitly as `se:grilling`; Study may compose it before planning workers.
+  explicitly as `se:grilling`; the bundled Study workflow may compose it before
+  planning workers.
+- skills/study/ is the explicit-only read-only investigation entry point. It
+  builds one curated handoff and immediately composes Grilling. In Codex App it
+  continues in one separate visible Sol/medium task with up to five visible
+  Luna/max workers in the same saved local project. In Codex CLI it keeps the
+  current session and profile as controller and uses up to five native
+  Luna/max subagents. Because Study, Grilling, and Learn ship together, it does
+  not run a cross-package dependency preflight. Invoke it explicitly as
+  `se:study`.
 - skills/audit/ is the explicit read-only live-monitoring entry point. It
   exhausts every authoritative continuation or host/project partition before
   claiming complete inventory, deduplicates stable task identities, freezes an

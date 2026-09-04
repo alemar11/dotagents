@@ -1,7 +1,7 @@
 {
   "name": "se",
-  "version": "4.1.0",
-  "description": "Refine ideas through interactive grilling, turn them into clear Feature plans, deliver reviewed pull requests, maintain project knowledge, and audit active work.",
+  "version": "4.2.0",
+  "description": "Refine and study ideas, turn them into clear Feature plans, deliver reviewed pull requests, maintain project knowledge, and audit active work.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SE",
-    "shortDescription": "Refine ideas, plan Features, deliver changes, and preserve knowledge.",
-    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, Idea captures proposals, and Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
+    "shortDescription": "Refine ideas, run studies, plan Features, and deliver changes.",
+    "longDescription": "SE supports a graph-first software-delivery workflow. Learn maintains durable project knowledge, Grilling sharpens a topic or handoff through one-question-at-a-time interviews, and Study composes both before orchestrating a read-only investigation in a separate App task or the current CLI session. Idea captures proposals, while Feature uses one explicitly profiled planner plus a small transient graph to publish evidence-backed Feature Plan Sets without task-bootstrap bureaucracy. Implement uses one visible graph orchestrator, coordinates reusable repository workers, chooses serial or concurrent execution, uses a tiny host-local repository-ownership registry, and produces standalone or same-repository stacked pull requests without an execution ledger. Audit observes active SE work without making changes. Implement leaves merge, deploy, release, and post-merge closure to the user.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -20,7 +20,7 @@
     ],
     "websiteURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
-      "Use $se:grilling to sharpen a topic, $se:learn to preserve knowledge, or $se:idea to save a proposal.",
+      "Use $se:grilling to sharpen a topic, $se:study to investigate it, or $se:learn to preserve knowledge.",
       "Use $se:feature to turn related requests into Feature issues and Macro Tasks without writing code.",
       "Use $se:implement for lightweight reusable-worker delivery and standalone or stacked pull requests."
     ],

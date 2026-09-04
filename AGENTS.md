@@ -12,6 +12,18 @@ Follow the [Agent Skills specification](https://agentskills.io/specification)
 and the [Codex skills reference](https://developers.openai.com/codex/skills/)
 when the package is intended for Codex.
 
+## Agent skills
+
+### Domain memory
+
+`CONTEXT.md` is the shared-context entry point. Read it first, then follow its
+`Scoped Contexts` table when relevant. When the project evolves, update only
+evidence-backed shared purpose, vocabulary, durable project rules, boundaries,
+known state, explicit unknowns, scope routing, and topic/ADR indexes; route
+conditional detail to indexed `project-context/` topics and accepted
+load-bearing decisions to indexed ADRs. Keep always-active agent rules in
+`AGENTS.md`; exclude tentative plans, secrets, and raw logs.
+
 ## Global Naming and Identity
 
 - Use lower-kebab-case for skill and plugin directory names, public identifiers,
