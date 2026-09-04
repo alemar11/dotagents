@@ -44,7 +44,8 @@ G is the repo-local Git and GitHub workflow plugin. It uses authenticated `gh`, 
 
 SE is the repository's software-delivery workflow plugin. It refines and
 studies ideas, turns them into Feature plans, delivers them through reviewed
-pull requests, maintains project knowledge, and audits active work:
+pull requests or lightweight local commits, maintains project knowledge, and
+audits active work:
 
 | Skill | Purpose |
 | --- | --- |
@@ -54,6 +55,7 @@ pull requests, maintains project knowledge, and audits active work:
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn related requests into clear Features and Macro Tasks, then delegate minimal optional issue labels and type without writing code. |
 | `se:implement` | Deliver planned Features through bounded local and hosted review, reusable workers, standalone or stacked pull requests, and release-before-complete repository ownership. |
+| `se:implement-light` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 Xcode is the repository's Apple developer-tools plugin. It preserves the

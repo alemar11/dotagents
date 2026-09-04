@@ -1,7 +1,8 @@
 # SE Plugin Maintenance
 
 plugins/se/ is the repository's graph-first workflow package. Learn, Grilling,
-Study, Idea, Feature, Implement, and Audit expose distinct workflow surfaces;
+Study, Idea, Feature, Implement, Implement Light, and Audit expose distinct
+workflow surfaces;
 Feature owns the repository-scoped textual Feature Plan Set graph.
 Keep SE as the sole active owner of these workflow contracts; do not
 reintroduce a retired compatibility surface.
@@ -103,6 +104,9 @@ folder.
 - skills/implement/scripts/repository-claims is the shipped host-local
   repository-ownership CLI. Its schema and version constants are runtime
   sources of truth; focused tests live under skills/implement/tests/.
+- skills/implement-light/SKILL.md owns the implicit local-only implementation
+  surface. It neither creates an orchestrator nor acquires repository claims;
+  publication and other external effects remain outside its contract.
 - test_all.py is the package discovery aggregator for the executable claims and
   runtime-alignment suites; it owns no behavior tests.
 - skills/idea/SKILL.md owns explicit session capture, the transient Idea bundle,

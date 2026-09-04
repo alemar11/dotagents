@@ -16,9 +16,10 @@ Its skills are deliberately separated by responsibility:
   Feature owns the textual Feature Plan Set, sibling Feature registry, and local
   Macro Task graphs; Implement uses a small transient delivery graph
   reconstructed from live evidence.
-- Every bundled skill owns `references/states.md`, a compact human-readable
-  table that distinguishes workflow nodes from domain values, persisted
-  statuses, checkpoints, modes, external observations, and output labels.
+- Every graph-owning bundled skill owns `references/states.md`, a compact
+  human-readable table that distinguishes workflow nodes from domain values,
+  persisted statuses, checkpoints, modes, external observations, and output
+  labels.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
   Feature, and Implement hosted handoffs.
@@ -95,6 +96,13 @@ Its skills are deliberately separated by responsibility:
   provider-clean evidence or transparently adjudicated non-actionable findings,
   verifies current PR base/body/topology, then releases the complete repository
   claim. Later fix SHAs repeat candidate review before hosted re-review.
+- skills/implement-light/ is the implicit local-only implementation entry point.
+  It implements one selected spec, ticket, or directly described unit of work in
+  the current repository, uses TDD where practical, runs targeted and full
+  validation, requests an independent review where available, and commits only
+  required files. It creates no orchestrator, repository claim, worktree, pull
+  request, or publication effect. It may also be invoked explicitly as
+  `se:implement-light`.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local
