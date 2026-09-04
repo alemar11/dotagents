@@ -137,8 +137,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   registry atomically protects an immutable repository set and stores only
   repository ownership, while Features, workers, Git, pull requests, review,
   and CI remain externally owned. Each stable exact-head pull request must be
-  ready rather than draft and have terminal clean hosted review plus required
-  validation and CI. Implement never merges, deploys, or releases.
+  preceded by a clean independent local Sol/xhigh adversarial candidate review,
+  then be ready rather than draft and have terminal clean hosted review plus
+  required validation and CI. Implement never merges, deploys, or releases.
 - `se:audit` runs only after explicit invocation and observes a frozen cohort of
   active SE sessions until terminal state or user stop. Complete coverage
   requires exhausting every authoritative continuation and host/project

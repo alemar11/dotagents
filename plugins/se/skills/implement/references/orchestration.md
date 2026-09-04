@@ -17,14 +17,16 @@ the condition for every declared edge.
 | claim-repositories | blocked | Claim overlap, provisional task effects, binding, or orchestrator identity cannot be reconciled safely. |
 | reconcile | schedule | At least one selected Feature remains unfinished and current authoritative evidence supports another scheduling decision. |
 | reconcile | release-claims | The caller explicitly requested handoff or abandonment and every task created by the orchestrator is independently quiescent. |
-| reconcile | complete | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base, and no explicit release is pending. |
+| reconcile | complete | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, its authoritative Feature contract and current intended base match the immutable contract identity and full base SHA reviewed locally, it has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and it passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base, and no explicit release is pending. |
 | reconcile | deferred | Safe continuation requires a material semantic decision or additional user authority. |
-| reconcile | blocked | Required capability, identity, ownership, or effect evidence remains unavailable or ambiguous. |
-| schedule | deliver-feature | One or more dependency-ready Features are not already assigned to an independently observed active lane and have verified bases, topology, and trustworthy worker targets. |
+| reconcile | blocked | Required capability, identity, ownership, or effect evidence remains unavailable or ambiguous, or the candidate-review repair budget is exhausted without a clean result. |
+| schedule | deliver-feature | One or more dependency-ready Features are not already assigned to an independently observed active lane and have verified bases, topology, trustworthy worker targets, and reconciled candidate-review evidence indicating implementation, repair, review preparation, or publication work. |
 | schedule | reconcile | No new assignment should start because only active lanes remain or until a bounded authoritative refresh observes a material Git, pull-request, review, CI, task, or Feature change. |
 | schedule | deferred | The only responsible continuation requires a material user decision or authority. |
 | schedule | blocked | Unfinished work has no responsible ready, refresh, or user-decision path. |
-| deliver-feature | reconcile | A worker returns exact completion, partial progress, correction, or blocker evidence; concurrent returns reconcile independently. |
+| deliver-feature | review-candidate | A worker returns a stable locally committed Feature candidate at an exact base and full HEAD with all required validation passing and no clean current candidate review. |
+| deliver-feature | reconcile | A worker returns exact published completion, partial progress that is not ready for candidate review, correction, or blocker evidence; concurrent returns reconcile independently. |
+| review-candidate | reconcile | The fresh independent reviewer returns a clean, findings, or indeterminate result bound to an immutable snapshot of the exact candidate base and full HEAD, or cannot establish the required execution or remaining review-cycle budget. `reconcile` alone chooses the next terminal or nonterminal edge. |
 | release-claims | complete | Exact whole-group release is independently verified. |
 | release-claims | blocked | Release cannot be proved exact and safe. |
 
@@ -67,10 +69,12 @@ Best-effort rename a reused worker for its current Feature. Titles and project
 grouping are diagnostics, never identity, correctness evidence, or a reason to
 retry or replace a task.
 
-Use the configured model and reasoning defaults unless the caller explicitly
-requests another profile. If a caller makes a profile acceptance-critical,
-verify it or report that it cannot be established; otherwise profile metadata
-does not gate delivery.
+Use the configured model and reasoning defaults for the orchestrator and
+implementation workers unless the caller explicitly requests another profile.
+The independent candidate reviewer instead uses its fixed profile from
+[candidate-review.md](candidate-review.md). If a caller makes any other profile
+acceptance-critical, verify it or report that it cannot be established;
+otherwise profile metadata does not gate delivery.
 
 Resolve one integration branch per repository before scheduling. A
 repository-qualified caller override wins; otherwise use the authoritative
@@ -145,6 +149,25 @@ verified starting point and branch under the protocol above, then returns new
 exact evidence. Never treat the old Feature title or dialogue as current
 implementation state.
 
+## Candidate review
+
+After implementation and required validation, the worker locally commits the
+stable candidate and becomes quiescent with a clean worktree. It returns its
+exact base and full HEAD. Enter
+`review-candidate` under [candidate-review.md](candidate-review.md) before the
+first push. Every reviewer result returns to `reconcile`: findings schedule the
+same worker for repair and revalidation, while a clean unchanged result
+schedules that worker to publish. Immediately before publication, ready
+transition, or completion, reread the authoritative Feature contract, intended
+base tip, and candidate HEAD and require all three to match the reviewed
+contract identity and full SHAs. Any contract edit, repair, base-tip drift,
+rebase, restack, or other candidate change invalidates the result and requires
+a fresh review before the next push.
+
+Candidate review is independent, local, read-only, and scoped to the complete
+Feature delta. It is not the hosted review described below and cannot satisfy
+that later gate.
+
 ## Pull-request graph
 
 Use one branch and one pull request per Feature delta.
@@ -191,13 +214,14 @@ G-owned explicit review request and its bound wait for that HEAD; never convert
 the PR back to draft merely to retrigger automatic review.
 
 Review findings return the same trustworthy worker to `deliver-feature` for a
-focused repair, required validation, and publication to the existing PR. A
-changed full HEAD invalidates the prior review and requires one new G-owned
-explicit re-review request and bound wait. Pending or timed-out review remains
-unfinished work; reconcile and resume the same lineage without another ready
-transition or duplicate request. `not-requested`, absent comments, zero review
-threads, draft-only review, stale evidence, provider failure, and ambiguous
-correlation never satisfy `reconcile -> complete`.
+focused repair and required validation. The repaired local commit must pass a
+fresh independent candidate review before publication to the existing PR. A
+changed full HEAD also invalidates the prior hosted review and requires one new
+G-owned explicit re-review request and bound wait after push. Pending or
+timed-out review remains unfinished work; reconcile and resume the same lineage
+without another ready transition or duplicate request. `not-requested`, absent
+comments, zero review threads, draft-only review, stale evidence, provider
+failure, and ambiguous correlation never satisfy `reconcile -> complete`.
 
 These receipts and observations remain external delivery evidence available
 from G, GitHub, and task history. Do not persist them in the repository-claims
@@ -219,8 +243,8 @@ Reconstruct current truth in this order:
 
 1. authoritative Feature issue content and dependency relations;
 2. current repository branches, commits, and worktrees;
-3. current pull-request, review, and CI state;
-4. visible Codex task history and worker handoffs;
+3. current pull-request, hosted-review, and CI state;
+4. visible Codex task history, candidate-review evidence, and worker handoffs;
 5. the repository registry only for orchestrator ownership.
 
 The registry does not prove that a worker is running, a branch is clean, a PR

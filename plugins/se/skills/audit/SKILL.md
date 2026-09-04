@@ -207,8 +207,9 @@ Confirm `graph-violation` only when evidence proves at least one of:
 Missing narration or hidden reasoning is never automatically a violation. For
 Implement's lightweight graph, combine orchestrator and worker evidence only
 through independently established session identities and SE handoffs. Several
-Implement workers may occupy
-`deliver-feature` concurrently after one `schedule` decision.
+Implement workers may occupy `deliver-feature` concurrently after one
+`schedule` decision, and their independently reviewed candidates may occupy
+`review-candidate` concurrently before returning to `reconcile`.
 
 A conforming run may still support `graph-design-improvement` when repeated
 loops, ambiguous ownership, weak stopping rules, or unavoidable evidence gaps

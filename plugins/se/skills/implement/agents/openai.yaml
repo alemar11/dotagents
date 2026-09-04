@@ -1,7 +1,7 @@
 interface:
   display_name: "🛠️ Implement"
-  short_description: "Deliver Features with lightweight graph orchestration."
+  short_description: "Deliver independently reviewed Features through a lightweight graph."
   brand_color: "#6D28D9"
-  default_prompt: "Use $se:implement to implement these published Feature issues through visible tasks and standalone or stacked pull requests."
+  default_prompt: "Use $se:implement to deliver these published Feature issues through independent candidate review and standalone or stacked pull requests."
 policy:
   allow_implicit_invocation: false

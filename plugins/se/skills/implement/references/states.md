@@ -12,11 +12,12 @@ at `reconcile` from externally owned evidence.
 | --- | --- | --- |
 | `intake` | action | Resolve the exact selected Feature set, its body-backed dependencies, repositories, and visible home. |
 | `claim-repositories` | action | Atomically acquire or reuse repository ownership and bind one correlated visible orchestrator. |
-| `reconcile` | validation | Reconstruct current truth from Feature, Git, pull-request, review/CI, and task owners before another effect. |
+| `reconcile` | validation | Reconstruct current truth from Feature, Git, candidate-review, pull-request, hosted-review/CI, and task owners before another effect. |
 | `schedule` | decision | Compute the ready frontier and choose serial or bounded concurrent work. |
-| `deliver-feature` | action | Run one verified worker lane through implementation, validation, commit, standalone or stacked pull-request publication, ready transition, and exact-HEAD hosted review and CI convergence. Several ready lanes may occupy this node concurrently. |
+| `deliver-feature` | action | Run one verified worker lane through implementation, validation, and a stable local commit; after clean candidate review, resume the same lane for standalone or stacked pull-request publication, ready transition, and exact-HEAD hosted review and CI convergence. Several ready lanes may occupy this node concurrently. |
+| `review-candidate` | validation | Run a fresh independent read-only adversarial review of one complete locally committed Feature delta with the required fixed profile. Several independently scheduled candidates may occupy this node concurrently. |
 | `release-claims` | action | Release the exact whole repository group only for an authorized handoff or abandonment after quiescence is proved. |
-| `complete` | terminal | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, an explicitly requested ownership release completed. |
+| `complete` | terminal | Every selected Feature has a current exact-HEAD pull request that is ready rather than draft, its authoritative Feature contract and current intended base match the immutable contract identity and full base SHA reviewed locally, it has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and it passes required validation and CI with no unresolved blocker, or is proved already incorporated into its integration base; alternatively, an explicitly requested ownership release completed. |
 | `deferred` | terminal | A material semantic decision or additional user authority is required. |
 | `blocked` | terminal | No safe transition remains because required capability, identity, ownership, evidence, or reconciliation is unavailable. |
 
@@ -27,13 +28,26 @@ repository registry, task metadata, branch names, or pull requests.
 
 | Disposition | Meaning |
 | --- | --- |
-| `delivery-required` | The selected Feature still requires its own implementation delta and a current exact-HEAD pull request that is ready rather than draft, has terminal clean G-normalized hosted Codex review, and satisfies required validation and CI. |
+| `delivery-required` | The selected Feature still requires its own implementation delta and a current exact-HEAD pull request that is ready rather than draft, whose authoritative Feature contract and intended base match the immutable contract identity and full base SHA reviewed locally, that has clean independent candidate review and terminal clean G-normalized hosted Codex review for that same HEAD, and that satisfies required validation and CI. |
 | `already-incorporated` | Current exact evidence proves the selected Feature's complete acceptance outcome is already present in its integration base. |
 
 An unmet dependency remains `delivery-required`; it never makes a selected
 Feature disappear from completion. If a selected Feature has no exclusive
 delta but is not proved already incorporated, defer for user direction rather
 than creating an empty pull request or excluding it as ineligible.
+
+## Transient candidate-review dispositions
+
+| `candidate_review_disposition` | Meaning |
+| --- | --- |
+| `clean` | The independent reviewer found no material issue blocking publication of the exact reviewed Feature contract, base, and candidate HEAD. |
+| `findings` | One or more material findings require repair or an evidence-backed rebuttal accepted by a fresh review. |
+| `indeterminate` | Exact target, reviewer execution, or evidence was insufficient for a trustworthy verdict. |
+
+These values are transient reviewer results, not workflow nodes or persisted
+claim state. Their meanings are canonical here; the operational review contract
+only produces and consumes them. Any content, ancestry, base, or full-HEAD
+change invalidates them.
 
 ## Persisted repository-claim facts
 
@@ -75,10 +89,13 @@ workflow state and do not authorize creation, binding, release, or repair.
 ## External observations
 
 Task activity, worktree cleanliness, Feature dependencies, branches, commits,
-pull requests, review results, CI results, and merge state are observed from
-their current owners. A draft PR, a generic `not-requested` review observation,
-and absence of comments or review threads are non-terminal external evidence;
-completion requires a ready PR and terminal clean G-normalized hosted Codex
-review bound to the current full HEAD. Ready-transition receipts, explicit
-re-review receipts, and review observations must never be projected into this
-registry.
+candidate-review results, pull requests, hosted-review results, CI results, and
+merge state are observed from their current owners. Candidate review is valid
+only for its immutable Feature-contract and candidate snapshots, exact base,
+and full HEAD. A draft PR, a generic `not-requested`
+hosted-review observation, and absence of comments or review threads are
+non-terminal external evidence; completion requires a ready PR plus clean
+candidate review bound to the current Feature contract, intended base, and full
+HEAD plus a clean hosted review bound to that HEAD. Candidate-review
+results, ready-transition receipts, explicit re-review receipts, and hosted
+review observations must never be projected into this registry.

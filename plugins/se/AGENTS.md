@@ -95,6 +95,9 @@ folder.
   orchestration entrypoint. Its directly routed references own transition
   conditions, Feature-graph scheduling, repository claims, and its intentionally
   minimal state vocabulary.
+- skills/implement/references/candidate-review.md owns candidate-review runtime
+  operations; skills/implement/references/states.md solely owns its state names
+  and meanings. G continues to own the separate hosted review lifecycle.
 - skills/implement/scripts/repository-claims is the shipped host-local
   repository-ownership CLI. Its schema and version constants are runtime
   sources of truth; focused tests live under skills/implement/tests/.
@@ -198,8 +201,11 @@ folder.
   exact Feature selection correlate; otherwise create one visible orchestrator.
   Verify each worker's repository, remote, isolated worktree, branch, and full
   starting SHA before mutation. Titles and project grouping are diagnostic only.
-  Use configured model and reasoning defaults unless the caller explicitly
-  requests an override.
+  Use configured model and reasoning defaults for the orchestrator and workers
+  unless the caller explicitly requests an override. Keep candidate-review
+  operations, fixed profile, lifecycle, and convergence in their routed runtime
+  reference, their value registry in `references/states.md`, and the indexed
+  profile projection synchronized without duplicating those contracts here.
 - Keep pull-request review exact-head and hosted. A newly published draft is an
   intermediate state. Once the candidate is stable, make the PR ready, read back
   the same full HEAD and non-draft state, and wait for the automatic hosted
@@ -208,11 +214,12 @@ folder.
   transitions or requests before retry and never toggle draft state to create a
   review lineage.
 - Keep Implement completion closed to a current exact-head PR that is ready,
-  terminal clean hosted review, required validation and CI, and correct
-  standalone or stacked topology, or authoritative evidence that the Feature is
-  already incorporated into its integration base. A caller-required draft PR
-  defers completion. Merge, deploy, release, issue closure, destructive recovery,
-  and unrelated cleanup remain outside invocation authority.
+  clean independent candidate review, terminal clean hosted review, required
+  validation and CI, and correct standalone or stacked topology, or
+  authoritative evidence that the Feature is already incorporated into its
+  integration base. A caller-required draft PR defers completion. Merge,
+  deploy, release, issue closure, destructive recovery, and unrelated cleanup
+  remain outside invocation authority.
 - Feature requests its planner title when supported but never reads, corrects,
   or gates on it. Implement titles are useful diagnostics but never identity or
   correctness evidence.
@@ -311,9 +318,10 @@ folder.
   targets, terminal reachability, terminal nodes without outgoing edges,
   exact selected-Feature scope, body-backed dependency scheduling, visible
   orchestrator placement, serial worker reuse, bounded concurrent lanes,
-  same-repository stacks, cross-repository scheduling, exact-head ready and
-  hosted-review convergence, resume reconstruction through `reconcile`, claim
-  conflicts, and mutation boundaries.
+  same-repository stacks, cross-repository scheduling, mandatory independent
+  candidate review with Sol/xhigh and exact-base/full-HEAD invalidation,
+  exact-head ready and hosted-review convergence, resume reconstruction through
+  `reconcile`, claim conflicts, and mutation boundaries.
 - Validate that every bundled skill routes to `references/states.md`, every
   graph node appears in its skill's state table, and Implement's workflow
   registry, transition conditions, and Mermaid projection agree while every
@@ -354,8 +362,9 @@ folder.
 - Use bounded forward-model scenarios to validate Implement selection
   scope, workflow-graph traversal, visible orchestrator placement,
   orchestrator-owned concurrency, serial worker reuse, same-repository stacks,
-  cross-repository scheduling, resume reconstruction through `reconcile`, claim
-  conflict behavior, and mutation boundaries.
+  cross-repository scheduling, candidate-review clean/findings/indeterminate
+  paths, profile enforcement, review invalidation, resume reconstruction
+  through `reconcile`, claim conflict behavior, and mutation boundaries.
 - Check that the marketplace path and plugin metadata point to this package.
 - Scan for retired delivery-skill identifiers and removed legacy task contracts
   before handoff.

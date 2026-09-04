@@ -86,11 +86,13 @@ Its skills are deliberately separated by responsibility:
   dependencies schedule standalone pull requests. Its one-table SQLite
   registry stores only host-local repository ownership. Workflow position,
   Feature, worker, Git, pull-request, review, and CI truth remain external, with
-  no workflow ledger, persisted checkpoint graph, fixed task profile, or title
-  gate. A newly published draft is intermediate: the worker makes the stable
-  exact-head PR ready, waits for the automatic Codex review through the G-owned
-  ready lineage, and cannot complete until current-head review is terminal
-  clean; later fix SHAs use explicit G-owned re-review.
+  no workflow ledger, persisted checkpoint graph, or title gate. Each stable
+  locally committed candidate first receives a fresh independent read-only
+  Sol/xhigh adversarial review of its complete delta. A newly published draft
+  is then intermediate: the worker makes the stable exact-head PR ready, waits
+  for the automatic Codex review through the G-owned ready lineage, and cannot
+  complete until both current-head reviews are clean; later fix SHAs repeat the
+  candidate review before explicit G-owned hosted re-review.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local
