@@ -1,0 +1,7 @@
+interface:
+  display_name: "👻 Ghostty"
+  short_description: "Arrange Ghostty windows, tabs, and split panes"
+  default_prompt: "Use $ghostty to inspect or arrange Ghostty windows, tabs, split panes, commands, titles, or keybindings."
+  brand_color: "#7C3AED"
+policy:
+  allow_implicit_invocation: false
