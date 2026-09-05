@@ -1,0 +1,7 @@
+interface:
+  display_name: "Herdr"
+  short_description: "Inspect and control Herdr terminal sessions"
+  default_prompt: "Use $herdr to inspect or control the current Herdr workspaces, tabs, panes, terminals, or agents."
+  brand_color: "#2563EB"
+policy:
+  allow_implicit_invocation: false
