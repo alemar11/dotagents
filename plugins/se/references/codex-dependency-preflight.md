@@ -20,7 +20,7 @@ and Intake reaches this gate before any hosted source read, while Publish
 reaches it before the first hosted publication operation. An explicitly
 requested `preview` from a new local source does not load this gate. A preview
 whose source is hosted, including a hosted Idea or issue, still runs the gate
-for that read. Implement has no local-only or preview mode:
+for that read. Delivery Features has no local-only or preview mode:
 run the gate before its mandatory first authoritative GitHub Feature Plan,
 PR, review, label, or relation read. A passing gate authorizes only the next
 handoff to the applicable G-owned workflow; it does not broaden the mutation
@@ -58,7 +58,7 @@ actually attempted; its absence or failure never blocks semantic publication.
 The Feature preview route for a new local source requires neither workflow
 because it performs no hosted access.
 
-For Implement, the required workflow set includes the G
+For Delivery Features, the required workflow set includes the G
 owners needed by the selected publication, review, CI, issue, local Git, and
 stack paths. The delivery-status workflow plus branch-protection, ruleset,
 mergeability-policy, merge-queue, auto-merge, and provider-policy inspection

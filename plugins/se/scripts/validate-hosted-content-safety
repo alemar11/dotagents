@@ -34,11 +34,11 @@ done
 for relative in \
   skills/idea/SKILL.md \
   skills/feature/SKILL.md \
-  skills/implement/SKILL.md \
+  skills/deliver-features/SKILL.md \
   skills/idea/references/publishing.md \
   skills/feature/steps/publish.md \
   skills/feature/templates/maintenance-changelog.md \
-  skills/implement/references/orchestration.md; do
+  skills/deliver-features/references/orchestration.md; do
   target="$plugin_root/$relative"
   rg -Fq -- "hosted-content-safety.md" "$target" || \
     fail "missing canonical route in $relative"

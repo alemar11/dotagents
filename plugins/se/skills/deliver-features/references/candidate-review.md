@@ -1,9 +1,12 @@
-# Implement Candidate Review
+# Delivery Features Candidate Review
 
 Load this reference before `review-candidate`. It owns reviewer independence,
 the transient receipt, immutable target, fixed profile, checkout lifecycle, and
 the Feature-wide review-revision budget. [states.md](states.md) owns every
-Implement disposition value. G owns the separate hosted review lifecycle.
+Delivery Features disposition value. G owns the separate hosted review lifecycle.
+Compose [`se:adversarial-review`](../../adversarial-review/SKILL.md) for the
+generic skeptical review posture and finding contract. This reference owns the
+Delivery Features handoff and evidence boundaries around that review.
 
 ## Candidate and checkout
 
@@ -70,18 +73,6 @@ unproved execution independence, dirty snapshot, or cleanup result other than
 result. `not-executed`, `interrupted`, and `ambiguous` require local disposition
 `indeterminate`; attempt `2` additionally requires the matching attempt-1
 receipt. A valid receipt never contains a claim token.
-
-## Adversarial result
-
-Act as a skeptical shipment reviewer. Inspect the complete Feature delta and
-relevant paths for material correctness, hidden assumptions, authorization or
-permission errors, data loss, concurrency, retries and idempotency, migration
-and compatibility hazards, rollback and partial failure, degraded dependencies,
-and missing observability. Apply only relevant lenses.
-
-Each finding identifies the concrete failure mode, affected file and tight line
-range when available, supporting evidence, confidence, and focused
-recommendation. The reviewer never fixes its own findings.
 
 ## Execution recovery
 

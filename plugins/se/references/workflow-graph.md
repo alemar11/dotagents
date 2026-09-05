@@ -1,13 +1,13 @@
 # SE Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE
-workflows. It applies to Learn, Grilling, Idea, Feature, Implement, and Audit
+workflows. It applies to Learn, Grilling, Idea, Feature, Delivery Features, and Audit
 without turning every skill into the same implementation graph.
 
 The existing workflow-contract.md remains the canonical owner of the Idea
 hosted shape. This reference owns workflow structure only.
 Feature owns Feature Plan Set semantics, Feature identities, Feature-level
-planning dependencies, and the durable local Macro Task projections. Implement
+planning dependencies, and the durable local Macro Task projections. Delivery Features
 owns scheduling interpretation and a small transient delivery graph whose
 position is reconstructed from live evidence.
 Learn, Grilling, Idea, and Audit own their skill-specific registries and branch
@@ -22,7 +22,7 @@ values from different fields remain distinct.
 ## Graph model
 
 A workflow graph describes control state and authority boundaries for one skill
-run. It is distinct from the durable Feature Plan Set graph and the Implement
+run. It is distinct from the durable Feature Plan Set graph and the Delivery Features
 execution graph:
 
 - a workflow node describes what phase the skill is in;
@@ -36,7 +36,7 @@ execution graph:
 - a workflow graph may contain decisions, validations, actions, and terminal
   outcomes;
 - Feature-level relations describe planning structure between Feature IDs and
-  may include `blocked_by` context. Implement deterministically projects a
+  may include `blocked_by` context. Delivery Features deterministically projects a
   same-repository edge as mandatory stack intent and a cross-repository edge as
   scheduling-only context;
 - Macro Task relations describe planning structure only within one
@@ -104,7 +104,7 @@ as the source of truth. Explanatory prose may clarify a condition but must not
 add an unregistered edge.
 
 Feature keeps its planning step files and registry as its local source of truth.
-Learn, Grilling, Idea, Implement, and Audit keep their registries in their
+Learn, Grilling, Idea, Delivery Features, and Audit keep their registries in their
 SKILL.md files while branch-specific details remain in routed references.
 
 ## Common terminal meanings
@@ -119,7 +119,7 @@ SKILL.md files while branch-specific details remain in routed references.
 Each skill declares the subset it supports. Feature retains its existing
 complete and blocked terminal contract. Learn uses all four meanings. Idea
 uses reported, deferred, complete, and blocked.
-Implement uses complete, deferred, and blocked.
+Delivery Features uses complete, deferred, and blocked.
 Audit uses reported and blocked.
 Grilling uses complete for a confirmed refined handoff, reported for a
 user-stopped best-effort handoff, and blocked when responsible questioning

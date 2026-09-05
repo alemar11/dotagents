@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-local repository ownership registry for se:implement."""
+"""Host-local repository ownership registry for se:deliver-features."""
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 
-CLI_VERSION = "4.4.0"
+CLI_VERSION = "5.1.0"
 SCHEMA_VERSION = 1
 TIMEOUT_MS = 5000
 DATABASE_NAME = "repository-claims.sqlite3"
 DEFAULT_DB = (
     Path.home()
-    / ".cache/dotagents/plugins/se/skills/implement"
+    / ".cache/dotagents/plugins/se/skills/deliver-features"
     / DATABASE_NAME
 )
 PUBLIC_COLUMNS = (

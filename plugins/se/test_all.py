@@ -10,7 +10,7 @@ from pathlib import Path
 PLUGIN = Path(__file__).resolve().parent
 TEST_FILES = (
     PLUGIN / "tests/test_plugin_runtime_alignment.py",
-    PLUGIN / "skills/implement/tests/test_repository_claims.py",
+    PLUGIN / "skills/deliver-features/tests/test_repository_claims.py",
 )
 
 

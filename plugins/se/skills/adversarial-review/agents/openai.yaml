@@ -1,0 +1,7 @@
+interface:
+  display_name: "🧪 Adversarial Review"
+  short_description: "Pressure-test software changes before they ship."
+  default_prompt: "Use $se:adversarial-review to independently pressure-test this software change and report evidence-backed findings without editing it."
+  brand_color: "#B45309"
+policy:
+  allow_implicit_invocation: false

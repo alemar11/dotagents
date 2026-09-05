@@ -9,7 +9,7 @@ description: "Observe active SE sessions and report workflow problems, regressio
 
 Use this skill only after an explicit `$se:audit` invocation. Observe the
 initial cohort of active application sessions that can be attributed directly
-to Learn, Idea, Feature, Implement, or another non-monitoring skill owned by the
+to Learn, Idea, Feature, Delivery Features, or another non-monitoring skill owned by the
 current SE plugin. Monitor that frozen cohort until every selected session
 becomes terminal or the user stops the audit.
 
@@ -205,18 +205,18 @@ Confirm `graph-violation` only when evidence proves at least one of:
 - a terminal claim incompatible with required evidence.
 
 Missing narration or hidden reasoning is never automatically a violation. For
-Implement's lightweight graph, combine orchestrator and worker evidence only
+the Delivery Features graph, combine orchestrator and worker evidence only
 through independently established session identities and SE handoffs. Several
-Implement workers may occupy `deliver-feature` concurrently after one
+Delivery Features workers may occupy `deliver-feature` concurrently after one
 `schedule` decision, and their independently reviewed candidates may occupy
 `review-candidate` concurrently before returning to `reconcile`.
 
-For an Implement `complete` claim, require observed
+For a Delivery Features `complete` claim, require observed
 `reconcile -> release-claims -> complete`, exact whole-group unclaimed readback,
 and retained final delivery or authorized handoff/abandonment evidence. For
 delivery, verify that actual PR base and topology match reviewed intent and
 distinguish `provider-clean` from explicitly reported `adjudicated-clean` hosted
-acceptance. A blocked or deferred Implement run may correctly retain its claim.
+acceptance. A blocked or deferred Delivery Features run may correctly retain its claim.
 
 A conforming run may still support `graph-design-improvement` when repeated
 loops, ambiguous ownership, weak stopping rules, or unavoidable evidence gaps

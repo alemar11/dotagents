@@ -1,7 +1,7 @@
 # SE Plugin Maintenance
 
 plugins/se/ is the repository's graph-first workflow package. Learn, Grilling,
-Study, Idea, Feature, Implement, Implement Light, and Audit expose distinct
+Study, Idea, Feature, Delivery Features, Implement, and Audit expose distinct
 workflow surfaces;
 Feature owns the repository-scoped textual Feature Plan Set graph.
 Keep SE as the sole active owner of these workflow contracts; do not
@@ -58,7 +58,7 @@ folder.
   the selected skill branch and never use them as surface evidence.
 - references/hosted-content-safety.md owns mandatory portable-content
   projection, exact single-line title-artifact normalization, and local-path
-  correction before every hosted write produced by Idea, Feature, or Implement,
+  correction before every hosted write produced by Idea, Feature, or Delivery Features,
   plus one bounded non-blocking repair of the same artifact after readback. G
   owns transport and readback, not semantic cleanup.
 - scripts/validate-hosted-content-safety owns the static owner-routing,
@@ -92,19 +92,22 @@ folder.
   keeps the standard front matter and its declared transitions synchronized.
 - skills/feature/templates/ owns reusable authoring templates and is not a
   node namespace.
-- skills/implement/SKILL.md owns the lightweight workflow graph and
+- skills/adversarial-review/SKILL.md owns the explicit reusable read-only
+  skeptical review posture and generic finding contract. Composed callers own
+  their target identity, lifecycle, and disposition mapping.
+- skills/deliver-features/SKILL.md owns the orchestrated Feature-delivery graph and
   orchestration entrypoint. Its directly routed references own transition
   conditions, Feature-graph scheduling, repository claims, and its intentionally
   minimal state vocabulary.
-- skills/implement/references/candidate-review.md owns candidate-review runtime
+- skills/deliver-features/references/candidate-review.md owns candidate-review runtime
   operations, its transient receipt, immutable checkout lifecycle, execution
   recovery, and the Feature-wide review-revision budget;
-  skills/implement/references/states.md solely owns its state names and
+  skills/deliver-features/references/states.md solely owns its state names and
   meanings. G continues to own the separate hosted review lifecycle.
-- skills/implement/scripts/repository-claims is the shipped host-local
+- skills/deliver-features/scripts/repository-claims is the shipped host-local
   repository-ownership CLI. Its schema and version constants are runtime
-  sources of truth; focused tests live under skills/implement/tests/.
-- skills/implement-light/SKILL.md owns the implicit local-only implementation
+  sources of truth; focused tests live under skills/deliver-features/tests/.
+- skills/implement/SKILL.md owns the implicit local-only implementation
   surface. It neither creates an orchestrator nor acquires repository claims;
   publication and other external effects remain outside its contract.
 - test_all.py is the package discovery aggregator for the executable claims and
@@ -142,7 +145,7 @@ folder.
   but repository identity gives it a deterministic implementation projection:
   a same-repository edge is mandatory stack intent and a cross-repository edge
   is scheduling-only. Macro-local `blocked_by` remains planning-only and may be
-  internalized by Implement while preserving every available
+  internalized by Delivery Features while preserving every available
   Macro Task outcome. The Plan Set body and registries remain semantic
   authority for both relation levels. After exact hosted identities exist,
   Feature must always
@@ -151,7 +154,7 @@ folder.
   and child Task to child Task only inside one parent Feature. A missing
   attempt or terminal result blocks publication, but a recorded `failed`,
   `unavailable`, or `unknown` provider result is a non-blocking warning and
-  never invalidates the body-backed graph. Implement consumes exactly the
+  never invalidates the body-backed graph. Delivery Features consumes exactly the
   caller-supplied parent Features as semantic contracts, reads sibling and
   dependency data without expanding that selection, and returns a verified
   standalone or stacked PR topology. Native `blockedBy`/`blocking` state is
@@ -183,18 +186,18 @@ folder.
   identity, stable Feature identities, criterion identity, monotonic retirement
   high-water marks, source and question provenance, Feature-level dependency
   relations, each closed Macro Task registry, macro-local planning relations,
-  and the durable parent/child projection. Implement owns exact-head delivery
+  and the durable parent/child projection. Delivery Features owns exact-head delivery
   evidence while preserving every Feature criterion and available Macro Task
   outcome. Sibling Features and their Tasks are never selected implicitly. The
   uppercase bracketed IDs are an explicit rendered-contract syntax exception to
   lower-kebab values.
-- Keep Implement concurrency separate from PR delivery topology. Serial work
+- Keep Delivery Features concurrency separate from PR delivery topology. Serial work
   may reuse a clean compatible repository worker; concurrent or cross-repository
   work uses isolated lanes, and overlapping writes never share one worktree.
   Capacity and execution order never create stack intent. Every same-repository
   Feature `blocked_by` edge does create stack intent, while cross-repository
   edges remain scheduling-only. Parent drift invalidates dependent evidence.
-- Keep Implement's public runtime contract in its `SKILL.md` and directly
+- Keep Delivery Features' public runtime contract in its `SKILL.md` and directly
   routed references. Its repository-claims CLI remains an ownership-only
   implementation detail and the sole source of truth for its exact schema and
   version; workflow position must never be persisted there. Do not duplicate
@@ -207,7 +210,7 @@ folder.
   release the orchestrator's final external effect after every other actor and
   mutation is quiescent. Handoff or abandonment still requires explicit
   authority.
-- Keep Feature independent from Implement task and claim handling. Its
+- Keep Feature independent from Delivery Features task and claim handling. Its
   controller creates or resumes one planner task with `gpt-5.6-sol` and
   `high` passed explicitly, then starts Intake in the planner's first turn.
   An accepted stable task receipt is sufficient. Do not add a bootstrap-only
@@ -215,7 +218,7 @@ folder.
   reconciliation, execution-target comparison, goal, or replacement protocol.
   Inspect the same task effect once only when creation is genuinely ambiguous.
   Repository and source identity are verified later as Intake evidence.
-- Keep Implement scheduling body-backed and evidence-driven. Inspect selected
+- Keep Delivery Features scheduling body-backed and evidence-driven. Inspect selected
   and unselected declared prerequisites without expanding the requested Feature
   set. Exclude Features already owned by an observed active lane, use
   change-driven reconciliation when only active lanes remain, and never create
@@ -240,7 +243,7 @@ folder.
   non-actionable findings require G disposition and a fresh local rebuttal
   review, never an empty commit. Reconcile ambiguous transitions or requests
   before retry and never toggle draft state or duplicate a same-head request.
-- Keep Implement completion closed to a current ready exact-head PR whose
+- Keep Delivery Features completion closed to a current ready exact-head PR whose
   actual base, body, and standalone or stacked topology match reviewed intent,
   with an admissible independent candidate-review receipt, required validation
   and CI, and either provider-clean hosted evidence or explicitly reported
@@ -250,14 +253,14 @@ folder.
   defers completion. Merge, deploy, release, issue closure, destructive
   recovery, and unrelated cleanup remain outside invocation authority.
 - Feature requests its planner title when supported but never reads, corrects,
-  or gates on it. Implement titles are useful diagnostics but never identity or
+  or gates on it. Delivery Features titles are useful diagnostics but never identity or
   correctness evidence.
 - Keep task prompts as flat semantic handoffs. Preserve bounded intent,
   constraints, source references, destination, validation, and return evidence,
   but unwrap raw task/delegation transport envelopes, escaped wrapper markup,
   parent prompts, and transcripts before creating a child task. Never use a
   transport wrapper as user intent or durable evidence.
-- Keep Idea capture independent from Feature Plan and Implement semantics while
+- Keep Idea capture independent from Feature Plan and Delivery Features semantics while
   using the shared workflow-graph vocabulary. Session context may be assembled
   in transient run state, but only an explicitly published hosted issue is
   durable; Idea must not write project memory or create application tasks.
@@ -342,8 +345,8 @@ folder.
   `complete` or `blocked`, and the
   absence of side effects or outgoing edges on terminal nodes.
 - Validate Idea default-publish/explicit-preview routing, Learn's local-only
-  boundary, and Implement's mandatory hosted-source and PR-output path.
-- Validate Implement registry/projection reconciliation, registered transition
+  boundary, and Delivery Features' mandatory hosted-source and PR-output path.
+- Validate Delivery Features registry/projection reconciliation, registered transition
   targets, terminal reachability, terminal nodes without outgoing edges,
   exact selected-Feature scope, body-backed dependency scheduling, visible
   orchestrator placement, serial worker reuse, bounded concurrent lanes,
@@ -354,12 +357,12 @@ folder.
   completion-time claim release, resume reconstruction through `reconcile`,
   claim conflicts, and mutation boundaries.
 - Validate that every bundled skill routes to `references/states.md`, every
-  graph node appears in its skill's state table, and Implement's workflow
+  graph node appears in its skill's state table, and Delivery Features' workflow
   registry, transition conditions, and Mermaid projection agree while every
   workflow node remains absent from
   repository-claim storage.
 - Run scripts/validate-hosted-content-safety and validate that Idea, Feature,
-  Implement, and their write-owning references route through
+  Delivery Features, and their write-owning references route through
   the one canonical hosted-content owner without duplicate Idea doctrine.
   Include exact single-line title artifacts without serialization-added
   terminators.
@@ -373,7 +376,7 @@ folder.
   only, and Feature title metadata never gates its planner.
 - Validate the canonical bracketed Feature acceptance syntax, monotonic
   high-water marks, plan publication/readback, malformed and legacy-checkbox
-  rejection, question-batch completeness, and Implement evidence bound to the
+  rejection, Grilling clarification completeness, and Delivery Features evidence bound to the
   current candidate SHA.
 - Validate that optional Feature classification runs only after exact issue
   readback, never presets metadata values, preserves the tagger cardinalities
@@ -386,13 +389,13 @@ folder.
   untraversable boundaries, evidence classifications, and prohibited mutation
   behavior.
 - Run `python3 -m unittest discover -s plugins/se -v` and require the package
-  aggregator to execute both Implement repository-claims and runtime-alignment
+  aggregator to execute both Delivery Features repository-claims and runtime-alignment
   suites. Also run CLI help, version, and read-only absent doctor. Validate
   structured read-only parser failures, atomic overlap rollback,
   same-token acquisition reuse, immutable repository sets, exact whole-group
   bind and release, corruption detection, file permissions, and the absence of
   WAL, TTL, heartbeat, force-release, and execution-state storage.
-- Use bounded forward-model scenarios to validate Implement selection
+- Use bounded forward-model scenarios to validate Delivery Features selection
   scope, workflow-graph traversal, visible orchestrator placement,
   orchestrator-owned concurrency, serial worker reuse, same-repository stacks,
   cross-repository scheduling, candidate-review clean/findings/indeterminate

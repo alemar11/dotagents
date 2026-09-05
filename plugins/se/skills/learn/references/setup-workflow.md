@@ -29,7 +29,7 @@ Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
 
 Reject runtime-only worker configuration in project-context setup files; those
-fields belong to Implement Feature.
+fields belong to Delivery Features planning contracts.
 
 ## Settings Editor
 

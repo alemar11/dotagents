@@ -21,7 +21,7 @@ dependencies without turning either into a technical execution graph.
 Feature never writes product code, chooses code design, creates branches or
 worktrees, schedules implementation workers, defines technical execution
 units, assigns `T-AC-NN` criteria, creates pull requests, merges, deploys, or
-releases. Those responsibilities belong to Implement.
+releases. Those responsibilities belong to Delivery Features.
 
 ## Planner task
 
@@ -105,7 +105,7 @@ The Plan Set contains:
   edges, both acyclic;
 - resolved material questions, their provenance, and explicit assumptions;
 - review findings and dispositions when they materially changed the plan;
-- an implementation-neutral handoff that lets Implement
+- an implementation-neutral handoff that lets Delivery Features
   derive technical work while preserving every Feature criterion and available
   Macro outcome.
 
@@ -127,7 +127,7 @@ outcomes and F-AC coverage. Cross-Feature Task-to-Task edges are invalid.
 For an existing-source revision, retain the exact Plan Set, Feature, Macro, and
 hosted issue identities. Apply the smallest semantic patch, increment the
 revision, preserve every unaffected field and executor-owned progress, and
-state what a later Implement run must reconsider. Never
+state what a later Delivery Features run must reconsider. Never
 silently create a replacement plan.
 
 Use [plan.md](templates/plan.md) for the canonical plan,

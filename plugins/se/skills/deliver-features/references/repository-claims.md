@@ -1,6 +1,6 @@
 # Repository Claims
 
-The repository-claims registry prevents two Implement orchestrators on
+The repository-claims registry prevents two Delivery Features orchestrators on
 the same host from owning overlapping repositories. It does nothing else.
 
 ## Identity and scope
@@ -37,7 +37,7 @@ heartbeat, automatic expiry, or automatic stale-owner recovery.
 
 The shipped `scripts/repository-claims` CLI uses this default database:
 
-`~/.cache/dotagents/plugins/se/skills/implement/repository-claims.sqlite3`
+`~/.cache/dotagents/plugins/se/skills/deliver-features/repository-claims.sqlite3`
 
 Its relevant operations are:
 

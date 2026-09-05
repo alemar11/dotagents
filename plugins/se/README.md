@@ -7,14 +7,20 @@ auditing active work without changing it.
 
 Its skills are deliberately separated by responsibility:
 
+- skills/adversarial-review/ is the explicit read-only entry point for
+  pressure-testing software changes. It reports evidence-backed findings and
+  never edits or fixes the reviewed target. Invoke it as
+  `se:adversarial-review`; composed workflows supply their own target identity
+  and lifecycle rules.
+
 - skills/feature/SKILL.md is the graph manifest and Mermaid overview.
 - skills/feature/steps/*.md are workflow nodes with a shared front matter
   contract.
 - skills/feature/templates/ contains authoring resources, not executable nodes.
 - references/workflow-graph.md is the shared structural contract for Learn,
-  Grilling, Idea, Feature, Implement, and Audit workflow graphs.
+  Grilling, Idea, Feature, Delivery Features, and Audit workflow graphs.
   Feature owns the textual Feature Plan Set, sibling Feature registry, and local
-  Macro Task graphs; Implement uses a small transient delivery graph
+  Macro Task graphs; Delivery Features uses a small transient delivery graph
   reconstructed from live evidence.
 - Every graph-owning bundled skill owns `references/states.md`, a compact
   human-readable table that distinguishes workflow nodes from domain values,
@@ -22,7 +28,7 @@ Its skills are deliberately separated by responsibility:
   labels.
 - references/workflow-contract.md owns the Idea hosted shape, while
   references/codex-dependency-preflight.md owns the G dependency gate for Idea,
-  Feature, and Implement hosted handoffs.
+  Feature, and Delivery Features hosted handoffs.
 - references/codex-runtime-surface.md owns shared read-only classification of
   the current Codex App or CLI surface. Surface-aware skills route from that
   result instead of defining local detection heuristics.
@@ -77,7 +83,7 @@ Its skills are deliberately separated by responsibility:
   regressions, graph violations, and graph-design improvements. It never
   contacts monitored sessions, writes repositories, or persists audit state.
   Invoke it explicitly as `se:audit`.
-- skills/implement/ is the explicit implementation entry point. One visible
+- skills/deliver-features/ is the explicit Feature-delivery entry point. One visible
   graph orchestrator follows a small transient workflow graph, owns an immutable
   selected repository set, and chooses serial or concurrent execution.
   Repository-bound workers are reusable lanes:
@@ -96,13 +102,13 @@ Its skills are deliberately separated by responsibility:
   provider-clean evidence or transparently adjudicated non-actionable findings,
   verifies current PR base/body/topology, then releases the complete repository
   claim. Later fix SHAs repeat candidate review before hosted re-review.
-- skills/implement-light/ is the implicit local-only implementation entry point.
+- skills/implement/ is the implicit local-only implementation entry point.
   It implements one selected spec, ticket, or directly described unit of work in
   the current repository, uses TDD where practical, runs targeted and full
   validation, requests an independent review where available, and commits only
   required files. It creates no orchestrator, repository claim, worktree, pull
   request, or publication effect. It may also be invoked explicitly as
-  `se:implement-light`.
+  `se:implement`.
 - skills/idea/ is the explicit capture entry point. It builds a transient
   session bundle and publishes verified hosted Ideas through the G-owned issue
   workflow by default. An explicitly requested preview remains entirely local
@@ -166,7 +172,7 @@ Its skills are deliberately separated by responsibility:
   updates and reads back the same issues. Any explicitly requested downstream
   handoff must reconcile before completion. Feature does not rehydrate or
   repair implementation execution units.
-- Idea, Feature, and Implement keep local control-plane records
+- Idea, Feature, and Delivery Features keep local control-plane records
   separate from hosted artifacts and apply one shared portable-content gate
   immediately before each hosted write, including content returned by workers
   and tools.

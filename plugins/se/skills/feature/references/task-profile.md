@@ -1,7 +1,7 @@
 # Feature Planner Task Profile
 
 This profile owns the one required application-task launch for `se:feature`.
-It is intentionally separate from Implement orchestration and repository-claim
+It is intentionally separate from Delivery Features orchestration and repository-claim
 handling.
 
 ```yaml

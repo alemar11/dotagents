@@ -1,6 +1,6 @@
-# Implement States
+# Delivery Features States
 
-Implement owns a small transient workflow graph. It has no persisted run
+Delivery Features owns a small transient workflow graph. It has no persisted run
 status, assignment status, checkpoint, effect journal, or delivery-state
 machine. On resume, the orchestrator re-enters the graph through `intake`,
 re-establishes ownership at `claim-repositories`, and derives the continuation
@@ -81,7 +81,7 @@ retry keeps the same ordinal.
 
 `adjudicated-clean` is never reported as a clean provider verdict. G-owned
 review states and feedback dispositions retain their own names and meanings;
-this field is only Implement's completion projection.
+this field is only Delivery Features' completion projection.
 
 ## Persisted repository-claim facts
 
@@ -89,7 +89,7 @@ this field is only Implement's completion projection.
 | --- | --- | --- |
 | `provisional` | A claim row whose `orchestrator_task_id` is null. | The immutable repository set is reserved, but task creation has not yet been reconciled and bound. |
 | `bound` | A claim row whose `orchestrator_task_id` is present. | One observed orchestrator task owns the complete repository set. |
-| unclaimed | No row for the repository. | No Implement orchestrator owns the repository on this host. This is absence, not a stored state. |
+| unclaimed | No row for the repository. | No Delivery Features orchestrator owns the repository on this host. This is absence, not a stored state. |
 
 Every row in one `claim_token` group has the same `home_project_key` and the
 same provisional or bound task value.

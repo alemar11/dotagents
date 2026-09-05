@@ -1,4 +1,4 @@
-# Implement Orchestration
+# Delivery Features Orchestration
 
 Load this reference for graph scheduling, multi-repository topology, resume,
 worker concurrency, pull-request stacks, claim conflicts, or workflow
@@ -204,7 +204,7 @@ read-only reconciliation; block when it cannot recover the exact lineage.
 Never substitute an explicit request or toggle the PR back to draft. Resume the
 same receipt and deadline after interruption.
 
-Project the terminal result into one Implement-owned
+Project the terminal result into one Delivery Features-owned
 `hosted_review_acceptance`:
 
 - G terminal `clean` for the exact HEAD produces `provider-clean`.

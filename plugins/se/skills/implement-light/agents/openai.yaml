@@ -1,7 +1,0 @@
-interface:
-  display_name: "🛠️ Implement Light"
-  short_description: "Implement local work from a spec or ticket."
-  brand_color: "#4338CA"
-  default_prompt: "Use $se:implement-light to implement the selected spec or ticket in the current repository, validate the result, request an independent code review where available, and commit only the required files to the current branch without publishing or deploying."
-policy:
-  allow_implicit_invocation: true

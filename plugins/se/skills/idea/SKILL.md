@@ -16,7 +16,7 @@ preserves a tentative proposal for later Feature planning and then stops.
 
 The workflow is:
 
-`Idea -> Feature -> Implement`
+`Idea -> Feature -> Delivery Features`
 
 Idea capture does not write Feature Plans, acceptance criteria, implementation
 plans, execution graphs, project memory, architecture decisions, or code. It does

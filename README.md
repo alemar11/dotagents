@@ -52,10 +52,11 @@ audits active work:
 | `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
 | `se:grilling` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
 | `se:study` | Grill one curated handoff, then run read-only analysis in one App controller or the current CLI session with optional Luna subagents. |
+| `se:adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `se:idea` | Save a concrete proposal for later Feature planning, or preview it locally. |
 | `se:feature` | Turn admitted requests and references into clear Features and Macro Tasks, clarify through Grilling when needed, and delegate minimal optional issue labels and type without writing code. |
-| `se:implement` | Deliver planned Features through bounded local and hosted review, reusable workers, standalone or stacked pull requests, and release-before-complete repository ownership. |
-| `se:implement-light` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
+| `se:deliver-features` | Deliver planned Features through bounded local and hosted review, reusable workers, standalone or stacked pull requests, and release-before-complete repository ownership. |
+| `se:implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:audit` | Observe active SE work and report workflow problems or improvement opportunities without making changes. |
 
 Xcode is the repository's Apple developer-tools plugin. It preserves the
@@ -128,7 +129,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `se:grilling` is read-only and explicit or parent-composed. It depends on
   `$se:learn` for context inspection, returns a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
-- `se:implement` accepts only caller-supplied published parent Feature issues
+- `se:deliver-features` accepts only caller-supplied published parent Feature issues
   and treats each parent as the semantic contract. It places one
   visible graph orchestrator in the single involved project or a selected
   coordination project. The orchestrator follows a small transient execution
@@ -143,7 +144,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   then be ready rather than draft with current base/body/topology evidence,
   accepted exact-head hosted review, required validation, and CI. Review-driven
   revisions are bounded across both gates. Successful delivery releases the
-  complete repository claim before completion. Implement never merges,
+  complete repository claim before completion. Delivery Features never merges,
   deploys, or releases.
 - `se:audit` runs only after explicit invocation and observes a frozen cohort of
   active SE sessions until terminal state or user stop. Complete coverage

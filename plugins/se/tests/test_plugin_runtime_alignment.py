@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 PLUGIN = Path(__file__).resolve().parents[1]
-REPOSITORY_CLAIMS = PLUGIN / "skills/implement/scripts/repository-claims"
+REPOSITORY_CLAIMS = PLUGIN / "skills/deliver-features/scripts/repository-claims"
 
 
 class PluginRuntimeAlignmentTests(unittest.TestCase):
@@ -13,7 +13,7 @@ class PluginRuntimeAlignmentTests(unittest.TestCase):
         manifest = json.loads(
             (PLUGIN / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
         )
-        implement_version = subprocess.run(
+        repository_claims_version = subprocess.run(
             [str(REPOSITORY_CLAIMS), "--version"],
             text=True,
             capture_output=True,
@@ -21,7 +21,7 @@ class PluginRuntimeAlignmentTests(unittest.TestCase):
         ).stdout.strip()
         default_prompts = manifest["interface"]["defaultPrompt"]
 
-        self.assertEqual(manifest["version"], implement_version)
+        self.assertEqual(manifest["version"], repository_claims_version)
         self.assertLessEqual(len(default_prompts), 3)
         self.assertTrue(all(len(prompt) <= 128 for prompt in default_prompts))
 
