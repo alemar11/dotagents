@@ -9,5 +9,5 @@ keep operation receipts in the run report.
 - change: <requested semantic change and supporting evidence>
 - preserved: <identities, accepted obligations, and executor progress>
 - retired_task_ids: <IDs no longer active, with historical references, or none>
-- retired_acceptance_ids: <F-AC IDs no longer active, or none>
+- acceptance_changes: <Materially replaced or removed acceptance obligations, or none>
 - delivery_impact: <task coverage, prerequisite, or outcome evidence to reconsider>

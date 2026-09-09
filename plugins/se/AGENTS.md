@@ -25,7 +25,7 @@ When ownership changes, update affected consumers and remove obsolete routes.
 
 ## Skill ownership
 
-- Deliver owns the lightweight worker-to-PR workflow and its local worker role,
+- Deliver owns the single-repository worker-to-PR workflow and its local worker role,
   optional integration and recovery references. It has no graph, claim registry,
   mandatory review gate or repair ledger. Deliver Features-specific invariants
   below remain scoped to that existing skill. Preserve both invocation contracts.
@@ -35,9 +35,9 @@ When ownership changes, update affected consumers and remove obsolete routes.
 - Grilling Session owns read-only interview refinement and composes Learn for context.
 - Explore owns read-only investigation in the invoking task or session, Grilling
   Session composition, bounded native workers, and synthesis.
-- Spec owns coherent specs, stable spec/F-AC/task identities, actionable
+- Spec owns coherent specs, stable spec/task identities, actionable
   task contracts, recommended order, real prerequisites, accepted decisions,
-  review, and GitHub/single-file Markdown projections. Its specification
+  review, and GitHub issue representation. Its specification
   reference owns content, and templates project it. Its delivery-authorization
   reference owns the post-save authorization decision; shared readiness states
   own metadata and Deliver owns the human handoff, not queue execution.
@@ -66,12 +66,12 @@ full protocols into this file:
   relevant baseline evidence, paired task verification checks, and full coverage. Task
   order is independent of identity and hard prerequisites. Planning never
   overwrites executor progress or prescribes workers and PR topology.
-- One outcome may span repositories. Delivery maps task contributions into
-  repository-bound units, verifies actual prerequisite availability and assembled
+- Each spec and its tasks belong to one repository. Cross-repository features use
+  linked repository specs. Delivery verifies prerequisite availability and assembled
   outcomes, and owns PR grouping, stack/integration choices, and closing refs.
-- GitHub and Markdown preserve one spec/task contract and one authoritative
-  destination. Exports are explicit snapshots. Native edges are projections;
-  preserve body-backed meaning, per-edge results, and foreign provider edges.
+- GitHub issues own the saved spec/task contract. Spec owns body-backed prerequisites
+  and ordinary links; G owns explicitly requested native blocker changes. Spec
+  preserves existing provider relationships.
 - Material spec questions compose Grilling Session in the planner. Safe assumptions
   and explicitly delegated decisions do not require extra interviews. Every
   complete draft passes Review, with progress-bounded correction.
@@ -93,8 +93,8 @@ full protocols into this file:
   G owns transport/readback; SE owns semantic projection and correction.
 - Graph node IDs and transitions stay synchronized across registries, step
   frontmatter, state glossaries, and Mermaid projections. Terminal nodes have
-  no outgoing edges. Preserve bracketed `F-AC-NN` syntax as an explicit external
-  rendering exception; criteria are not checkbox progress state.
+  no outgoing edges. Acceptance criteria are plain behavioral bullets;
+  verification belongs in task checks, and progress remains separate.
 
 ## Validation
 

@@ -13,11 +13,9 @@ this gate never changes that authoritative result.
 ## When to run
 
 For Learn, do not load this gate: Learn has no hosted dependency. Spec runs it before any hosted source read or GitHub save. A local
-source preview or Markdown save needs no G workflow. A Markdown destination or
-preview does not waive the gate for an explicitly admitted hosted source read.
+source preview needs no G workflow. A preview does not waive the gate for an explicitly admitted hosted source read.
 
-Delivery Features always publishes through G, even when its selected spec was
-saved as Markdown. Run the gate before its first authoritative GitHub repository,
+Delivery Features always reads saved specs and publishes through G. Run the gate before its first authoritative GitHub repository,
 issue, PR, review, CI, or relation read. Passing establishes availability for
 the next focused handoff; it does not broaden source or mutation authority.
 Review PR runs this gate before hosted access. Its default invocation authorizes

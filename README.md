@@ -54,8 +54,8 @@ includes delivery workflow retrospectives:
 | `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional Luna subagents. |
 | `se:adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
-| `se:spec` | Create or revise one coherent feature spec and actionable task plan, saving to GitHub or a single Markdown file. |
-| `se:deliver` | Orchestrate isolated workers for specs, issues or bounded work through validated ready PRs. |
+| `se:spec` | Create or revise one coherent feature spec and actionable task plan, saving to GitHub. |
+| `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
 | `se:deliver-features` | Deliver saved specs or selected tasks through surface-aware isolated workers, reviewed ready PRs, and verified outcomes from the current task. |
 | `se:implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
@@ -122,10 +122,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   `$se:learn` for context inspection, returns a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
 - `se:spec` saves one coherent spec with stable task identities, recommended
-  order, real prerequisites, and completion checks. GitHub is the default;
-  explicit Markdown saves contain the entire spec and task plan in one file.
-  A local-source Markdown save or preview requires no G workflow. Existing
-  artifacts retain their authority; exports are explicit snapshots.
+  order, real prerequisites, and completion checks. GitHub is the only saved destination;
+  no-write previews stay in the conversation and require no G access when using
+  only supplied or local sources. GitHub is the sole saved-spec authority.
+
 - SE skills retain the same delegation policy standalone and composed. Implement
   implements, validates and commits; independent review is a separate caller-owned
   gate, with no reviewer delegation inside Implement.
@@ -139,7 +139,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   native subagents. It supports stacks without mandatory independent review,
   repository claims or retrospectives. Source-progress writes are opt-in.
   `se:deliver-features` remains available with its existing stronger gates.
-- `se:deliver-features` accepts saved GitHub/Markdown specs or explicitly selected
+- `se:deliver-features` accepts saved GitHub specs or explicitly selected
   tasks and derives repository-bound delivery units from those contributions. Task
   dependencies do not mandate Git stacks. The current coordinator verifies actual
   prerequisites, useful PR boundaries, complete task coverage, and assembled

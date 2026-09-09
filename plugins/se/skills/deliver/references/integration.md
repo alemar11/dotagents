@@ -1,7 +1,7 @@
 # Dependencies and PR integration
 
 Read when contributions need combining, units have prerequisites, a stack or
-cross-repository integration, or parent/base changes affect existing work.
+external inputs, or parent/base changes affect existing work.
 The orchestrator owns topology and acceptance; workers perform integration and
 validation in their assigned branches.
 
@@ -15,13 +15,39 @@ and assigned writer before dispatching contributions that need combining.
 Verify prerequisite behavior in the intended base or an exact validated candidate
 before dependent work consumes it. A closed issue, completed task or planning
 order is not prerequisite proof. Unselected missing prerequisites block affected
-work without authorizing implementation. Explicit merged/deployed requirements
-still require observed evidence and separately authorized actions.
+work without authorizing implementation. Explicit merge/deployment requirements
+gate only their declared activity; they do not delay PR readiness unless that
+evidence is explicitly part of its acceptance boundary.
 
-For cross-repository work, identify the consumed contract and exact commit
-combination, make prerequisite artifacts available, and validate combined behavior.
-A branch in another repository cannot supply a Git base. Individual passing tests
-do not prove an assembled outcome; task subsets never imply a whole spec completed.
+## External prerequisites
+
+The spec owns the shared contract and PR-readiness evidence. Apply it to the
+activity being attempted, without taking ownership of another repository:
+
+- An agreed contract with missing implementation permits local development and
+  mocks when the declared acceptance boundary allows them. Validate the actual
+  agreed interface; do not invent behavior to make a mock pass.
+- An available external candidate can supply integration evidence before merge.
+  Identify its exact revision and consumable artifact, package or preview; run
+  the required checks from this repository. A PR link alone is not a usable input,
+  and a branch in another repository cannot supply this repository's Git base.
+- If required contract detail or implementation is missing, finish independent
+  local work and pause only affected work. Return the external spec/candidate
+  reference, missing capability or artifact, preserved local result, and exact
+  evidence needed to resume. Do not poll indefinitely; waiting or monitoring
+  beyond the current run requires a caller request.
+
+Local contract tests can complete delivery when that is the declared readiness
+boundary. They do not prove real compatibility with an unverified provider.
+If real interaction is required for readiness, keep delivery incomplete until it
+passes. Explicit merge or deployment conditions gate only their stated activity.
+Record deferred integration or release obligations without claiming they passed.
+
+External repositories remain read-only context. Consume supplied artifacts or
+available environments; do not implement, publish, deploy, or launch workers in
+another repository to manufacture a missing prerequisite. The caller coordinates
+its owner. On resume, recheck the prerequisite and invalidate affected evidence
+if the contract or consumed candidate changed; preserve unrelated validated work.
 
 ## Integration assignment
 
@@ -48,21 +74,12 @@ the repository's default/release branches as part of integration. If the target
 is an existing PR branch, reconcile its writer before reassignment. Preserve
 contribution branches and worktrees; integration does not authorize their cleanup.
 
-## Task closure through integration and stacks
+## Source references through integration and stacks
 
-Apply the entrypoint's [task issue closure](../SKILL.md#task-issue-closure) rule
-to the chosen landing path. An integration PR carries the closing references
-for every task it completes, including tasks supplied as commit-only contributions.
-
-Each stacked PR keeps its own task-closing lines even when its base is another
-feature branch. A visible issue link is not proof that merging into that branch
-will close the issue. Record the default-branch landing step: if PRs land
-individually, recheck each child's closing references after retargeting; if one
-PR lands the combined result, that PR must carry all completed task references.
-Include this requirement in the merge handoff without performing an unauthorized
-merge or changing topology solely to activate issue links. Pending default-branch
-activation does not block an otherwise verified ready stack; missing closing
-lines do.
+Apply the entrypoint's [source references](../SKILL.md#source-references) rule.
+Integration and stacked PRs use ordinary references to the source outcomes they
+contain, including commit-only contributions. Integration does not add issue
+closure handling or extend completion beyond verified ready PRs.
 
 ## Stacks and parent changes
 

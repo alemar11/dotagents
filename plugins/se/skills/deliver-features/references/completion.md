@@ -47,18 +47,15 @@ partial results and blocker, not successful delivery of the selected bundle.
 Before each G Send, derive caller-owned `closing_issue_refs` from exact issue
 identities and coverage. Never infer closure from a branch name or nearby issue.
 
-- A task issue qualifies only when this PR's merge completes all its task checks,
-  including prerequisite and cross-repository contributions already incorporated
-  in their intended bases. Partial contributions get ordinary task references.
+- Embedded tasks have no separate closing issue identity. Link their spec sections
+  as ordinary references; never create issues to obtain closing references.
 - A main spec issue qualifies only when this PR's merge plus already-incorporated
   work completes all tasks and feature criteria. A selected subset cannot close
   the parent while other work remains.
 - When several unmerged PRs jointly supply an outcome and none can safely close
   it alone, omit the closing keyword and report the exact post-merge action.
   Do not invent a final PR or close issues directly.
-- A Markdown-only spec has no GitHub closing identity. Use portable spec/task
-  references and an empty closing set unless exact associated issues were
-  explicitly supplied and verified.
+
 
 Check actual PR bases and landing order; a stacked link does not guarantee
 provider automatic closure. Pass the exact justified set to G, then read back

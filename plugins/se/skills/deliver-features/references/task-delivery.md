@@ -7,8 +7,8 @@ selection, execution units, integration, and PR grouping.
 
 ## Selected outcomes
 
-Accept an authoritative saved GitHub spec bundle or Markdown spec. Read the
-main spec and every task contract, including task-owned prerequisites. Reject exported snapshots. Select all tasks by default. An explicit subset selects exact
+Accept an authoritative saved GitHub spec issue. Read the
+main spec and every embedded task contract, including spec-level and task-owned prerequisites. Select all tasks by default. An explicit subset selects exact
 task IDs within their qualified spec identities; an explicit batch may select
 several specs. Read the surrounding spec to preserve constraints, not to expand
 implementation scope.
@@ -36,9 +36,10 @@ silently implement the prerequisite or claim that delivering a subset completes
 the whole spec. Expansion into another repository requires safe release and
 reacquisition of the newly frozen complete claim set before mutation.
 
-Map selected tasks to exact repositories and local checkouts. Claim selected
-implementation repositories plus any repository whose authoritative Markdown
-progress file will be written. A GitHub tracker owner alone does not imply a
+Each task inherits its spec's single `owner_repository`; resolve that repository
+and local checkout. Cross-repository selections consist of several linked specs,
+not tasks assigned to several repositories. Claim selected
+implementation repositories. A GitHub tracker owner alone does not imply a
 code repository claim. Do not claim every repository in an otherwise unselected
 part of the spec. Branch/worktree and source-file identities must be resolved
 before writing; display titles never establish them.
@@ -47,9 +48,9 @@ before writing; display titles never establish them.
 
 Choose the smallest coherent set of reviewable PRs. A delivery unit owns one
 spec, one repository, one branch, and one PR; it may supply one or several
-selected tasks or their per-repository contributions. Group tightly coupled
+selected tasks in that repository. Group tightly coupled
 schema/API work when useful; split independent outcomes or an unwieldy delta.
-Explicit caller grouping wins when feasible. Multi-repository work needs a PR
+Explicit caller grouping wins when feasible. A selection spanning linked specs needs a PR
 in each repository that has a new delta. Already-incorporated work needs exact
 current evidence, not an empty PR.
 
@@ -62,7 +63,8 @@ invalidates affected evidence and preserves the repair history under
 [review-repair-budget.md](../../../references/review-repair-budget.md).
 
 Account for every selected task across units or already-incorporated evidence.
-A partial contribution does not complete a multi-repository task. Relevant
+A partial contribution does not complete a task; completing one linked spec
+does not prove the combined cross-repository outcome. Relevant
 feature criteria and preservation constraints apply even to a subset; distinguish
 criteria fully verified by this selection from those awaiting other tasks.
 
@@ -84,6 +86,9 @@ gated operational outcome.
 Verify declared prerequisite outcomes, not merely a closed issue, list position,
 native edge, or finished agent turn. A code prerequisite must be available in
 the integration base or a validated candidate the dependent can consume.
+An open prerequisite issue does not block all selected work: evaluate the
+declared activity and evidence, and use a qualifying candidate without waiting
+for closure. Preserve explicitly requested issue-closure gates.
 Cross-repository candidates require a published PR, exact HEAD, and the needed
 contract/integration evidence. Respect explicit merged/deployed prerequisites;
 Delivery does not authorize those effects.

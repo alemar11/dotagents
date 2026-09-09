@@ -3,34 +3,34 @@
 The `spec` namespace describes transient caller choices and operation results,
 not a workflow graph. The saved identity and revision contract belongs to
 [specification.md](specification.md). A request resolves to preview or save;
-review findings return to drafting or clarification. A verified artifact completes
-the save; [delivery authorization](delivery-authorization.md) owns the subsequent
+review findings return to drafting or clarification. Each spec has its own save result. A multi-repository request completes only
+when all required repository specs and their ordinary links are verified; report
+partial saves by exact artifact rather than recreating the set. A verified artifact completes
+its save; [delivery authorization](delivery-authorization.md) owns the subsequent
 pickup decision. An unresolved required effect remains blocked.
 
 ## Caller choices
 
 | Field | Values | Meaning and default |
 | --- | --- | --- |
-| `destination` | `github`, `markdown` | GitHub for a new spec unless the caller requests a local file. Existing specs retain their authoritative destination; a change of destination requires explicit export or authority-transfer scope. |
 | `operation` | `preview`, `save` | Save by default; an explicit draft, preview, or no-write request renders without durable or hosted writes. |
 
-These are operation choices, not project configuration. The exact file path or
+These are operation choices, not project configuration. The exact issue or
 repository target is caller/repository data, not another enum. A preview may
 read an explicitly supplied hosted source through G; a local-only source
-constraint still forbids hosted reads. No destination or operation grants
+constraint still forbids hosted reads. No operation grants
 additional source access or implementation authority.
 
 ## Derived evidence and result values
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `source_route` | `new-source`, `existing-source` | Derived from whether the request creates a spec or revises/exports an existing authoritative artifact. |
+| `source_route` | `new-source`, `existing-source` | Derived from whether the request creates a spec or revises an existing authoritative artifact. |
 | `planning_readiness` | `ready`, `clarification-required`, `blocked` | Whether evidence supports drafting, a material choice remains, or essential evidence is unavailable. |
 | `grilling_outcome` | `refined`, `user-stopped`, `blocked` | Composed interview result; a stopped handoff is usable only when remaining assumptions are safe. |
 | `review_result` | `clean`, `revision-required`, `clarification-required`, `blocked` | Assessment of the complete spec and task contract. |
-| `save_result` | `previewed`, `saved`, `exported`, `blocked` | Complete non-durable rendering, verified authoritative save, verified snapshot export, or incomplete operation. |
+| `save_result` | `previewed`, `saved`, `blocked` | Complete in-conversation rendering, verified GitHub save, or incomplete operation. |
 | `readback` | `verified`, `no-op`, `ambiguous` | Observed exact saved content; no-op requires the target already matches. Ambiguity blocks a required save. |
-| `native_projection_result` | `verified`, `no-op`, `failed`, `unavailable`, `unknown` | GitHub relationship/dependency observation. A recorded native limitation is a warning when the complete semantic body representation is verified. |
 | `downstream_handoff_status` | `not-requested`, `verified`, `no-op`, `failed`, `unavailable`, `ambiguous` | Only not-requested, verified, or no-op permits completion when a handoff is in scope. |
 
 A saved spec may contain its semantic revision, explicit assumptions, acceptance

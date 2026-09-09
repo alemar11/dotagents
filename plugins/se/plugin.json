@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "se",
-  "version": "6.11.0",
-  "description": "Refine ideas, create feature specs with actionable tasks, save to GitHub or Markdown, and deliver reviewed changes.",
+  "version": "6.14.1",
+  "description": "Refine ideas, create feature specs with actionable tasks, save to GitHub, and deliver reviewed changes.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"

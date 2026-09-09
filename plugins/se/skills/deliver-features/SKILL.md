@@ -10,7 +10,7 @@ standalone and composed invocation.
 
 ## Scope and authority
 
-Deliver authoritative saved GitHub or Markdown specs. Select the whole spec by
+Deliver authoritative saved GitHub specs. Select the whole spec by
 default or exact tasks explicitly named by the caller. Read
 [task-delivery.md](references/task-delivery.md) during Intake and on material
 caller clarifications for scope reconciliation, prerequisites, coverage,

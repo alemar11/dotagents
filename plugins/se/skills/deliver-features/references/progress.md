@@ -26,38 +26,20 @@ not make code or Git changes invisible.
 
 ## Destination
 
-For GitHub, update the linked task issues through G and maintain a concise parent
-summary with task/PR links. Keep all semantic sections and foreign content.
+For GitHub, update one Delivery progress section in the authoritative spec issue
+through G, keyed by task ID with task-section/PR links. Do not create task issues. Keep all semantic sections and foreign content.
 Issue open/closed state does not substitute for delivery status; only observed
 merges permit `merged`, and parent delivery requires all tasks, not the selected
 subset. Apply [hosted-content safety](../../../references/hosted-content-safety.md)
 immediately before every hosted write and verify the exact resulting content.
-
-For Markdown, update the single authoritative source file in its original
-planning checkout. Keep the progress section separate from spec/task definitions.
-Preserve unrelated dirty content, reread before writing to avoid overwriting
-concurrent edits, and read back the targeted result. These progress edits remain
-local and uncommitted by default; report that explicitly. Do not create a
-self-referential commit containing its own reviewed HEAD or push a progress-only
-commit into a reviewed candidate. If the source is inside an active candidate
-worktree, defer its progress write until that lane is quiescent and it can remain
-a local, uncommitted metadata edit; never treat the resulting dirty file as a
-clean implementation worktree on resume. Keep that checkout as the authoritative
-planning location and create a fresh clean implementation lane from the preserved
-candidate commits when needed; do not move or discard the progress diff.
-
-An explicit request to publish Markdown progress is separate from code delivery:
-choose and validate an ordinary documentation change without claiming the old
-review covers its new commit. Do not silently create another authoritative copy
-or an additional PR just to persist progress.
 
 ## Update and resume
 
 Write observed progress after meaningful implementation, review, publication,
 merge observation, or blocking changes, and before safe release. Never mark
 `pr-ready` from publication alone: both review gates, required CI, selected task
-checks and integration evidence must be current. Mark a multi-repository task
-only after all its contributions qualify. A partial selection leaves other
+checks and integration evidence must be current. Mark a task only after all its checks qualify, including required integration
+evidence from linked specs. A partial selection leaves other
 tasks unchanged and reports their outstanding status.
 
 On resume, reconcile stored progress with current Git, PR, review, CI, and

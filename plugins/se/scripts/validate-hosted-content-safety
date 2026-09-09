@@ -33,7 +33,6 @@ done
 
 hosted_templates=(
   "$plugin_root/skills/spec/templates/spec.md"
-  "$plugin_root/skills/spec/templates/task.md"
   "$plugin_root/skills/spec/templates/maintenance-changelog.md"
 )
 

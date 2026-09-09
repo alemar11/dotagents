@@ -11,13 +11,15 @@ Grilling Session, Explore, Spec, Adversarial Review, Review PR, Delivery Feature
 Deliver, Deslop, and Implement skills have distinct runtime contracts, while `AGENTS.md`
 and `README.md` define package maintenance ownership and routing.
 
-Spec owns one coherent spec and actionable task plan, saved to GitHub or one
-Markdown file. Deliver Features owns task-to-PR grouping and integration, with task
+Spec owns one repository-scoped spec and actionable task plan, saved to one GitHub issue, with all task contracts embedded. Cross-repository features use
+one linked spec per implementation repository; tasks inherit their spec's owner. Related specs use ordinary links, with body-backed
+prerequisites that can be satisfied by usable PR candidates. Native GitHub
+blocker changes belong to G on explicit user request, never to Spec. Deliver Features owns task-to-PR grouping and integration, with task
 prerequisites independent of Git topology. The Spec content contract is at
 [`specification.md`](skills/spec/references/specification.md).
 Spec also owns the [delivery authorization](skills/spec/references/delivery-authorization.md)
 marker and post-save pickup decision. Authorization is separate from semantic
-revision and execution progress; exports remain inactive snapshots. No monitor
+revision and execution progress; No monitor
 is started by publishing or marking a spec.
 
 Explore runs in the invoking task or session. It explores relevant evidence before
@@ -56,3 +58,8 @@ separate workers/worktrees. Deliver returns bounded results and resume context;
 backlog monitoring and queue persistence belong to its caller. Claims, mandatory
 reviews, source-progress writes and retrospectives are not part of its default
 path. Deliver Features remains unchanged and independently invokable.
+
+Deliver owns one implementation repository per invocation. External prerequisites
+are inputs coordinated by the caller. Linked specs own shared interfaces and
+per-repository PR-readiness evidence; local contract checks and real integration
+are distinct obligations.

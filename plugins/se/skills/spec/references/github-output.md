@@ -6,77 +6,80 @@ provider operations, and readback; Spec owns the semantic projections.
 
 ## Projection
 
-GitHub issue titles use `Spec: <spec title>` for the parent and
-`Task: <task title>` for each subtask. Apply the prefix exactly once in previews,
-creates, exports and updates of selected issues; preserve the descriptive title.
-These prefixes are GitHub display metadata, not spec/task identity or dispatch
-signals. Keep Markdown titles and body headings unprefixed; a prefix-only change
-does not increment `spec_revision`.
+Save exactly one issue in the spec's `owner_repository`, titled
+`Spec: <spec title>`. Apply the prefix exactly once; it is display metadata,
+not identity, and a prefix-only change does not increment `spec_revision`.
+Keep body headings unprefixed. Never create task issues or sub-issue relationships.
 
-Save one main spec issue in its `owner_repository` and one associated issue per
-task. Put a single-repository task in that repository. Put a multi-repository
-task in the spec's owner repository unless the caller explicitly chooses another
-affected repository; its body still names every contributing repository.
+The issue body contains the complete spec, ordered task index, and every detailed
+task contract for that repository. Use the single [spec template](../templates/spec.md)
+with the shared [embedded task rendering](specification.md#rendering). Task links
+point to sections in this issue. Issue types and classification labels are optional;
+the [delivery marker](delivery-authorization.md) alone controls pickup authorization.
 
-The parent owns the specification and ordered task index. Each child owns its
-detailed task contract, including prerequisites, and links to the parent.
-Use the spec template for the parent and the task template for each child;
-keep task details out of the parent. The parent task list links to every child.
-Issue types and classification labels are optional metadata, never identity or
-dispatch signals. The main spec's [delivery marker](delivery-authorization.md) is
-the explicit pickup-authorization exception.
+For `operation=preview`, render the complete issue, target repository, and proposed
+spec links and prerequisite conditions without writes or collision claims. Local-source previews
+need no G access; hosted source reads retain their preflight and caller constraints.
 
-For `operation=preview`, render the parent, every child body, intended targets,
-and proposed mappings without any hosted write or collision claim. New local
-source previews need no G access. An explicit hosted source read remains governed
-by the hosted-source preflight and caller constraints.
+For cross-repository work, save one complete spec issue in each implementation
+repository. Prepare the coordinated drafts first, create or reuse each exact
+spec identity, then add reciprocal ordinary issue links once URLs are known.
+Verify every issue, companion link, and canonical shared-contract reference
+before reporting the full request saved. Reconcile
+partial publication against the same issues; never recreate a verified issue.
+Apply delivery authorization separately to each authoritative spec, reusing the
+user's established authorization scope.
+
+## Spec dependencies
+
+Link related specs with ordinary exact issue URLs, in the same or different
+repositories. When one supplies a prerequisite, state the required outcome or
+evidence and the activity it gates: implementation, integration, publication,
+merge, or deployment. Task-specific prerequisites stay in their task contracts;
+internal `blocked_by` references stay in the body. Shared scope or recommended
+order alone does not establish a dependency.
+
+Spec never creates, updates, or removes native GitHub blocked-by relationships. Delivery
+ends at ready PRs, so a usable candidate can satisfy a prerequisite while its
+issue remains open. An agreed interface can permit parallel implementation;
+integration may require a consumable candidate, and release may require deployed
+behavior. Specify the actual condition without choosing Delivery's PR topology.
+
+Preserve existing native relationships. If the user explicitly asks to add or
+remove blockers, that action belongs to `g:github-issues` outside the Spec workflow;
+keep its result separate from the spec save. Spec must not infer such a request
+from semantic prerequisites. Verify exact linked spec identities and reject
+self-dependencies or cycles in hard prerequisites without creating placeholder
+issues. Issue closure remains distinct from implementation or availability evidence.
 
 ## Save and verify
 
-Before hosted reads or writes, run the shared
+Before hosted reads or writes, apply the shared
 [G dependency preflight](../../../references/codex-dependency-preflight.md).
-Before each write, apply
-[hosted-content safety](../../../references/hosted-content-safety.md) to the
-exact final title/body, including worker- or provider-originated content.
+Before each write, apply [hosted-content safety](../../../references/hosted-content-safety.md)
+to the exact final content, including worker- or provider-originated content.
 
-1. Resolve exact target repositories and inspect for existing artifacts with
-   the intended spec/task identities. Reuse a verified matching identity; a
-   materially different collision needs reconciliation before creation.
-2. Create the main spec, then each missing task issue. Preserve receipts and
-   read back each artifact before proceeding. Existing revisions update the
-   same artifacts under [existing-specs.md](existing-specs.md).
-3. Once all identities exist, reconcile the parent task index with their exact
-   references and each child's parent reference. Read back the complete
-   spec and task bundle; no task detail may disappear during projection.
-4. Establish parent-child relationships and verify them. If a native relation
-   is unsupported, record the observed limitation and retain verified reciprocal
-   body links as the association. Missing or incorrect body links block.
-5. Derive dependencies from every task body and attempt each canonical dependency
-   as a native blocking relationship where supported, and record the result for every edge. An unavailable native
-   capability is recorded explicitly; it never changes the semantic graph.
-6. Optionally classify issues through `g:github-issues` after semantic save.
-   Classification must not add or remove the delivery marker. Optional
-   classification failure does not block semantic save or imply execution order.
+Resolve the owning repository and inspect for the intended spec identity. Reuse
+a verified match; reconcile a materially different collision before creation.
+Create or update the single complete issue and read it back under
+[existing-specs.md](existing-specs.md). Verify identity, title, revision, every
+task and anchor, acceptance coverage, prerequisites, and preserved foreign or
+executor-owned content before reporting semantic save complete.
 
-Every required issue identity, prefixed title, body, task association, and task prerequisite
-must be verified. Native relationship/dependency failures are warnings when
-the complete body-backed representation is verified; absent result coverage
-is not success. Preserve foreign provider edges and metadata. On revision,
-remove only native edges proved SE-owned and explicitly retired from the plan.
+Verify ordinary spec links and body-backed prerequisites as part of the save.
+Preserve provider relationships and foreign metadata. Optional issue classification
+must preserve delivery markers and does not gate semantic save.
 
-After an ambiguous operation, inspect the same intended artifact before retrying.
-Reuse a proved identity, retry only after proved non-application, and stop on
-unresolved ambiguity. Partial publication reports the exact completed and
-remaining artifacts; never replay the whole batch or substitute a local save.
-
-Saving the plan does not close tasks, the parent, or source issues. A separately
-requested source-issue closure or downstream notification occurs only after the
-complete save is verified and through its authorized owner. Reconcile that
-requested effect before completion.
+Reconcile an ambiguous operation against the same issue before retrying.
+Retry only after proved non-application and stop on unresolved ambiguity. Report
+completed and remaining effects; never recreate the issue or substitute a local
+save after partial publication. Saving does not close this spec or any source or
+prerequisite issue. Separately authorized closure or notification follows verified
+save through its owner and requires its own reconciliation.
 
 ## Delivery marker
 
-After the complete authoritative bundle is verified, apply the decision from
+After the complete authoritative issue is verified, apply the decision from
 [delivery-authorization.md](delivery-authorization.md) through `g:github-issues`.
 Apply the shared [readiness states](../../../references/states.md) contract for
 label creation, canonical colors, mutually exclusive state replacement and

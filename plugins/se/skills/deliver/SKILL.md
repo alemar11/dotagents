@@ -1,9 +1,12 @@
 ---
 name: deliver
-description: "Orchestrate isolated workers to deliver specs, issues, or bounded requests through ready PRs."
+description: "Orchestrate isolated workers in one repository to deliver specs, issues, or bounded requests through ready PRs."
 ---
 
 # Deliver
+
+Deliver verified ready PRs for selected work in one repository. Keep implementation
+with isolated workers and finish the source readiness handoff where applicable.
 
 Use the current task as delivery lead and orchestrator, designed for
 `gpt-6-astra` with caller-configured reasoning. Honor explicit profile overrides;
@@ -21,19 +24,34 @@ recurring monitoring and queue persistence belong to the caller.
 
 ## Select and assign
 
-Accept a saved SE spec, selected issues/tasks, or directly described bounded work.
-Resolve the intended outcome, repository identities, acceptance checks and caller
-constraints. A saved spec selects the whole spec unless the caller names a subset;
-read all task contracts and accepted decisions without rewriting requirements.
+Each invocation owns exactly one implementation repository. Accept its saved
+specs, selected issues or bounded work, and resolve that repository before
+assigning workers. Default to the current repository when it matches the request.
+For a request spanning repositories, handle the clearly selected local scope and
+return the other repository scopes to the caller; if no local target is clear,
+resolve that choice before dispatch. Never create another repository's orchestrator
+or workers. The caller coordinates separate Deliver runs.
+
+A saved spec selects the whole spec unless the caller names a subset. Read its
+embedded task contracts, prerequisites, shared contracts and accepted decisions.
+Linked specs in other repositories are context and external inputs, not selected
+implementation. Read [external prerequisites](references/integration.md#external-prerequisites)
+when another repository supplies a required interface or implementation. Evaluate
+the declared activity and evidence rather than issue closure or merge state.
+
+The orchestrator turns selected implementation scope into bounded worker
+assignments. These are not tracker issues or parent/child specs. Use source
+section links where useful; do not create issues for worker assignments.
 Do not implement unselected prerequisites. Ask only for material unresolved
 scope or authority; keep independent selected work moving.
 
 Choose useful repository-bound PR units, not one worker or PR per checklist item.
-Default to one active worker per repository; add isolated workers for independent
-concurrent assignments. Prefer worker/worktree reuse for compatible serial work
+Default to one active worker. Add isolated workers when independent assignments
+can progress concurrently and reduce elapsed time; keep dependent or overlapping
+writes serial unless their isolation and required inputs are established. Prefer worker/worktree reuse for compatible serial work
 under [workers.md](references/workers.md). Choose PR topology before dispatch;
 read [integration.md](references/integration.md) when combining contributions,
-handling dependencies, stacks, cross-repository outcomes or topology changes.
+handling dependencies, stacks, external inputs or topology changes.
 Parallel execution alone does not require a stack or an extra integration PR.
 Assign one writer per branch, PR and shared artifact, including
 any requested source-progress edits. Worktrees do not isolate ports, databases
@@ -48,7 +66,7 @@ Ordinary phase transitions need no coordinator approval round trip.
 ## Authority and worker work
 
 Explicit invocation of this skill requests and authorizes creation of the workers
-needed for selected delivery: visible tasks in matching saved repository projects
+needed for selected delivery: visible tasks in the selected saved repository project
 with isolated worktrees on the App, or native subagents with isolated worktrees
 on CLI. Do not ask for separate task-creation confirmation. This authority covers
 scoped branches, implementation, commits, pushes, PR creation/readiness and CI
@@ -84,28 +102,19 @@ transition, not Send behavior or a request for automated review. Use G GitHub
 Actions for current checks and CI fixes. Missing readiness capability blocks
 completion; do not report a draft as delivered.
 
-## Task issue closure
+## Source references
 
-The orchestrator maps completed task issues to their owning PRs and supplies
-each worker the exact issue identities and repository-qualified references.
-It supplies every task issue fully completed by the assigned PR
-as a closing reference. Require one canonical `Closes` line per task under
-`## Issues`; ordinary links do not satisfy task linkage. Keep parent specs as
-ordinary references for manual closure unless the user explicitly authorizes
-their automatic closure. An open parent spec or another unmerged task does not
-justify omitting a completed task's closing reference. For a task split across
-PRs, assign its closing reference to the PR that completes the whole task with
-its prerequisites incorporated; partial contributions use ordinary references.
-An empty set is valid only when no task issue is completed by that PR.
+The orchestrator supplies each worker the exact source spec or issue references
+and explains which implementation outcome its assignment contributes. PRs use
+ordinary GitHub references only. Saved specs must be GitHub issues; local
+documents may provide context for a direct bounded request but are not tracked
+spec artifacts.
+Worker assignments never acquire issue identities.
 
-The worker passes that set to G Send, preserves foreign content and verifies
-the exact closing lines and GitHub's issue references after publication. If
-provider linkage lags a correct body, refresh the readback before retrying any
-write. Missing or incorrect task references must be repaired before delivery;
-do not silently accept an empty set for completed task issues. Follow
-[integration.md](references/integration.md#task-closure-through-integration-and-stacks)
-for combined or stacked landing paths. Do not close issues directly as a substitute.
-Other source spec/issue progress is report-only unless separately requested,
+Issue closure is outside Deliver, including automatic closure on merge. Pass no
+closing references to G Send and do not add closing keywords. Verify ordinary
+source links after publication. Deliver does not plan, assign, or verify later
+issue closure. Source progress is report-only unless separately requested,
 except the required readiness handoff below.
 
 ## Coordinate and finish
@@ -120,28 +129,34 @@ Consume each result under the [worker result contract](references/workers.md#ass
 Verify current PR/CI facts and selected outcomes. When contributions need combining,
 assign a worker to integrate and validate them under the integration contract;
 the orchestrator accepts the assembled outcome. Reuse valid evidence
-instead of repeating every worker test. Changed scope, base or HEAD invalidates
+instead of repeating every worker test. Complete required checks, then broaden
+or repeat validation only for new changes, failures, or unresolved evidence gaps.
+Changed scope, base or HEAD invalidates
 affected evidence. A worker's completed turn alone is not delivery proof.
 
 Finish when every PR required for the selected scope is non-draft, required CI
 passes, and selected outcomes and any explicitly required reviews are verified.
-Verify that every completed task issue has the required closing reference on
-its owning PR and that parent specs retain the selected manual-closure policy.
-No required CI must be established from current evidence, not missing results.
+Verify each PR references its actual source scope using ordinary links.
+If no CI checks are required, establish that from repository policy and current
+PR facts. Missing check results alone do not prove that no checks are required.
 Already-incorporated work needs current outcome proof, not a duplicate PR.
 Draft, pending, partial and blocked results are not successful delivery. Ready
-PRs remain unmerged; merge/deployment prerequisites needing further authority
-remain blockers rather than being silently weakened.
+PRs remain unmerged. Later merge/deployment prerequisites are handoff information,
+not extra delivery gates, unless the spec explicitly requires that evidence for
+PR readiness. Do not invent a universal cross-repository integration requirement
+or weaken one required by the selected acceptance criteria.
 
-After the whole current spec meets these criteria, the orchestrator transitions
-its authoritative readiness marker to the human-ready state under
-[readiness states](../../references/states.md), using G GitHub Issues or a scoped
-Markdown metadata edit. Verify the transition before reporting the source handoff
-complete. Leave the parent open for human handling; do not transition partial or
+For each selected spec whose whole outcome meets these criteria, the orchestrator
+transitions its authoritative readiness marker to the human-ready state under
+[readiness states](../../references/states.md), using G GitHub Issues.
+Verify the transition before reporting the source handoff
+complete. Leave source issues open for human handling; do not transition partial or
 blocked specs or requeue delivered work after a failed metadata update. Direct
 requests without a saved spec need no readiness artifact.
 
-Return a concise result for the selected scope using the worker result contract;
+Return a concise result led by ready PR links and verified outcomes, followed
+only by material limitations or resume inputs. Use the worker result contract
+for the evidence needed to substantiate that result;
 combine contributions without claiming unselected outcomes. On interruption or
 partial results include a resume handoff under the worker recovery rules.
 Preserve worktrees and leave App workers visible by default.

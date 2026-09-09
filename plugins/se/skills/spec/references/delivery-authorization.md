@@ -21,10 +21,10 @@ For a spec without an established readiness decision, after the whole
 authoritative spec is saved and verified, ask: **Should this spec
 be available for automatic delivery to ready PRs?** Reuse an explicit answer or
 existing authorization; a request to publish and deliver already grants it.
-Publication alone does not. Preview/no-write operations and exports do not prompt
+Publication alone does not. Preview/no-write operations do not prompt
 for or enable pickup.
 
-If approved, apply the marker through the selected output reference and verify
+If approved, apply the marker through the GitHub output reference and verify
 it. Approval includes creating the exact missing repository label and applying
 it to the main issue, without a second confirmation. Declining leaves a new spec
 inactive; no answer is not approval. Do not repeat an answered question when
@@ -39,9 +39,7 @@ scope changes with active work and the authority already granted under
 [existing-specs.md](existing-specs.md). An unchanged marker does not grant new
 authority for work outside that agreement.
 
-Exports remain inactive snapshots even when the source is authorized. Transfer
-of authority must reconcile the old and new pickup locations before enabling the
-new one; never create two active authoritative copies. Explicit revocation clears
+Explicit revocation clears
 readiness under the shared states contract, preserving other metadata. A human-ready spec requires explicit renewed authorization before
 agent pickup; saving it again does not requeue it.
 

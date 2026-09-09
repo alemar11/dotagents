@@ -8,10 +8,10 @@ task plans, reviewed PR delivery with workflow retrospectives, and durable proje
 | `se:learn` | Maintain explicitly authorized local project knowledge and review rules. |
 | `se:grilling-session` | Refine a topic through one focused question and recommendation at a time. |
 | `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session. |
-| `se:spec` | Create or revise a coherent spec with an ordered actionable task plan; save to GitHub or one Markdown file. |
+| `se:spec` | Create or revise a coherent spec with an ordered actionable task plan; save to GitHub. |
 | `se:adversarial-review` | Independently pressure-test a fixed software change without editing it. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
-| `se:deliver` | Orchestrate isolated workers for specs, issues or bounded work through validated ready PRs. |
+| `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
 | `se:deliver-features` | Deliver saved specs or selected tasks through reviewed ready PRs from the current task. |
 | `se:implement` | Implement selected local work, optionally consult a UI designer, validate it, and commit scoped files without publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
@@ -23,16 +23,17 @@ Deslop requires explicit user invocation.
 ## Feature specifications
 
 One main spec describes a coherent outcome, accepted decisions, acceptance
-criteria, and tasks. An outcome may span repositories. Tasks have stable IDs,
+criteria, and tasks in one repository. Cross-repository features produce one
+linked spec per implementation repository. Tasks have stable IDs,
 scoped outcomes, completion checks, validation, and real prerequisites. Their
 recommended sequence does not imply dependencies or Git stacks.
 
-Spec saves new specs to GitHub by default: one parent spec issue plus
-associated task issues. An explicit Markdown save writes one complete file
-containing the spec and every task. Preview writes neither destination. Existing
-specs retain their authority; an explicit export creates a labeled snapshot.
+Spec saves new specs to GitHub by default: one spec issue containing the complete task plan.
+Related specs use ordinary links; prerequisites state the evidence and activity
+they gate, allowing dependent work from usable PR candidates. Spec never manages native issue
+blockers; explicitly requested blocker changes belong to G. No-write previews remain in the conversation; saved specs use GitHub only.
 See the canonical [specification contract](skills/spec/references/specification.md)
-and [revision and export rules](skills/spec/references/existing-specs.md).
+and [revision rules](skills/spec/references/existing-specs.md).
 
 Spec runs in the current session with its configured model and reasoning and
 updates the task title to `📚 Plan Feature · <outcome>` when supported. It asks
@@ -43,21 +44,24 @@ does not start delivery implicitly.
 After verifying an authoritative save, Spec asks whether to authorize automatic
 delivery to ready PRs unless the answer or authorization is already established.
 Approval applies `ready-for-agent` to the main GitHub issue, creating the label
-if missing, or sets `delivery: ready-for-agent` in Markdown frontmatter. New specs
-remain inactive without approval; Markdown keeps an empty `delivery:` field.
-Ordinary revisions preserve authorization, exports remain inactive, and setting
+if missing. New specs remain inactive without approval. Ordinary revisions
+preserve authorization, and setting
 the marker does not start a monitor. The [authorization contract](skills/spec/references/delivery-authorization.md)
 owns the pickup decision; shared [readiness states](references/states.md) own
-the GitHub label catalog, Markdown values and lifecycle transitions.
+the GitHub label catalog and lifecycle transitions.
 
 The templates use a compact ordered task list; each task owns its repository
 scope, acceptance links, prerequisites, and paired verification checks. GitHub
-stores task bodies in child issues; Markdown nests them in the same file.
+embeds all task bodies in the spec issue.
 
 ## Deliver
 
 [`se:deliver`](skills/deliver/SKILL.md) accepts saved specs, selected issues, or
-bounded requests. The current task is the delivery lead and orchestrator, designed
+bounded requests in exactly one repository. External specs are inputs; the caller
+coordinates separate repository runs. Linked specs define shared contracts and
+state whether local contract checks or real-candidate integration makes each PR
+ready. Missing required inputs produce a resumable handoff after independent
+work finishes. The current task is the delivery lead and orchestrator, designed
 for Astra with caller-configured reasoning and explicit profile overrides.
 Workers use isolated worktrees: visible App tasks or native CLI subagents. Reuse
 a worker and its worktree for compatible serial work, switching branches as needed;
@@ -86,7 +90,7 @@ automatic cross-session ownership exclusion.
 
 ## Deliver Features
 
-Delivery consumes authoritative saved specs from GitHub or Markdown, selects
+Delivery consumes authoritative saved specs from GitHub, selects
 the whole spec by default or explicit tasks, and maps selected contributions
 into repository-bound delivery units. Units choose useful
 PR boundaries; they are not required to match task or spec counts. Delivery
@@ -157,8 +161,7 @@ lineage, bounded waits and terminal evidence.
   review evidence admissibility and hosted finding adjudication.
 - G owns GitHub transport, issue lifecycle, review lineage, CI, and stack
   operations. SE runs its dependency preflight before the required handoff;
-  it never installs or substitutes G. Local-source Spec Markdown work has
-  no G dependency.
+  it never installs or substitutes G. Previews using only supplied or local sources need no G access.
 - The [hosted-content contract](references/hosted-content-safety.md) owns portable
   paths, titles, and bounded readback repair. SE owns semantic projection;
   G owns transport and provider readback.
@@ -166,7 +169,7 @@ lineage, bounded waits and terminal evidence.
   distinguish transient workflow position from saved content and external facts.
 - [Delivery progress](skills/deliver-features/references/progress.md) updates task
   status and PR links in the original destination without changing semantic
-  requirements. Markdown progress remains local and uncommitted by default.
+  requirements.
 - Repository claims store ownership only. No spec/task progress, worker state,
   Git/PR state, review evidence, or workflow node belongs in that registry.
 - Explore stays in the invoking task or session with optional

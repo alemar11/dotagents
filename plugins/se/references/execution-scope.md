@@ -3,7 +3,13 @@
 Read when invoking an SE skill directly or composing it in another workflow.
 A skill has the same responsibility and subagent policy in both cases. Caller
 identity does not enable, disable, or transfer that skill's delegation behavior.
-Explicit user constraints and available capabilities still govern execution.
+Explicit user instructions take precedence over skill guidance; established
+authorization persists across phases and continuations. Resolve routine choices
+from the request and existing evidence. Ask only when an unresolved choice changes
+the outcome, scope, or authority, and continue unaffected authorized work. If a
+skill instruction causes a pause or departure, link its exact source, quote the
+responsible instruction, and distinguish its requirement from your interpretation.
+Available capabilities still govern what can actually execute.
 
 | Skill | Delegation policy |
 | --- | --- |
