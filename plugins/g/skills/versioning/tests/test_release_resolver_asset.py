@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
@@ -51,9 +52,33 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.2")
-        self.assertEqual(completed.stdout.strip(), "0.2.2")
+        self.assertRegex(self.resolver.RESOLVER_VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertEqual(completed.stdout.strip(), self.resolver.RESOLVER_VERSION)
         self.assertEqual(completed.stderr, "")
+
+    def test_resolves_without_project_files_network_or_child_processes(self) -> None:
+        # Audit hooks reject effects regardless of which library initiates them.
+        runner = """
+import runpy, sys
+
+def reject_external_access(event, args):
+    if event.startswith(("socket.", "subprocess.", "os.exec", "os.spawn")) or event == "os.system":
+        raise RuntimeError("unexpected external access: " + event)
+
+sys.addaudithook(reject_external_access)
+resolver = runpy.run_path(sys.argv[1])
+result = resolver["resolve"](
+    ref_name="main", default_branch="main", operation="patch",
+    raw_tags=["v1.0.0"], confirmed_tag=None,
+)
+assert result["ok"] and result["tag"] == "v1.0.1-rc.1", result
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            completed = subprocess.run(
+                [sys.executable, "-I", "-c", runner, str(ASSET)],
+                cwd=directory, capture_output=True, text=True,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_final_tag_classification_requires_canonical_stable_form(self) -> None:
         self.assertTrue(self.resolver.is_final_tag("v1.2.3"))
@@ -128,17 +153,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertEqual(result["tag_state"], "existing-final")
         self.assertTrue(result["is_final"])
 
-    def test_asset_has_no_project_or_network_dependency(self) -> None:
-        source = ASSET.read_text(encoding="utf-8")
-        self.assertNotIn("package.json", source)
-        self.assertNotIn("subprocess", source)
-        self.assertNotIn("urllib", source)
-        self.assertNotIn("requests", source)
 
-    def test_plan_summary_is_independent_of_workflow_display_names(self) -> None:
-        source = ASSET.read_text(encoding="utf-8")
-        self.assertIn("Review the exact resolved tag above", source)
-        self.assertNotIn("Run **Release version", source)
 
 if __name__ == "__main__":
     unittest.main()

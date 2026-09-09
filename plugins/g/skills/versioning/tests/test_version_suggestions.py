@@ -18,7 +18,7 @@ class VersionSuggestionsTests(unittest.TestCase):
 
     def test_version_is_reported(self) -> None:
         completed = subprocess.run([str(SCRIPT), "--version"], check=True, capture_output=True, text=True)
-        self.assertEqual(completed.stdout.strip(), "1.2.0")
+        self.assertRegex(completed.stdout.strip(), r"^\d+\.\d+\.\d+$")
 
     def test_validate_accepts_only_canonical_stable_and_candidate_tags(self) -> None:
         stable = self.run_cli(

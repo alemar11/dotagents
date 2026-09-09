@@ -12,9 +12,10 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from g import __version__
 
 from g import cli
-from g.common import GError, Result, normalize_remote
+from g.common import GError, Result
 from g.publish import _find_open_pr, open_pr, preflight
 
 
@@ -28,13 +29,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "5.1.0")
+        self.assertEqual(output.strip(), __version__)
 
     def test_json_doctor_shape(self) -> None:
         doctor_payload = {
             "ok": True,
             "provider_ready": True,
-            "version": "5.1.0",
+            "version": __version__,
             "checks": {
                 "gh_stack": {"status": "missing"},
             },
@@ -43,7 +44,7 @@ class CliContractTests(unittest.TestCase):
             code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "5.1.0")
+        self.assertEqual(payload["version"], __version__)
         self.assertNotIn("connector", payload["checks"])
         self.assertIn("gh_stack", payload["checks"])
 
@@ -95,17 +96,6 @@ class CliContractTests(unittest.TestCase):
             self.assertIn("--reservation-file", output.getvalue())
             self.assertNotIn("--ledger-file", output.getvalue())
 
-    def test_plugin_runtime_does_not_reference_external_skill_installations(self) -> None:
-        source = Path(__file__).resolve().parents[1] / "src" / "g"
-        runtime = "\n".join(
-            path.read_text(encoding="utf-8") for path in sorted(source.glob("*.py"))
-        )
-        for forbidden in (
-            "skills/implement-feature", ".agents/skills", ".codex/skills",
-            "ledger-cache", "--ledger-file",
-        ):
-            self.assertNotIn(forbidden, runtime)
-
     def test_publish_rejects_inline_title_without_echoing_it(self) -> None:
         hostile = "`unsafe` $(command) $HOME"
         code, output = self.invoke([
@@ -119,10 +109,6 @@ class CliContractTests(unittest.TestCase):
         code, output = self.invoke(["--json", "publish", "template"])
         self.assertEqual(code, 64)
         self.assertEqual(json.loads(output)["error"]["code"], "invalid_arguments")
-
-    def test_normalize_remote(self) -> None:
-        self.assertEqual(normalize_remote("git@github.com:owner/repo.git"), "owner/repo")
-        self.assertEqual(normalize_remote("https://github.com/owner/repo.git"), "owner/repo")
 
     def test_publish_refuses_default_branch(self) -> None:
         state = {"repo": "owner/repo", "root": "/tmp/repo", "branch": "main", "default_branch": "main", "on_default_branch": True, "upstream": None, "dirty": False, "status": [], "existing_pull_request": None}

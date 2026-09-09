@@ -14,7 +14,7 @@ from urllib import error, parse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from g import attachment, cli
+from g import __version__, attachment, cli
 from g.common import GError
 
 
@@ -279,7 +279,7 @@ class AttachmentContractTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "5.1.0")
+        self.assertEqual(payload["version"], __version__)
         self.assertTrue(payload["data"]["dry_run"])
         self.assertEqual(payload["data"]["file"]["name"], "-published proof.svg")
 

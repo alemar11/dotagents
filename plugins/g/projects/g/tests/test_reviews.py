@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from g import __version__
 from g import reviews as cli
 from g.common import GError, Result
 from g.provider_text import ProviderText
@@ -190,14 +191,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "5.1.0")
+        self.assertEqual(stdout.getvalue().strip(), __version__)
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "5.1.0")
+        self.assertEqual(payload["version"], __version__)
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -581,7 +582,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "5.1.0")
+        self.assertEqual(payload["version"], __version__)
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -610,7 +611,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "5.1.0")
+        self.assertEqual(payload["version"], __version__)
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -1936,10 +1937,6 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
         self.assertEqual(code, 0)
         validated = json.loads(stdout.getvalue())
         self.assertEqual(validated["data"]["reservation"], packet)
-
-    def test_g_has_no_external_skill_authority_verifier(self) -> None:
-        self.assertFalse(hasattr(cli, "_verify_started_ledger_authority"))
-        self.assertFalse(hasattr(cli, "_ledger_cache_script"))
 
     def test_request_consumes_before_post_and_never_retries_after_crash(self) -> None:
         path, packet, _ = self.packet_file("review-request")

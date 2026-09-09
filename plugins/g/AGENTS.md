@@ -42,5 +42,5 @@ or wrong-repository extensions must fail closed. Never install during tests.
 Validate changed skill metadata, reference routing, and affected contracts.
 Do not test Markdown wording or moved prose. Executable changes use the
 project-scoped tests and rebuilt-artifact checks. Keep manifest, package
-version, version assertions, and shipped artifact aligned for each versioned
+version, and shipped artifact aligned for each versioned
 commit. Installed caches are verification surfaces, not source.
