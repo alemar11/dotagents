@@ -15,9 +15,6 @@ this gate never changes that authoritative result.
 For Learn, do not load this gate: Learn has no hosted dependency. Spec runs it before any hosted source read or GitHub save. A local
 source preview needs no G workflow. A preview does not waive the gate for an explicitly admitted hosted source read.
 
-Delivery Features always reads saved specs and publishes through G. Run the gate before its first authoritative GitHub repository,
-issue, PR, review, CI, or relation read. Passing establishes availability for
-the next focused handoff; it does not broaden source or mutation authority.
 Review PR runs this gate before hosted access. Its default invocation authorizes
 requesting and waiting for a missing explicit review; audit-only scope remains
 read-only. It does not authorize or own any other hosted action. Explicit SE
@@ -32,7 +29,7 @@ no-push constraints remove publication authority, not permission for admitted
 read-only source/CI inspection. Deliver's ready transition is explicitly owned by its entrypoint and uses G's
 network/gh preflight with the supported GitHub CLI operation, because Send
 excludes readiness. This admitted operation is not a fallback for missing G
-publication or CI workflows. This does not change Deliver Features' gates.
+publication or CI workflows.
 
 ## Required evidence
 
@@ -66,14 +63,6 @@ change incomplete even when semantic save succeeded.
 Review PR requires only the hosted review owner's inspection, request, wait and
 reconciliation operations. It does not use publication, local Git, issue, stack,
 CI, finding-repair, reply/resolution, or merge-policy workflows.
-
-For Delivery Features, the required workflow set includes the G
-owners needed by the selected publication, review, CI, issue, local Git, and
-stack paths. The delivery-status workflow plus branch-protection, ruleset,
-mergeability-policy, merge-queue, auto-merge, and provider-policy inspection
-are not required and must not be added to the dependency gate. A generic
-GitHub read or raw provider call is not a substitute for the focused typed
-workflow that owns the evidence being collected.
 
 ## Blocking outcomes
 

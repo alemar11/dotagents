@@ -54,8 +54,8 @@ in each assignment.
 
 The worker owns implementation, self-inspection, tests, PR publication/readiness
 and required CI for its branch within that assignment. It loads Implement, then
-the applicable G workflows; it does not inherit Deliver Features' developer role,
-independent-review gate, phase handoffs or claims. CI fixes remain within the
+runs the [candidate review](#candidate-review), handles scoped fixes through
+Implement, and uses the applicable G workflows through readiness. CI fixes remain within the
 original outcome and are revalidated and published by the same worker.
 
 When the orchestrator selects a shared integration PR, contribution assignments
@@ -66,9 +66,11 @@ uses the same worker profile, transport and result contract under
 [integration.md](integration.md#integration-assignment). A contribution handoff
 completes that assignment, not the selected feature's delivery.
 
-Workers may delegate only Implement's
-[optional UI designer](../../implement/SKILL.md#optional-ui-design); other agent
-creation is prohibited. Workers cannot broaden scope, mutate another worker's
+Workers may delegate Implement's
+[optional UI designer](../../implement/SKILL.md#optional-ui-design) and Deliver's
+[candidate reviewer](#candidate-review); other agent creation is prohibited.
+The reviewer belongs to the Deliver assignment, not Implement's own delegation
+contract. Workers cannot broaden scope, mutate another worker's
 branch/PR, land PRs, deploy or perform production actions. An integration assignment
 may combine assigned commits into its own delivery branch. Honor direct user stops
 and corrections; relay material scope/target changes to the orchestrator and
@@ -77,8 +79,9 @@ orchestrator is the normal coordination point, not a barrier to user authority.
 
 Return selected source references and, for a spec, its identity and revision;
 verified outcomes and outstanding scope; PR URLs when applicable and exact HEAD/base;
-verified closing references and ordinary source links; checks and
-required CI state; worker/worktree/branch identities, preserved dirty content,
+verified closing references and ordinary source links; reviewed base/HEAD,
+review findings and their dispositions, final fix-validation HEAD or explicit
+review skip; checks and required CI state; worker/worktree/branch identities, preserved dirty content,
 blockers and the next bounded action when work remains. For missing external
 inputs, name the required capability/artifact and resume evidence; do not assign
 work to the other repository or claim deferred integration passed. Finish mutation before
@@ -86,6 +89,44 @@ returning completion. The orchestrator verifies current facts without asking for
 another ritual receipt or a replay of the worker's investigation.
 Keep each result bound to its repository, branch/PR and full commits even after
 the worker's checkout moves to another assignment.
+
+## Candidate review
+
+Read when preparing a completed PR candidate. The owning worker creates one native
+read-only [code-reviewer](../../../references/subagents/code-reviewer.md) for the
+whole candidate after implementation, integration and relevant local checks.
+Use its Astra/medium default where runtime profile selection is permitted;
+otherwise inherit the configured profile, honoring explicit user overrides.
+For a combined PR, the integration worker runs this pass after assembly;
+contribution-only assignments need no separate pass. Each PR in
+a stack has its own candidate review against its actual base.
+
+Commit the candidate and suspend candidate mutations until the reviewer returns.
+Supply an immutable base/HEAD snapshot, complete delta, selected scope, repository
+rules and validation evidence, without the implementation conversation. Reviewers
+never modify code. Wait for a complete result tied to those exact revisions;
+missing evidence or failed review execution is a blocker, not a clean pass.
+Reconcile an uncertain launch before recovery; reuse a completed attributable
+review on resume rather than automatically requesting another.
+
+The worker assesses findings, implements actionable scoped fixes through
+Implement, and verifies each disposition and corrected outcome with affected
+checks. Document why any finding needs no change. Escalate material scope or
+authority decisions to the orchestrator; ordinary fixes need no coordination
+roundtrip. Return the review evidence and fix validation with the delivery result
+for the orchestrator to verify.
+Do not automatically run a second review or create a repair-round ledger.
+Explicitly requested or repository-required follow-up reviews retain their own
+contract. If corrective work changes HEAD, retain the reviewed HEAD and record
+fix verification at the final HEAD; never claim the reviewer reviewed the fixes.
+Unrelated scope/base changes invalidate affected evidence and require
+reconciliation before readiness, not silent reuse of the earlier clean result.
+
+A worker may publish a draft while review is pending, but must complete review
+disposition and verify corrections before marking it ready or reporting an
+existing ready PR delivered. No orchestrator acknowledgment is required. Explicit user instructions may skip the pass;
+report that exception. Required review capability being unavailable blocks
+completion rather than silently substituting worker self-inspection.
 
 ## Requested reviews
 
@@ -110,7 +151,7 @@ for the workflows it needs; immediately before every hosted write it applies
 routes in worker assignments. Do not install, reload or substitute dependencies.
 
 For publication use G Send; it creates drafts and preserves existing draft state.
-Deliver owns readiness after publication. Resolve `references/network-execution.md`
+The worker owns readiness after publication and completed review/fix verification. Resolve `references/network-execution.md`
 and `references/gh-dependency-preflight.md` from the installed G source root
 established by G preflight; never assume SE and G are sibling directories.
 The assigned worker follows those contracts and reads the exact PR's draft state

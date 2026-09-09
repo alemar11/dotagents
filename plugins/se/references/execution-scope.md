@@ -18,7 +18,6 @@ Available capabilities still govern what can actually execute.
 | Spec | Draft and review in the invoking session; optional research/review helpers use shared roles. |
 | Explore | Investigate in the invoking task or session; optional native helpers follow its worker contract. Never create visible tasks. |
 | Deliver | Own isolated workers through PR publication and CI under its local worker contract; the current task owns orchestration. |
-| Deliver Features | Own its coordinator, implementation lanes and reviewers under its delivery contract. |
 
 An orchestrator may launch an agent and assign it a skill. The agent follows
 that skill's delegation boundary without changing its own profile. For example,

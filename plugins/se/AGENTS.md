@@ -17,7 +17,6 @@ When ownership changes, update affected consumers and remove obsolete routes.
 | `references/workflow-graph.md` | Graph vocabulary, registry structure, terminal meanings, authority, and validation. |
 | `references/codex-dependency-preflight.md` | Availability of required G workflows before hosted access. |
 | `references/codex-runtime-surface.md` | Read-only App/CLI classification; capability checks are not surface evidence. |
-| `references/review-repair-budget.md` | Delivery/Implement per-PR repair budget across local/hosted gates, reservations and recovery. |
 | `references/execution-scope.md` | Uniform standalone/composed responsibilities and delegation policies across SE skills. |
 | `references/subagents.md` and `references/subagents/` | Role index, common constraints and reusable role definitions with default profiles; callers own transport, orchestration and disposition. |
 | `references/hosted-content-safety.md` | Portable hosted content, title normalization, and bounded same-artifact repair. |
@@ -26,9 +25,8 @@ When ownership changes, update affected consumers and remove obsolete routes.
 ## Skill ownership
 
 - Deliver owns the single-repository worker-to-PR workflow and its local worker role,
-  optional integration and recovery references. It has no graph, claim registry,
-  mandatory review gate or repair ledger. Deliver Features-specific invariants
-  below remain scoped to that existing skill. Preserve both invocation contracts.
+  integration, single-pass candidate review and recovery references. It has no
+  graph, claim registry or repair ledger.
 
 - Learn owns local durable context, localization, review rules, and managed
   AGENTS pointers. It does not own tracker, task, or delivery state.
@@ -43,13 +41,6 @@ When ownership changes, update affected consumers and remove obsolete routes.
   own metadata and Deliver owns the human handoff, not queue execution.
 - Adversarial Review owns independent read-only critique and generic findings;
   composed callers own target identity, lifecycle, and disposition mapping.
-- Delivery Features owns selected-spec/task scheduling, integration and acceptance,
-  surface-specific developer transport, native research/review subagents, claims,
-  budget reservations, progress, and reviewed PR delivery.
-  Its closeout owns run measurements and generalized workflow improvement reports.
-  It composes Implement, Adversarial Review and Review PR; it does not duplicate
-  their procedures. Delivery owns candidate lifecycle, finding adjudication and
-  hosted acceptance; its state meanings remain in its own `references/states.md`.
 - Review PR requests or resumes one hosted Codex review, waits, and returns the
   provider result to the calling task. It owns no subagents, repairs, CI or
   acceptance. G owns provider operations, lineage and bounded waiting.
@@ -79,17 +70,6 @@ full protocols into this file:
 - Spec runs in the invoking session and updates its title when supported.
   Title availability does not gate planning. Model profiles remain in runtime
   owners and the repository model index.
-- Separate Delivery Features concurrency from PR topology. Overlapping writers
-  never share a worktree. Parent drift invalidates dependent evidence.
-- For Deliver Features, preserve exact-base/full-HEAD candidate and hosted evidence, review-revision
-  budgets, reconciled recovery, and final whole-group claim release. Draft,
-  blocked, and deferred results are not successful delivery.
-- `repository-claims` owns only fenced ownership of the immutable repository set.
-  Its schema/version constants are authoritative. Do not persist workflow,
-  Feature, worker, Git, PR, review, or CI state there; add no TTL, heartbeat,
-  force release, or stale-owner recovery. Only the bound orchestrator uses the
-  token. Safe pauses preserve work and release after verified quiescence; only
-  unresolved actor, preservation, or release safety retains ownership/uncertainty.
 - Hosted writes pass the shared content-safety owner, including worker output.
   G owns transport/readback; SE owns semantic projection and correction.
 - Graph node IDs and transitions stay synchronized across registries, step
@@ -105,12 +85,9 @@ assert Markdown wording or section placement. Use bounded forward-model checks
 when changed semantics cannot be established statically.
 
 For hosted-content changes, run `scripts/validate-hosted-content-safety` and
-inspect affected write owners. For executable claims or version alignment,
+inspect affected write owners. For manifest alignment,
 run `python3 -m unittest discover -s plugins/se -v` from the repository root;
-`test_all.py` must discover the claims and alignment suites. Verify claims help,
-version, and an absent-registry read-only doctor. Never use production claims
-as test fixtures.
+`test_all.py` discovers the alignment suite.
 
 Check manifest/marketplace paths and scan for retired identifiers after routing
-changes. Keep the repository-claims version aligned with
-the plugin manifest in every versioned commit.
+changes. Keep both plugin manifest versions aligned.

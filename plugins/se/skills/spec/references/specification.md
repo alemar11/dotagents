@@ -81,9 +81,7 @@ Revision rules live in [existing-specs.md](existing-specs.md).
 Planning never overwrites executor-owned progress or claims implementation
 completion from a drafted task list.
 
-Delivery owns the separate execution section under
-[progress.md](../../deliver-features/references/progress.md). That section and
-provider status are excluded from semantic contract identity and do not advance
+Preserved executor-owned progress and provider status are excluded from semantic contract identity and do not advance
 `spec_revision`; all requirements, decisions and task contracts remain included.
 The shared [delivery readiness](../../../references/states.md) metadata is also
 excluded: it records pickup eligibility or human handoff, not requirements.

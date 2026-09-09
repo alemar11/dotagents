@@ -1,7 +1,7 @@
 # SE
 
 SE supports repository-grounded refinement, feature specifications, actionable
-task plans, reviewed PR delivery with workflow retrospectives, and durable project knowledge.
+task plans, reviewed PR delivery, and durable project knowledge.
 
 | Skill | Responsibility |
 | --- | --- |
@@ -12,7 +12,6 @@ task plans, reviewed PR delivery with workflow retrospectives, and durable proje
 | `se:adversarial-review` | Independently pressure-test a fixed software change without editing it. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
-| `se:deliver-features` | Deliver saved specs or selected tasks through reviewed ready PRs from the current task. |
 | `se:implement` | Implement selected local work, optionally consult a UI designer, validate it, and commit scoped files without publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
 
@@ -23,8 +22,7 @@ Deslop requires explicit user invocation.
 ## Feature specifications
 
 One main spec describes a coherent outcome, accepted decisions, acceptance
-criteria, and tasks in one repository. Cross-repository features produce one
-linked spec per implementation repository. Tasks have stable IDs,
+criteria, and tasks in one repository. Cross-repository coordination belongs to the caller. Tasks have stable IDs,
 scoped outcomes, completion checks, validation, and real prerequisites. Their
 recommended sequence does not imply dependencies or Git stacks.
 
@@ -67,7 +65,7 @@ Workers use isolated worktrees: visible App tasks or native CLI subagents. Reuse
 a worker and its worktree for compatible serial work, switching branches as needed;
 concurrent assignments require separate workers and worktrees. Serial stacked PRs
 retain distinct branches and may share a worker/worktree. Each worker owns
-implementation, self-checks, publication and required CI in one assignment.
+implementation, self-checks, independent candidate review, scoped fixes, publication and required CI in one assignment.
 The orchestrator owns scope, dependencies, optional stacks and assembled outcomes.
 When contributions feed one PR, it assigns a regular worker to integrate their
 validated commits, resolve conflicts, verify combined behavior and publish the
@@ -80,61 +78,12 @@ Delivery finishes with all required PRs non-draft, current required CI passing,
 and selected outcomes verified. Merge and deployment are separate. There are no
 mandatory adversarial/hosted reviews, claims, repair-round ledgers or audits;
 repository/user requirements still apply. Complete saved specs transition from
-agent-ready to human-ready using the shared states contract, leaving parent
-closure to the user and preventing automatic requeue. Other source-progress
+agent-ready to human-ready using the shared states contract, leaving automatic issue closure to a later PR merge and preventing automatic requeue. Other source-progress
 writes are opt-in.
 Worker setup/recovery and integration details are loaded only when applicable.
 The skill returns the selected outcome and resume context to its caller; backlog
 monitoring, scheduling and queue persistence remain outside Deliver. It has no
 automatic cross-session ownership exclusion.
-
-## Deliver Features
-
-Delivery consumes authoritative saved specs from GitHub, selects
-the whole spec by default or explicit tasks, and maps selected contributions
-into repository-bound delivery units. Units choose useful
-PR boundaries; they are not required to match task or spec counts. Delivery
-verifies prerequisite availability, resolves fan-in integration, and uses
-standalone or stacked PRs according to actual Git topology. It does not turn
-planning order into artificial dependencies.
-
-The intended coordinator is the current Astra task with caller-configured
-reasoning; the skill preserves task settings and explicit profile overrides.
-In the Codex App it creates run-scoped visible developer tasks in exact saved
-repository projects and isolated worktrees; in the CLI developers remain native
-subagents. App workers may be reused within that delivery run, remain visible
-after completion, and are never adopted by later runs. The user communicates
-only with the coordinator. Research and review roles remain native subagents.
-It composes Implement for initial work and repairs, Adversarial
-Review for local critique, and Review PR for hosted monitoring. Implementation
-lanes have isolated worktrees; the coordinator
-alone holds repository claims. Each committed candidate passes independent local
-review before publication, then a ready PR receives an explicit `@codex review`
-request, including its first review. Both gates and required CI must pass for
-the current HEAD. Two repair rounds apply per PR across local and hosted review.
-Completion verifies selected task checks, assembled outcomes, PR linkage, progress
-updates and exact whole-group release. Safe pauses also release once every actor
-is stopped and work preserved; resume reacquires and reconciles existing work.
-See [task delivery](skills/deliver-features/references/task-delivery.md) and
-[completion](skills/deliver-features/references/completion.md).
-
-Local review has a [bounded attempt deadline](skills/deliver-features/references/candidate-review.md#attempt-deadline).
-Before dependent work, Delivery checks supported managed PR topology; rebasing
-keeps changed candidates local until validation and independent review pass.
-Compound stack synchronization cannot bypass that publication boundary.
-
-Every run ends with a [closeout](skills/deliver-features/references/closeout.md),
-including blocked or stopped work. It reports delivered outcomes, duration and
-available token usage with explicit coverage, then audits what worked, failed,
-or could improve in Delivery and its invoked skills. Recommendations must
-generalize across projects and remain proposals. The coordinator may use one
-bounded research helper when useful; safe claim release precedes analysis.
-
-PR delivery, merge, and issue closure are separate facts. A partial task PR
-cannot close its parent spec. G receives exact justified closing references;
-closure that needs multiple unmerged contributions remains an explicit
-post-merge action. Delivery never merges, deploys, releases, or directly closes
-implementation issues without separate authorization.
 
 ## Standalone PR review
 
@@ -151,14 +100,11 @@ lineage, bounded waits and terminal evidence.
 
 - [Execution scope](references/execution-scope.md) preserves the same subagent
   policy standalone and composed. Implement and Adversarial Review execute work;
-  an orchestrator may assign them to agents but they never launch their own.
+  an orchestrator may assign them to agents; Implement may consult its optional UI designer.
 
 - [Execution roles](references/subagents.md) own reusable research, development and review
   definitions. Explore, Spec and Delivery select them while retaining their own delegation,
   lifecycle, fallback, and final decisions.
-- [Repair budget](references/review-repair-budget.md) is shared by Delivery and
-  Implement. Delivery owns [candidate review](skills/deliver-features/references/candidate-review.md),
-  review evidence admissibility and hosted finding adjudication.
 - G owns GitHub transport, issue lifecycle, review lineage, CI, and stack
   operations. SE runs its dependency preflight before the required handoff;
   it never installs or substitutes G. Previews using only supplied or local sources need no G access.
@@ -167,11 +113,6 @@ lineage, bounded waits and terminal evidence.
   G owns transport and provider readback.
 - [Workflow graphs](references/workflow-graph.md) and each skill's state reference
   distinguish transient workflow position from saved content and external facts.
-- [Delivery progress](skills/deliver-features/references/progress.md) updates task
-  status and PR links in the original destination without changing semantic
-  requirements.
-- Repository claims store ownership only. No spec/task progress, worker state,
-  Git/PR state, review evidence, or workflow node belongs in that registry.
 - Explore stays in the invoking task or session with optional
   bounded native subagents. Delivery alone selects App-visible or CLI-native
   developer transport under its runtime contract. Learn remains local-only.

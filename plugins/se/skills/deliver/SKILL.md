@@ -51,7 +51,7 @@ checkout verification, writer isolation, reuse and result evidence.
 
 Explicit invocation authorizes required worker creation, scoped branches,
 implementation, commits, pushes, PR publication/readiness, integration of assigned
-commits and CI corrections. Reuse that authority across continuations without
+commits, one independent candidate review and scoped review/CI corrections. Reuse that authority across continuations without
 phase-by-phase approval. Ask only for material unresolved scope or authority;
 keep independent selected work moving.
 
@@ -62,10 +62,11 @@ recovery and scope expansion remain unauthorized.
 
 Workers compose Implement, then applicable G workflows. Before hosted access or
 publication, follow [publication and readiness](references/workers.md#publication-and-readiness),
-including dependency preflight and hosted-content safety. Independent review is
-not mandatory; user/repository-required reviews apply and optional reviews run
-only when requested. For review findings, follow
-[requested reviews](references/workers.md#requested-reviews).
+including dependency preflight and hosted-content safety. After implementation
+and any integration pass local checks, the owning worker runs one independent
+[code review](references/workers.md#candidate-review) per completed PR candidate
+and handles scoped fixes before readiness. Explicit user instructions to skip it win; additional
+user/repository-required reviews still apply. No hosted review is requested by default.
 
 ## Source references
 
@@ -96,7 +97,9 @@ Dispatch assignments whose prerequisites are verified, then repeat this loop:
 3. Reassess which selected assignments now have their required inputs. Reuse a
    finished worker for compatible serial work or dispatch independent workers;
    do not wait for unrelated assignments to finish.
-4. Assign scoped corrections while evidence shows progress. Repeated unchanged
+4. Verify returned review and fix evidence under the worker contract; assign
+   scoped follow-up work for unresolved findings or evidence gaps while progress
+   continues. Repeated unchanged
    failures or unresolved authority/decisions yield a precise blocker; continue
    other actionable work and finish when delivery is verified or none remains.
 

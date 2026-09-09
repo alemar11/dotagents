@@ -1,13 +1,12 @@
 # SE Workflow Graph Contract
 
 This reference owns the shared structural vocabulary for graph-first SE
-workflows. It applies to Learn, Grilling Session, Spec, and Delivery Features
+workflows. It applies to Learn, Grilling Session, and Spec
 without turning every skill into the same implementation graph.
 
 This reference owns workflow structure only.
 Spec owns the [specification and task contract](../skills/spec/references/specification.md).
-Delivery Features owns transient task-to-unit mapping, scheduling, integration,
-and PR topology. Learn and Grilling Session own their local graphs.
+Learn and Grilling Session own their local graphs.
 
 Every graph-owning skill routes to `references/states.md`. Its registry is the
 structural source of truth for nodes and edges; the state reference explains
@@ -85,7 +84,7 @@ as the source of truth. Explanatory prose may clarify a condition but must not
 add an unregistered edge.
 
 Spec keeps its spec-authoring step files and registry as its local source of truth.
-Learn, Grilling Session, and Delivery Features keep their registries in their
+Learn and Grilling Session keep their registries in their
 SKILL.md files while branch-specific details remain in routed references.
 
 ## Common terminal meanings

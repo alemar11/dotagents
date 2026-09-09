@@ -68,6 +68,8 @@ the affected tests and assembled-outcome checks on the combined result. A clean
 Git merge or separate green worker tests do not establish combined correctness.
 Material requirement conflicts return to the orchestrator for resolution.
 
+The integration worker runs Deliver's single review pass on the assembled
+candidate and verifies scoped fixes before readiness.
 The worker publishes or updates the intended integration PR and completes required
 CI and readiness under Deliver. Return source-to-result commit evidence with the
 normal worker result; the orchestrator verifies contribution coverage and accepts
@@ -111,6 +113,6 @@ actual ancestry, PR bases and current HEADs after publication. Do not allow a
 compound stack operation to push another worker's unvalidated changes.
 
 When changes interact, verify the selected assembled outcome at the current
-commit combination before reporting delivery. No mandatory independent review is
-introduced by stacking. Partial/draft/pending contributions remain incomplete;
+commit combination before reporting delivery. Apply Deliver's candidate review
+to each final PR delta; stacking adds no extra review round. Partial/draft/pending contributions remain incomplete;
 ready stacked PRs do not mean their parents have merged.

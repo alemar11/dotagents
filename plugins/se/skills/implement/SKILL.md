@@ -11,7 +11,7 @@ standalone and composed invocation.
 Implement exactly the selected spec, ticket, directly described work, or
 caller-assigned repair batch. Read the main spec and detailed task contract when
 provided; a spec is not required for a direct implementation or review fix.
-Use `se:deliver-features` for explicitly requested reviewed delivery of saved
+Use `se:deliver` for explicitly requested reviewed delivery of saved
 specs. Discussion of implementation does not itself select work.
 
 ## Assignment and execution
@@ -26,12 +26,7 @@ unselected prerequisites or change requirements to make checks pass.
 The executing task or developer subagent retains the caller-selected profile.
 Implement creates no tasks and never operates claims. Its only delegation is
 the optional UI designer below, with the same policy standalone or composed.
-For assignments within a managed Deliver Features review loop, read the
-[shared repair budget](../../references/review-repair-budget.md), require that
-owner's reserved batch, and preserve its identity/count; Implement cannot reserve
-or reset a round. Direct review fixes and Deliver assignments outside that
-managed loop use the selected findings and validation contract without acquiring
-a repair budget. Preserve any separately established caller-owned budget.
+Preserve any separately established caller-owned budget.
 
 Use test-driven development where practical, especially at pre-agreed seams.
 Run checks covering the changed behavior and repository-required gates. Broaden
