@@ -34,40 +34,23 @@ evidence is explicitly part of its acceptance boundary.
 
 ## External prerequisites
 
-For requests spanning repositories, handle the clearly selected local scope and
-return other scopes to the caller. Resolve an unclear local target before
-dispatch. Never create another repository's orchestrator or workers; the caller
-coordinates separate Deliver runs. Linked specs in other repositories are
-context and external inputs, not selected implementation. Evaluate declared
-activity and evidence rather than issue closure or merge state.
+Select one repository and return other scope to the caller; resolve an unclear
+target before dispatch. External repositories are read-only context, never
+additional implementation or worker targets.
 
-The spec owns the shared contract and PR-readiness evidence. Apply it to the
-activity being attempted, without taking ownership of another repository:
+Use the supplied contract and acceptance criteria to decide what can proceed.
+An agreed interface may permit local implementation and fixture tests without a
+provider candidate. Require real interaction only when readiness explicitly
+calls for it; fixtures do not prove live compatibility. Keep later merge or
+rollout conditions separate from PR readiness.
 
-- An agreed contract with missing implementation permits local development and
-  mocks when the declared acceptance boundary allows them. Validate the actual
-  agreed interface; do not invent behavior to make a mock pass.
-- An available external candidate can supply integration evidence before merge.
-  Identify its exact revision and consumable artifact, package or preview; run
-  the required checks from this repository. A PR link alone is not a usable input,
-  and a branch in another repository cannot supply this repository's Git base.
-- If required contract detail or implementation is missing, finish independent
-  local work and pause only affected work. Return the external spec/candidate
-  reference, missing capability or artifact, preserved local result, and exact
-  evidence needed to resume. Do not poll indefinitely; waiting or monitoring
-  beyond the current run requires a caller request.
-
-Local contract tests can complete delivery when that is the declared readiness
-boundary. They do not prove real compatibility with an unverified provider.
-If real interaction is required for readiness, keep delivery incomplete until it
-passes. Explicit merge or deployment conditions gate only their stated activity.
-Record deferred integration or release obligations without claiming they passed.
-
-External repositories remain read-only context. Consume supplied artifacts or
-available environments; do not implement, publish, deploy, or launch workers in
-another repository to manufacture a missing prerequisite. The caller coordinates
-its owner. On resume, recheck the prerequisite and invalidate affected evidence
-if the contract or consumed candidate changed; preserve unrelated validated work.
+For required integration, consume an identifiable revision and usable artifact,
+package or environment; a PR link alone is insufficient, and another repository's
+branch is not a local Git base. If inputs are missing, finish independent work
+and report the missing capability, preserved result and evidence needed to resume.
+Do not invent provider behavior or poll indefinitely; ongoing monitoring requires
+a caller request. On resume, recheck changed inputs and invalidate affected
+evidence while preserving unrelated results.
 
 ## Integration assignment
 

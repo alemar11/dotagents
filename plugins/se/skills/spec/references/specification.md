@@ -33,18 +33,15 @@ and operational outcomes directly. Omit empty optional sections.
 
 ## Interfaces and readiness
 
-Describe the complete user-visible behavior this repository owns, including
-accepted interfaces, data and failure semantics, and compatibility assumptions.
-Existing API/schema documentation may ground those decisions; documentation links
-are evidence, not cross-repository issue relationships or delegated work.
+Record accepted interfaces, failure semantics and compatibility assumptions;
+API/schema documentation may supply evidence. Describe required external
+capabilities as inputs, without planning another repository's work or linking
+its issues. Missing implementation does not block planning against an agreed
+contract; resolve material interface uncertainty before calling the plan ready.
 
-State which local checks or real integration evidence make this repository's PR
-ready, including the required inputs. Distinguish later rollout conditions from
-readiness. Mocks do not establish provider verification. Missing external
-capabilities may be recorded as explicit assumptions or required inputs without
-linking another repository's issues or specifying its implementation. Resolve
-material interface uncertainty before presenting the plan as ready; report
-unavailable evidence without inventing it.
+State the checks and inputs required for PR readiness separately from rollout
+conditions. Require real integration only when the accepted criteria call for
+it, and never present fixture tests as provider verification.
 
 ## Identity and authority
 
