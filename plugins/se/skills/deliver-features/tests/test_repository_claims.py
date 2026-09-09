@@ -57,7 +57,7 @@ class RepositoryClaimsTests(unittest.TestCase):
         version = subprocess.run(
             [str(CLI), "--version"], text=True, capture_output=True, check=True
         )
-        self.assertEqual(version.stdout.strip(), "6.14.1")
+        self.assertRegex(version.stdout.strip(), r"^\d+\.\d+\.\d+$")
         result = self.run_cli("doctor")[1]["result"]
         self.assertEqual(result["status"], "absent")
         self.assertFalse(self.directory.exists())

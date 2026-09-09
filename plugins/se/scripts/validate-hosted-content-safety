@@ -14,22 +14,20 @@ fail() {
 
 test -s "$owner" || fail "missing or empty canonical owner"
 
-for relative in \
-  skills/spec/SKILL.md \
-  skills/implement/SKILL.md \
-  skills/deliver/SKILL.md \
-  skills/deliver/references/workers.md \
-  skills/deliver-features/SKILL.md \
-  skills/review-pr/SKILL.md \
-  skills/spec/references/github-output.md \
-  skills/deliver-features/references/completion.md \
-  skills/deliver-features/references/progress.md \
-  skills/spec/templates/maintenance-changelog.md \
-  skills/deliver-features/references/orchestration.md; do
-  target="$plugin_root/$relative"
-  rg -Fq -- "hosted-content-safety.md" "$target" || \
-    fail "missing canonical route in $relative"
-done
+# Resolve actual links to the policy owner; consumers may route indirectly.
+python3 - "$plugin_root" "$owner" <<'PYLINKS'
+import re
+import sys
+from pathlib import Path
+
+root, owner = map(Path, sys.argv[1:])
+for source in root.rglob("*.md"):
+    for target in re.findall(r"\]\(([^)]+)\)", source.read_text(encoding="utf-8")):
+        path = target.split("#", 1)[0]
+        if Path(path).name == owner.name and "://" not in path:
+            if (source.parent / path).resolve() != owner.resolve():
+                raise SystemExit(f"hosted-content-safety: invalid policy link in {source.relative_to(root)}: {target}")
+PYLINKS
 
 hosted_templates=(
   "$plugin_root/skills/spec/templates/spec.md"

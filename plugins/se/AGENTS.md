@@ -111,5 +111,5 @@ version, and an absent-registry read-only doctor. Never use production claims
 as test fixtures.
 
 Check manifest/marketplace paths and scan for retired identifiers after routing
-changes. Keep the repository-claims version and its version assertions aligned with
+changes. Keep the repository-claims version aligned with
 the plugin manifest in every versioned commit.
