@@ -320,7 +320,7 @@ class PortfolioHealthTests(unittest.TestCase):
 
         self.assertEqual(set(payload), {"ok", "version", "command", "data"})
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], PORTFOLIO_HEALTH.VERSION)
         self.assertEqual(payload["command"], ["scan"])
         self.assertNotIn("version", data)
         self.assertEqual(data["entrypoint_policy"]["estimator"], "ceil(utf8_bytes/4)")
@@ -410,7 +410,7 @@ class PortfolioHealthTests(unittest.TestCase):
         self.assertEqual(doctor.returncode, 0, doctor.stderr)
         payload = json.loads(doctor.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], PORTFOLIO_HEALTH.VERSION)
         self.assertFalse(payload["data"]["network_required"])
 
     def test_retired_no_live_flag_is_rejected(self) -> None:

@@ -273,7 +273,7 @@ class SessionEvidenceTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["version"], cli.VERSION)
         self.assertEqual(payload["command"], ["scan"])
         self.assertTrue(payload["ok"])
         target = payload["data"]["targets"]["skill-audit"]
@@ -299,7 +299,7 @@ class SessionEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(doctor.returncode, 0, doctor.stderr)
         payload = json.loads(doctor.stdout)
-        self.assertEqual(payload["version"], "1.0.0")
+        self.assertEqual(payload["version"], cli.VERSION)
         self.assertEqual(payload["command"], ["doctor"])
         self.assertTrue(payload["ok"])
 
