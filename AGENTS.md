@@ -117,6 +117,15 @@ contracts. Do not add Markdown-only tests. For executable changes, use affected
 behavioral tests and verify the shipped artifact. Use forward model tests only
 when static checks cannot establish the changed behavior.
 
+Tests must catch observable regressions or enforce a documented external
+contract. Do not assert prose wording, private helper names, or source keywords
+as proxies for behavior. Exercise dependency boundaries through isolated runtime
+checks. Consolidate repeated cases for the same function; retain separate tests
+when they exercise distinct integration boundaries. Compare reported versions
+with their canonical owner instead of duplicating release literals. Keep
+artifact/manifest alignment checks. Markdown parser behavior and reference-path
+validation are useful contracts; skill prose snapshots are not.
+
 Scope rebuildable caches to `~/.cache/dotagents/skills/<skill>/` or
 `~/.cache/dotagents/plugins/<plugin>/`; bundled-skill caches belong under the
 plugin's `skills/<skill>/` subdirectory. Do not store user configuration there.
