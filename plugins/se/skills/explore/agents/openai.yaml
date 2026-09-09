@@ -1,0 +1,7 @@
+interface:
+  display_name: "🔬 Explore"
+  short_description: "Explore first, then refine and investigate read-only."
+  default_prompt: "Use $se:explore to explore the evidence first, refine the open questions through $se:grilling-session, and complete the read-only investigation here."
+  brand_color: "#0E7490"
+policy:
+  allow_implicit_invocation: false

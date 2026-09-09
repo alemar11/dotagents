@@ -1,9 +1,9 @@
-# Study Orchestration
+# Explore Orchestration
 
 Read this reference after Grilling Session returns `refined` or `user-stopped`. It owns
 the shared subagent selection, assignment, setup, monitoring, synthesis, and
-failure policy for both Study surfaces. Surface references own only controller
-placement and the subagent's surface-specific working context.
+failure policy. The invoking task or session remains the controller; every
+worker uses its working-directory context.
 
 ## Capacity selection
 
@@ -46,12 +46,12 @@ explicit report justification.
 Before assigning workers, read the shared
 [`evidence-researcher`](../../../references/subagents/evidence-researcher.md)
 role. It owns the worker's purpose, read-only boundary, model settings, and
-evidence memo; Study owns the refined assignment, slot lifecycle, and synthesis.
+evidence memo; Explore owns the refined assignment, slot lifecycle, and synthesis.
 
 Reserve every planned slot before creation and number it once from 1 through
 5. Each worker assignment must include:
 
-- one bounded objective and its relation to the refined handoff;
+- one bounded objective and its relation to the refined scope;
 - included evidence surfaces and explicit non-goals;
 - concrete questions to answer;
 - repository paths or source families to inspect;
@@ -59,20 +59,20 @@ Reserve every planned slot before creation and number it once from 1 through
 - dependencies on other assignments, if any;
 - a concise Markdown memo shape;
 - the selected research role, read-only boundary, and slot number;
-- an absolute prohibition on invoking Study or creating child workers.
+- an absolute prohibition on invoking Explore or creating child workers.
 
 Assignments should be mutually distinct and collectively sufficient. Serialize
 only those that truly depend on an earlier unstable finding. Workers report to
-the active Study controller, not directly to another worker.
+the active Explore controller, not directly to another worker.
 
 ## Native subagent setup
 
 For each positive planned slot, create one native subagent under the active
-Study controller:
+Explore controller:
 
 - Request the shared `evidence-researcher` profile explicitly.
 - Keep the assignment in the controller's working-directory context.
-- Supply the slot number, refined handoff slice, read-only boundary, evidence
+- Supply the slot number, relevant conversation context, read-only boundary, evidence
   expectations, concise Markdown memo shape, and recursion prohibition.
 - Record the stable subagent identity and parent lineage returned by the
   runtime. A label or assignment text is never identity.
@@ -84,7 +84,7 @@ transport. Never create a replacement beyond the reserved slot.
 
 ## Setup and no-replacement policy
 
-Set `worker_transport` to `subagent` for every positive plan. Study never
+Set `worker_transport` to `subagent` for every positive plan. Explore never
 creates visible App worker tasks. One reserved slot permits at most one
 creation request unless authoritative reconciliation
 proves that the request had no effect and the same slot can safely complete
@@ -135,7 +135,7 @@ last evidence. Missing evidence is unavailable, never implicit success.
 ## Synthesis and outcome
 
 The controller owns the final reasoning. It must compare worker claims against
-the refined handoff and inspected evidence, resolve contradictions where
+the refined scope and inspected evidence, resolve contradictions where
 possible, and label remaining uncertainty. Worker memos are inputs, not
 authority.
 
@@ -148,8 +148,7 @@ Use these overall outcomes:
   planned slot failed, drifted, remained unresolved, was abandoned, or lacked
   terminal evidence.
 - `failed`: no usable synthesis can be returned, including a blocked Grilling Session
-  phase or failed App controller setup.
+  phase.
 
 Read [output-template.md](output-template.md) immediately before reporting and
-include only the controller section selected by `study_surface` plus the
-shared subagent ledger.
+include the subagent ledger when workers were planned.

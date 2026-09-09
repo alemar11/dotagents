@@ -7,7 +7,7 @@ Scope: `plugins/se/`
 ## Project Purpose Delta
 
 SE is the repository's graph-first software-delivery plugin. Its bundled Learn,
-Grilling Session, Study, Spec, Adversarial Review, Review PR, Delivery Features,
+Grilling Session, Explore, Spec, Adversarial Review, Review PR, Delivery Features,
 Deliver, Deslop, and Implement skills have distinct runtime contracts, while `AGENTS.md`
 and `README.md` define package maintenance ownership and routing.
 
@@ -20,7 +20,11 @@ marker and post-save pickup decision. Authorization is separate from semantic
 revision and execution progress; exports remain inactive snapshots. No monitor
 is started by publishing or marking a spec.
 
-Study, Spec and Deliver Features share subordinate role definitions in
+Explore runs in the invoking task or session. It explores relevant evidence before
+Grilling Session, then investigates remaining questions without a separate
+controller or transfer handoff.
+
+Explore, Spec and Deliver Features share subordinate role definitions in
 [`subagents.md`](references/subagents.md). Their callers own delegation and
 lifecycle. Deliver Features is designed for an Astra coordinator in the current task,
 retaining caller-configured reasoning and profile overrides. App delivery uses

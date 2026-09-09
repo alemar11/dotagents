@@ -33,8 +33,8 @@ When ownership changes, update affected consumers and remove obsolete routes.
 - Learn owns local durable context, localization, review rules, and managed
   AGENTS pointers. It does not own tracker, task, or delivery state.
 - Grilling Session owns read-only interview refinement and composes Learn for context.
-- Study owns read-only study topology, its curated handoff, Grilling Session, worker cap,
-  and synthesis. App/CLI details and worker operations live in its references.
+- Explore owns read-only investigation in the invoking task or session, Grilling
+  Session composition, bounded native workers, and synthesis.
 - Spec owns coherent specs, stable spec/F-AC/task identities, actionable
   task contracts, recommended order, real prerequisites, accepted decisions,
   review, and GitHub/single-file Markdown projections. Its specification

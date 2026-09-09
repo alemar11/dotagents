@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "6.10.0",
+  "version": "6.11.0",
   "description": "Refine ideas, create feature specs with actionable tasks, save to GitHub or Markdown, and deliver reviewed changes.",
   "author": {
     "name": "alemar11",
@@ -22,7 +22,7 @@
     "privacyPolicyURL": "https://github.com/alemar11/dotagents",
     "termsOfServiceURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
-      "Use $se:grilling-session to sharpen a topic, $se:study to investigate it, or $se:learn to preserve knowledge.",
+      "Use $se:grilling-session to sharpen a topic, $se:explore to investigate it, or $se:learn to preserve knowledge.",
       "Use $se:spec to create a feature spec and actionable tasks, saving to GitHub or one Markdown file.",
       "Use $se:deliver for worker-to-PR delivery, or $se:deliver-features for the existing independently reviewed workflow."
     ],

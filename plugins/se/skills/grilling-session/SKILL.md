@@ -67,14 +67,13 @@ project knowledge.
 - Before declaring the brief refined, ask one final confirmation question that
   presents the compact interpretation and invites correction.
 
-When composed by Study, use the complete curated handoff as the starting brief
-and ask the first question in the selected Study controller immediately after
-the Learn read. For `study_surface=app-task`, keep every question and answer in
-the separate visible Study task; the invoking parent may point the user there
-but must not relay the interview turn by turn. For
-`study_surface=cli-session`, keep every question and answer directly in the
-invoking CLI session. On either surface, do not plan or create Study workers
-until the Grilling Session outcome is `refined` or `user-stopped`.
+When composed by Explore, begin after its initial exploration. Use the user's
+request, existing conversation, and exploration findings as context; no curated
+transfer handoff is required. Reuse inspected evidence and focus on remaining
+decisions rather than asking the user to repeat established facts. Ask the
+first interview question in the invoking task or session after the Learn read.
+Keep the interview and its refined result in that same conversation. Do not
+plan or create Explore workers until the outcome is `refined` or `user-stopped`.
 
 ## Workflow graph
 

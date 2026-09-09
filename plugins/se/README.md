@@ -7,7 +7,7 @@ task plans, reviewed PR delivery with workflow retrospectives, and durable proje
 | --- | --- |
 | `se:learn` | Maintain explicitly authorized local project knowledge and review rules. |
 | `se:grilling-session` | Refine a topic through one focused question and recommendation at a time. |
-| `se:study` | Refine a curated handoff, then conduct a read-only investigation. |
+| `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session. |
 | `se:spec` | Create or revise a coherent spec with an ordered actionable task plan; save to GitHub or one Markdown file. |
 | `se:adversarial-review` | Independently pressure-test a fixed software change without editing it. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
@@ -150,7 +150,7 @@ lineage, bounded waits and terminal evidence.
   an orchestrator may assign them to agents but they never launch their own.
 
 - [Execution roles](references/subagents.md) own reusable research, development and review
-  definitions. Study, Spec and Delivery select them while retaining their own delegation,
+  definitions. Explore, Spec and Delivery select them while retaining their own delegation,
   lifecycle, fallback, and final decisions.
 - [Repair budget](references/review-repair-budget.md) is shared by Delivery and
   Implement. Delivery owns [candidate review](skills/deliver-features/references/candidate-review.md),
@@ -169,7 +169,7 @@ lineage, bounded waits and terminal evidence.
   requirements. Markdown progress remains local and uncommitted by default.
 - Repository claims store ownership only. No spec/task progress, worker state,
   Git/PR state, review evidence, or workflow node belongs in that registry.
-- Study keeps its separate App controller or current CLI session and optional
+- Explore stays in the invoking task or session with optional
   bounded native subagents. Delivery alone selects App-visible or CLI-native
   developer transport under its runtime contract. Learn remains local-only.
 

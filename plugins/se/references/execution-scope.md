@@ -10,7 +10,7 @@ Explicit user constraints and available capabilities still govern execution.
 | Adversarial Review, Review PR, Grilling Session, Learn | Perform their work in the executing session/task; create no tasks or subagents. |
 | Implement | Execute local work in the current session/task; may delegate only its optional read-only UI designer under its own contract. |
 | Spec | Draft and review in the invoking session; optional research/review helpers use shared roles. |
-| Study | Own its controller and optional helpers under its surface and worker contracts. |
+| Explore | Investigate in the invoking task or session; optional native helpers follow its worker contract. Never create visible tasks. |
 | Deliver | Own isolated workers through PR publication and CI under its local worker contract; the current task owns orchestration. |
 | Deliver Features | Own its coordinator, implementation lanes and reviewers under its delivery contract. |
 

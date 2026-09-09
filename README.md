@@ -51,7 +51,7 @@ includes delivery workflow retrospectives:
 | --- | --- |
 | `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
 | `se:grilling-session` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
-| `se:study` | Grill one curated handoff, then run read-only analysis in one App controller or the current CLI session with optional Luna subagents. |
+| `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional Luna subagents. |
 | `se:adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `se:spec` | Create or revise one coherent feature spec and actionable task plan, saving to GitHub or a single Markdown file. |
@@ -101,27 +101,19 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `se:study` builds one curated handoff, starts Grilling Session immediately, and then
-  runs a strictly read-only investigation on the active Codex surface. In the
-  App it creates one separate visible Sol/medium controller in the exact saved
-  local project without a worktree. In the CLI the current session and its
-  current profile remain the controller. On either surface, substantial
-  independent evidence work may use native Luna/max subagents in the
-  controller's working-directory context; Study never creates additional
-  visible App worker tasks.
-  Five is an absolute worker cap; larger requests are capped and reported
-  automatically. Stable controller task and subagent identities are the only
-  identity and recovery keys. App-only controller title, task telemetry, and
-  parent monitoring do not apply to CLI runs. Neither a controller nor a
-  subagent may invoke Study recursively or create another worker layer. When
-  no worker count is specified, focused analysis uses no subagent, one is
-  reserved for a large or noisy evidence surface, and multiple subagents
-  require genuinely independent tracks; five is a cap, not the default.
-- `se:study`, `$se:grilling-session`, and `$se:learn` ship together in the SE plugin.
-  Study invokes its sibling Grilling Session workflow directly, which uses Learn for a
-  read-only Project Context pass. The separate App Study task or current CLI
-  session asks the user one question with a recommended answer per turn and
-  cannot plan workers until the handoff is confirmed or the user stops
+- `se:explore` explores relevant evidence in the current task or session before
+  Grilling Session, then investigates remaining questions using the existing
+  conversation. The entire investigation is strictly read-only.
+  It retains the current model and reasoning profile and never creates visible
+  tasks or prepares a controller transfer handoff. Substantial independent
+  evidence work may use native Luna/max subagents in the current working
+  directory. Five is an absolute worker cap, not the default; larger requests
+  are capped and reported. Workers cannot invoke Explore or delegate further.
+- `se:explore`, `$se:grilling-session`, and `$se:learn` ship together in the SE plugin.
+  Explore invokes its sibling Grilling Session workflow directly, which uses Learn for a
+  read-only Project Context pass. The current task or session asks the user one
+  question with a recommended answer per turn and
+  cannot plan workers until the scope is confirmed or the user stops
   grilling.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires `$g:github-issues`; its optional classification branch never gates semantic publication, while no SE skill installs G automatically.
@@ -284,7 +276,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill okf \
   --skill skill-cli-creator \
   --skill tanstack \
-  --skill study \
+  --skill explore \
   --skill postgres \
   --skill plugins-reload \
   --skill skill-audit \
