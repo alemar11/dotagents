@@ -36,11 +36,15 @@ treating the embedded sections as authoritative. Do not create more task issues,
 close or delete old ones, or remove old relationships without explicit scope.
 Reconcile active delivery assignments before transferring their progress owner.
 
-When revising an older cross-repository spec, split its implementation work by
-repository. Keep the original issue for its owner repository and create
-linked specs for the other repositories. Preserve obligations and attributable
-progress, record the old-to-new task references, and reconcile active assignments
-before transferring ownership. Do not close or delete source artifacts.
+When an older spec includes cross-repository work or links, do not split it or
+create companion issues. Draft a local-only revision for its owner repository.
+Removing accepted obligations requires revision authority and reconciliation
+with active assignments; report material conflicts rather than silently dropping
+work. Move superseded cross-repository relationships out of the active plan only
+within that authority. Preserve historical source attribution, executor-owned
+content and provider relationships; these are historical records, not permission
+to add or refresh cross-repository issue links. If narrowing is outside the
+request, report the affected scope and exact decision needed before saving it.
 
 GitHub is the sole saved authority. Supplied local documents may inform a new
 GitHub spec when publication is authorized, but Spec never maintains, exports, or

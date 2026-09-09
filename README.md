@@ -122,7 +122,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   context and relevant evidence without requiring Learn or a repository, returns
   a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
-- `se:spec` saves one coherent spec with stable task identities, recommended
+- `se:spec` targets one repository per invocation, with no cross-repository issue
+  references or companion specs. It saves coherent specs with stable task identities, recommended
   order, real prerequisites, and completion checks. GitHub is the only saved destination;
   no-write previews stay in the conversation and require no G access when using
   only supplied or local sources. GitHub is the sole saved-spec authority.

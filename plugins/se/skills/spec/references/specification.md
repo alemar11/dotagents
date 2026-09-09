@@ -6,16 +6,16 @@ Markdown. Output references own storage and transport, not feature meaning.
 
 ## Main specification
 
-One spec describes work in exactly one repository. All its tasks inherit that
-repository. For a requested feature spanning repositories, create one spec per
-implementation repository, each with its own outcome, acceptance criteria, and
-embedded task plan. Link the related specs with exact ordinary references and
-explain their shared interface and integration expectations. A referenced
-repository needing no implementation does not require another spec.
+One invocation targets exactly one repository; every spec and task it produces
+belongs there. An explicit batch may contain several independent specs in that
+repository. Do not create parent issues, task issues, set registries, companion
+specs in other repositories, or cross-repository issue references. Same-repository
+spec links remain ordinary references, distinct from prerequisites.
 
-Do not create a parent issue, task issues, or a set registry. Keep shared contract
-meaning consistent across the specs; distinguish relationships from prerequisites.
-An explicit batch may include several independent specs in the same repository.
+When the request spans repositories, select the clearly intended local scope or
+resolve the target before drafting. Return other repository work to the caller
+as out of scope without planning or publishing it. Do not silently drop those
+requirements or claim the local spec covers the complete cross-repository outcome.
 
 A complete spec records:
 
@@ -31,34 +31,20 @@ Use the project's vocabulary. Include user stories only when they clarify
 behavior; a refactor or infrastructure spec can describe interfaces, invariants,
 and operational outcomes directly. Omit empty optional sections.
 
-## Shared contracts across repositories
+## Interfaces and readiness
 
-When creating linked specs for one cross-repository feature, define the interfaces
-that connect their work before calling the plans ready. Put each shared contract
-in one canonical section of an owning spec, or reference an existing authoritative
-API/schema document. Companion specs link to that exact contract and describe
-only their own obligations; do not create another issue or duplicate the contract.
+Describe the complete user-visible behavior this repository owns, including
+accepted interfaces, data and failure semantics, and compatibility assumptions.
+Existing API/schema documentation may ground those decisions; documentation links
+are evidence, not cross-repository issue relationships or delegated work.
 
-Use the smallest precise representation for the boundary: producer and consumer,
-operations/events/package surface, relevant data shape and semantics, failure
-behavior, and compatibility or version assumptions. Include a concrete schema or
-example when prose would leave material ambiguity. Omit details irrelevant to the
-interface. Existing accepted interfaces need a reference, not a rewritten copy.
-
-Each repository spec states what makes its PR ready: local checks against the
-agreed contract, verification against a real external candidate, or both. Name
-which repository verifies each required interaction, what input it consumes, and
-what evidence proves it. Distinguish later rollout conditions from PR-readiness
-requirements. Mocks never imply provider verification. A material unresolved
-interface decision returns to clarification; a missing implementation alone does
-not prevent saving a complete plan with explicit prerequisites.
-
-Review linked specs together for incompatible assumptions, missing integration
-ownership, and circular readiness conditions. Do not require both sides to finish
-first: agree the contract, identify a provider candidate that can be produced
-independently, or resolve the actual constraint. Contract revisions must identify
-affected companion specs and evidence; reconcile active work without silently
-rewriting obligations outside the authorized revision scope.
+State which local checks or real integration evidence make this repository's PR
+ready, including the required inputs. Distinguish later rollout conditions from
+readiness. Mocks do not establish provider verification. Missing external
+capabilities may be recorded as explicit assumptions or required inputs without
+linking another repository's issues or specifying its implementation. Resolve
+material interface uncertainty before presenting the plan as ready; report
+unavailable evidence without inventing it.
 
 ## Identity and authority
 
@@ -70,8 +56,8 @@ rewriting obligations outside the authorized revision scope.
 
 The spec's identity is its owner repository plus `spec_id`. Titles, list
 positions, local paths, and hosted issue numbers are not substitutes. Use exact
-saved artifact references when referring to another spec; do not resolve an
-external prerequisite by a bare title or ID.
+saved references within the selected repository when referring to another spec;
+do not resolve a prerequisite by a bare title or ID.
 
 Acceptance criteria are plain bullets describing observable success, without
 checkboxes, assigned IDs, short titles, or mandatory per-criterion verification
@@ -87,11 +73,11 @@ prerequisites. Related specs use ordinary links; prerequisites remain in the
 body, including internal task dependencies. Spec never manages native GitHub
 blocking relationships; explicit user requests belong to G, outside this contract.
 
-Spec-level prerequisites identify exact external spec references, required
+Spec-level prerequisites identify exact same-repository spec references, required
 implementation outcomes or evidence, and the activity and scope they gate.
 Do not require issue closure or merge when a usable PR candidate supplies the
 needed outcome. Preserve explicitly required merge or deployment conditions. Task-specific
-external prerequisites stay with their tasks. Delivery checks both; a dependency
+prerequisites outside the spec stay with their tasks. Delivery checks both; a dependency
 does not authorize implementing the prerequisite or expanding selection.
 
 Revision rules live in [existing-specs.md](existing-specs.md).
@@ -121,7 +107,7 @@ prerequisites, and completion checks without the drafting conversation.
 | `acceptance_refs` | Exact text of existing acceptance criteria to which this task contributes; contribution alone does not prove a criterion satisfied. |
 | `checks` | Each check pairs an observable completion condition with its test or observation; include assembled integration evidence where needed. |
 | `blocked_by` | Other task IDs in this spec that supply real prerequisites, each with the required outcome or evidence. |
-| `external_prerequisites` | Exact external artifact references and required evidence, or none. They never expand implementation selection. |
+| `external_prerequisites` | Prerequisites outside this spec but within its repository, with exact artifact references and required evidence, or none. The established field name is retained; it does not permit cross-repository issue links or expand selection. |
 
 The spec task index is an ordered list of task IDs, titles, and detail links.
 It owns membership and recommended order; task details own all other task

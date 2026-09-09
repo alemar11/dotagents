@@ -1,103 +1,81 @@
 ---
 name: spec
-description: "Create or revise feature specs and task plans on explicit request; save to GitHub and offer delivery authorization."
+description: "Create or revise feature specs and task plans in one repository; save to GitHub and offer delivery authorization."
 ---
 
 # Feature Specification
 
-Produce one repository-scoped spec and an ordered, verifiable task plan from the
-current discussion, supplied references, or an existing spec. When requested work
-spans repositories, produce one linked spec per implementation repository.
-The requested result is verified GitHub issues, or complete in-conversation
-previews when no writes were requested. Planning does not implement code, create
-branches or PRs, change execution progress, or start Delivery implicitly.
+Turn the current discussion, supplied references or an existing spec into a
+complete user-visible outcome and the smallest verifiable task plan. Save one
+GitHub issue per spec with all tasks embedded, or return complete conversational
+previews for draft/no-write requests.
 
-## Current session
+## Scope and execution
 
-Work in the invoking session with its configured model and reasoning. Once the
-outcome is clear, update the current task title to `📚 Plan Feature · <outcome>`
-when supported. Invocation authorizes this title update; do not create or fork
-a planner task. If renaming is unavailable or fails, continue planning and
-briefly report the limitation. Titles do not establish spec or repository identity.
+Select exactly one implementation repository, defaulting to the current one
+when it matches. Resolve an unclear target before drafting. Report other
+repository work as out of scope; do not split it into companion specs or add
+cross-repository issue references. Planning does not implement, create branches
+or PRs, change execution progress, or implicitly start Delivery.
 
-Follow the shared [execution scope](../../references/execution-scope.md).
-For independent repository research or a bounded draft review, optional helpers
-may reduce elapsed time or improve evidence. Use the corresponding role in
-[subagents.md](../../references/subagents.md); read that role before delegation.
-Keep ownership of the complete spec here and work serially when helpers are
-unavailable or prohibited.
+Follow [execution scope](../../references/execution-scope.md) in the invoking
+session with its configured model and reasoning. When the outcome is clear,
+rename this task to `📚 Plan Feature · <outcome>` if supported; failure is a
+reported limitation, not a blocker. Do not create or fork a planner task or use
+titles as identity. Optional research or draft-review helpers use the appropriate
+[shared role](../../references/subagents.md); read it before delegation. Retain
+spec ownership and proceed serially when helpers are unavailable or prohibited.
 
-## Draft and review
+## Define the outcome and tasks
 
-Read [specification.md](references/specification.md) for the saved content and
-identity contract. Inspect relevant code and repository instructions, preserving
-source attribution, caller scope, and accepted decisions. For revisions,
-read [existing-specs.md](references/existing-specs.md) before changing the draft.
+Read [specification.md](references/specification.md) for content, identity and
+review requirements. Reuse conversation evidence and accepted decisions;
+inspect relevant code and repository instructions to resolve remaining facts.
+For revisions, first apply [existing-specs.md](references/existing-specs.md).
 
-Compose [Grilling Session](../grilling-session/SKILL.md) in this session only for
-material unresolved decisions. Preserve prior answers and use safe labeled
-assumptions or delegated choices; a complete brief needs no fresh interview.
-Ordinary answer waits are not terminal blockers.
+Compose [Grilling Session](../grilling-session/SKILL.md) only for material choices
+that evidence, prior answers, safe labeled assumptions or delegated decisions
+cannot resolve. A complete brief needs no new interview or pre-save approval.
+Ordinary answer waits are nonterminal; missing essential evidence blocks only
+affected work after unaffected authorized work is completed.
 
-Use [spec.md](templates/spec.md) to draft the complete artifact, including its
-embedded task sections. Read [task-decomposition.md](references/task-decomposition.md)
-when deriving or changing tasks. Keep the smallest useful task plan.
-Describe prerequisites by the evidence and
-activity they gate. Spec uses ordinary links and never manages native GitHub
-blockers; explicit blocker requests belong to `g:github-issues`, outside Spec.
-A usable PR candidate may enable dependent work before its issue closes.
+Draft with [spec.md](templates/spec.md): problem, observable behavior, scope,
+accepted decisions, acceptance criteria and embedded tasks. Use
+[task-decomposition.md](references/task-decomposition.md) when creating or changing
+tasks: prefer narrow end-to-end outcomes, real prerequisites and checks that
+prove behavior. Keep task dependencies separate from worker, branch and PR
+topology, which belong to Delivery.
 
-For linked repository specs, define shared contracts and each repository's
-PR-readiness evidence under [specification.md](references/specification.md#shared-contracts-across-repositories).
+Review and correct the whole artifact before saving. Preserve requested outcomes
+and decisions, cover every criterion with credible task checks, verify dependency
+feasibility, and ensure each task works with the main spec in a fresh session.
+Same-repository issue links are ordinary references; native blocker management
+belongs to G on explicit request, outside Spec.
 
-Review the complete draft against the specification contract before saving:
-requested outcomes and accepted decisions are preserved, every acceptance
-criterion has task coverage and credible verification, dependencies are real
-and feasible, and each task is understandable with the main spec in a fresh
-session. Acceptance checks describe feature behavior and prerequisite evidence;
-worker, branch and PR topology choices belong to Delivery. Revisions preserve
-identities and executor-owned progress.
-Correct findings across the whole artifact. A complete brief needs no additional
-interview or pre-save approval. Ask only about material choices that existing
-evidence, accepted decisions, or safe assumptions cannot resolve. If essential
-evidence is unavailable, report the affected scope and missing input after
-completing unaffected authorized work. Resume from the saved content and current
-evidence; do not maintain a planning workflow graph or execution journal.
+## Save and hand off
 
-## Save and report
+Read [states.md](references/states.md) and [GitHub output](references/github-output.md)
+for operation selection, publication and readback. Invocation authorizes the
+scoped save unless restricted. GitHub is the only saved destination: previews
+remain in conversation, and local-file-only requests authorize no hosted save.
+Before hosted reads apply [G preflight](../../references/codex-dependency-preflight.md);
+before every hosted write apply [hosted-content safety](../../references/hosted-content-safety.md).
+Local-source previews need no G access.
 
-Invocation authorizes saving one GitHub issue per spec, subject to caller
-constraints. Draft, preview, or no-write requests return the complete issue body
-in the conversation without files or hosted writes. GitHub is the only saved-spec
-destination; do not write local spec files or exports. A local-file-only request
-is outside this skill's save capability and does not authorize GitHub publication.
-Read [states.md](references/states.md) and [GitHub output](references/github-output.md).
+Verify the complete saved artifact. Reconcile uncertain or partial saves against
+its existing identity before retrying; never substitute files or previews for a
+failed save. After verified save, follow
+[delivery authorization](references/delivery-authorization.md) for the pickup
+decision, marker verification and any explicitly requested downstream handoff.
+Publication alone neither authorizes nor starts delivery.
 
-Before hosted source reads or saves, apply the shared
-[G dependency preflight](../../references/codex-dependency-preflight.md).
-Before every hosted write, apply
-[hosted-content-safety.md](../../references/hosted-content-safety.md).
-A preview using only supplied or local source material needs no G access.
-
-Verify the complete saved representation. Reconcile uncertain effects against
-the same artifact before retrying, retaining identities from partial saves.
-Never substitute a local file or preview after a failed save. After a
-verified authoritative save, follow [delivery authorization](references/delivery-authorization.md)
-to ask whether to enable pickup, reuse established authority and verify any
-requested marker change. Publishing alone never enables automatic delivery.
-Perform an explicitly requested downstream handoff only after verified save and
-any requested marker change; reconcile its result before claiming completion.
-
-Return the saved reference or complete preview, a concise task summary,
-material assumptions, review and save results, observed delivery authorization,
-and any exact remaining blocker or unanswered authorization question.
-Keep the final report concise; do not reproduce saved issue bodies or internal
-review logs unless requested. Previews still include the complete proposed bodies.
-Keep operation receipts out of the saved spec. Planning completion proves the
-artifact exists, not that its feature has been implemented.
+Return saved links or complete previews, a concise task summary, material
+assumptions, review/save results, observed pickup authorization and exact remaining
+blockers or questions. Do not reproduce saved bodies or review logs unless asked.
+Keep operation receipts out of specs; artifact completion proves no implementation.
+Resume from saved content and current evidence, without a planning graph or journal.
 
 ## Skill Dependencies
 
-Material clarification composes bundled `se:grilling-session`, using its current
-context-first refinement contract. Hosted reads and saves require the installed
-`g@alemar11` issue workflow. Spec never installs or substitutes dependencies.
+Material clarification uses bundled `se:grilling-session`. Hosted reads and saves
+require installed `g@alemar11`. Never install or substitute dependencies.

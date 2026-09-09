@@ -21,19 +21,11 @@ For `operation=preview`, render the complete issue, target repository, and propo
 spec links and prerequisite conditions without writes or collision claims. Local-source previews
 need no G access; hosted source reads retain their preflight and caller constraints.
 
-For cross-repository work, save one complete spec issue in each implementation
-repository. Prepare the coordinated drafts first, create or reuse each exact
-spec identity, then add reciprocal ordinary issue links once URLs are known.
-Verify every issue, companion link, and canonical shared-contract reference
-before reporting the full request saved. Reconcile
-partial publication against the same issues; never recreate a verified issue.
-Apply delivery authorization separately to each authoritative spec, reusing the
-user's established authorization scope.
-
 ## Spec dependencies
 
-Link related specs with ordinary exact issue URLs, in the same or different
-repositories. When one supplies a prerequisite, state the required outcome or
+Link related specs only with exact issue URLs in the selected repository.
+Verify repository identity for every authored issue reference before saving;
+reject cross-repository links rather than publishing companion specs. When one supplies a prerequisite, state the required outcome or
 evidence and the activity it gates: implementation, integration, publication,
 merge, or deployment. Task-specific prerequisites stay in their task contracts;
 internal `blocked_by` references stay in the body. Shared scope or recommended

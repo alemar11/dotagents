@@ -33,10 +33,9 @@ combined and verified. Spec resolves semantic incompatibilities; Delivery
 chooses and verifies the concrete integration strategy before starting the
 dependent work.
 
-A task belongs to its spec's single repository. Split cross-repository work
-into tasks in the corresponding repository specs, with exact external prerequisite
-references where needed. State shared interface and integration checks explicitly;
-related specs can proceed in parallel when no required condition prevents it.
+All tasks stay in the selected repository. Express any required external
+capability as an input or assumption for local behavior; return implementation
+in other repositories to the caller without task plans or issue links.
 
 Explain unusual granularity or integration constraints briefly. Ask about a
 split only when it changes outcome, responsibility, rollout, or another

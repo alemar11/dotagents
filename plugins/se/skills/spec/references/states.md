@@ -3,9 +3,10 @@
 The `spec` namespace describes transient caller choices and operation results,
 not a workflow graph. The saved identity and revision contract belongs to
 [specification.md](specification.md). A request resolves to preview or save;
-review findings return to drafting or clarification. Each spec has its own save result. A multi-repository request completes only
-when all required repository specs and their ordinary links are verified; report
-partial saves by exact artifact rather than recreating the set. A verified artifact completes
+review findings return to drafting or clarification. Each spec has its own save
+result within the invocation's single repository. Verify all selected specs and
+their same-repository links; report partial saves by exact artifact. Other
+repository work is out of scope, not an unsaved companion artifact. A verified artifact completes
 its save; [delivery authorization](delivery-authorization.md) owns the subsequent
 pickup decision. An unresolved required effect remains blocked.
 

@@ -19,7 +19,7 @@ facts, and external results.
 A workflow graph describes phases and authority boundaries for one skill run.
 It is distinct from a saved feature's ordered tasks and from Delivery's units:
 
-- a spec describes work in one repository; cross-repository features use linked specs;
+- a Spec invocation describes work in one repository with only same-repository issue references;
 - a task is an actionable contribution with completion checks and validation;
 - recommended order guides work, while task dependencies describe real
   prerequisite outcomes and evidence;

@@ -24,11 +24,11 @@
 
 ## Related specs
 
-<Ordinary links to companion specs and their part in the shared outcome. Omit when none.>
+<Ordinary links to related specs in this repository only. Omit when none.>
 
-## Shared contract
+## Interfaces
 
-<For cross-repository work: define the interface in its owning spec, or link its canonical definition. State this repository's producer/consumer obligations, relevant data and failure semantics, and compatibility assumptions. Omit when no shared boundary exists.>
+<Accepted interfaces, data/failure semantics and compatibility assumptions for this repository. Cite API/schema documentation when useful; do not link other repositories' issues or plan their work. Omit when unnecessary.>
 
 ## PR readiness
 
@@ -63,7 +63,7 @@
 #### Prerequisites
 
 - blocked_by: <task ID and required outcome, or none>
-- external_prerequisites: <exact reference and required evidence, or none>
+- external_prerequisites: <same-repository artifact outside this spec and required evidence, or none>
 
 #### Checks
 

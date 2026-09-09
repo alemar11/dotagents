@@ -45,4 +45,5 @@ agent pickup; saving it again does not requeue it.
 
 Report the saved source and observed pickup authorization separately. Setting the
 marker does not invoke Deliver; only an explicitly requested downstream handoff
-uses the entrypoint's handoff rules.
+runs after the verified save and any requested marker change. Reconcile its
+result before claiming completion; an uncertain effect is not a verified handoff.

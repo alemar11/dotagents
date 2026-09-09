@@ -66,8 +66,9 @@ full protocols into this file:
   relevant baseline evidence, paired task verification checks, and full coverage. Task
   order is independent of identity and hard prerequisites. Planning never
   overwrites executor progress or prescribes workers and PR topology.
-- Each spec and its tasks belong to one repository. Cross-repository features use
-  linked repository specs. Delivery verifies prerequisite availability and assembled
+- Each Spec invocation and all its specs/tasks belong to one repository. Spec
+  authors only same-repository issue references; cross-repository coordination
+  belongs to its caller. Delivery verifies prerequisite availability and assembled
   outcomes, and owns PR grouping, stack/integration choices, and closing refs.
 - GitHub issues own the saved spec/task contract. Spec owns body-backed prerequisites
   and ordinary links; G owns explicitly requested native blocker changes. Spec

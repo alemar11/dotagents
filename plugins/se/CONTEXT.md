@@ -11,8 +11,7 @@ Grilling Session, Explore, Spec, Adversarial Review, Review PR, Delivery Feature
 Deliver, Deslop, and Implement skills have distinct runtime contracts, while `AGENTS.md`
 and `README.md` define package maintenance ownership and routing.
 
-Spec owns one repository-scoped spec and actionable task plan, saved to one GitHub issue, with all task contracts embedded. Cross-repository features use
-one linked spec per implementation repository; tasks inherit their spec's owner. Related specs use ordinary links, with body-backed
+Spec owns one repository-scoped spec and actionable task plan, saved to one GitHub issue, with all task contracts embedded. Each invocation selects one repository; tasks inherit their spec's owner. Spec creates no cross-repository issue links or companion specs. Related same-repository specs use ordinary links, with body-backed
 prerequisites that can be satisfied by usable PR candidates. Native GitHub
 blocker changes belong to G on explicit user request, never to Spec. Deliver Features owns task-to-PR grouping and integration, with task
 prerequisites independent of Git topology. The Spec content contract is at
@@ -60,6 +59,6 @@ reviews, source-progress writes and retrospectives are not part of its default
 path. Deliver Features remains unchanged and independently invokable.
 
 Deliver owns one implementation repository per invocation. External prerequisites
-are inputs coordinated by the caller. Linked specs own shared interfaces and
+are inputs coordinated by the caller. Supplied contracts own shared interfaces and
 per-repository PR-readiness evidence; local contract checks and real integration
 are distinct obligations.

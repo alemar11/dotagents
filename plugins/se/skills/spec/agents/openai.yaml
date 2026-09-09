@@ -1,7 +1,7 @@
 interface:
   display_name: "📚 Feature Specification"
-  short_description: "Create specs and offer delivery authorization."
+  short_description: "Plan one repository and offer delivery authorization."
   brand_color: "#BE185D"
-  default_prompt: "Use $se:spec to save a feature spec and task plan to GitHub, then ask whether to authorize delivery to ready PRs."
+  default_prompt: "Use $se:spec to save a feature spec and task plan for this repository to GitHub, then ask whether to authorize delivery to ready PRs."
 policy:
   allow_implicit_invocation: false
