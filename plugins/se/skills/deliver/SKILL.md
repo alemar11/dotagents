@@ -34,13 +34,12 @@ layers must work together. Keep coupled work together; each assignment needs an
 acceptance boundary, not its own PR.
 
 Default to one active worker implementing and publishing one coherent outcome
-on one branch. Add isolated workers when independent assignments can reduce
-elapsed time. Keep dependent or overlapping writes serial unless isolation and
-required inputs are established. Choose PR topology before dispatch. Read
-[integration.md](references/integration.md) for dependencies, stacks, combining
-contributions or topology changes. Integration is needed only when separate
-branches must combine into one PR; parallelism alone requires neither a stack
-nor an extra PR.
+on one branch. Add workers only when independent assignments can reduce elapsed
+time; keep overlapping or dependent writes serial until isolation and inputs are
+established. Before dispatch, choose the PR topology under
+[integration.md](references/integration.md) when work needs separate PRs, stacks,
+combined contributions or external inputs. Parallelism alone does not require
+an integration PR.
 
 Read the [runtime surface](../../references/codex-runtime-surface.md), then
 [workers.md](references/workers.md) before creating or assigning workers. Supply
@@ -87,15 +86,23 @@ progress is report-only unless requested, except the readiness handoff below.
 
 ## Coordinate and finish
 
-Wait for results, attention requests or meaningful changes without busy-polling
-or generic continuation messages. Correct scoped failures while evidence shows
-progress; repeated unchanged failures or unresolved authority/decisions yield a
-precise blocker. Continue independent work.
+Dispatch assignments whose prerequisites are verified, then repeat this loop:
 
-Accept [worker results](references/workers.md#assignment-and-result) against current
-PR/CI facts and selected outcomes, including assembled behavior where required.
+1. Wait for a worker result, attention request or meaningful external change.
+   Avoid busy-polling and generic continuation messages.
+2. Verify the [result](references/workers.md#assignment-and-result) against current
+   commits, PR/CI facts and the assigned outcome. If separate branches must form
+   one PR, assign a regular worker to integrate and validate the combined result.
+3. Reassess which selected assignments now have their required inputs. Reuse a
+   finished worker for compatible serial work or dispatch independent workers;
+   do not wait for unrelated assignments to finish.
+4. Assign scoped corrections while evidence shows progress. Repeated unchanged
+   failures or unresolved authority/decisions yield a precise blocker; continue
+   other actionable work and finish when delivery is verified or none remains.
+
 Reuse valid evidence; repeat or broaden checks only for changes, failures or
-evidence gaps. Changed scope, base or HEAD invalidates affected evidence.
+evidence gaps. Changed scope, base, HEAD or consumed input invalidates affected
+evidence. A completed worker turn alone does not establish its outcome.
 
 Delivery completes only when all required PRs are non-draft, required CI passes,
 selected outcomes and required reviews are verified, and source links are correct.

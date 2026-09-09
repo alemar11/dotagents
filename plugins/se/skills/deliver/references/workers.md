@@ -46,7 +46,9 @@ the worker's first progress report to the orchestrator includes its permanent
 worker/task identity when available and the resolved worktree path. A pending
 creation handle or title is not that identity. This report is informational:
 editing does not wait for acknowledgment or unavailable identity metadata.
-Give only needed context, not the full orchestration conversation.
+Use exact source and commit pointers for available context, adding only
+assignment-specific decisions and constraints. Do not duplicate entire specs or
+the orchestration conversation.
 Carry the [publication and readiness](#publication-and-readiness) obligations
 in each assignment.
 
