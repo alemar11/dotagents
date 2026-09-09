@@ -22,7 +22,7 @@ marker and post-save pickup decision. Authorization is separate from semantic
 revision and execution progress; No monitor
 is started by publishing or marking a spec.
 
-Explore runs in the invoking task or session. It explores relevant evidence before
+Explore runs in the invoking task or session. It uses Learn for read-only context preparation and explores relevant evidence before
 Grilling Session, then investigates remaining questions without a separate
 controller or transfer handoff.
 

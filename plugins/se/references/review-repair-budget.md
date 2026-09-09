@@ -1,5 +1,9 @@
 # Review Repair Budget
 
+This contract applies to managed Deliver Features review loops and their
+Implement assignments. Ordinary Deliver review fixes and standalone repairs do
+not acquire this budget merely because their input contains review findings.
+
 Each independent unit starts at round `0` before a PR exists. Its exact PR
 inherits that count upon publication. Permit two review-driven repair or
 rebuttal rounds per PR across local and hosted review combined. Batch all known
@@ -25,11 +29,11 @@ assuming zero or blocking unrelated work.
 ## Ownership and handoff
 
 Read before assigning any review-driven repair or rebuttal, or reconstructing
-its count. Delivery and Implement consume this contract. `repair_round` is a
-persisted execution fact in attributable owner history and any Delivery progress;
+its count within a managed loop. Deliver Features and Implement consume this contract. `repair_round` is a
+persisted execution fact in attributable owner history and any Deliver Features progress;
 it is not a skill-local counter or semantic spec field.
 
-Delivery is the sole budget owner for its units. It records the reservation and
+Deliver Features is the sole budget owner for its units. It records the reservation and
 exact batch before assigning Implement, which preserves that identity/count
 without reserving another round. Re-entry for the same batch carries its result
 evidence. Review PR only monitors provider review; it neither consumes this

@@ -46,12 +46,7 @@ ambiguity.
 
 ## Invocation preflight and authority
 
-Before the selected branch, resolve the actual root-to-target `AGENTS.md`
-chain, read root `CONTEXT.md` first when it exists, follow only relevant scoped
-routes, and classify the canonical Project Context pointer. Reconcile a pointer
-only when the current request already authorizes that context write; otherwise
-report the exact proposal. The preflight derives state and never grants write
-authority.
+The context preflight derives state; it never grants write authority.
 
 Apply these authority rules:
 
@@ -106,16 +101,11 @@ flowchart TD
 
 ## Execution and result
 
-1. Resolve the smallest slice, repository scope, evidence boundary, and current
-   authority.
-2. Inspect the applicable context chain and only the evidence required by the
-   selected branch.
-3. Draft exact targets, wording, evidence, unknowns, and links.
-4. Report read-only work; otherwise confirm when required, apply only authorized
-   local changes, then read them back and verify links, indexes, preserved
-   content, and the diff.
-5. Return the terminal state, changed files, capture outcome, pointer state,
-   context ownership, and only the selected branch's additional result fields.
+Draft exact targets, wording, evidence, unknowns and links. Report read-only
+work; apply authorized changes only after any required decision, then read them
+back and verify links, indexes, preserved content and the diff. Return the
+terminal state, changed files, capture outcome, pointer state, context ownership
+and only the selected branch's additional fields.
 
 Use the current Git repository as the default scope. Cross-repository work
 requires explicitly authorized identities and candidate roots verified

@@ -12,6 +12,19 @@ Choose separate PRs for independent outcomes, stacks for actual branch dependenc
 or contribution branches feeding one integration PR for a coupled outcome.
 Sequential landing alone does not imply stacked PRs. Name the integration target
 and assigned writer before dispatching contributions that need combining.
+
+For broad mechanical changes that cannot be split into independently passing
+outcomes, consider expand–migrate–contract: introduce the compatible new form,
+migrate consumers in bounded groups, then remove the old form after verifying
+no consumers remain. If intermediate contributions cannot pass independently,
+use one integration branch and establish correctness on the assembled result
+before publication as ready. Define each contribution's applicable checks and
+which checks require assembly in its assignment. A validated contribution passes
+those applicable checks and reports the deferred checks and any observed failures
+that depend on missing contributions; it does not establish combined correctness.
+Unrelated failures still require correction. Repository-required gates remain
+binding, and all required assembled checks must pass before the PR is ready.
+
 Verify prerequisite behavior in the intended base or an exact validated candidate
 before dependent work consumes it. A closed issue, completed task or planning
 order is not prerequisite proof. Unselected missing prerequisites block affected
@@ -20,6 +33,13 @@ gate only their declared activity; they do not delay PR readiness unless that
 evidence is explicitly part of its acceptance boundary.
 
 ## External prerequisites
+
+For requests spanning repositories, handle the clearly selected local scope and
+return other scopes to the caller. Resolve an unclear local target before
+dispatch. Never create another repository's orchestrator or workers; the caller
+coordinates separate Deliver runs. Linked specs in other repositories are
+context and external inputs, not selected implementation. Evaluate declared
+activity and evidence rather than issue closure or merge state.
 
 The spec owns the shared contract and PR-readiness evidence. Apply it to the
 activity being attempted, without taking ownership of another repository:
@@ -54,8 +74,9 @@ if the contract or consumed candidate changed; preserve unrelated validated work
 Assign integration to a regular worker; it is an assignment, not a separate
 permanent role. Reuse a finished worker/worktree when safe under
 [workers.md](workers.md#serial-reuse-and-concurrent-work). Supply the target
-repository, delivery branch/base, pinned validated contribution commits, source
-contracts, combined acceptance checks and intended PR. Make those exact commits
+repository, delivery branch/base, pinned contribution commits with their
+validation evidence and deferred assembly checks, source contracts, combined
+acceptance checks and intended PR. Make those exact commits
 available in the integration checkout before combining them.
 
 The assigned worker integrates the pinned commits into its owned delivery branch,
@@ -77,9 +98,18 @@ contribution branches and worktrees; integration does not authorize their cleanu
 ## Source references through integration and stacks
 
 Apply the entrypoint's [source references](../SKILL.md#source-references) rule.
-Integration and stacked PRs use ordinary references to the source outcomes they
-contain, including commit-only contributions. Integration does not add issue
-closure handling or extend completion beyond verified ready PRs.
+An integration PR may carry closing references for selected issues whose full
+outcomes it assembles, including commit-only contributions. Contribution PRs
+that only implement part of an issue use ordinary links.
+
+For stacks, assess completion against the actual PR base and contributed scope;
+ancestor work alone does not justify another closing reference. Do not mark a
+parent spec for closure when its completion is spread across PRs and no one PR
+completes the whole scope. Use ordinary links in that case and report the
+remaining closure handoff. Closing keywords on a non-default-base PR do not
+establish automatic closure; report that limitation without retargeting or
+merging the PR. Integration and stacks do not extend delivery beyond verified
+ready PRs or authorize direct issue closure.
 
 ## Stacks and parent changes
 

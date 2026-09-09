@@ -15,9 +15,12 @@ work. Do not substitute the other surface, an external process, or implementatio
 in the orchestrator. Apply the entrypoint's authorization boundary before worker
 creation. Never create a replacement coordinator.
 
-Workers default to `gpt-5.6-luna` with `max` reasoning; explicit user overrides
-win. Request those settings, but do not gate editing on effective-model telemetry
-or claim that requested settings were independently observed. Use the worker
+Where the live runtime permits skill-selected profiles, workers default to
+`gpt-5.6-luna` with `max` reasoning; explicit user overrides win. Where profile
+selection requires an explicit user request, inherit the configured default
+unless that request exists. Do not ask for confirmation merely to select a
+profile. Request only permitted settings, without gating editing on effective-model
+telemetry or claiming requested settings were independently observed. Use the worker
 title `🤖 <assignment>` when supported, naming its bounded work. Include the
 repository name only when needed to distinguish otherwise ambiguous tasks.
 Do not use the orchestrator's 🚚 prefix. Titles are metadata, not target identity.
@@ -36,15 +39,16 @@ the selected outcome and constraints, exact repository and intended
 worktree/branch/base, prerequisite commits, relevant source contracts with spec
 identity/revision when applicable, shared-contract reference and declared readiness
 boundary, any pinned external input, validation,
-publication authority and ordinary source references under
+publication authority and source references with the exact issues eligible for
+closing references under
 [Source references](../SKILL.md#source-references). After checkout verification,
 the worker's first progress report to the orchestrator includes its permanent
 worker/task identity when available and the resolved worktree path. A pending
 creation handle or title is not that identity. This report is informational:
 editing does not wait for acknowledgment or unavailable identity metadata.
 Give only needed context, not the full orchestration conversation.
-Carry the entrypoint's G preflight and
-[hosted-content safety](../../../references/hosted-content-safety.md) obligations.
+Carry the [publication and readiness](#publication-and-readiness) obligations
+in each assignment.
 
 The worker owns implementation, self-inspection, tests, PR publication/readiness
 and required CI for its branch within that assignment. It loads Implement, then
@@ -71,7 +75,7 @@ orchestrator is the normal coordination point, not a barrier to user authority.
 
 Return selected source references and, for a spec, its identity and revision;
 verified outcomes and outstanding scope; PR URLs when applicable and exact HEAD/base;
-verified ordinary source links; checks and
+verified closing references and ordinary source links; checks and
 required CI state; worker/worktree/branch identities, preserved dirty content,
 blockers and the next bounded action when work remains. For missing external
 inputs, name the required capability/artifact and resume evidence; do not assign
@@ -81,7 +85,52 @@ another ritual receipt or a replay of the worker's investigation.
 Keep each result bound to its repository, branch/PR and full commits even after
 the worker's checkout moves to another assignment.
 
+## Requested reviews
+
+Read when a requested review returns findings or repairs enter a separately
+managed review workflow.
+
+For requested reviews, the orchestrator selects scoped actionable findings and
+assigns fixes to the owning worker through Implement, then verifies the corrected
+outcome and any required follow-up review. These fixes use the same progress and
+blocker rules as other delivery work; they do not create a repair-round ledger.
+A separately established managed review workflow retains its owner and budget;
+carry its reserved batch when delegating repairs within that workflow.
+
+
+## Publication and readiness
+
+Read before hosted access or PR publication in the orchestrator and each worker.
+
+Before hosted access, the actual actor applies [G preflight](../../../references/codex-dependency-preflight.md)
+for the workflows it needs; immediately before every hosted write it applies
+[hosted-content safety](../../../references/hosted-content-safety.md). Carry these
+routes in worker assignments. Do not install, reload or substitute dependencies.
+
+For publication use G Send; it creates drafts and preserves existing draft state.
+Deliver owns readiness after publication. Resolve `references/network-execution.md`
+and `references/gh-dependency-preflight.md` from the installed G source root
+established by G preflight; never assume SE and G are sibling directories.
+The assigned worker follows those contracts and reads the exact PR's draft state
+and full HEAD. For a draft, mark only that validated PR ready using the supported
+GitHub CLI operation, then read back non-draft state and unchanged full HEAD.
+For an already-ready PR, verify non-draft state and the validated full HEAD as a
+no-op; do not attempt another ready transition. An unexpected HEAD change
+requires reconciliation and affected validation before accepting readiness. This is a distinct authorized
+transition, not Send behavior or a request for automated review. Use G GitHub
+Actions for current checks and CI fixes. Missing readiness capability blocks
+completion; do not report a draft as delivered.
+
+
+If no CI checks are required, establish that from repository policy and current
+PR facts; missing results alone are not proof. Already-incorporated work needs
+current outcome proof, not a duplicate PR.
+
 ## Serial reuse and concurrent work
+
+Assign one writer per branch, PR and shared artifact, including
+any requested source-progress edits. Worktrees do not isolate ports, databases
+or external services; separate those resources or serialize their use.
 
 Prefer the same worker and worktree for compatible serial assignments in the
 same repository. On every reassignment, update the existing worker's title to
@@ -109,6 +158,9 @@ per branch/PR. A reused worker never handles two active assignments at once.
 Leave completed App tasks visible and unarchived.
 
 ## Recovery
+
+Separate runs have no automatic ownership exclusion or lock replacement;
+reconcile known competing work before a conflicting write.
 
 Wait for results or meaningful changes, not repeated generic status updates.
 If setup or publication has an uncertain effect, inspect the existing task or

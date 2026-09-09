@@ -19,28 +19,23 @@ Grilling Session is conversational and read-only. It may inspect repository cont
 source, documentation, and other read-only evidence, but it never edits project
 files, persists the transcript, creates tasks, or delegates work. If the user
 asks to preserve an accepted rule or decision, return it as a durable-knowledge
-candidate and use `$se:learn` separately only with the authority that request
-provides. A parent read-only workflow may forbid even that follow-up capture.
+candidate for the caller or a separately authorized knowledge workflow. Do not
+capture it during the interview.
 
 Read [references/states.md](references/states.md) before interpreting workflow
 or result state. Read the shared
 [workflow-graph.md](../../references/workflow-graph.md) before using the
 registry below.
 
-## Context preflight
+## Context use
 
-Before the first question, compose `$se:learn` in a strictly read-only context
-inspection using `memory_slice=domain-memory`,
-`domain_operation=periodic-review`, and `capture_mode=defer-to-caller`.
-Require it to read the applicable `AGENTS.md` chain, root `CONTEXT.md`, matched
-first-class subproject context, and only the topic files or ADRs relevant to
-the inferred subject. Do not request setup, repair, compaction, or capture.
-
-Treat repository evidence as grounding, not as a substitute for the user's
-intent. If Learn is unavailable, stop before questioning and report the
-dependency. If no repository context exists, continue from the supplied
-conversation or handoff and state that the context read returned no established
-project knowledge.
+Start from the topic, conversation and caller evidence; no repository or
+knowledge-management skill is required. Callers own context preparation and
+subsequent work. Inspect read-only evidence when a question depends on a
+checkable fact, reusing supplied findings unless new evidence challenges them.
+Evidence grounds the interview but does not replace user intent. Disclose missing
+evidence and continue unaffected questions; block only when responsible
+questioning cannot continue.
 
 ## Interview contract
 
@@ -67,45 +62,23 @@ project knowledge.
 - Before declaring the brief refined, ask one final confirmation question that
   presents the compact interpretation and invites correction.
 
-When composed by Explore, begin after its initial exploration. Use the user's
-request, existing conversation, and exploration findings as context; no curated
-transfer handoff is required. Reuse inspected evidence and focus on remaining
-decisions rather than asking the user to repeat established facts. Ask the
-first interview question in the invoking task or session after the Learn read.
-Keep the interview and its refined result in that same conversation. Do not
-plan or create Explore workers until the outcome is `refined` or `user-stopped`.
+Return composed results in the invoking conversation.
 
 ## Workflow graph
 
-The registry owns transitions; Mermaid is its projection.
+The registry owns structural edges; Mermaid is its projection. Read
+[transition conditions](references/states.md#transition-conditions) for the
+canonical conditions governing these node contracts.
 
 | node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| context-read | action | Ground the session in applicable Project Context through Learn. | explicit invocation or authorized parent handoff | topic or supplied handoff, repository scope | relevant context evidence or an empty-context observation | frame, blocked | Learn is unavailable or responsible repository scope cannot be resolved | read, transient | none |
-| frame | decision | Infer the subject and select the highest-leverage ambiguity. | context inspection completed | supplied brief and context evidence | working interpretation and next ambiguity | question, blocked | no coherent topic can be selected without unavailable user input | transient | none |
+| context-read | action | Use supplied context and inspect relevant evidence when needed. | explicit invocation or authorized parent handoff | topic, conversation, or supplied handoff | available context and evidence limitations | frame, blocked | essential evidence is unavailable and responsible questioning cannot continue | read, transient | none |
+| frame | decision | Infer the subject and select the highest-leverage ambiguity. | available context assessed | supplied brief and context evidence | working interpretation and next ambiguity | question, blocked | no coherent topic can be selected without unavailable user input | transient | none |
 | question | action | Ask exactly one focused question with a recommended answer, then incorporate the user's response. | one material ambiguity or final confirmation remains | working interpretation and latest user answer | recommendation, concise rationale, and updated interpretation or stop request | question, confirm, reported, blocked | required user input cannot be obtained | transient | none |
 | confirm | decision | Present the compact interpretation for final user confirmation. | no known material ambiguity remains | working interpretation | confirmation, correction, or stop request | question, complete, reported | none | transient | none |
 | complete | terminal | Return the user-confirmed refined handoff. | user confirms the compact interpretation | confirmed brief and evidence | refined handoff | none | terminal | none | complete |
 | reported | terminal | Return the best-supported handoff after the user stops questioning. | user asks to stop before confirmation | working interpretation and evidence | handoff with unconfirmed items | none | terminal | none | reported |
 | blocked | terminal | Report why responsible questioning or synthesis cannot continue. | required dependency, context, or input is unavailable | retained evidence and blocker | blocker and smallest recovery input | none | terminal | none | blocked |
-
-## Transition conditions
-
-This matrix owns the condition for every edge declared above.
-
-| from | to | when |
-| --- | --- | --- |
-| context-read | frame | Learn returns relevant context evidence or a valid empty-context observation. |
-| context-read | blocked | Learn is unavailable or repository scope cannot be resolved responsibly. |
-| frame | question | one coherent topic and its next material ambiguity are known. |
-| frame | blocked | a coherent topic cannot be selected and user input is unavailable. |
-| question | question | the latest answer leaves another material ambiguity. |
-| question | confirm | no known material ambiguity remains. |
-| question | reported | the user asks to stop. |
-| question | blocked | required user input cannot be obtained. |
-| confirm | question | the user corrects or extends the compact interpretation. |
-| confirm | complete | the user confirms the compact interpretation. |
-| confirm | reported | the user asks to stop without confirming. |
 
 ~~~mermaid
 flowchart TD
@@ -136,9 +109,3 @@ On `complete`, return a compact Markdown handoff containing:
 On `reported`, return the same shape using the best supported interpretation and
 label every unconfirmed item. On `blocked`, return the exact blocker and the
 smallest input needed to resume. Do not include the raw interview transcript.
-
-## Skill Dependencies
-
-This skill requires the installed `$se:learn` skill for its initial read-only
-Project Context inspection. It never installs, refreshes, substitutes, or
-silently bypasses that dependency.

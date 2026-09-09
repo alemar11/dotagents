@@ -7,6 +7,10 @@ worker uses its working-directory context.
 
 ## Capacity selection
 
+Five workers is the absolute cap for the entire run. Setup failure may reduce
+`created_worker_count` but never changes the planned count or frees a slot.
+Set `worker_transport=none` for a zero-worker plan and `subagent` otherwise.
+
 Record these facts before creating any worker:
 
 - `original_requested_count`: the user's explicit number or `unspecified`;

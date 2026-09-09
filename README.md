@@ -110,16 +110,17 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   directory. Five is an absolute worker cap, not the default; larger requests
   are capped and reported. Workers cannot invoke Explore or delegate further.
 - `se:explore`, `$se:grilling-session`, and `$se:learn` ship together in the SE plugin.
-  Explore invokes its sibling Grilling Session workflow directly, which uses Learn for a
-  read-only Project Context pass. The current task or session asks the user one
+  Explore invokes Learn for a read-only Project Context pass before exploration,
+  then invokes Grilling Session with the gathered evidence. The current task or session asks the user one
   question with a recommended answer per turn and
   cannot plan workers until the scope is confirmed or the user stops
   grilling.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires `$g:github-issues`; its optional classification branch never gates semantic publication, while no SE skill installs G automatically.
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
-- `se:grilling-session` is read-only and explicit or parent-composed. It depends on
-  `$se:learn` for context inspection, returns a transient refined handoff, and
+- `se:grilling-session` is read-only and explicit or parent-composed. It uses supplied
+  context and relevant evidence without requiring Learn or a repository, returns
+  a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
 - `se:spec` saves one coherent spec with stable task identities, recommended
   order, real prerequisites, and completion checks. GitHub is the only saved destination;

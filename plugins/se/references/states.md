@@ -30,7 +30,9 @@ Unknown or conflicting values do not authorize automatic pickup.
   preserve it. Only explicit renewed delivery authorization permits a return to
   `ready-for-agent`, after reconciling the changed scope and existing work.
 - Explicit revocation removes either owned label.
-  Human acceptance and issue closure remain manual unless separately authorized.
+  Human acceptance remains manual. Deliver may add closing references for fully
+  completed scope under its [source-reference contract](../skills/deliver/SKILL.md#source-references); later merge may close
+  those issues automatically. Direct issue closure requires separate authority.
 
 The marker is eligibility, not a lock. Before dispatch, reconcile the same spec
 identity/revision with existing assignments and PRs. Resume active work; do not

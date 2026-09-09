@@ -22,15 +22,14 @@ The intended coordinator is Astra (`gpt-6-astra`) in the current task, with
 the caller's configured reasoning. This skill does not change task settings or
 create a replacement coordinator; explicit caller profile choices take precedence.
 Rename it to `🚚 Deliver · <scope>` when supported, without gating work on its title.
-Use surface-specific developer workers and isolated implementation worktrees;
-never create a separate coordinator. Before delegation read the selected
+Use surface-specific developer workers and isolated implementation worktrees.
+Before delegation read the selected
 [shared role](../../references/subagents.md): `developer`, `code-reviewer`, or
 `evidence-researcher`.
 
-Own scope, integration choices, evidence acceptance and recovery. Delegate bounded
-execution, consume concise results, and read branch-specific procedures only
-when needed. Choose routine sequencing without extra approval; escalate material
-scope or authority decisions. Do not replay completed work to restate its proof.
+Own scope, integration, evidence acceptance and recovery. Delegate bounded
+execution and choose routine sequencing without extra approval; escalate material
+scope or authority decisions. Reuse valid evidence without replaying completed work.
 
 Invocation authorizes selected implementation, worktrees, branches, commits,
 pushes, PR publication/readiness, explicit hosted review requests and scoped
@@ -108,22 +107,16 @@ PRs are ready with current local review, explicit-request hosted acceptance and
 required CI, progress updates are verified, and exact claim release is proved.
 Ready does not mean merged; a task subset does not mean the whole spec delivered.
 
-Apply the shared two-round repair budget per PR across both review gates. Pause
-exhausted PRs or those awaiting decisions/capabilities while independent work continues. When
-no useful work remains, preserve work, stop all actors, save progress, and
-release safely before reporting a pause. Retain claims only when safety or
-release evidence remains uncertain. Resume through Intake, reacquire ownership,
-and revalidate existing evidence without resetting budgets or duplicating review
-requests. Workflow nodes and queues are never persisted as progress or claims.
+Pause exhausted PRs or those awaiting decisions/capabilities while independent
+work continues. When no useful work remains, follow the routed recovery,
+progress and claim contracts to preserve work, stop actors and release safely;
+retain claims only for unresolved safety or release evidence. Resume through
+Intake without resetting budgets or duplicating review requests. Workflow nodes
+and queues are never persisted as progress or claims.
 
-## Result
-
-Every terminal report follows [closeout.md](references/closeout.md): delivery
-results with duration and token-usage coverage, followed by a workflow audit of
-what worked, what failed, and reusable improvements to this skill or its invoked
-skills. The coordinator owns synthesis; optional bounded research does not
-change any invoked skill's delegation policy. A paused run reports partial
-results and its resume handoff, never a successful delivery claim.
+Every terminal report follows [closeout.md](references/closeout.md), including its
+measurements and mandatory retrospective. A pause reports partial results and
+resume inputs, never successful delivery.
 
 ## Skill Dependencies
 

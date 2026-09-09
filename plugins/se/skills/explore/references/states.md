@@ -32,7 +32,10 @@ request justified five.
 
 ## Grilling Session state
 
-Grilling Session remains `not-started` during the initial direct exploration.
+Grilling Session remains `not-started` during Learn context preparation and
+the initial direct exploration. If Explore cannot run its required Learn
+dependency, report overall `failed` with Grilling Session still `not-started`;
+do not create workers.
 Exploration findings are transient evidence, not a separate workflow state or
 a confirmed scope. Once evidence supports informed questions, begin the
 interview: `not-started` transitions to `awaiting-answer` or `blocked`. Each
@@ -46,7 +49,7 @@ answer may lead to another `awaiting-answer`, `refined`, `user-stopped`, or
 | `awaiting-answer` | Grilling Session has asked one current question and needs the user's answer. | Nonterminal; create no workers. |
 | `refined` | The user confirmed the refined scope. | Continue to worker planning. |
 | `user-stopped` | The user ended Grilling Session before confirmation. | Continue from the best-supported scope and preserve unconfirmed items. |
-| `blocked` | Grilling Session or its Learn context dependency could not run responsibly. | Create no workers; overall outcome is `failed`. |
+| `blocked` | Grilling Session could not run responsibly. | Create no workers; overall outcome is `failed`. |
 
 Question count, answers, the refined scope, and unconfirmed items are run
 data. A controller waiting for the next answer remains nonterminal even when

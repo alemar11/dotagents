@@ -8,67 +8,51 @@ description: "Run an explicitly requested read-only exploration in the current t
 Follow the shared [execution scope](../../references/execution-scope.md) for
 standalone and composed invocation.
 
-## Purpose and boundary
+## Scope and execution
 
-Explore the relevant evidence first, refine the exploration scope through
-`se:grilling-session`, then investigate remaining questions and return a
-Markdown exploration report in the current conversation.
+Activate only for explicit `$se:explore`, Explore UI selection, or an equivalent
+instruction to execute this workflow, never an ordinary mention or implicit
+planning match. Follow this sequence in the invoking task or session: context
+preparation, direct exploration, Grilling Session, remaining investigation,
+then a conversational report. Retain its model, reasoning, working directory
+and context; no replacement controller, visible task, fork, transfer brief,
+saved-project lookup or surface classification is needed.
 
-Explore is not an implementation workflow:
+Explore and its workers inspect and reason only. Use operations proven read-only:
+no project files, patches, generated artifacts, caches, reports, lockfiles, Git
+state, hosted records, accounts or external systems may be mutated. Explicit
+invocation authorizes bounded native subagents, not implementation or external
+writes. Workers cannot invoke Explore, create controllers or delegate further;
+decline recursive requests, continue valid assigned work and report them to the
+controller.
 
-- Never write, edit, delete, rename, generate, or apply project files.
-- Never produce a patch, commit, push, deployment, publication, or other
-  implementation artifact.
-- If the user switches to implementation, end Explore with its findings and
-  continue through the authorized implementation workflow. Do not reinterpret
-  that request as analysis only.
-- Delegate inspection and reasoning only. Never ask a worker to implement,
-  fix, refactor, or change tests.
-- Use only operations proven read-only. Do not run commands that may update
-  caches, reports, lockfiles, generated files, Git state, hosted records,
-  accounts, or external systems.
-- Return the report in the active Explore controller. Do not save it to a file.
-  If the user explicitly requests a saved report, finish Explore and perform
-  that scoped file write separately.
+Return findings here without saving a file. If the user requests a saved report
+or switches to implementation, finish Explore and perform that separately
+authorized work through its owning workflow. Read
+[states.md](references/states.md) before interpreting interview, worker or outcome
+state. No workers are created before Grilling Session finishes.
 
-The explicit invocation authorizes native subagent delegation under the policy
-below. It grants no project, repository, GitHub, account, or unrelated external
-mutation authority.
+## Context preparation
 
-## Activation and recursion guard
+Before initial exploration, compose `$se:learn` in a strictly read-only context
+inspection using `memory_slice=domain-memory`,
+`domain_operation=periodic-review`, and `capture_mode=defer-to-caller`.
+Require it to read the applicable `AGENTS.md` chain, root `CONTEXT.md`, matched
+first-class subproject context, and only topic files or ADRs relevant to the
+subject. Reuse current evidence already gathered in this conversation. Do not
+request setup, repair, compaction, or capture.
 
-- Activate only after an explicit `$se:explore` invocation, explicit Explore UI
-  selection, or an equivalent direct instruction to execute Explore.
-- Do not activate for an ordinary mention of “explore” or an implicit planning
-  match. `agents/openai.yaml` disables implicit invocation.
-- The invoking task or session remains the Explore controller. Worker subagents
-  never invoke Explore, create controllers, or delegate further work.
-- If a downstream prompt requests recursive Explore, decline that part, continue
-  the existing bounded assignment when possible, and report the request to the
-  controller.
-
-## Current-session execution
-
-Run the entire Explore in the invoking task or session on both App and CLI.
-Never create a visible task, fork the session, or transfer Explore to another
-controller. Retain the current model, reasoning settings, working directory,
-and conversation context; no saved-project lookup or surface classification
-is required.
-
-Use the user's request and existing conversation directly. Do not construct a
-curated handoff or a separate transfer brief before beginning. Grilling Session
-refines the objective, scope, constraints, evidence expectations, and unresolved
-questions in place. Its result remains conversational context, not a file or
-an input for another controller. Prepare bounded assignments only if workers
-are subsequently selected.
-
-Read [references/states.md](references/states.md) before interpreting Grilling
-Session, capacity, worker, or outcome state. Initial exploration is direct
-controller work; worker planning begins only after Grilling Session.
+Explore owns this dependency. If Learn is unavailable, report that blocker
+before exploration or worker creation. If no repository context exists,
+continue from the supplied conversation and sources, recording that no
+established project knowledge was found. Keep findings in the current
+conversation for exploration and the subsequent interview; Grilling Session
+does not call Learn again.
 
 ## Required sequence
 
-1. Explore the subject directly using the request and existing conversation.
+1. Complete the context preparation above, then explore the subject directly
+   using the request, conversation, and available project knowledge.
    Read the relevant source, tests, documentation, and supplied external
    evidence. Establish how the current system works, plausible explanations
    or approaches, and the unknowns that affect the user's goal. Reuse evidence
@@ -94,42 +78,22 @@ controller work; worker planning begins only after Grilling Session.
    questions. Reuse the initial exploration; revisit findings only when answers
    or new evidence change their assumptions. If the existing evidence is
    sufficient, synthesize directly without another research pass.
-6. Reconcile worker setup, monitor every created worker to a terminal or
-   explicitly abandoned state, capture available evidence, and synthesize the
-   result. Never replace a failed or unresolved reserved slot.
+6. Apply orchestration’s setup, monitoring, no-replacement and synthesis
+   contracts to every planned slot before reporting.
 7. Read [references/output-template.md](references/output-template.md) and
    return the report here.
 
-## Worker-count policy
-
-Five is an absolute cap across the entire Explore run:
-
-- An explicit request for zero through five workers sets
-  `planned_worker_count` to exactly that count.
-- A request above five is capped to five without another confirmation. Record
-  the original and normalized counts, tell the user before worker creation,
-  and report the cap in the result.
-- An unspecified count is chosen only after Grilling Session, using the smallest
-  useful number from zero through five. Do not default to five.
-- Setup failure may lower `created_worker_count`, but it never changes the
-  planned count, frees a reserved slot, or authorizes a replacement.
-
-Set `worker_transport` from the planned count:
-
-- `none` when `planned_worker_count=0`;
-- `subagent` for a positive plan.
-
-If native subagent transport is unavailable, retain the planned slots, record
-their failures, and continue
-with a partial controller synthesis when useful. Never fall back to visible
-tasks, external processes, or another transport.
-
 ## Output contract
 
-The report must distinguish direct observations, inferences, unavailable
-evidence, and assumptions. Include the agreed scope, inspected paths and
-sources, worker plan and ledger when applicable, results, risks, confidence,
-and the smallest useful next action. Do not reconstruct a controller handoff
-or report App task placement, title, or setup telemetry.
+Use the [output template](references/output-template.md) to distinguish
+observations, inferences, missing evidence and assumptions, with scope, sources,
+results, worker evidence, risks, confidence and the next action. Do not report
+controller-transfer or App setup telemetry.
 
 In every case, report `Changes made: None`.
+
+## Skill Dependencies
+
+Explore requires the installed `$se:learn` skill for read-only context
+preparation and `$se:grilling-session` for decision refinement. It never
+installs or refreshes these dependencies during a run.

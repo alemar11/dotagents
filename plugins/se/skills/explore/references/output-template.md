@@ -9,7 +9,7 @@ subagent ledger only when workers were planned.
 - **Objective and agreed scope:** Summarize the question, constraints, decisions,
   evidence expectations, and unconfirmed items after exploration and Grilling Session. Do not
   reproduce the interview transcript or construct a transfer handoff.
-- **Grilling Session outcome:** `<refined/user-stopped/blocked>`
+- **Grilling Session outcome:** `<not-started/refined/user-stopped/blocked>`
 - **Worker plan:** Original requested count, planned count after the cap,
   created count, and reason for the selected count. State when no workers were
   planned. If capped, record the original request and pre-creation disclosure.
