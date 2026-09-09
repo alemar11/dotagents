@@ -42,7 +42,7 @@ class OkfCliTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 self.okf.main(["--version"])
         self.assertEqual(raised.exception.code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "3.0.0")
+        self.assertEqual(stdout.getvalue().strip(), self.okf.VERSION)
 
     def test_doctor_json_shape(self) -> None:
         stdout = io.StringIO()
@@ -50,7 +50,7 @@ class OkfCliTests(unittest.TestCase):
             code = self.okf.main(["--json", "doctor"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "3.0.0")
+        self.assertEqual(payload["version"], self.okf.VERSION)
         self.assertEqual(payload["spec_version"], "0.2")
         self.assertIn("pyyaml", payload["checks"])
         self.assertTrue(payload["checks"]["anchored_io"])
@@ -820,7 +820,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 0)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["version"], "3.0.0")
+            self.assertEqual(payload["version"], self.okf.VERSION)
             self.assertEqual(payload["spec_version"], "0.2")
             self.assertTrue(Path(payload["path"]).exists())
 
