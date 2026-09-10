@@ -62,12 +62,13 @@ includes delivery workflow retrospectives:
 
 Xcode is the repository's Apple developer-tools plugin. It preserves the
 official stable and beta release-note resolver and adds safe launch guidance
-for Apple's native headless MCP server:
+for Apple's native headless MCP server and embedded skill installation:
 
 | Skill | Purpose |
 | --- | --- |
 | `xcode:whats-new` | Resolve release notes for the active Xcode plus the latest stable and beta versions, or for one requested version. |
 | `xcode:mcp` | Safely launch and verify the Xcode-provided headless MCP server on attended Macs, unattended hosts, or explicitly isolated CI machines. |
+| `xcode:skills` | Install or update Xcode's embedded skills in a target repository's `.agents/skills` for Codex. |
 
 ## Reusable Skills
 

@@ -1,7 +1,7 @@
 {
   "name": "xcode",
-  "version": "1.2.0",
-  "description": "Read official stable and beta Xcode release notes and safely launch Apple's native headless Xcode MCP server.",
+  "version": "1.3.0",
+  "description": "Read Xcode release notes, launch its native headless MCP server, and install embedded skills for Codex repositories.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -19,8 +19,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Xcode",
-    "shortDescription": "Read stable and beta Xcode updates and launch its native MCP server.",
-    "longDescription": "Xcode bundles a What's New skill for official Apple stable and beta release notes and an MCP skill for safely launching the Xcode-provided headless server on attended Macs, unattended hosts, and explicitly isolated CI machines.",
+    "shortDescription": "Xcode release notes, native MCP, and embedded skills for Codex.",
+    "longDescription": "Xcode bundles skills for official stable and beta release notes, safely launching Apple's native headless MCP server, and installing or updating Xcode's embedded skills in Codex repositories.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -33,7 +33,8 @@
     "termsOfServiceURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $xcode:whats-new to show what's new in my active Xcode.",
-      "Use $xcode:mcp to launch Apple's native Xcode MCP server safely."
+      "Use $xcode:mcp to launch Apple's native Xcode MCP server safely.",
+      "Use $xcode:skills to install or update Xcode's embedded skills in this repository."
     ],
     "brandColor": "#147EFB",
     "composerIcon": "./assets/xcode-small.svg",
