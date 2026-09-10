@@ -11,6 +11,7 @@ task plans, reviewed PR delivery, and durable project knowledge.
 | `se:spec` | Create or revise a coherent spec with an ordered actionable task plan; save to GitHub. |
 | `se:adversarial-review` | Independently pressure-test a fixed software change without editing it. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
+| `se:chief-of-staff` | Coordinate one visible Deliver task per repository in the App, through ready PRs and required cross-repository checks. |
 | `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
 | `se:implement` | Implement selected local work, optionally consult a UI designer, validate it, and commit scoped files without publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
@@ -51,6 +52,19 @@ the GitHub label catalog and lifecycle transitions.
 The templates use a compact ordered task list; each task owns its repository
 scope, acceptance links, prerequisites, and paired verification checks. GitHub
 embeds all task bodies in the spec issue.
+
+## Chief of Staff
+
+[`se:chief-of-staff`](skills/chief-of-staff/SKILL.md) runs only in the Codex App,
+in the current task without changing its project or execution location. Chief of
+Staff never creates or switches worktrees for itself. It verifies every selected
+repository has a standalone saved project before any dispatch or follow-up, then
+reuses or creates one visible Deliver coordinator per repository. A failed mapping
+gate blocks coordination while leaving running tasks untouched. Deliver retains
+implementation, worker, review and CI ownership; Chief of Staff coordinates
+external inputs and verifies required cross-repository results through ready PRs.
+Invocation authorizes the selected delivery tasks, not project repair, merging or
+deployment. It preserves task identities and results in the conversation for resume.
 
 ## Deliver
 
@@ -115,7 +129,8 @@ lineage, bounded waits and terminal evidence.
   distinguish transient workflow position from saved content and external facts.
 - Explore stays in the invoking task or session with optional
   bounded native subagents. Delivery alone selects App-visible or CLI-native
-  developer transport under its runtime contract. Learn remains local-only.
+  developer transport under its runtime contract. Chief of Staff coordinates visible
+  App Deliver tasks across repositories. Learn remains local-only.
 
 This source tree is the maintained SE design surface; installed caches are
 verification surfaces, not editable source.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "🧭 Chief of Staff"
+  short_description: "Coordinate repository Deliver tasks in the Codex App."
+  default_prompt: "Use $se:chief-of-staff to coordinate these repositories through ready PRs and required cross-repository checks."

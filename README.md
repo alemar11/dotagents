@@ -55,6 +55,7 @@ includes delivery workflow retrospectives:
 | `se:adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `se:spec` | Create or revise one coherent feature spec and actionable task plan, saving to GitHub. |
+| `se:chief-of-staff` | Coordinate one visible Deliver task per repository in the App, through ready PRs and required cross-repository checks. |
 | `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
 | `se:implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |

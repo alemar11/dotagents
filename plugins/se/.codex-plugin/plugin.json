@@ -1,7 +1,7 @@
 {
   "name": "se",
-  "version": "6.17.0",
-  "description": "Refine ideas, create feature specs with actionable tasks, save to GitHub, and deliver reviewed changes.",
+  "version": "6.18.0",
+  "description": "Specify repository work, deliver reviewed PRs, and coordinate related deliveries across repositories.",
   "author": {
     "name": "alemar11",
     "url": "https://github.com/alemar11"
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Specify features, plan tasks, and deliver reviewed changes.",
-    "longDescription": "SE supports repository-grounded refinement, feature specifications, and reviewed delivery. Spec saves one repository-scoped spec with actionable tasks to GitHub. Deliver coordinates isolated workers through implementation, independent candidate review, scoped fixes, required CI and ready PRs. Workers use visible App tasks or native CLI subagents; a regular integration worker combines contributions when needed. Learn maintains project knowledge; Implement handles bounded local work; Review PR requests or resumes hosted review and reports the result. Merge, deployment and releases require separate authorization.",
+    "longDescription": "SE supports repository-grounded refinement, feature specifications, and reviewed delivery. Spec saves one repository-scoped spec with actionable tasks to GitHub. Deliver coordinates isolated workers through implementation, independent candidate review, scoped fixes, required CI and ready PRs. Workers use visible App tasks or native CLI subagents; a regular integration worker combines contributions when needed. Learn maintains project knowledge; Implement handles bounded local work; Review PR requests or resumes hosted review and reports the result. Merge, deployment and releases require separate authorization. Chief of Staff coordinates one visible Deliver task per repository in the Codex App after verifying every standalone project mapping, through ready PRs and required cross-repository verification.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -24,7 +24,7 @@
     "defaultPrompt": [
       "Use $se:grilling-session to sharpen a topic, $se:explore to investigate it, or $se:learn to preserve knowledge.",
       "Use $se:spec to create a feature spec and actionable tasks, saving to GitHub.",
-      "Use $se:deliver to deliver specs, issues or bounded requests through reviewed ready PRs."
+      "Use $se:deliver for one repository, or $se:chief-of-staff to coordinate related repository deliveries in the App."
     ],
     "brandColor": "#BE185D"
   }

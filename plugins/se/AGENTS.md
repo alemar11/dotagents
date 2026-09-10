@@ -24,6 +24,10 @@ When ownership changes, update affected consumers and remove obsolete routes.
 
 ## Skill ownership
 
+- Chief of Staff owns App-only cross-repository coordination, the global standalone
+  project gate, Deliver task reuse and combined acceptance. Deliver owns all
+  repository execution; project configuration remains App-owned.
+
 - Deliver owns the single-repository worker-to-PR workflow and its local worker role,
   integration, single-pass candidate review and recovery references. It has no
   graph, claim registry or repair ledger.

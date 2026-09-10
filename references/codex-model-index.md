@@ -10,6 +10,7 @@ active runtime.
 
 | skill | model | reason | description |
 | --- | --- | --- | --- |
+| [`$se:chief-of-staff`](../plugins/se/skills/chief-of-staff/SKILL.md) | `configured/default` | `configured/default` | Invoking coordinator retains its settings; new visible Deliver tasks inherit App defaults and reused tasks retain settings unless explicitly overridden by the user. |
 | [`$se:explore`](../plugins/se/skills/explore/SKILL.md) | `configured/default` | `configured/default` | Invoking App task or CLI session acting as the read-only Explore controller; its active model and reasoning are intentionally retained. |
 | [`$se:explore`](../plugins/se/skills/explore/SKILL.md), [`$se:spec`](../plugins/se/skills/spec/SKILL.md) | `gpt-5.6-luna` | `max` | Shared [`evidence-researcher`](../plugins/se/references/subagents/evidence-researcher.md) role. Calling skills own selection, concurrency, lifecycle, and fallback. |
 | [`$se:spec`](../plugins/se/skills/spec/SKILL.md) | Inherit | Inherit | The invoking session owns drafting and review with its configured model and reasoning; no separate planner. Optional helpers use the shared roles below. |

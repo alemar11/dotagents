@@ -17,6 +17,7 @@ Available capabilities still govern what can actually execute.
 | Implement | Execute local work in the current session/task; may delegate only its optional read-only UI designer under its own contract. |
 | Spec | Draft and review in the invoking session; optional research/review helpers use shared roles. |
 | Explore | Investigate in the invoking task or session; optional native helpers follow its worker contract. Never create visible tasks. |
+| Chief of Staff | Coordinate one visible App Deliver task per selected repository; never implement or direct Deliver workers. |
 | Deliver | Own isolated workers through PR publication and CI under its local worker contract; the current task owns orchestration. |
 
 An orchestrator may launch an agent and assign it a skill. The agent follows
