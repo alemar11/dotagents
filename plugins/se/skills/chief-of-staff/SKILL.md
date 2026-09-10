@@ -13,12 +13,21 @@ projectless or project-bound, with its configured model and reasoning. Follow
 CLI or unresolved surfaces cannot run this workflow; report the limitation
 without creating a replacement controller or substituting subagents.
 
-The visible Chief of Staff task keeps its original execution location for the
-entire run and every continuation. Never create or switch worktrees for this
-coordinator, fork or move it to another checkout, or change its project association.
-If it starts projectless, it remains projectless; if it starts in a project or
-existing worktree, it stays there. Deliver task isolation never relocates Chief
-of Staff.
+## Hard coordinator location rule
+
+Chief of Staff and its Deliver coordinators must never be associated with a
+separate worktree. Chief of Staff runs projectless or directly in its original
+saved project location; each Deliver coordinator runs directly in its mapped
+repository's saved checkout. Only Deliver's implementation workers use isolated
+worktrees. This is a required topology, not a preference or a creation default.
+
+Verify actual execution location and App association before coordination and on
+resume. If Chief of Staff already runs in a separate worktree, or its location
+cannot be verified, block before dispatch or follow-up. Do not move or fork it,
+create a replacement, or silently accept its existing worktree. Report that the
+user must invoke it from a projectless task or the original saved project location.
+An eligible Chief of Staff task retains its identity, project association and
+execution location throughout the run; a projectless task remains projectless.
 
 Once scope is known, use `🧭 Chief of Staff · <scope>` for the invoking task's
 title when supported. Title availability never gates coordination.
@@ -65,7 +74,8 @@ its project identities and roots reconcile with the live inventory. Do not assum
 a storage filename or schema, modify App state, or treat stale records as current
 configuration. Unavailable full membership evidence leaves the gate unresolved.
 
-Missing, ambiguous, mismatched or unverifiable mappings block the whole run's
+Missing, ambiguous, mismatched or unverifiable mappings and violations of the
+hard coordinator location rule block the whole run's
 dispatches and follow-ups, including unaffected repositories. Report the exact
 configuration gap and required correction. Already-running tasks remain untouched;
 do not stop, reassign or message them while the gate fails. Read-only reconciliation
@@ -75,18 +85,25 @@ when scope, host or project configuration changes or evidence becomes uncertain.
 ## Reconcile and assign
 
 After the gate passes, inspect existing tasks by actual repository, project,
-selected scope and current state. Reuse one compatible Deliver coordinator per
+execution location, selected scope and current state. An otherwise matching
+Deliver coordinator in a separate worktree fails the global configuration gate:
+leave it untouched and report the mismatch, without continuing it or creating a
+duplicate. Reuse one compatible Deliver coordinator per
 repository for this run, including completed tasks with useful results or serial
 follow-up work. Do not adopt unrelated work or infer a match from its title.
 Multiple competing matches or overlapping ownership require reconciliation before
 affected dispatch; never create another coordinator to bypass the conflict.
 
 Create a visible task in the mapped project only when no compatible Deliver task
-exists. Use the App's supported Git worktree default unless the user requests the
-saved checkout. Give it a complete initial assignment: invoke Deliver, identify
+exists. Explicitly select execution directly in the saved checkout, never the
+App's worktree default. If that execution mode cannot be selected or verified,
+block rather than substitute a worktree. Give it a complete initial assignment
+requiring the coordinator to remain in that saved checkout: invoke Deliver, identify
 its single repository and selected scope, source references, acceptance criteria,
 external inputs, required cross-repository checks and established authority.
-Deliver owns its implementation workers and verifies their checkouts.
+Deliver owns its implementation workers and verifies their isolated checkouts.
+Verify the created coordinator's actual saved-checkout location and project
+association; a creation request alone does not establish the required topology.
 
 Record stable task and host identities, assigned scope and observed setup. A
 pending creation receipt is not a usable task identity or verified execution.

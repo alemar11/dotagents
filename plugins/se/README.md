@@ -57,7 +57,10 @@ embeds all task bodies in the spec issue.
 
 [`se:chief-of-staff`](skills/chief-of-staff/SKILL.md) runs only in the Codex App,
 in the current task without changing its project or execution location. Chief of
-Staff never creates or switches worktrees for itself. It verifies every selected
+Staff must be projectless or in its original saved project location; Deliver
+coordinators must use their saved repository checkouts. Separate coordinator
+worktrees fail the global gate, including on resume. Only implementation workers
+use isolated worktrees. It verifies every selected
 repository has a standalone saved project before any dispatch or follow-up, then
 reuses or creates one visible Deliver coordinator per repository. A failed mapping
 gate blocks coordination while leaving running tasks untouched. Deliver retains

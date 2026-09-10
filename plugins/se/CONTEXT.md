@@ -52,7 +52,10 @@ are distinct obligations.
 
 [Chief of Staff](skills/chief-of-staff/SKILL.md) owns App-only cross-repository
 coordination from the invoking task, retaining its project association and execution
-location across continuations without creating or switching its worktree.
+location across continuations. Chief of Staff must be projectless or in its
+original saved project location, and its Deliver coordinators must run directly
+in their saved repository checkouts. Separate coordinator worktrees fail preflight;
+only implementation workers use isolated worktrees.
 It gates all dispatch and follow-up on verified
 standalone project mappings, reconciles one Deliver task per repository, and
 coordinates required external inputs and combined verification. Deliver retains
