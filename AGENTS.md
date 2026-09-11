@@ -1,8 +1,10 @@
 # Repository Guidelines
 
-Reusable skills live in `skills/`, maintainer skills in `.agents/skills/`,
-plugins in `plugins/`, and MCP setup skills in `skills/`. Each skill has `SKILL.md`;
-each plugin has `.codex-plugin/plugin.json`.
+Reusable skills and MCP setup skills live in `skills/`; maintainer skills live
+in `.agents/skills/`. Each skill has `SKILL.md`. Optional Codex plugins live in
+`plugins/` with `.codex-plugin/plugin.json` and are registered in
+`.agents/plugins/marketplace.json`; the marketplace may be empty when no
+plugins ship.
 
 For cross-package purpose or ownership, consult `CONTEXT.md` and its relevant
 scoped context. Read the nearest package `AGENTS.md` before maintaining that
@@ -77,8 +79,6 @@ retrying a mutation.
 - Remove retired source, metadata, catalog/install entries, registries, and
   repository-owned installation links together, then scan for stale references.
 - Choose an unused repository color when adding `brand_color`.
-- Keep `skills/plugins-reload/SKILL.md` aligned with the local marketplace's
-  plugin set and supported installation workflow.
 
 ## Plugin maintenance
 
@@ -129,6 +129,10 @@ validation are useful contracts; skill prose snapshots are not.
 Scope rebuildable caches to `~/.cache/dotagents/skills/<skill>/` or
 `~/.cache/dotagents/plugins/<plugin>/`; bundled-skill caches belong under the
 plugin's `skills/<skill>/` subdirectory. Do not store user configuration there.
+Durable one-use state that is not rebuildable cache may keep a documented
+historical path (for example `github-review-threads` reservation and journal
+roots under `~/.cache/dotagents/plugins/g/...`). Do not relocate those roots
+without an explicit migration that preserves consumed markers.
 
 Preserve unrelated work. When commits are requested, separate responsibilities
 across skills or plugins. Run `git diff --check` before handoff.

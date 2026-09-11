@@ -2,12 +2,9 @@
 
 ## Project Purpose
 
-This repository maintains reusable Codex skills, project-maintainer skills,
-repo-local plugins, and MCP setup skills. `README.md` describes the
+This repository maintains reusable skills, project-maintainer skills,
+and MCP setup skills. `README.md` describes the
 catalog; `AGENTS.md` owns repository-wide maintenance rules.
 
-## Scoped Contexts
-
-| Scope | Owned paths | Context |
-| --- | --- | --- |
-| SE plugin | `plugins/se/` | [`plugins/se/CONTEXT.md`](plugins/se/CONTEXT.md) |
+Engineering workflows live in separate `skills/` directories. Skill-local
+references own their contracts; named skill dependencies own composed work.

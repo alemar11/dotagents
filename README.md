@@ -1,68 +1,47 @@
 # dotagents
 
-Reusable Codex skills, project maintainer skills, and optional repo-local plugins.
+Reusable agent skills and project maintainer skills.
 
 This repository is organized around reusable installable skills:
 
 - **Reusable skills** under `skills/`, which can be linked locally or installed into Codex.
 
-Project-only maintainer workflows live under `.agents/skills/`, and optional repo-local plugin discovery lives under `.agents/plugins/`.
+Project-only maintainer workflows live under `.agents/skills/`. The retained
+`.agents/plugins/marketplace.json` registry is empty; the current catalog ships
+as skills.
 
 ## Repository Layout
 
 | Path | Purpose |
 | --- | --- |
 | `skills/` | Reusable skills, each with a `SKILL.md` entrypoint and `agents/openai.yaml` metadata. |
-| `plugins/` | Optional repo-local Codex plugins, each with `.codex-plugin/plugin.json` and optional bundled skills. |
 | `.agents/skills/` | Project-local maintainer skills for working on this repository. |
 | `.agents/plugins/marketplace.json` | Local plugin discovery surface for this checkout. |
 | `skills-link.sh` | Local development helper that links reusable skills into `~/.agents/skills`. |
-
-## Repo-Local Plugins
-
-G is the repo-local Git and GitHub workflow plugin. Skills use direct `git` and
-`gh`; its small shared CLI handles attachments, verified PR publication, review
-receipts, guarded stacks, worktree fingerprints, and star-list membership
-updates. It has no GitHub connector dependency. It bundles:
-
-| Skill | Purpose |
-| --- | --- |
-| `g:git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
-| `g:github-repository-triage` | Triage issue and pull request queues across one or more repositories read-only. |
-| `g:github-issues` | Manage GitHub issues, attachments, relationships, label/type classification, and taxonomy proposals. |
-| `g:github-projects` | Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. |
-| `g:github-investigation` | Investigate issues, pull requests, and proposed fixes using repository evidence. |
-| `g:github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
-| `g:github-delivery-status` | Inspect exact-head pull-request delivery readiness, merge policy, rulesets, checks, queue, and automation state without mutating GitHub. |
-| `g:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
-| `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
-| `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `g:yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
-| `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
-| `g:versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
-
-SE is the repository's software-delivery workflow plugin. It refines and
-studies ideas, turns them into Feature plans, delivers them through reviewed
-pull requests or lightweight local commits, maintains project knowledge, and
-includes delivery workflow retrospectives:
-
-| Skill | Purpose |
-| --- | --- |
-| `se:learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
-| `se:grilling-session` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
-| `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional Luna subagents. |
-| `se:adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
-| `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
-| `se:spec` | Create or revise one coherent feature spec and actionable task plan, saving to GitHub. |
-| `se:chief-of-staff` | Coordinate one visible Deliver task per repository in the App, through ready PRs and required cross-repository checks. |
-| `se:deliver` | Orchestrate isolated workers in one repository through validated ready PRs. |
-| `se:implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
-| `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
 
 ## Reusable Skills
 
 | Skill | Purpose |
 | --- | --- |
+| `learn` | Maintain durable project knowledge, decisions, localization guidance, and code review rules. |
+| `grilling-session` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
+| `explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional research subagents. |
+| `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
+| `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
+| `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
+| `implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only when authorized, without orchestration or publication. |
+| `deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
+| `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
+| `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
+| `github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
+| `github-status` | Summarize issue and pull-request queues read-only, or inspect one PR's exact-head delivery readiness, merge policy, checks, and automation state. |
+| `github-issues` | Manage GitHub issues, attachments, relationships, label/type classification, and taxonomy proposals. |
+| `github-projects` | Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. |
+| `github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
+| `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
+| `github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
+| `github-stacked-pr` | Manage stacked branches and dependent pull requests, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
+| `github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `crusty` | Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty. |
 | `ms-roberts` | Use when medium or long user-authored English prompts contain grammar errors; append corrections and learning tips after the main answer. |
 | `socrates` | Offer opt-in exercises about meaningful recent engineering work, or quiz the user when explicitly requested. |
@@ -70,7 +49,6 @@ includes delivery workflow retrospectives:
 | `skill-cli-creator` | Create or refactor CLIs shipped inside a skill or plugin bundle. |
 | `tanstack` | Build, debug, review, or migrate applications using TanStack packages. |
 | `postgres` | Inspect Postgres databases, design or run SQL, and manage migrations through the shipped Postgres CLI. |
-| `plugins-reload` | Reload this repository’s G and SE plugin installations when explicitly requested. |
 | `swift-api-design` | Design, rename, or review Swift API surfaces using the bundled official API Design Guidelines. |
 | `swift-docc` | Author, review, preview, or publish Swift-DocC symbol documentation, articles, and tutorials. |
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |
@@ -95,45 +73,50 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `se:explore` explores relevant evidence in the current task or session before
+- `explore` explores relevant evidence in the current task or session before
   Grilling Session, then investigates remaining questions using the existing
   conversation. The entire investigation is strictly read-only.
-  It retains the current model and reasoning profile and never creates visible
-  tasks or prepares a controller transfer handoff. Substantial independent
-  evidence work may use native Luna/max subagents in the current working
-  directory. Five is an absolute worker cap, not the default; larger requests
-  are capped and reported. Workers cannot invoke Explore or delegate further.
-- `se:explore`, `$se:grilling-session`, and `$se:learn` ship together in the SE plugin.
+  It never creates visible tasks or prepares a controller transfer handoff.
+  Independent evidence work may use subagents with focused research briefs,
+  subject to user constraints and host capacity. Workers cannot invoke Explore
+  or delegate further. Research helpers prescribe no model or reasoning level.
+- Install `explore` with its `grilling-session` and `learn` dependencies.
   Explore invokes Learn for a read-only Project Context pass before exploration,
   then invokes Grilling Session with the gathered evidence. The current task or session asks the user one
   question with a recommended answer per turn and
   cannot plan workers until the scope is confirmed or the user stops
   grilling.
+- Install `spec` with its `grilling-session` and `github-issues` dependencies.
+  Install `review-pr` with its `github-review-threads` dependency. These
+  dependencies must be reachable in the current session; the invoking skills
+  never install or substitute them automatically.
+- `review-pr` obtains one hosted Codex review result for a PR. Use
+  `$github-review-threads` for inspect, reply, resolve, and other provider
+  review operations. Use `$adversarial-review` for local independent change
+  review; use `$crusty` only when explicitly asked for Crusty.
 - `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
-- The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires `$g:github-issues`; its optional classification branch never gates semantic publication, while no SE skill installs G automatically.
-- `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
-- `se:grilling-session` is read-only and explicit or parent-composed. It uses supplied
+- Spec uses installed `$grilling-session` for material clarification and
+  `$github-issues` for hosted reads and publication when saving to GitHub.
+- `learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
+- `grilling-session` is read-only and explicit or parent-composed. It uses supplied
   context and relevant evidence without requiring Learn or a repository, returns
   a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
-- `se:spec` targets one repository per invocation, with no cross-repository issue
+- `spec` targets one repository per invocation, with no cross-repository issue
   references or companion specs. It saves coherent specs with stable task identities, recommended
   order, real prerequisites, and completion checks. GitHub is the only saved destination;
-  no-write previews stay in the conversation and require no G access when using
+  no-write previews stay in the conversation and require no GitHub skill access when using
   only supplied or local sources. GitHub is the sole saved-spec authority.
 
-- SE skills retain the same delegation policy standalone and composed. Implement
-  implements, validates and commits; independent review is a separate caller-owned
-  gate, with no reviewer delegation inside Implement.
-- `se:review-pr` reuses a completed current-target review, resumes a pending
+- Engineering skills retain the same delegation policy standalone and composed. Implement
+  implements and validates, then commits only with user or composed-assignment
+  authority; independent review is a separate caller-owned gate, with no
+  reviewer delegation inside Implement.
+- `review-pr` reuses a completed current-target review, resumes a pending
   request, or requests and waits when needed. It returns the provider result to
   the calling task, standalone or composed, with no subagents, repairs, CI or
   acceptance decisions. Explicit inspect-only scope remains read-only.
-- `se:deliver` uses the current task to coordinate isolated workers through
-  implementation, validation, PR creation and required CI. It accepts specs,
-  issues or bounded requests; App workers are visible tasks and CLI workers are
-  native subagents. It supports stacks and one independent code-reviewer pass per completed PR,
-  without repository claims, automatic repeat reviews or retrospectives. Source-progress writes are opt-in.
+
 
 ## Project-Local Skills
 
@@ -144,64 +127,6 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 Project-local skills are repository-specific and are not included in reusable install commands.
 
 ## Installation
-
-### Use Repo-Local Plugins
-
-Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
-
-Register the `alemar11` marketplace from GitHub, then install the required plugins:
-
-```sh
-codex plugin marketplace add alemar11/dotagents --ref main
-codex plugin add g@alemar11
-codex plugin add se@alemar11
-```
-
-If the `alemar11` marketplace is already registered, install the plugins directly:
-
-```sh
-codex plugin add g@alemar11
-codex plugin add se@alemar11
-```
-
-For local development from a dotagents checkout, register the checkout instead
-of the GitHub source, then install the same plugin:
-
-```sh
-codex plugin marketplace add /path/to/dotagents
-codex plugin add g@alemar11
-codex plugin add se@alemar11
-```
-
-During local development, validate each changed plugin and reinstall it from
-the repository source. G has a dedicated helper; SE is reinstalled directly:
-
-```sh
-plugins/g/projects/g/scripts/reinstall-local
-codex plugin add se@alemar11 --json
-```
-
-For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
-
-```sh
-codex plugin marketplace upgrade alemar11
-codex plugin remove g@alemar11
-codex plugin add g@alemar11
-codex plugin remove se@alemar11
-codex plugin add se@alemar11
-```
-
-When migrating from the retired Feature Flow plugin identity, remove the old
-installation before installing SE:
-
-```sh
-codex plugin remove feature-flow@alemar11
-codex plugin add se@alemar11
-```
-
-Restart Codex or open a fresh task after installation so the bundled skills and
-connectors are discovered. Do not edit installed cache copies under
-`~/.codex/plugins/cache/`.
 
 ### Link Reusable Skills For Local Development
 
@@ -218,7 +143,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new
+Use $skill-installer to install skills from alemar11/dotagents --path skills/git-commit skills/yeet skills/github-actions skills/github-status skills/github-issues skills/github-projects skills/github-releases skills/versioning skills/github-review-threads skills/github-stacked-pr skills/github-stars skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
 ```
 
 Install one reusable skill by passing only its path:
@@ -243,20 +168,42 @@ Install all reusable skills globally for Codex:
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
+  --skill git-commit \
+  --skill yeet \
+  --skill github-actions \
+  --skill github-status \
+  --skill github-issues \
+  --skill github-projects \
+  --skill github-releases \
+  --skill versioning \
+  --skill github-review-threads \
+  --skill github-stacked-pr \
+  --skill github-stars \
   --skill crusty \
   --skill ms-roberts \
   --skill socrates \
   --skill okf \
   --skill skill-cli-creator \
   --skill tanstack \
-  --skill explore \
   --skill postgres \
-  --skill plugins-reload \
   --skill swift-api-design \
   --skill swift-docc \
   --skill youtube \
   --skill hopper \
-  --skill discourse
+  --skill discourse \
+  --skill xcode-mcp \
+  --skill xcode-skills \
+  --skill xcode-whats-new \
+  --skill ghostty \
+  --skill herdr \
+  --skill learn \
+  --skill grilling-session \
+  --skill explore \
+  --skill adversarial-review \
+  --skill review-pr \
+  --skill spec \
+  --skill implement \
+  --skill deslop
 ```
 
 Install one reusable skill globally for Codex:
