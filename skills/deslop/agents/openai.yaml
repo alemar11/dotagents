@@ -1,0 +1,7 @@
+interface:
+  display_name: "🧹 Deslop"
+  short_description: "Audit and safely remove low-value repository code."
+  default_prompt: "Use $deslop to audit and safely remove low-value code in this repository."
+  brand_color: "#65A30D"
+policy:
+  allow_implicit_invocation: false

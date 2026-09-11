@@ -1,7 +1,0 @@
-interface:
-  display_name: "📚 Feature Specification"
-  short_description: "Refine one repository spec and optionally publish it."
-  brand_color: "#BE185D"
-  default_prompt: "Use $se:spec to refine a feature spec in conversation; publish it to GitHub only when explicitly requested."
-policy:
-  allow_implicit_invocation: false

@@ -1,7 +1,0 @@
-interface:
-  display_name: "🛠️ Implement"
-  short_description: "Implement local work from a spec or ticket."
-  brand_color: "#4338CA"
-  default_prompt: "Use $se:implement to implement and validate the selected work in the current repository or assigned worktree, commit scoped files, and return the candidate to any caller-owned review gate without publication."
-policy:
-  allow_implicit_invocation: true

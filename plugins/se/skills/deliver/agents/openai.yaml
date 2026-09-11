@@ -1,6 +1,0 @@
-interface:
-  display_name: "🚚 Deliver"
-  short_description: "Deliver scoped work in one repository to ready PRs."
-  default_prompt: "Use $se:deliver to create or reuse App worker tasks or CLI subagents and deliver this repository’s scope through validated, ready PRs."
-policy:
-  allow_implicit_invocation: true

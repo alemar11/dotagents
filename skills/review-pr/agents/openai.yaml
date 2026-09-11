@@ -1,0 +1,7 @@
+interface:
+  display_name: "🔎 Review PR"
+  short_description: "Request, wait, and report one hosted Codex PR review."
+  default_prompt: "Use $review-pr for this pull request: reuse a current Codex review, wait for a pending one, or request and wait when needed, then report the result."
+  brand_color: "#DB2777"
+policy:
+  allow_implicit_invocation: false
