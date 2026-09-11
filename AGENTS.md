@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 Reusable skills live in `skills/`, maintainer skills in `.agents/skills/`,
-plugins in `plugins/`, and MCP helpers in `mcps/`. Each skill has `SKILL.md`;
+plugins in `plugins/`, and MCP setup skills in `skills/`. Each skill has `SKILL.md`;
 each plugin has `.codex-plugin/plugin.json`.
 
 For cross-package purpose or ownership, consult `CONTEXT.md` and its relevant

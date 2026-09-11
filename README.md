@@ -1,12 +1,12 @@
 # dotagents
 
-Reusable Codex skills, project maintainer skills, optional repo-local plugins, and MCP install helpers.
+Reusable Codex skills, project maintainer skills, and optional repo-local plugins.
 
 This repository is organized around reusable installable skills:
 
 - **Reusable skills** under `skills/`, which can be linked locally or installed into Codex.
 
-Project-only maintainer workflows live under `.agents/skills/`, optional repo-local plugin discovery lives under `.agents/plugins/`, and global MCP setup helpers live under `mcps/`.
+Project-only maintainer workflows live under `.agents/skills/`, and optional repo-local plugin discovery lives under `.agents/plugins/`.
 
 ## Repository Layout
 
@@ -16,7 +16,6 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 | `plugins/` | Optional repo-local Codex plugins, each with `.codex-plugin/plugin.json` and optional bundled skills. |
 | `.agents/skills/` | Project-local maintainer skills for working on this repository. |
 | `.agents/plugins/marketplace.json` | Local plugin discovery surface for this checkout. |
-| `mcps/` | Helpers for installing global Codex MCP server entries not bundled with Codex itself. |
 | `skills-link.sh` | Local development helper that links reusable skills into `~/.agents/skills`. |
 
 ## Repo-Local Plugins
@@ -87,6 +86,8 @@ for Apple's native headless MCP server and embedded skill installation:
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |
 | `ghostty` | Inspect or arrange Ghostty terminals and edit configuration or keybindings when explicitly requested. |
 | `herdr` | Inspect or control Herdr terminal workspaces, panes, and agents when the user explicitly asks to use Herdr. |
+| `hopper` | Configure and verify Hopper Disassembler MCP for Codex or Cursor globally or per project. |
+| `discourse` | Configure and verify Discourse MCP for Codex or Cursor globally or per project. |
 
 ### TanStack References
 
@@ -231,7 +232,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse
 ```
 
 Install one reusable skill by passing only its path:
@@ -267,7 +268,9 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill plugins-reload \
   --skill swift-api-design \
   --skill swift-docc \
-  --skill youtube
+  --skill youtube \
+  --skill hopper \
+  --skill discourse
 ```
 
 Install one reusable skill globally for Codex:

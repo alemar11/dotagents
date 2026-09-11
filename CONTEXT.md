@@ -3,7 +3,7 @@
 ## Project Purpose
 
 This repository maintains reusable Codex skills, project-maintainer skills,
-repo-local plugins, and MCP installation helpers. `README.md` describes the
+repo-local plugins, and MCP setup skills. `README.md` describes the
 catalog; `AGENTS.md` owns repository-wide maintenance rules.
 
 ## Scoped Contexts
