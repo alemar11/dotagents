@@ -14,9 +14,9 @@ in `SKILL.md` and routed references; this file governs package maintenance.
 
 ## Maintenance contract
 
-- Use `skill-audit` read-only when health, prompt-quality, overlap, or usage
-  claims require portfolio or session evidence; apply approved fixes only in
-  the owning package.
+- Keep health, prompt-quality, overlap, and usage evidence separate from
+  maintenance authority; use local repository checks and supplied runtime
+  evidence for those claims.
 - Keep metadata-only changes on the metadata playbook and preserve
   `SKILL.md` frontmatter as the source of truth.
 - Route substantial new-skill or public package reshapes through the creator

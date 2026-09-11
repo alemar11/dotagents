@@ -26,9 +26,8 @@ Maintain existing skill and plugin packages through one routed control plane:
 
 ## Runtime Dependencies
 
-This project-local skill is Codex-dependent. Use `$skill-audit` read-only when
-health or workflow-family claims require portfolio, writing-quality, prompt-cost,
-or session evidence. Use `$skill-creator` or `$plugin-creator` for substantial
+This project-local skill is Codex-dependent. Use local repository checks and
+supplied runtime evidence for health or workflow-family claims. Use `$skill-creator` or `$plugin-creator` for substantial
 public reshapes and native `codex review` for non-trivial implementation closeout. The
 remaining workflows rely on the local repository filesystem, shell, and `git`.
 
@@ -64,8 +63,8 @@ canonical `result` and `change_state` values and actionable findings.
 
 ## Execution Boundaries
 
-- Direct `audit` and instruction-density routes remain read-only. `$skill-audit`
-  findings are evidence, not automatic cleanup authority.
+- Direct `audit` and instruction-density routes remain read-only; their findings
+  are evidence, not automatic cleanup authority.
 - A bare maintenance run may apply only safe, low-ambiguity improvements with a
   concrete rationale. Report strategic, behavior-sensitive, or high-ambiguity
   candidates for approval.

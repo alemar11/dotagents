@@ -6,8 +6,8 @@ connected skills or plugins.
 
 ## Evidence Boundary
 
-- Use `$skill-audit` when portfolio or session evidence is required. A
-  reproducible test failure, supplied log, or observed live failure may be
+- Use local repository checks and supplied runtime evidence when portfolio or
+  session evidence is required. A reproducible test failure, supplied log, or observed live failure may be
   sufficient for its own claim. All evidence gathering remains read-only;
   Maintainer owns edits only after the finding is accepted for implementation.
 - Start with current repo state and cheap history, then memory summaries. Inspect

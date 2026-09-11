@@ -82,7 +82,6 @@ for Apple's native headless MCP server and embedded skill installation:
 | `tanstack` | Build, debug, review, or migrate applications using TanStack packages. |
 | `postgres` | Inspect Postgres databases, design or run SQL, and manage migrations through the shipped Postgres CLI. |
 | `plugins-reload` | Reload this repository’s G, SE, and Xcode plugin installations when explicitly requested. |
-| `skill-audit` | Audit skill or plugin instructions and usage evidence read-only. Use only when explicitly invoked as $skill-audit. |
 | `swift-api-design` | Design, rename, or review Swift API surfaces using the bundled official API Design Guidelines. |
 | `swift-docc` | Author, review, preview, or publish Swift-DocC symbol documentation, articles, and tutorials. |
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |
@@ -116,7 +115,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   question with a recommended answer per turn and
   cannot plan workers until the scope is confirmed or the user stops
   grilling.
-- `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires native `codex review` for non-trivial implementation closeout.
+- `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
 - The G-dependent SE skills run a read-only Codex plugin preflight before their first required G handoff and fail closed when G is unavailable; Feature publication requires `$g:github-issues`; its optional classification branch never gates semantic publication, while no SE skill installs G automatically.
 - `se:learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `se:grilling-session` is read-only and explicit or parent-composed. It uses supplied
@@ -232,7 +231,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/skill-audit skills/swift-api-design skills/swift-docc skills/youtube
+Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube
 ```
 
 Install one reusable skill by passing only its path:
@@ -266,7 +265,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill explore \
   --skill postgres \
   --skill plugins-reload \
-  --skill skill-audit \
   --skill swift-api-design \
   --skill swift-docc \
   --skill youtube

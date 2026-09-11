@@ -35,8 +35,8 @@ maintenance request needs to be routed to a concrete task.
      covering structural and policy integrity, metadata and discovery,
      entrypoint size, reference routing, representative invoked-path cost, and
      applicable validation evidence.
-   - Treat prompt size as diagnostic and invoke `$skill-audit` only when health
-     signals require deeper prompt-quality, overlap, or runtime evidence.
+   - Treat prompt size as diagnostic and use local checks or supplied runtime
+     evidence when deeper prompt-quality, overlap, or runtime evidence is needed.
 5. `review instruction density`
    - Inspect one or more existing skills or plugins and identify where the same
      runtime behavior can be achieved with fewer instructions.

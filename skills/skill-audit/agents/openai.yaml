@@ -1,8 +1,0 @@
-interface:
-  display_name: "Skill Audit"
-  short_description: "Explicit-only read-only audit of Codex skills and plugins."
-  brand_color: "#C06C84"
-  default_prompt: "Use $skill-audit to audit the requested skills or plugins and return evidence-backed findings."
-
-policy:
-  allow_implicit_invocation: false

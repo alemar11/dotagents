@@ -25,12 +25,8 @@ for structural, discovery, instruction, reference-path, and validation health.
    - existing scripts and references for every active pointer;
    - aligned repo guidance, Codex-dependency classification, and portable
      fallbacks.
-3. Run the cheap portfolio signal for the selected roots:
-
-   ```bash
-   skills/skill-audit/scripts/portfolio-health --json scan \
-     --inventory-source filesystem --no-logs --root <skill-or-skill-root>
-   ```
+3. Run the repository's structural commands below and any package-owned
+   validation scripts for the selected roots.
 
 4. Interpret size without turning it into a correctness gate:
 
@@ -51,15 +47,7 @@ for structural, discovery, instruction, reference-path, and validation health.
 
    Do not sum the entire package. Count a disclosed reference when the selected
    branch must load it, even if the text moved out of `SKILL.md`.
-6. Invoke `$skill-audit` read-only when any of these signals is present:
-   - the entrypoint band is not `normal`;
-   - description or duplicate candidates appear;
-   - weak pointers, instruction sprawl, ownership overlap, or writing-quality
-     problems are suspected;
-   - the user asks about prompt cost, trigger quality, overlap, or runtime
-     behavior;
-   - a behavior claim requires representative session evidence.
-7. Select applicable non-mutating proof from `validation-matrix.md`. Validate
+6. Select applicable non-mutating proof from `validation-matrix.md`. Validate
    package shape, contracts, scripts, and composed behavior in proportion to the
    audited scope.
 
@@ -90,5 +78,5 @@ Add these health details to the common report in `release-checklist.md`:
 - structural and policy proof;
 - portfolio command and entrypoint bands;
 - representative invoked paths when reviewed;
-- whether `$skill-audit` ran and what evidence status it returned;
+- evidence sources used for health conclusions;
 - blocking findings, warnings, and deferred maintenance.

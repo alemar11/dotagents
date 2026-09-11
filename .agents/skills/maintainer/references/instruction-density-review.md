@@ -42,10 +42,7 @@ asks for compaction opportunities before refactoring.
    - description selection value and prompt-budget pressure
    - optional-tool or portability boundary
 4. Measure entrypoint size and representative invoked-path cost using
-   `skill-health.md`. When the entrypoint is outside `normal`, descriptions or
-   overlaps are suspect, instruction sprawl is visible, or runtime behavior is
-   in question, invoke `$skill-audit` read-only for deeper evidence. Treat size
-   as diagnostic, never as a standalone failure.
+   `skill-health.md`. Treat size as diagnostic, never as a standalone failure.
 5. Classify every candidate:
    - `safe trim`: remove redundant wording without changing behavior
    - `move to reference`: keep behavior but route dense detail out of `SKILL.md`
