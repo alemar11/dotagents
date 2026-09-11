@@ -1,8 +1,9 @@
 # Xcode MCP States
 
-This skill owns no persisted configuration, checkpoint, or ledger. It observes
-Xcode-owned permission and process state and reports one transient launch
-outcome. Normalize external command wording to the canonical values below.
+This skill may update client-owned MCP configuration when requested. It owns
+no checkpoint or ledger. It observes Xcode-owned permission and process state
+and reports one transient launch outcome. Normalize external command wording
+to the canonical values below.
 
 ## `execution_environment`
 
@@ -53,7 +54,8 @@ This is external authorization state owned by Xcode:
 This is the skill's transient result state:
 
 - `already-running`: final status showed the requested server was already
-  running and no launch mutation was needed.
+  running and no launch mutation was needed. This is not an early-return gate
+  or evidence of client configuration, tool discovery, or project access.
 - `started`: final status showed the server running after the authorized
   launch commands.
 - `approval-required`: a required persistent, administrator, folder, agent, or
@@ -62,3 +64,18 @@ This is the skill's transient result state:
 - `blocked`: the requested environment or target identity could not be safely
   established.
 - `failed`: authorized launch commands completed without a running final state.
+
+## Transitions and completion
+
+Observe permissions and process state before acting. Authorized enablement
+changes permission state; client connection or workspace opening can change
+`stopped` to `running`. Opening or creating a project can change authorization
+from `none` to `pending`, then to the approved duration. Process state alone
+does not imply any authorization transition.
+
+Select the outcome after the requested checks, not at the first running status.
+If a required approval is missing, report `approval-required` even when the
+process is running. For configuration-only work where no connection is attempted,
+omit `launch_outcome` and report launch as untested. Report configuration, tool
+discovery, requested project access, and observed UI state separately; none is
+inferred from a successful command or another successful check.
