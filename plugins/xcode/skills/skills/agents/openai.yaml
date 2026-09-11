@@ -1,4 +1,0 @@
-interface:
-  display_name: "Xcode Skills"
-  short_description: "Install or update Xcode skills for Codex repos"
-  default_prompt: "Use $xcode:skills to install or update Xcode's embedded skills in this repository's .agents/skills directory."

@@ -1,5 +1,5 @@
 ---
-name: mcp
+name: xcode-mcp
 description: "Launch or diagnose Apple’s native headless Xcode MCP server on macOS."
 ---
 

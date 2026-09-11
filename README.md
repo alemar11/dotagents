@@ -59,16 +59,6 @@ includes delivery workflow retrospectives:
 | `se:implement` | Implement selected local work from a spec, ticket, issue, or direct request, validate it, and commit only the required files without orchestration or publication. |
 | `se:deslop` | Explicit-only audit and minimal safe cleanup of low-value code across every major directory. |
 
-Xcode is the repository's Apple developer-tools plugin. It preserves the
-official stable and beta release-note resolver and adds safe launch guidance
-for Apple's native headless MCP server and embedded skill installation:
-
-| Skill | Purpose |
-| --- | --- |
-| `xcode:whats-new` | Resolve release notes for the active Xcode plus the latest stable and beta versions, or for one requested version. |
-| `xcode:mcp` | Safely launch and verify the Xcode-provided headless MCP server on attended Macs, unattended hosts, or explicitly isolated CI machines. |
-| `xcode:skills` | Install or update Xcode's embedded skills in a target repository's `.agents/skills` for Codex. |
-
 ## Reusable Skills
 
 | Skill | Purpose |
@@ -80,7 +70,7 @@ for Apple's native headless MCP server and embedded skill installation:
 | `skill-cli-creator` | Create or refactor CLIs shipped inside a skill or plugin bundle. |
 | `tanstack` | Build, debug, review, or migrate applications using TanStack packages. |
 | `postgres` | Inspect Postgres databases, design or run SQL, and manage migrations through the shipped Postgres CLI. |
-| `plugins-reload` | Reload this repository’s G, SE, and Xcode plugin installations when explicitly requested. |
+| `plugins-reload` | Reload this repository’s G and SE plugin installations when explicitly requested. |
 | `swift-api-design` | Design, rename, or review Swift API surfaces using the bundled official API Design Guidelines. |
 | `swift-docc` | Author, review, preview, or publish Swift-DocC symbol documentation, articles, and tutorials. |
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |
@@ -88,6 +78,9 @@ for Apple's native headless MCP server and embedded skill installation:
 | `herdr` | Inspect or control Herdr terminal workspaces, panes, and agents when the user explicitly asks to use Herdr. |
 | `hopper` | Configure and verify Hopper Disassembler MCP for Codex or Cursor globally or per project. |
 | `discourse` | Configure and verify Discourse MCP for Codex or Cursor globally or per project. |
+| `xcode-mcp` | Explicitly configure, launch, or diagnose Apple's native headless Xcode MCP server. |
+| `xcode-skills` | Explicitly install or update Xcode's embedded skills in a target repository. |
+| `xcode-whats-new` | Explicitly read official release notes for the active, latest, or requested stable or beta Xcode. |
 
 ### TanStack References
 
@@ -162,7 +155,6 @@ Register the `alemar11` marketplace from GitHub, then install the required plugi
 codex plugin marketplace add alemar11/dotagents --ref main
 codex plugin add g@alemar11
 codex plugin add se@alemar11
-codex plugin add xcode@alemar11
 ```
 
 If the `alemar11` marketplace is already registered, install the plugins directly:
@@ -170,7 +162,6 @@ If the `alemar11` marketplace is already registered, install the plugins directl
 ```sh
 codex plugin add g@alemar11
 codex plugin add se@alemar11
-codex plugin add xcode@alemar11
 ```
 
 For local development from a dotagents checkout, register the checkout instead
@@ -180,17 +171,14 @@ of the GitHub source, then install the same plugin:
 codex plugin marketplace add /path/to/dotagents
 codex plugin add g@alemar11
 codex plugin add se@alemar11
-codex plugin add xcode@alemar11
 ```
 
 During local development, validate each changed plugin and reinstall it from
-the repository source. G has a dedicated helper; SE and Xcode are reinstalled
-directly:
+the repository source. G has a dedicated helper; SE is reinstalled directly:
 
 ```sh
 plugins/g/projects/g/scripts/reinstall-local
 codex plugin add se@alemar11 --json
-codex plugin add xcode@alemar11 --json
 ```
 
 For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
@@ -201,8 +189,6 @@ codex plugin remove g@alemar11
 codex plugin add g@alemar11
 codex plugin remove se@alemar11
 codex plugin add se@alemar11
-codex plugin remove xcode@alemar11
-codex plugin add xcode@alemar11
 ```
 
 When migrating from the retired Feature Flow plugin identity, remove the old
@@ -232,7 +218,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse
+Use $skill-installer to install skills from alemar11/dotagents --path skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/plugins-reload skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new
 ```
 
 Install one reusable skill by passing only its path:

@@ -1,5 +1,5 @@
 ---
-name: skills
+name: xcode-skills
 description: Install or update Xcode's embedded agent skills in a target repository for Codex.
 ---
 
