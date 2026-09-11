@@ -15,7 +15,7 @@ When ownership changes, update affected consumers and remove obsolete routes.
 | --- | --- |
 | `references/states.md` | Shared spec-delivery readiness states, GitHub label colors, authorization and verified human handoff. |
 | `references/workflow-graph.md` | Graph vocabulary, registry structure, terminal meanings, authority, and validation. |
-| `references/codex-dependency-preflight.md` | Availability of required G workflows before hosted access. |
+| `references/g-dependency-preflight.md` | Host-specific setup and availability of required G workflows before hosted access. |
 | `references/codex-runtime-surface.md` | Read-only App/CLI classification; capability checks are not surface evidence. |
 | `references/execution-scope.md` | Uniform standalone/composed responsibilities and delegation policies across SE skills. |
 | `references/subagents.md` and `references/subagents/` | Role index, common constraints and reusable role definitions with default profiles; callers own transport, orchestration and disposition. |

@@ -128,5 +128,14 @@ scheduling graph or ledger.
 ## Skill Dependencies
 
 Bundled [Implement](../implement/SKILL.md) owns local implementation and validation.
-Installed `g@alemar11` owns Git/GitHub publication, CI and optional stacks; load
-only needed workflows. The orchestrator owns assignments, integration and acceptance.
+The repository-owned G plugin owns Git/GitHub publication, CI and optional
+stacks; apply the host-specific [G dependency
+preflight](../../references/g-dependency-preflight.md) and load only needed
+workflows. Cursor can expose G through its portable Agent Plugin, while Codex
+uses the marketplace-qualified `g@alemar11` plugin. The orchestrator owns
+assignments, integration and acceptance.
+
+Deliver's worker transport remains Codex App or Codex CLI: Cursor G exposure
+alone does not provide the visible App-task or native CLI-subagent transport
+required by this workflow. If the active host is Cursor, report that transport
+limitation instead of substituting another orchestration path.

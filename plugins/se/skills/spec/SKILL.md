@@ -66,9 +66,12 @@ Read [states.md](references/states.md) and [GitHub output](references/github-out
 for operation selection and optional publication. Refinement stays in the
 conversation and performs no durable write. Publish only after an explicit user
 request.
-Before hosted reads apply [G preflight](../../references/codex-dependency-preflight.md);
-before every hosted write apply [hosted-content safety](../../references/hosted-content-safety.md).
-Local-source refinement needs no G access.
+Before hosted reads apply the host-specific [G
+preflight](../../references/g-dependency-preflight.md); before every hosted
+write apply [hosted-content safety](../../references/hosted-content-safety.md).
+Cursor uses the portable `g` Agent Plugin; Codex uses the installed
+marketplace-qualified `g@alemar11` plugin. Local-source refinement needs no G
+access.
 
 For publication, verify the complete GitHub artifact. Reconcile uncertain or
 partial publication against its existing identity before retrying; never claim
@@ -85,5 +88,5 @@ without a planning graph or journal.
 ## Skill Dependencies
 
 Material clarification uses bundled `se:grilling-session`. Hosted reads and
-publication require installed `g@alemar11`. Never install or substitute
-dependencies.
+publication require the repository-owned G plugin exposed by the active host.
+Never install or substitute dependencies during a run.

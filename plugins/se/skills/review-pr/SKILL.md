@@ -31,9 +31,12 @@ The calling task owns those follow-up actions under its own authority.
 
 Read [states.md](references/states.md) for result meanings and
 [hosted-review.md](references/hosted-review.md) before inspection, requests,
-waiting or resume. Apply the [G preflight](../../references/codex-dependency-preflight.md)
-before hosted access and [hosted-content safety](../../references/hosted-content-safety.md)
-immediately before a review-request write.
+waiting or resume. Apply the host-specific [G
+preflight](../../references/g-dependency-preflight.md) before hosted access and
+[hosted-content safety](../../references/hosted-content-safety.md) immediately
+before a review-request write. G must be exposed as an Agent Plugin in Cursor
+or as an installed marketplace plugin in Codex; the preflight records which
+host path was used.
 
 ## Result and caller handoff
 
@@ -52,7 +55,9 @@ invocation reports the same evidence directly to the user in the calling task.
 
 ## Skill Dependencies
 
-Installed `g@alemar11` supplies `g:github-review-threads` for exact review requests,
-inspection, bounded waiting, and reconciliation. Compose only those operations;
-its feedback-to-code and reply/resolution branches are outside this skill's scope.
-Never install, refresh, or substitute the dependency.
+The installed G plugin supplies `g:github-review-threads` for exact review
+requests, inspection, bounded waiting, and reconciliation. Compose only those
+operations; its feedback-to-code and reply/resolution branches are outside this
+skill's scope. In Codex the qualified dependency is `g@alemar11`; in Cursor it
+is the portable `g` Agent Plugin from the repository publisher. Never install,
+refresh, or substitute the dependency during a run.

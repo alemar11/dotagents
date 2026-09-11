@@ -47,7 +47,7 @@ issues. Issue closure remains distinct from implementation or availability evide
 ## Publish and verify
 
 Before hosted reads or writes, apply the shared
-[G dependency preflight](../../../references/codex-dependency-preflight.md).
+[G dependency preflight](../../../references/g-dependency-preflight.md).
 Before each write, apply [hosted-content safety](../../../references/hosted-content-safety.md)
 to the exact final content, including worker- or provider-originated content.
 

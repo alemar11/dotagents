@@ -145,10 +145,11 @@ carry its reserved batch when delegating repairs within that workflow.
 
 Read before hosted access or PR publication in the orchestrator and each worker.
 
-Before hosted access, the actual actor applies [G preflight](../../../references/codex-dependency-preflight.md)
-for the workflows it needs; immediately before every hosted write it applies
-[hosted-content safety](../../../references/hosted-content-safety.md). Carry these
-routes in worker assignments. Do not install, reload or substitute dependencies.
+Before hosted access, the actual actor applies the host-specific [G
+preflight](../../../references/g-dependency-preflight.md) for the workflows it
+needs; immediately before every hosted write it applies [hosted-content
+safety](../../../references/hosted-content-safety.md). Carry these routes in
+worker assignments. Do not install, reload or substitute dependencies.
 
 For publication use G Send; it creates drafts and preserves existing draft state.
 The worker owns readiness after publication and completed review/fix verification. Resolve `references/network-execution.md`
