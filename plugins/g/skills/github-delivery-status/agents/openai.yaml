@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Delivery Status"
-  short_description: "Inspect complete PR delivery readiness read-only"
-  brand_color: "#DE4C36"
-  default_prompt: "Use $g:github-delivery-status to inspect this pull request's exact-head GitHub delivery state without mutating or merging it."

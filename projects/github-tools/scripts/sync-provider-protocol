@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Copy canonical provider-protocol modules into consuming skill packages."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import sys
+from pathlib import Path
+
+
+def repository_root(start: Path | None = None) -> Path:
+    """Resolve the dotagents repository root by anchored markers, not parent depth."""
+
+    here = (start or Path(__file__)).resolve()
+    for candidate in (here, *here.parents):
+        sync = candidate / "projects" / "github-tools" / "scripts" / "sync-provider-protocol"
+        skills = candidate / "skills"
+        protocol = candidate / "projects" / "github-tools" / "src" / "github_provider_protocol"
+        if sync.is_file() and skills.is_dir() and protocol.is_dir():
+            return candidate
+    raise SystemExit("could not locate the dotagents repository root from sync-provider-protocol")
+
+
+ROOT = repository_root()
+PROTOCOL = ROOT / "projects" / "github-tools" / "src" / "github_provider_protocol"
+MANIFEST = ["common.py", "repository.py", "integrity.py", "provider_text.py"]
+TARGETS = [
+    ROOT / "skills" / "yeet" / "scripts" / "publish_lib",
+    ROOT / "skills" / "github-review-threads" / "scripts" / "reviews_lib",
+]
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sync(*, check: bool) -> int:
+    if not PROTOCOL.is_dir():
+        print(f"canonical protocol missing at {PROTOCOL}", file=sys.stderr)
+        return 1
+    missing = [name for name in MANIFEST if not (PROTOCOL / name).is_file()]
+    if missing:
+        print(f"canonical protocol missing: {', '.join(missing)}", file=sys.stderr)
+        return 1
+    failures = 0
+    for target in TARGETS:
+        if not check:
+            target.mkdir(parents=True, exist_ok=True)
+        for name in MANIFEST:
+            src = PROTOCOL / name
+            dest = target / name
+            if check:
+                if not dest.is_file():
+                    print(f"missing copy: {dest}", file=sys.stderr)
+                    failures += 1
+                elif digest(src) != digest(dest):
+                    print(f"drift: {dest} != {src}", file=sys.stderr)
+                    failures += 1
+            else:
+                dest.write_bytes(src.read_bytes())
+                print(f"synced {dest.relative_to(ROOT)}")
+    if check and failures:
+        return 1
+    if check:
+        print("provider-protocol copies match canonical source")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Verify copies; do not write.")
+    return sync(check=parser.parse_args().check)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

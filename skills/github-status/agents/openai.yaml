@@ -1,0 +1,5 @@
+interface:
+ display_name: "GitHub Status"
+ short_description: "Inspect queues or PR delivery readiness read-only"
+ brand_color: "#DE4C36"
+ default_prompt: "Use $github-status to inspect repository issue and pull-request queues or one pull request's exact-head delivery state without mutating or merging it."

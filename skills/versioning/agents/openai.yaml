@@ -1,0 +1,5 @@
+interface:
+  display_name: "Versioning"
+  short_description: "Plan and apply SemVer tags with guarded Actions"
+  brand_color: "#047857"
+  default_prompt: "Use $versioning to validate canonical SemVer tags, operate or author guarded release Actions, select existing tags for drafted or directly published GitHub Releases, and preserve exact-tag approval."

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Yeet"
+  short_description: "Commit, push, and open one pull request"
+  brand_color: "#EA580C"
+  default_prompt: "Use $yeet to confirm the intended local changes and caller-provided resolved GitHub issues, commit them, push the branch, and open or update one pull request without changing its draft state."

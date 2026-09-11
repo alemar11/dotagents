@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Stack"
-  short_description: "Manage stacked branches and pull requests"
-  brand_color: "#0F766E"
-  default_prompt: "Use $g:github-stack to inspect or manage this stacked pull-request lifecycle through the G CLI."

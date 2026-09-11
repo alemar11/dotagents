@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Stars"
-  short_description: "Manage GitHub stars and star lists"
-  brand_color: "#CA8A04"
-  default_prompt: "Use $g:github-stars to list, add, remove, or organize the authenticated user's GitHub stars and star lists."
