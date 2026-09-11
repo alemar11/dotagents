@@ -74,7 +74,9 @@ the active Explore controller, not directly to another worker.
 For each positive planned slot, create one native subagent under the active
 Explore controller:
 
-- Request the shared `evidence-researcher` profile explicitly.
+- On `codex-app` or `codex-cli`, request the shared `evidence-researcher` Codex
+  profile explicitly. On another or unresolved runtime surface, inherit the
+  host or caller profile; the Codex profile is not a creation gate.
 - Keep the assignment in the controller's working-directory context.
 - Supply the slot number, relevant conversation context, read-only boundary, evidence
   expectations, concise Markdown memo shape, and recursion prohibition.

@@ -19,8 +19,9 @@ Unknown or conflicting values do not authorize automatic pickup.
 
 ## Transitions and ownership
 
-- Spec enables `ready-for-agent` only after a verified authoritative save and
-  established pickup authorization under its delivery-authorization reference.
+- An explicitly authorized delivery workflow may enable `ready-for-agent` only
+  after a verified authoritative spec exists. Spec refinement and publication
+  do not apply this label.
 - Deliver changes `ready-for-agent` to `ready-for-human` only after the entire
   current spec revision meets its delivery completion criteria, including required PRs,
   applicable CI and declared validation under Deliver's

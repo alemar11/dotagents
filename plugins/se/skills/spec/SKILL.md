@@ -1,14 +1,14 @@
 ---
 name: spec
-description: "Create or revise feature specs and task plans in one repository; save to GitHub and offer delivery authorization."
+description: "Refine feature specs and task plans in one repository, keeping the result in conversation by default and optionally publishing it to GitHub."
 ---
 
 # Feature Specification
 
 Turn the current discussion, supplied references or an existing spec into a
-complete user-visible outcome and the smallest verifiable task plan. Save one
-GitHub issue per spec with all tasks embedded, or return complete conversational
-previews for draft/no-write requests.
+complete user-visible outcome and the smallest verifiable task plan. Refine the
+spec in the current conversation by default. Publish one GitHub issue per spec
+with all tasks embedded only when the user explicitly requests publication.
 
 ## Scope and execution
 
@@ -22,9 +22,16 @@ Follow [execution scope](../../references/execution-scope.md) in the invoking
 session with its configured model and reasoning. When the outcome is clear,
 rename this task to `📚 Plan Feature · <outcome>` if supported; failure is a
 reported limitation, not a blocker. Do not create or fork a planner task or use
-titles as identity. Optional research or draft-review helpers use the appropriate
-[shared role](../../references/subagents.md); read it before delegation. Retain
-spec ownership and proceed serially when helpers are unavailable or prohibited.
+titles as identity. Optional research uses the shared
+[evidence-researcher role](../../references/subagents/evidence-researcher.md),
+whose Codex profile is `gpt-5.6-luna` with `max` reasoning. Optional draft review uses
+the shared [spec-reviewer role](../../references/subagents/spec-reviewer.md),
+whose Codex profile is `gpt-5.6-sol` with `xhigh` reasoning. On Codex, request
+the mapped role profile explicitly unless the caller overrides it. On another
+or unresolved host, inherit its configured profile without treating the Codex
+mapping as a requirement or gate. Read the selected role before delegation,
+retain Spec ownership, and proceed serially when helpers are unavailable or
+prohibited.
 
 ## Define the outcome and tasks
 
@@ -33,9 +40,10 @@ review requirements. Reuse conversation evidence and accepted decisions;
 inspect relevant code and repository instructions to resolve remaining facts.
 For revisions, first apply [existing-specs.md](references/existing-specs.md).
 
-Compose [Grilling Session](../grilling-session/SKILL.md) only for material choices
-that evidence, prior answers, safe labeled assumptions or delegated decisions
-cannot resolve. A complete brief needs no new interview or pre-save approval.
+Start by refining the brief in the current conversation. Use [Grilling
+Session](../grilling-session/SKILL.md) when material choices need user input;
+evidence, prior answers, safe assumptions or delegated decisions may resolve a
+choice without another question. A complete brief proceeds directly to review.
 Ordinary answer waits are nonterminal; missing essential evidence blocks only
 affected work after unaffected authorized work is completed.
 
@@ -46,36 +54,36 @@ tasks: prefer narrow end-to-end outcomes, real prerequisites and checks that
 prove behavior. Keep task dependencies separate from worker, branch and PR
 topology, which belong to Delivery.
 
-Review and correct the whole artifact before saving. Preserve requested outcomes
-and decisions, cover every criterion with credible task checks, verify dependency
+Review and correct the whole artifact before refining or publishing. Preserve
+requested outcomes and decisions, cover every criterion with credible task checks, verify dependency
 feasibility, and ensure each task works with the main spec in a fresh session.
 Same-repository issue links are ordinary references; native blocker management
 belongs to G on explicit request, outside Spec.
 
-## Save and hand off
+## Refine and optionally publish
 
 Read [states.md](references/states.md) and [GitHub output](references/github-output.md)
-for operation selection, publication and readback. Invocation authorizes the
-scoped save unless restricted. GitHub is the only saved destination: previews
-remain in conversation, and local-file-only requests authorize no hosted save.
+for operation selection and optional publication. Refinement stays in the
+conversation and performs no durable write. Publish only after an explicit user
+request.
 Before hosted reads apply [G preflight](../../references/codex-dependency-preflight.md);
 before every hosted write apply [hosted-content safety](../../references/hosted-content-safety.md).
-Local-source previews need no G access.
+Local-source refinement needs no G access.
 
-Verify the complete saved artifact. Reconcile uncertain or partial saves against
-its existing identity before retrying; never substitute files or previews for a
-failed save. After verified save, follow
-[delivery authorization](references/delivery-authorization.md) for the pickup
-decision, marker verification and any explicitly requested downstream handoff.
-Publication alone neither authorizes nor starts delivery.
+For publication, verify the complete GitHub artifact. Reconcile uncertain or
+partial publication against its existing identity before retrying; never claim
+publication from the conversational draft. Spec publication never creates,
+updates or removes GitHub labels and never starts delivery.
 
-Return saved links or complete previews, a concise task summary, material
-assumptions, review/save results, observed pickup authorization and exact remaining
-blockers or questions. Do not reproduce saved bodies or review logs unless asked.
-Keep operation receipts out of specs; artifact completion proves no implementation.
-Resume from saved content and current evidence, without a planning graph or journal.
+Return the refined spec or published link, a concise task summary, material
+assumptions, review/publication results and exact remaining blockers or questions.
+Do not reproduce published bodies or review logs unless asked. Keep operation
+receipts out of specs; artifact completion proves no implementation.
+Resume from the current conversation or a published issue and current evidence,
+without a planning graph or journal.
 
 ## Skill Dependencies
 
-Material clarification uses bundled `se:grilling-session`. Hosted reads and saves
-require installed `g@alemar11`. Never install or substitute dependencies.
+Material clarification uses bundled `se:grilling-session`. Hosted reads and
+publication require installed `g@alemar11`. Never install or substitute
+dependencies.

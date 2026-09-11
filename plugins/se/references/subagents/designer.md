@@ -1,7 +1,8 @@
 # designer
 
-Default profile: `gpt-6-astra` with `low` reasoning. Follow the
-[common role contract](../subagents.md#calling-contract). Execute as a read-only
+Codex profile: `gpt-6-astra` with `low` reasoning. On non-Codex hosts, follow
+the host or caller's configured profile. Follow the [common role
+contract](../subagents.md#calling-contract). Execute as a read-only
 native subagent; create no further agents or visible tasks.
 
 Develop a concrete, proportionate UI proposal within the accepted requirements

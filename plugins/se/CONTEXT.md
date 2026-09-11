@@ -11,15 +11,15 @@ Grilling Session, Explore, Spec, Adversarial Review, Review PR,
 Deliver, Deslop, and Implement skills have distinct runtime contracts, while `AGENTS.md`
 and `README.md` define package maintenance ownership and routing.
 
-Spec owns one repository-scoped spec and actionable task plan, saved to one GitHub issue, with all task contracts embedded. Each invocation selects one repository; tasks inherit their spec's owner. Spec creates no cross-repository issue links or companion specs. Related same-repository specs use ordinary links, with body-backed
+Spec owns one repository-scoped spec and actionable task plan, refined in the
+conversation by default and optionally published to one GitHub issue with all
+task contracts embedded. Each invocation selects one repository; tasks inherit their spec's owner. Spec creates no cross-repository issue links or companion specs. Related same-repository specs use ordinary links, with body-backed
 prerequisites that can be satisfied by usable PR candidates. Native GitHub
 blocker changes belong to G on explicit user request, never to Spec. Deliver owns task-to-PR grouping and integration, with task
 prerequisites independent of Git topology. The Spec content contract is at
 [`specification.md`](skills/spec/references/specification.md).
-Spec also owns the [delivery authorization](skills/spec/references/delivery-authorization.md)
-marker and post-save pickup decision. Authorization is separate from semantic
-revision and execution progress; No monitor
-is started by publishing or marking a spec.
+Spec does not own delivery authorization or apply GitHub labels; Delivery is
+separately requested. Publishing a spec does not start a monitor.
 
 Explore runs in the invoking task or session. It uses Learn for read-only context preparation and explores relevant evidence before
 Grilling Session, then investigates remaining questions without a separate

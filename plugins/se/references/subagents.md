@@ -20,14 +20,17 @@ authorize delegation or any additional source access. Keep skill-specific
 controllers with their owning skills. Deliver owns its
 [candidate-review lifecycle](../skills/deliver/references/workers.md#candidate-review).
 
-Select a role by its stable ID and request its model and reasoning explicitly.
-An explicit caller override takes precedence; otherwise do not substitute a
-different profile silently. Give the helper an independent context with a
-self-contained brief and the necessary source references, rather than requiring
-full conversation inheritance. Record requested settings separately from any
-independently observed settings; a successful launch or self-report does not
-prove the effective profile. Report unavailable capability or an uncertain
-launch to the owner, which applies its own fallback and recovery rules.
+Select a role by its stable ID. When the runtime is classified as `codex-app` or
+`codex-cli`, request the role's Codex model and reasoning profile explicitly;
+an explicit caller override takes precedence. On another host, or when the
+runtime surface is unresolved, inherit that host or caller's configured profile
+without treating the Codex profile as a requirement or a launch gate. Give the
+helper an independent context with a self-contained brief and the necessary
+source references, rather than requiring full conversation inheritance. Record
+requested settings separately from independently observed settings; a successful
+launch or self-report does not prove the effective profile. A profile-selection
+failure alone does not block the helper: report it to the owner and use the host
+or caller profile under the owner's fallback and recovery rules.
 
 All roles return results to their owner; none interviews or accepts instructions
 from the user or broadens its assignment. Roles

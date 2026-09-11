@@ -9,9 +9,9 @@ their exact logical and saved identities, retired IDs, unrelated
 content, and executor-owned status, checkboxes, comments, and progress. Record
 the smallest semantic change; increment `spec_revision` once for the accepted
 semantic bundle revision. A save retry or unchanged revision does not increment it.
-Preserve agent-ready or human-ready metadata under
-[delivery-authorization.md](delivery-authorization.md);
-ordinary revisions do not reset its marker or repeat an answered pickup question.
+Preserve unrelated provider metadata during publication; Spec does not own or
+modify labels or delivery authorization. Ordinary revisions change only the
+accepted semantic bundle and affected task contracts.
 Before reshaping active work, reconcile material changes against existing delivery
 assignments and the user's granted scope. Marker-only edits are nonsemantic.
 
@@ -44,8 +44,8 @@ work. Move superseded cross-repository relationships out of the active plan only
 within that authority. Preserve historical source attribution, executor-owned
 content and provider relationships; these are historical records, not permission
 to add or refresh cross-repository issue links. If narrowing is outside the
-request, report the affected scope and exact decision needed before saving it.
+request, report the affected scope and exact decision needed before publishing it.
 
-GitHub is the sole saved authority. Supplied local documents may inform a new
-GitHub spec when publication is authorized, but Spec never maintains, exports, or
-synchronizes a second local copy. Preserve attribution and source content.
+For published specs, GitHub is the saved authority. Before publication, the
+refined spec exists only in the current conversation; Spec does not maintain or
+export a second local copy. Preserve attribution and source content.

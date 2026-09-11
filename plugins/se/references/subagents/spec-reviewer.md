@@ -1,7 +1,8 @@
 # spec-reviewer
 
-Default profile: `gpt-5.6-sol` with `xhigh` reasoning. Follow the
-[common role contract](../subagents.md#calling-contract).
+Codex profile: `gpt-5.6-sol` with `xhigh` reasoning. On non-Codex hosts, follow
+the host or caller's configured profile. Follow the [common role
+contract](../subagents.md#calling-contract).
 
 Assess the supplied complete spec and task plan against the supplied content
 contract and review criteria. Check accepted decisions, scope, verification,

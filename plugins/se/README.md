@@ -8,7 +8,7 @@ task plans, reviewed PR delivery, and durable project knowledge.
 | `se:learn` | Maintain explicitly authorized local project knowledge and review rules. |
 | `se:grilling-session` | Refine a topic through one focused question and recommendation at a time. |
 | `se:explore` | Explore evidence, refine the question, and investigate read-only in the current task or session. |
-| `se:spec` | Create or revise a coherent spec with an ordered actionable task plan; save to GitHub. |
+| `se:spec` | Refine a coherent spec with an ordered actionable task plan; optionally publish it to GitHub. |
 | `se:adversarial-review` | Independently pressure-test a fixed software change without editing it. |
 | `se:review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `se:chief-of-staff` | Coordinate one visible Deliver task per repository in the App, through ready PRs and required cross-repository checks. |
@@ -27,27 +27,23 @@ criteria, and tasks in one repository. Cross-repository coordination belongs to 
 scoped outcomes, completion checks, validation, and real prerequisites. Their
 recommended sequence does not imply dependencies or Git stacks.
 
-Spec saves new specs to GitHub by default: one spec issue containing the complete task plan.
+Spec refines new specs in the current conversation by default. On explicit request,
+it publishes one spec issue containing the complete task plan.
 Related specs use ordinary links; prerequisites state the evidence and activity
 they gate, allowing dependent work from usable PR candidates. Spec never manages native issue
-blockers; explicitly requested blocker changes belong to G. No-write previews remain in the conversation; saved specs use GitHub only.
+blockers; explicitly requested blocker changes belong to G. Spec publication never
+creates or changes labels.
 See the canonical [specification contract](skills/spec/references/specification.md)
 and [revision rules](skills/spec/references/existing-specs.md).
 
 Spec runs in the current session with its configured model and reasoning and
 updates the task title to `📚 Plan Feature · <outcome>` when supported. It asks
 material specification questions through Grilling Session and reviews the complete
-spec/task contract before saving. Planning preserves execution progress and
+spec/task contract before refining or publishing. Planning preserves execution progress and
 does not start delivery implicitly.
 
-After verifying an authoritative save, Spec asks whether to authorize automatic
-delivery to ready PRs unless the answer or authorization is already established.
-Approval applies `ready-for-agent` to the main GitHub issue, creating the label
-if missing. New specs remain inactive without approval. Ordinary revisions
-preserve authorization, and setting
-the marker does not start a monitor. The [authorization contract](skills/spec/references/delivery-authorization.md)
-owns the pickup decision; shared [readiness states](references/states.md) own
-the GitHub label catalog and lifecycle transitions.
+Spec does not ask for delivery authorization and does not apply readiness labels.
+Delivery must be requested and coordinated separately.
 
 The templates use a compact ordered task list; each task owns its repository
 scope, acceptance links, prerequisites, and paired verification checks. GitHub

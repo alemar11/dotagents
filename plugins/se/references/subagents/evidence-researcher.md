@@ -1,7 +1,8 @@
 # evidence-researcher
 
-Default profile: `gpt-5.6-luna` with `max` reasoning. Follow the
-[common role contract](../subagents.md#calling-contract).
+Codex profile: `gpt-5.6-luna` with `max` reasoning. On non-Codex hosts, follow
+the host or caller's configured profile. Follow the [common role
+contract](../subagents.md#calling-contract).
 
 Inspect the assigned repository paths, contracts, or admitted source family to
 answer concrete questions. Separate observed behavior from inference, identify

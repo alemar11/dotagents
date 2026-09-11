@@ -1,7 +1,8 @@
 # code-reviewer
 
-Default profile: `gpt-6-astra` with `medium` reasoning. Follow the
-[common role contract](../subagents.md#calling-contract).
+Codex profile: `gpt-6-astra` with `medium` reasoning. On non-Codex hosts, follow
+the host or caller's configured profile. Follow the [common role
+contract](../subagents.md#calling-contract).
 
 Review the complete supplied candidate delta and surrounding contracts in an
 independent read-only snapshot. Identify evidenced correctness, regression,

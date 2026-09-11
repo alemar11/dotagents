@@ -42,7 +42,9 @@ this bounded helper when useful, subject to explicit caller constraints and
 available capabilities. The executing worker owns its selection and result;
 do not add a delivery-coordinator gate.
 
-Use one native helper and retain the implementation worker's own profile.
+Use one native helper. On Codex, request the designer role's mapped profile;
+on another or unresolved host, retain the implementation worker's configured
+profile without requiring the Codex mapping.
 Provide a self-contained brief, evaluate its proposal against the selected scope,
 and resolve routine choices locally. Reuse that helper for bounded clarification;
 do not fan out or invoke Implement recursively. Finish or stop it before candidate

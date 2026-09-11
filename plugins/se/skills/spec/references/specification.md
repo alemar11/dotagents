@@ -83,9 +83,8 @@ completion from a drafted task list.
 
 Preserved executor-owned progress and provider status are excluded from semantic contract identity and do not advance
 `spec_revision`; all requirements, decisions and task contracts remain included.
-The shared [delivery readiness](../../../references/states.md) metadata is also
-excluded: it records pickup eligibility or human handoff, not requirements.
-Spec preserves either state during ordinary revisions.
+Delivery readiness metadata is outside the Spec contract and is owned by the
+separately requested delivery workflow.
 
 ## Task contract
 
@@ -129,7 +128,7 @@ architecture, migration, and testing decisions when they constrain the outcome.
 Record the decision, consequence, and evidence or authority. Existing accepted
 decisions, choices explicitly delegated to the planner, and safe explicit
 assumptions may proceed without a new interview. Material unresolved choices
-return through Grilling Session before saving a ready spec.
+return through Grilling Session before publishing a ready spec.
 
 Distinguish binding decisions from implementation suggestions. Binding
 decisions are part of the spec contract; suggestions are optional approaches

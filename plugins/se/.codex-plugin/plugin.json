@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "SE",
     "shortDescription": "Specify features, plan tasks, and deliver reviewed changes.",
-    "longDescription": "SE supports repository-grounded refinement, feature specifications, and reviewed delivery. Spec saves one repository-scoped spec with actionable tasks to GitHub. Deliver coordinates isolated workers through implementation, independent candidate review, scoped fixes, required CI and ready PRs. Workers use visible App tasks or native CLI subagents; a regular integration worker combines contributions when needed. Learn maintains project knowledge; Implement handles bounded local work; Review PR requests or resumes hosted review and reports the result. Merge, deployment and releases require separate authorization. Chief of Staff coordinates one visible Deliver task per repository in the Codex App after verifying every standalone project mapping, through ready PRs and required cross-repository verification.",
+    "longDescription": "SE supports repository-grounded refinement, feature specifications, and reviewed delivery. Spec refines one repository-scoped spec in conversation and optionally publishes it to GitHub. Deliver coordinates isolated workers through implementation, independent candidate review, scoped fixes, required CI and ready PRs. Workers use visible App tasks or native CLI subagents; a regular integration worker combines contributions when needed. Learn maintains project knowledge; Implement handles bounded local work; Review PR requests or resumes hosted review and reports the result. Merge, deployment and releases require separate authorization. Chief of Staff coordinates one visible Deliver task per repository in the Codex App after verifying every standalone project mapping, through ready PRs and required cross-repository verification.",
     "developerName": "alemar11",
     "category": "Developer Tools",
     "capabilities": [
@@ -23,7 +23,7 @@
     "termsOfServiceURL": "https://github.com/alemar11/dotagents",
     "defaultPrompt": [
       "Use $se:grilling-session to sharpen a topic, $se:explore to investigate it, or $se:learn to preserve knowledge.",
-      "Use $se:spec to create a feature spec and actionable tasks, saving to GitHub.",
+      "Use $se:spec to refine a feature spec and actionable tasks; publish to GitHub only when requested.",
       "Use $se:deliver for one repository, or $se:chief-of-staff to coordinate related repository deliveries in the App."
     ],
     "brandColor": "#BE185D"

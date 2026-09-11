@@ -39,10 +39,10 @@ When ownership changes, update affected consumers and remove obsolete routes.
   Session composition, Learn context preparation, bounded native workers, and synthesis.
 - Spec owns coherent specs, stable spec/task identities, actionable
   task contracts, recommended order, real prerequisites, accepted decisions,
-  review, and GitHub issue representation. Its specification
-  reference owns content, and templates project it. Its delivery-authorization
-  reference owns the post-save authorization decision; shared readiness states
-  own metadata and Deliver owns the human handoff, not queue execution.
+  review, and optional GitHub issue representation. Its specification
+  reference owns content and templates project it; Spec does not own delivery
+  authorization or labels. Shared readiness states remain owned by the delivery
+  workflow.
 - Adversarial Review owns independent read-only critique and generic findings;
   composed callers own target identity, lifecycle, and disposition mapping.
 - Review PR requests or resumes one hosted Codex review, waits, and returns the
