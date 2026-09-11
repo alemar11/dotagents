@@ -7,8 +7,7 @@ description: "Launch or diagnose Apple’s native headless Xcode MCP server on m
 
 Safely prepare, start, and verify the headless MCP server shipped with Xcode.
 This skill operates Apple's `xcrun mcp-server`; it does not install or
-substitute XcodeBuildMCP, configure an MCP client, or perform general Apple
-platform development work.
+substitute XcodeBuildMCP, or perform general Apple platform development work.
 
 ## State model
 
@@ -46,6 +45,60 @@ Continue only after launcher discovery succeeds.
    enablement, persistent agent or folder approval, or unsafe global
    authorization. Never use unsafe global authorization outside an explicitly
    identified disposable, isolated CI machine.
+
+## MCP configuration
+
+Prefer project scope so the repository declares its Xcode tooling and the
+connection is limited to the intended project. Open the project in Xcode and
+enable “Allow external agents to use Xcode tools” in Xcode Intelligence
+settings before connecting an external agent. Inspect existing entries first
+and preserve unrelated servers.
+
+### Project scope (recommended)
+
+For Codex, add this block to `<project>/.codex/config.toml` and commit it when
+the project should share the setup:
+
+```toml
+[mcp_servers.xcode]
+command = "xcrun"
+args = ["mcpbridge"]
+```
+
+For Cursor, merge this entry into `<project>/.cursor/mcp.json` and commit it
+when the project should share the setup:
+
+```json
+{
+  "mcpServers": {
+    "xcode": {
+      "command": "xcrun",
+      "args": ["mcpbridge"]
+    }
+  }
+}
+```
+
+Codex project configuration is loaded for trusted projects. Cursor merges
+project and global MCP files, with the project entry taking priority for the
+same name.
+
+### Global scope (optional)
+
+For Codex, run:
+
+```sh
+codex mcp add xcode -- xcrun mcpbridge
+```
+
+For Cursor, merge the same JSON entry into `~/.cursor/mcp.json` instead of the
+project file.
+
+### Verification
+
+Verify Codex with `codex mcp list`, or Cursor with `agent mcp list` (or the
+Cursor MCP settings screen). Keep the Xcode project open and confirm the agent
+can see Xcode tools before attempting a build or edit.
 
 ## Verification and recovery
 

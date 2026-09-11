@@ -34,34 +34,28 @@ If the search returns no app, explain what is missing and stop. If multiple
 copies exist, ask which one to use. Do not invent a download URL or silently
 install Hopper. Preserve existing MCP entries and credentials.
 
-## Codex
+## MCP configuration
 
-For all projects, run this from a shell:
+Prefer project scope so the repository declares the tool it needs and teammates
+can reproduce the setup. Inspect existing entries first, preserve unrelated
+servers and credentials, and replace an existing entry only when the user asks.
 
-```sh
-codex mcp add HopperMCPServer -- "$hopper_server"
-```
+### Project scope (recommended)
 
-Inspect first with `codex mcp get HopperMCPServer`; if it already exists, leave
-its current settings alone unless the user explicitly asks to replace it.
-
-For one repository, add this file at `<project>/.codex/config.toml` and commit
-it when the project should share the setup:
+For Codex, add this block to `<project>/.codex/config.toml` and commit it when
+the project should share the setup:
 
 ```toml
 [mcp_servers.HopperMCPServer]
 command = "<resolved HopperMCPServer path>"
 ```
 
-Codex loads project configuration only for trusted projects. The project file
-is merged with the user configuration, so project setup does not remove other
-global servers.
+Codex loads project configuration only for trusted projects and merges it with
+the user configuration.
 
-## Cursor
-
-Cursor reads the same JSON shape from both scopes. For all projects, merge this
-entry into `~/.cursor/mcp.json`, replacing the command placeholder with the
-resolved value of `$hopper_server`:
+For Cursor, merge this entry into `<project>/.cursor/mcp.json`, replacing the
+command placeholder with the resolved value of `$hopper_server`. Commit the file
+when teammates should receive it:
 
 ```json
 {
@@ -73,14 +67,24 @@ resolved value of `$hopper_server`:
 }
 ```
 
-For one repository, merge the entry into `<project>/.cursor/mcp.json` instead,
-replacing the command placeholder with the resolved server path, and commit that
-file when teammates should receive it. Cursor merges global and project files;
-a project entry with the same name takes priority.
+Cursor merges global and project files; a project entry with the same name takes
+priority.
 
-Cursor CLI uses the same configuration. Verify with `agent mcp list` (or the
-Cursor MCP settings screen), then start a fresh agent session if the server was
-added while Cursor was running.
+### Global scope (optional)
+
+For Codex, run this from a shell:
+
+```sh
+codex mcp add HopperMCPServer -- "$hopper_server"
+```
+
+For Cursor, merge the same JSON entry into `~/.cursor/mcp.json` instead of the
+project file.
+
+### Verification
+
+Verify Codex with `codex mcp list`, or Cursor with `agent mcp list` (or the Cursor
+MCP settings screen). Start a fresh agent session after changing configuration.
 
 ## Use and verification
 

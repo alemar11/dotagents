@@ -15,19 +15,16 @@ Inspect existing configuration before changing it. Preserve unrelated servers,
 environment variables, and credentials. If `npx` is unavailable, report the
 Node.js/npm prerequisite and stop.
 
-## Codex
+## MCP configuration
 
-For all projects, run:
+Prefer project scope so the repository declares the tool it needs and teammates
+can reproduce the setup. Inspect existing entries first, preserve unrelated
+servers and credentials, and replace an existing entry only when the user asks.
 
-```sh
-codex mcp add discourse -- npx -y @discourse/mcp@latest
-```
+### Project scope (recommended)
 
-Check first with `codex mcp get discourse`; leave an existing entry unchanged
-unless the user explicitly requests replacement. Authenticate or provide
-secrets only through the server's supported environment variables or auth flow.
-
-For one repository, merge this block into `<project>/.codex/config.toml`:
+For Codex, merge this block into `<project>/.codex/config.toml` and commit it
+when the project should share the setup:
 
 ```toml
 [mcp_servers.discourse]
@@ -35,13 +32,11 @@ command = "npx"
 args = ["-y", "@discourse/mcp@latest"]
 ```
 
-Commit project configuration only when the repository intentionally shares this
-tool. Codex project configuration is loaded for trusted projects and is merged
-with the user-level configuration.
+Codex project configuration is loaded for trusted projects and is merged with
+the user-level configuration.
 
-## Cursor
-
-For all projects, merge this entry into `~/.cursor/mcp.json`:
+For Cursor, merge this entry into `<project>/.cursor/mcp.json` and commit it only
+when the project should share the server:
 
 ```json
 {
@@ -54,12 +49,22 @@ For all projects, merge this entry into `~/.cursor/mcp.json`:
 }
 ```
 
-For one repository, merge it into `<project>/.cursor/mcp.json` and commit that
-file only when the project should share the server. Cursor merges global and
-project files, with the project definition taking priority for the same name.
-The Cursor CLI (`agent`) and editor use these same files.
+Cursor merges global and project files, with the project definition taking
+priority for the same name. The Cursor CLI (`agent`) and editor use these same
+files.
 
-## Use and verification
+### Global scope (optional)
+
+For Codex, run:
+
+```sh
+codex mcp add discourse -- npx -y @discourse/mcp@latest
+```
+
+For Cursor, merge the same JSON entry into `~/.cursor/mcp.json` instead of the
+project file.
+
+### Verification
 
 Verify Codex with `codex mcp list`, or Cursor with `agent mcp list` and
 `agent mcp list-tools discourse`. Start a fresh session after changing config.
