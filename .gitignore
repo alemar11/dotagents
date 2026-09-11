@@ -5,4 +5,6 @@ plans/
 __pycache__/
 *.pyc
 .cache/
+.pytest_cache/
+.ruff_cache/
 .agents/skills/Maintainer/artifacts/
