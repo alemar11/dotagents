@@ -22,7 +22,10 @@ Unknown or conflicting values do not authorize automatic pickup.
 - Spec enables `ready-for-agent` only after a verified authoritative save and
   established pickup authorization under its delivery-authorization reference.
 - Deliver changes `ready-for-agent` to `ready-for-human` only after the entire
-  current spec revision meets its delivery completion criteria, including required PRs, CI and declared validation. Ready PRs need not be merged. Partial,
+  current spec revision meets its delivery completion criteria, including required PRs,
+  applicable CI and declared validation under Deliver's
+  [publication contract](../skills/deliver/references/workers.md#publication-and-readiness).
+  Ready PRs need not be merged. Partial,
   blocked or task-subset delivery does not trigger the transition. Explicitly
   requested delivery of an inactive saved spec may reach `ready-for-human` under
   the same completion criteria; no intermediate pickup marker is required.

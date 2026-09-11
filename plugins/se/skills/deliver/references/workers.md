@@ -53,7 +53,7 @@ Carry the [publication and readiness](#publication-and-readiness) obligations
 in each assignment.
 
 The worker owns implementation, self-inspection, tests, PR publication/readiness
-and required CI for its branch within that assignment. It loads Implement, then
+and applicable CI for its branch within that assignment. It loads Implement, then
 runs the [candidate review](#candidate-review), handles scoped fixes through
 Implement, and uses the applicable G workflows through readiness. CI fixes remain within the
 original outcome and are revalidated and published by the same worker.
@@ -81,7 +81,7 @@ Return selected source references and, for a spec, its identity and revision;
 verified outcomes and outstanding scope; PR URLs when applicable and exact HEAD/base;
 verified closing references and ordinary source links; reviewed base/HEAD,
 review findings and their dispositions, final fix-validation HEAD or explicit
-review skip; checks and required CI state; worker/worktree/branch identities, preserved dirty content,
+review skip; checks and CI applicability/results; worker/worktree/branch identities, preserved dirty content,
 blockers and the next bounded action when work remains. For missing external
 inputs, name the required capability/artifact and resume evidence; do not assign
 work to the other repository or claim deferred integration passed. Finish mutation before
@@ -165,9 +165,27 @@ Actions for current checks and CI fixes. Missing readiness capability blocks
 completion; do not report a draft as delivered.
 
 
-If no CI checks are required, establish that from repository policy and current
-PR facts; missing results alone are not proof. Already-incorporated work needs
-current outcome proof, not a duplicate PR.
+CI is conditional on the repository and PR. Reconcile the current candidate's
+check results and workflow runs with repository CI configuration and documented
+requirements, including external CI. If the PR triggers applicable CI, wait for
+it and fix failures within scope before delivery, even when branch protection
+does not require those checks. Expected but missing runs and inaccessible results
+remain unresolved; an empty check list alone does not establish that CI is absent.
+Legitimate skips or filters need applicability evidence, not a claim that tests ran.
+
+When the repository has no configured or required CI, report CI as not applicable
+and complete delivery once local validation, review and the other acceptance
+criteria pass. Do not add CI or require a plan upgrade merely to deliver a PR.
+
+Branch-protection policy and CI results are separate evidence. Unless the
+assignment explicitly requires merge-policy verification, a policy-read failure
+alone does not block delivery; it does not make available CI results unknown.
+Distinguish an explicit plan-related feature restriction from missing permission
+or an unexplained failure, and disclose the limitation. G's full merge-policy
+readiness may remain unknown while SE delivery completes; never claim that hidden
+merge gates passed. Verified delivery requirements still apply, and merge-policy
+verification gates delivery only when explicitly required by the assignment.
+Already-incorporated work needs current outcome proof, not a duplicate PR.
 
 ## Serial reuse and concurrent work
 

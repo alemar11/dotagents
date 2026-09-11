@@ -1,6 +1,6 @@
 {
   "name": "se",
-  "version": "6.18.1",
+  "version": "6.18.2",
   "description": "Specify repository work, deliver reviewed PRs, and coordinate related deliveries across repositories.",
   "author": {
     "name": "alemar11",

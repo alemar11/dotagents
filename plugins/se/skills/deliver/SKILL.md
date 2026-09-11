@@ -43,7 +43,7 @@ an integration PR.
 
 Read the [runtime surface](../../references/codex-runtime-surface.md), then
 [workers.md](references/workers.md) before creating or assigning workers. Supply
-complete assignments through required CI and publication, or validated commits
+complete assignments through applicable CI and publication, or validated commits
 for an assigned integration worker. The worker contract owns transport, profiles,
 checkout verification, writer isolation, reuse and result evidence.
 
@@ -107,7 +107,8 @@ Reuse valid evidence; repeat or broaden checks only for changes, failures or
 evidence gaps. Changed scope, base, HEAD or consumed input invalidates affected
 evidence. A completed worker turn alone does not establish its outcome.
 
-Delivery completes only when all required PRs are non-draft, required CI passes,
+Delivery completes only when all required PRs are non-draft, applicable CI passes
+or is verified not applicable under [publication and readiness](references/workers.md#publication-and-readiness),
 selected outcomes and required reviews are verified, and source links are correct.
 Draft, pending, partial and blocked results are incomplete. Ready PRs stay
 unmerged. Later merge/deployment conditions are handoff information unless

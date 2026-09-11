@@ -82,7 +82,7 @@ Workers use isolated worktrees: visible App tasks or native CLI subagents. Reuse
 a worker and its worktree for compatible serial work, switching branches as needed;
 concurrent assignments require separate workers and worktrees. Serial stacked PRs
 retain distinct branches and may share a worker/worktree. Each worker owns
-implementation, self-checks, independent candidate review, scoped fixes, publication and required CI in one assignment.
+implementation, self-checks, independent candidate review, scoped fixes, publication and applicable CI in one assignment.
 The orchestrator owns scope, dependencies, optional stacks and assembled outcomes.
 When contributions feed one PR, it assigns a regular worker to integrate their
 validated commits, resolve conflicts, verify combined behavior and publish the
@@ -91,8 +91,11 @@ still ends at verified ready PRs. Parallel work does not require stacked PRs.
 Worker creation follows the active runtime's authorization rules; established
 authority is preserved across assignments and continuations.
 
-Delivery finishes with all required PRs non-draft, current required CI passing,
-and selected outcomes verified. Merge and deployment are separate. There are no
+Delivery finishes with all required PRs non-draft, applicable CI passing,
+and selected outcomes verified. Repositories without CI are deliverable after
+local validation and review; unavailable branch-policy reads alone do not block
+delivery. The [worker contract](skills/deliver/references/workers.md#publication-and-readiness)
+owns CI applicability and evidence. Merge and deployment are separate. There are no
 mandatory adversarial/hosted reviews, claims, repair-round ledgers or audits;
 repository/user requirements still apply. Complete saved specs transition from
 agent-ready to human-ready using the shared states contract, leaving automatic issue closure to a later PR merge and preventing automatic requeue. Other source-progress

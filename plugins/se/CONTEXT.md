@@ -33,8 +33,10 @@ Review PR reports hosted review results without repairs or acceptance decisions.
 issues and bounded requests. Its current-task delivery lead is designed for Astra,
 retaining configured reasoning and explicit profile overrides. It
 owns its worker role locally.
-Workers complete implementation through required CI, or hand validated commits
-to an assigned integration worker for a shared PR. Integration is a regular worker
+Workers complete implementation through applicable CI, or hand validated commits
+to an assigned integration worker for a shared PR. Deliver owns CI applicability:
+repositories without CI can deliver after validation and review; provider
+merge-policy visibility is separate from delivery acceptance. Integration is a regular worker
 assignment that combines contributions and verifies the assembled behavior; the
 orchestrator verifies selected outcomes and integration. Compatible serial work,
 including stacked branches, reuses workers/worktrees; concurrent assignments use
