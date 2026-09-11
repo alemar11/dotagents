@@ -1,4 +1,4 @@
-# Send Workflows
+# Yeet Workflows
 
 ## Publish New Work
 
@@ -34,7 +34,7 @@ Apply all of these gates before continuing:
   more than one or if its head branch/repository does not match the verified
   push target.
 - When one PR exists, record its `isDraft` value. Updating its branch, title, or
-  body must preserve that exact value; Send never changes an existing PR
+  body must preserve that exact value; Yeet never changes an existing PR
   between draft and ready.
 
 ### Base Selection And Existing PR Reuse
@@ -52,17 +52,17 @@ read-back base. A missing or ambiguous base, an explicit-base mismatch, a fork
 head, or a repository mismatch blocks mutation. Never retarget an existing PR or
 silently fall back to the default branch. Preserve its `isDraft` value.
 
-Send does not infer, verify, link, or manage a stack. A composing workflow that
+Yeet does not infer, verify, link, or manage a stack. A composing workflow that
 has already established a parent/child relationship invokes the separate
-`$g:github-stack` flow after Send's publication readback. Do not make
+`$g:github-stack` flow after Yeet's publication readback. Do not make
 `gh stack submit` the fallback: it publishes every local stack branch and
-bypasses Send's one-branch push, body, and draft-state contracts.
+bypasses Yeet's one-branch push, body, and draft-state contracts.
 
 ### Closing Issue References
 
 Before committing or mutating a PR, receive the exact caller-owned
 `closing_issue_refs` set for issues fully resolved by this PR. A composing
-workflow owns the implementation and acceptance evidence; Send validates the
+workflow owns the implementation and acceptance evidence; Yeet validates the
 issue identities and transports the set. Preserve valid closing references
 already present in an existing PR description.
 
@@ -88,7 +88,7 @@ already closed; it remains part of the PR's tracking history. Do not add a new
 closing reference for an already-closed issue unless the explicit or accepted
 execution evidence still identifies it as resolved by this PR.
 
-The selected PR base does not change this validation. Send carries the exact
+The selected PR base does not change this validation. Yeet carries the exact
 caller-provided set to the PR body and verifies the canonical lines and provider
 references; it does not decide whether the current delivery topology will make
 GitHub close those issues or mutate an issue directly. A composing workflow such
@@ -126,9 +126,9 @@ After preflight and scope verification, reuse a suitable existing commit or run
 the complete `$g:git-commit` workflow with
 `commit_operation=commit-only`, even when the
 overall user request includes publishing. Do not stage or commit directly in
-Send: `$g:git-commit` owns the pre-existing-index guard, explicit staging,
+Yeet: `$g:git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the
-delegated `$g:git-commit` call push; Send retains sole ownership of push after its
+delegated `$g:git-commit` call push; Yeet retains sole ownership of push after its
 second publish preflight. Do not force `commit_kind=regular`: let Git Commit
 apply its canonical default and honor an explicit or target-repository fixup
 requirement only with an exact target.
@@ -163,20 +163,20 @@ When the post-push lookup returns an existing PR, do not run `publish open
 post-update `isDraft` value to equal the pre-push value. An existing ready PR
 therefore remains ready while its branch and optional title/body are updated.
 Require its base to equal the pre-push base or the explicitly requested base;
-Send never silently retargets an existing PR.
+Yeet never silently retargets an existing PR.
 
 After the post-push lookup returns the exact existing PR or `publish open`
 returns the exact newly created PR, require the PR head to equal the full
 published commit SHA. Verify the exact repository, PR, base, full published head
-SHA, draft state, and issue linkage. Send stops after this publication evidence.
+SHA, draft state, and issue linkage. Yeet stops after this publication evidence.
 It must not
 request or wait for an automated Codex review. A composing workflow may invoke
 `$g:github-review-threads` separately using this exact publication evidence;
-the ready transition and any automatic provider review remain outside Send.
+the ready transition and any automatic provider review remain outside Yeet.
 
 ## No Publishable Local Work
 
-Use this branch when the user invokes `send` but the task is issue-only hygiene
+Use this branch when the user invokes `yeet` but the task is issue-only hygiene
 or the checkout has no intended code/docs changes to publish.
 
 ```bash
@@ -194,7 +194,7 @@ relationships, or closure to `$g:github-issues` with
 
 Close out by saying explicitly:
 
-- full `send` was not applicable because there was no publishable local change;
+- full `yeet` was not applicable because there was no publishable local change;
 - which GitHub issue mutations were performed;
 - current branch/worktree state;
 - any untracked files intentionally left alone.

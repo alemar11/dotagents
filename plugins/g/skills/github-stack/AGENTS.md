@@ -2,7 +2,7 @@
 
 This bundled skill owns stack-level routing and operational guidance for the
 G wrapper around `github/gh-stack`. Keep single-PR publication policy in
-`../send/` and the typed command contract in `../../references/stack-cli.md`.
+`../yeet/` and the typed command contract in `../../references/stack-cli.md`.
 
 ## Ownership boundaries
 

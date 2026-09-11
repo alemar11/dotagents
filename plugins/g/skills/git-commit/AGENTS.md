@@ -15,7 +15,7 @@ the shared G options reference.
 ## Maintenance rules
 
 - Preserve explicit path staging, exact fixup target resolution, and the
-  boundary between commit-only work and `$g:send` publication.
+  boundary between commit-only work and `$g:yeet` publication.
 - Do not add automatic autosquash, infer fixups from review prose, or duplicate
   shared option definitions in this skill.
 - Validate adapter changes with syntax/fixture checks and the shared G

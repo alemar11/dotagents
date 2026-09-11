@@ -19,7 +19,7 @@ extension for stacked pull requests. It has no GitHub connector dependency.
 | `g:github-review-threads` | Inspect review feedback and explicitly reply to or resolve selected threads. |
 | `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `g:github-stars` | Manage the authenticated user's stars and star lists. |
-| `g:send` | Commit, push, and open or update one pull request with explicit scope. |
+| `g:yeet` | Commit, push, and open or update one pull request with explicit scope. |
 | `g:github-stack` | Manage stacked branches and dependent pull requests with the G stack wrapper. |
 | `g:versioning` | Apply the shared version, tag, release-line, and approval-gated release-tag conventions. |
 

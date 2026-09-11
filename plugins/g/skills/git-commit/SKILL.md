@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: "Create local Git commits or push them when requested. Use $g:send for pull-request publication."
+description: "Create local Git commits or push them when requested. Use $g:yeet for pull-request publication."
 ---
 
 # Git Commit
@@ -31,8 +31,8 @@ history reachable from `HEAD`. Stop when the target is missing, ambiguous,
 outside the current history, subject-ambiguous, or does not own the change.
 Never amend the target in place and never autosquash fixup commits.
 
-If the user asks for a PR, draft PR, branch publication, or "send", use
-`$g:send` instead. `commit_operation=push-only` never creates a commit;
+If the user asks for a PR, draft PR, branch publication, or "yeet", use
+`$g:yeet` instead. `commit_operation=push-only` never creates a commit;
 `commit_operation=commit-and-push` does both operations. When the user
 explicitly authorizes direct-to-main issue closure, use issue-closing commit
 trailers such as `Closes #123` only after staging the intended paths and

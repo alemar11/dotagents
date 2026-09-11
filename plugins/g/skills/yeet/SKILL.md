@@ -1,16 +1,16 @@
 ---
-name: send
+name: yeet
 description: "Commit and push scoped changes, then create or update one PR while preserving existing draft state."
 ---
 
-# Send
+# Yeet
 
 Before any shell command that may contact GitHub or a package registry, read
 and follow [Network execution](../../references/network-execution.md).
 
 ## Role
 
-Publish one branch and PR. Compose `g:git-commit` for commit authoring; Send owns
+Publish one branch and PR. Compose `g:git-commit` for commit authoring; Yeet owns
 the push, base selection, PR body, and publication readback. Reuse an existing
 suitable commit and matching PR.
 
@@ -37,16 +37,16 @@ publication target. Without an explicit base, preserve its read-back
 Stop on a missing or ambiguous base instead of retargeting the PR or silently
 falling back to the default branch. Preserve its current `isDraft` value.
 
-Send does not infer, verify, link, or manage a stack. A caller that needs a
-parent/child relationship invokes `$g:github-stack` separately after Send's
-publication receipt. Do not use `stack submit` as a Send fallback.
+Yeet does not infer, verify, link, or manage a stack. A caller that needs a
+parent/child relationship invokes `$g:github-stack` separately after Yeet's
+publication receipt. Do not use `stack submit` as a Yeet fallback.
 
 ## Issue Linkage Contract
 
 Accept `closing_issue_refs` as caller-owned factual input: the exact GitHub
 issues whose accepted scope is fully satisfied by this PR. Validate every
 candidate against its exact GitHub repository and issue before PR mutation.
-Send must not derive an issue from a bare number, branch name, commit subject,
+Yeet must not derive an issue from a bare number, branch name, commit subject,
 nearby issue, parent Feature Spec, dependency, or partial implementation.
 
 When `closing_issue_refs` is nonempty:
@@ -60,7 +60,7 @@ When `closing_issue_refs` is nonempty:
   evidence rather than adding a closing keyword that could close the wrong
   issue.
 
-The selected PR base does not change this validation. Send carries the exact
+The selected PR base does not change this validation. Yeet carries the exact
 caller-provided issue set to the PR body and verifies the resulting body and
 provider references; it does not decide whether the current delivery topology
 will make GitHub close those issues or mutate an issue directly. A composing
@@ -85,10 +85,10 @@ closeout. See `references/workflows.md` for body construction and verification.
 4. Receive and validate the caller's exact `closing_issue_refs`. Read an
    existing PR body when present, preserve its valid closing references, and
    prepare the complete template-aware PR body. Do not impose a default-base
-   requirement in Send.
+   requirement in Yeet.
 5. Reuse the current commit when it already represents the intended scope.
    Otherwise create one through `$g:git-commit` with
-   `commit_operation=commit-only`; Send retains ownership of push. Do not
+   `commit_operation=commit-only`; Yeet retains ownership of push. Do not
    override Git Commit's `commit_kind` selection: it defaults to `regular` and
    may select a targeted fixup only from the explicit request or
    target-repository instructions with an exact target.
@@ -107,11 +107,11 @@ closeout. See `references/workflows.md` for body construction and verification.
    and require the exact canonical `Closes` line for every resolved
    `closing_issue_ref`. Preserve the existing PR's base and draft state; never
    retarget it implicitly.
-8. Stop after publication and its read-backs. Send must not request or wait for
+8. Stop after publication and its read-backs. Yeet must not request or wait for
    an automated Codex review. If a composing workflow needs one, it must invoke
    `$g:github-review-threads` as a separate operation using the exact repository,
-   PR, and full published head SHA from Send's publication evidence. The ready
-   transition and any automatic provider review remain outside Send.
+   PR, and full published head SHA from Yeet's publication evidence. The ready
+   transition and any automatic provider review remain outside Yeet.
 9. Return branch, PR URL, commit hash, PR base, canonical
    `closing_issue_refs`, issue-linkage verification, exact published head,
    draft-state read-back, and verification performed. If post-publication

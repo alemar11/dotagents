@@ -25,16 +25,16 @@ operation.
 
 ## Boundaries
 
-- Use `$g:send` for publishing or updating one PR, including its title,
+- Use `$g:yeet` for publishing or updating one PR, including its title,
   body, closing issue references, draft state, and push ownership.
 - Use this skill for an explicit parent/child link, even when the PRs were just
-  published by `$g:send`. `send` does not infer or invoke `stack link`; do not
+  published by `$g:yeet`. `yeet` does not infer or invoke `stack link`; do not
   replace this explicit relationship flow with `stack submit`.
 - Use this skill when the user explicitly asks for stack-wide publication,
   navigation, rebase, sync, restructuring, merge, or recovery.
 - Do not silently turn a single-PR request into a stack-wide operation.
 - `stack submit` is an explicit multi-branch publication mode. It does not
-  inherit `send`'s issue-linkage, body, or draft-preservation contract; route
+  inherit `yeet`'s issue-linkage, body, or draft-preservation contract; route
   those responsibilities separately when required.
 
 ## Readiness and authorization

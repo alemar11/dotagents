@@ -45,7 +45,7 @@ the local branch lifecycle. Arguments are bottom-to-top:
 Consume the exact PR identities and publication readbacks from the caller when
 available. Verify both repositories, the child base, both full heads, and the
 intended bottom-to-top order before treating the link receipt as authoritative.
-This is distinct from `send`: `send` owns the current branch publication, while
+This is distinct from `yeet`: `yeet` owns the current branch publication, while
 this skill owns the explicit parent/current relationship. Do not use `link` to
 guess a stack from branch names or ambiguous PRs.
 
@@ -71,8 +71,8 @@ ready for review. Without `--open`, preserve the extension's default draft
 behavior. `submit` pushes active branches and creates or updates multiple PRs;
 it is not atomic and may leave earlier branches published if a later push fails.
 
-Do not use this path for a normal `$g:send` request. It does not create
-the Send-owned issue linkage, body verification, draft-preservation evidence,
+Do not use this path for a normal `$g:yeet` request. It does not create
+the Yeet-owned issue linkage, body verification, draft-preservation evidence,
 or the one-branch publication evidence.
 
 ## Modify a middle layer

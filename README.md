@@ -37,7 +37,7 @@ updates. It has no GitHub connector dependency. It bundles:
 | `g:github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
 | `g:github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `g:github-stars` | Manage the authenticated user's GitHub stars and star lists. |
-| `g:send` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
+| `g:yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `g:github-stack` | Manage stacked branches and dependent pull requests through the G stack CLI, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `g:versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
 

@@ -1,5 +1,0 @@
-interface:
-  display_name: "Send"
-  short_description: "Commit, push, and send one pull request"
-  brand_color: "#EA580C"
-  default_prompt: "Use $g:send to confirm the intended local changes and caller-provided resolved GitHub issues, commit them, push the branch, and open or update one pull request without changing its draft state."
