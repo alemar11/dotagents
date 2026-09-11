@@ -1,0 +1,5 @@
+interface:
+  display_name: "🛠️ Hopper MCP"
+  short_description: "Configure Hopper MCP for Codex or Cursor"
+  default_prompt: "Use $hopper to configure or verify Hopper Disassembler MCP globally or for this project in Codex or Cursor."
+  brand_color: "#5B5BD6"

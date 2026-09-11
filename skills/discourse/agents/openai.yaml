@@ -1,0 +1,5 @@
+interface:
+  display_name: "💬 Discourse MCP"
+  short_description: "Configure Discourse MCP for Codex or Cursor"
+  default_prompt: "Use $discourse to configure or verify Discourse MCP globally or for this project in Codex or Cursor."
+  brand_color: "#3B82F6"
