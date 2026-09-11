@@ -1,6 +1,6 @@
 ---
 name: maintainer
-description: Manually audit, maintain, and re-engineer existing repo skills and plugins through health checks, targeted upgrades, workflow hardening, package lifecycle work, validation, and explicit refreshes.
+description: Manually audit, maintain, and re-engineer existing repo skills, optional plugins, and coupled maintenance projects through health checks, targeted upgrades, workflow hardening, package lifecycle work, validation, and explicit refreshes.
 ---
 
 # Maintainer
@@ -12,7 +12,8 @@ Use this project-maintainer skill only after the user explicitly invokes
 routes here. This skill is manual-only. Do not auto-select it for ordinary
 skill, plugin, metadata, docs, or repository change requests.
 
-Maintain existing skill and plugin packages through one routed control plane:
+Maintain existing skills, optional plugins, and coupled maintenance projects
+through one routed control plane:
 
 - A bare `run`, `run your tasks`, or equivalent imperative starts a
   conservative repo-wide maintenance pass.

@@ -12,7 +12,10 @@ for structural, discovery, instruction, reference-path, and validation health.
   maintenance workflow may apply only safe, low-ambiguity findings and must
   defer strategic or behavior-sensitive changes.
 - Named packages stay targeted. An unnamed health request covers local reusable
-  skills, repo-local plugins, and project-local skills in this repository.
+  skills, project-local skills, optional repo-local plugins when present, and
+  coupled maintenance projects under `projects/*` or `skills/*/projects/*`
+  when those trees are in scope. An empty marketplace with no plugin packages
+  is healthy when docs and install surfaces agree.
 
 ## Health Workflow
 
@@ -20,9 +23,12 @@ for structural, discovery, instruction, reference-path, and validation health.
    globally clean worktree.
 2. Check structural and policy integrity:
    - stable package names and required `SKILL.md` files;
-   - expected `agents/openai.yaml`, plugin manifests, and marketplace entries;
+   - expected `agents/openai.yaml`; plugin manifests and marketplace entries
+     only when plugins ship (empty marketplace is valid);
    - lowercase `references/*.md` filenames except `README.md` and `AGENTS.md`;
    - existing scripts and references for every active pointer;
+   - coupled `projects/*` maintenance sources still resolve for skills that
+     document them;
    - aligned repo guidance, Codex-dependency classification, and portable
      fallbacks.
 3. Run the repository's structural commands below and any package-owned
@@ -56,12 +62,12 @@ for structural, discovery, instruction, reference-path, and validation health.
 ```bash
 rg --files -g 'SKILL.md' -g 'agents/openai.yaml'
 rg --files -g 'references/*.md'
-rg -n "scripts/|agents/openai.yaml|SKILL.md|\.agents/skills/" -S
+rg -n "scripts/|agents/openai.yaml|SKILL.md|\.agents/skills/|projects/" -S
 rg -n "request_user_input|subagent|\$CODEX_HOME|~/.codex|Codex CLI|Codex App" -S
 ```
 
-Use focused package roots and exclude generated caches or installed plugin cache
-copies from editable-owner findings.
+Use focused package roots and exclude generated caches or installed plugin
+cache copies from editable-owner findings.
 
 ## Severity And Output
 

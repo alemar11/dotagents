@@ -1,6 +1,6 @@
 interface:
   display_name: "Maintainer"
-  short_description: "Manually audit, maintain, and re-engineer repo skills and plugins through health, lifecycle, validation, and refresh workflows."
+  short_description: "Manually audit and maintain repo skills, optional plugins, and coupled projects through health, lifecycle, validation, and refresh workflows."
   brand_color: "#B85C00"
   default_prompt: "Use $maintainer only for this explicit maintenance request. Route health audits read-only, bare requests to conservative maintenance, named targets to scoped upgrades, runtime failures to workflow-family hardening, and package moves or removals to lifecycle maintenance. Keep substantial reshapes creator-first, select validation by change type, and keep instruction-density reviews proposal-first."
 policy:

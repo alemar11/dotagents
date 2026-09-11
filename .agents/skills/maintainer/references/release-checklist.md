@@ -12,14 +12,15 @@ Run this checklist before finalizing maintainer updates.
 ## 2. Package And Policy Consistency
 
 - Align skill names/descriptions across `SKILL.md`, `agents/openai.yaml`, README,
-  manifests, and marketplace entries in scope.
+  and any in-scope plugin manifests or marketplace entries.
 - Verify required files, lowercase `references/*.md` names, and referenced
-  scripts/docs.
+  scripts/docs, including coupled `projects/*` paths skills document.
 - Scan for stale names, paths, invocations, dependencies, install prompts, and
   retired discovery surfaces.
 - Reconcile Codex-dependency classification and runtime/maintenance boundaries.
 - For plugin changes, verify the semantic version bump, embedded CLI alignment,
-  deterministic artifact, install/cache parity, and clean reinstall.
+  deterministic artifact, install/cache parity, and clean reinstall. Skip plugin
+  gates when no plugins ship.
 
 ## 3. Execute Validation
 
@@ -57,9 +58,10 @@ changing Git history.
 - With PR or other publication authority, use the matching publication workflow
   and its own scope rules. Do not infer commit authority from a bare PR request,
   or PR/publication authority from commit or push authority.
-- Prefer the matching G workflow when installed. Direct scoped `git` is
-  the fallback for explicitly authorized commit/push operations when G is
-  unavailable.
+- Prefer `$git-commit` for authorized local commits and `$yeet` for
+  authorized single-PR publication when those skills are installed. Direct
+  scoped `git` is the fallback for explicitly authorized commit/push operations
+  when they are unavailable.
 - After an authorized commit or push, verify the exact commit range, branch
   divergence, and that authorized paths plus the staged set are clean. Confirm
   unrelated pre-existing changes remain unchanged; global worktree cleanliness

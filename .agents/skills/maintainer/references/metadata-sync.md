@@ -25,7 +25,9 @@ when a brand-new skill scaffold is needed.
 - Description compactness and selection value across `SKILL.md` frontmatter, `agents/openai.yaml` short descriptions, and README one-liners
 - README skill list and one-line descriptions
 - Any install prompts or usage snippets that list skill names
-- Plugin names, descriptions, marketplace entries, and usage snippets when plugins are in scope
+- Plugin names, descriptions, marketplace entries, and usage snippets when
+  plugins are in scope. An empty marketplace needs no fabricated plugin
+  entries.
 
 ## Workflow
 1. Enumerate skill manifests:

@@ -1,8 +1,9 @@
 # Maintainer Package
 
 `.agents/skills/maintainer/` is the repository's maintenance control plane for
-existing skills and plugins. User-facing invocation and runtime contracts stay
-in `SKILL.md` and routed references; this file governs package maintenance.
+existing skills, optional plugins, and coupled maintenance projects.
+User-facing invocation and runtime contracts stay in `SKILL.md` and routed
+references; this file governs package maintenance.
 
 ## Owned surfaces
 
@@ -25,6 +26,9 @@ in `SKILL.md` and routed references; this file governs package maintenance.
   guidance may route explicit maintenance work here.
 - Keep instruction-density reviews proposal-first and wait for approval before
   compaction refactors.
+- Treat plugins as optional. An empty marketplace and absent `plugins/*` tree
+  are valid. Include repo-root `projects/*` and skill-local
+  `skills/*/projects/*` when those packages own editable maintenance source.
 
 ## Validation
 
@@ -33,7 +37,8 @@ in `SKILL.md` and routed references; this file governs package maintenance.
   validate skill metadata with the canonical metadata validator.
 - Select validation from `references/validation-matrix.md`.
 - Plugin and CLI maintenance must verify shipped artifacts and installed/cache
-  state where applicable; composed workflows require focused contract tests and
-  bounded scenario proof when risk justifies it.
+  state where applicable; skip plugin gates when no plugins ship. Composed
+  workflows require focused contract tests and bounded scenario proof when risk
+  justifies it.
 - A portfolio diagnostic is evidence for investigation, not by itself a
   package failure or deletion authorization.

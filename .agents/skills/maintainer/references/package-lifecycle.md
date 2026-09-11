@@ -1,7 +1,7 @@
 # Package Lifecycle
 
 Use this playbook to merge, rename, move, bundle, replace, or retire existing
-skills and plugins.
+skills, plugins, or coupled maintenance projects under `projects/*`.
 
 ## Creator-First Boundary
 

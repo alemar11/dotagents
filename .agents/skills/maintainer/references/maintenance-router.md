@@ -26,10 +26,12 @@ playbook dispatch rather than a second value registry.
 ## Routing Rules
 
 1. A bare `run`, `run your tasks`, or maintenance pass resolves to
-   `maintain` with `run-maintenance.md`. Inspect local skills and plugins,
-   shortlist concrete low-ambiguity drift, apply safe upgrades, sync touched
-   docs, audit health, and close out. Do not infer refresh, new-skill creation,
-   workflow hardening, package lifecycle work, or a substantial reshape.
+   `maintain` with `run-maintenance.md`. Inspect the default inventory in
+   `task-menu.md` (skills, optional plugins when present, coupled
+   `projects/*`), shortlist concrete low-ambiguity drift, apply safe upgrades,
+   sync touched docs, audit health, and close out. Do not infer refresh,
+   new-skill creation, workflow hardening, package lifecycle work, or a
+   substantial reshape.
 2. Named existing packages resolve to targeted `maintain` with
    `skill-upgrade.md`; explicit metadata/docs wording resolves to
    `metadata-sync.md`.

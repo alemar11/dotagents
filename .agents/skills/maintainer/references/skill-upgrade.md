@@ -10,24 +10,32 @@ or more existing skills or plugins.
 - Avoid silently expanding a targeted upgrade into repo-wide refresh work.
 
 ## Task Boundary
-- `upgrade` is for one or more existing target skills or plugins.
+- `upgrade` is for one or more existing target skills, plugins, or coupled
+  maintenance projects.
 - Default scope per target skill:
   - the skill's `SKILL.md`
   - the skill's `agents/openai.yaml`
   - the skill's `references/*.md`
+  - skill-local `projects/<tool>/` when the skill documents that maintenance
+    source
   - directly coupled mentions in `README.md` or `AGENTS.md` when wording or durable repo guidance changes
 - Default scope per target plugin:
   - `.codex-plugin/plugin.json`
   - bundled `skills/*`, shared `scripts/*`, `projects/*`, and `assets/*` when directly coupled to the requested change
   - `.agents/plugins/marketplace.json`
   - directly coupled mentions in `README.md` or `AGENTS.md`
+- Default scope per repo-root maintenance project under `projects/<tool>/`:
+  - project `AGENTS.md`, scripts, tests, and synced consumers named by that
+    project
+  - do not treat absence of plugins as related drift
 - Do not refresh domain best-practices content unless the user explicitly asks for `refresh`.
 - If the requested change merges/removes public packages, changes public invocation, redistributes major responsibilities, moves standalone skills into a plugin, or breaks a handoff schema, stop this playbook and route through `$skill-creator` or `$plugin-creator` first. Resume with `package-lifecycle.md` for integration and cleanup.
 
 ## Workflow
-1. Identify the target skill, plugin, or mixed target set and inspect each current package:
-   - for skills: `SKILL.md`, `agents/openai.yaml`, any referenced `references/*.md`, and `scripts/*`
+1. Identify the target skill, plugin, maintenance project, or mixed target set and inspect each current package:
+   - for skills: `SKILL.md`, `agents/openai.yaml`, any referenced `references/*.md`, `scripts/*`, and skill-local `projects/*` when present
    - for plugins: `.codex-plugin/plugin.json`, bundled `skills/*`, shared `scripts/*`, `projects/*`, and `assets/*` as needed
+   - for repo-root `projects/<tool>/`: project docs, scripts, tests, and documented skill consumers
    - related mentions in `README.md`, `AGENTS.md`, and `.agents/plugins/marketplace.json` when a plugin is involved
 2. Define the concrete upgrade goals for each target before editing:
    - trigger clarity

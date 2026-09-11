@@ -5,13 +5,19 @@ task, including bare maintainer imperatives such as `run`, `run your tasks`,
 or other default maintenance requests.
 
 ## Purpose
-- Keep one or more existing skills or plugins healthy with proactive, low-ambiguity improvements.
+- Keep existing skills, optional plugins, and coupled maintenance projects
+  healthy with proactive, low-ambiguity improvements.
 - Treat `run` as the default entrypoint for this maintainer skill.
 - Apply concrete maintenance work automatically when the rationale is clear.
 
 ## Task Boundary
-- If the user does not name targets, inspect all local skills and repo-local plugins in the repository.
-- `run` may update multiple skills or plugins when each change has a concrete rationale and low ambiguity.
+- If the user does not name targets, inspect the default inventory in
+  `task-menu.md`: reusable skills, project-local skills, optional plugins when
+  present, and coupled `projects/*` maintenance trees when relevant.
+- An empty `.agents/plugins/marketplace.json` and absent `plugins/*` packages
+  are valid. Do not treat missing plugins as drift.
+- `run` may update multiple packages when each change has a concrete rationale
+  and low ambiguity.
 - Auto-apply only safe maintenance items such as:
   - metadata and docs alignment
   - compacting long descriptions that duplicate trigger or workflow detail already present in `SKILL.md`
@@ -26,21 +32,24 @@ or other default maintenance requests.
 ## Workflow
 1. Enumerate local packages and directly coupled repo docs:
    - reusable skills under `skills/*`
-   - repo-local plugins under `plugins/*`
    - project-local maintainer skills under `.agents/skills/*`
+   - optional repo-local plugins under `plugins/*` when present and listed in
+     `.agents/plugins/marketplace.json`
+   - coupled maintenance projects under repo-root `projects/*` and skill-local
+     `skills/*/projects/*` when those packages own editable source or validators
    - related `README.md` and `AGENTS.md` entries
 2. Run `skill-health.md` read-only, then shortlist packages with clear,
    maintainable improvements from its findings.
    - Include stale Codex-dependency inventory or ambiguous Codex-tool wording in this inspection.
    - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners when they are too long, duplicated, or misaligned.
 3. For each shortlisted target, apply a targeted upgrade using the rules from `skill-upgrade.md`.
-4. Run `metadata-sync.md` for the touched skills, plugins, and coupled repo docs.
+4. Run `metadata-sync.md` for the touched skills, plugins, maintenance projects, and coupled repo docs.
 5. Rerun `skill-health.md` across touched areas and repo-level reference drift.
 6. Finish with `release-checklist.md` and report canonical `result` and
    `change_state` values.
 
 ## Quality Gates
-- Every changed skill or plugin has a concrete rationale.
+- Every changed skill, plugin, or maintenance project has a concrete rationale.
 - Multi-target runs stay easy to explain target by target.
 - Touched Codex-dependent skills name their required Codex tools/contracts clearly, and touched portable skills keep Codex-only helpers optional.
 - `run` ends with no unresolved metadata drift or broken references in the touched scope.

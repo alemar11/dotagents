@@ -1,95 +1,111 @@
 # Maintainer Task Menu
 
 Use this file when the user asks what the `$maintainer` skill can do or when a
-maintenance request needs to be routed to a concrete task.
+maintenance request needs to be routed to a concrete task. Each task lists its
+scope, mutation boundary, and owning playbook.
+
+Default package inventory for unnamed repo-wide work:
+
+- reusable skills under `skills/*`
+- project-local skills under `.agents/skills/*`
+- optional Codex plugins under `plugins/*` when present and registered in
+  `.agents/plugins/marketplace.json` (an empty marketplace is valid; missing
+  plugins are not drift)
+- coupled maintenance projects under repo-root `projects/*` and skill-local
+  `skills/*/projects/*` when those packages are in scope
 
 ## Tasks
 
 1. `maintain skills`
-   - Inspect one or more skills or plugins, ensure there is no meaningful drift,
-     and compare or update local `SKILL.md`, `agents/openai.yaml`,
-     `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
-     `README.md`, and `AGENTS.md` as needed.
-   - With no named targets, default scope is all local skills and repo-local
-     plugins in this repository.
-   - With named targets, keep the pass targeted to those skills or plugins.
-   - With explicit metadata/docs wording, stay in metadata-only alignment mode.
-   - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short
-     descriptions, and README one-liners in metadata drift and prompt-budget
-     checks.
-   - Finish with skill-health and release-style reporting when the scope is
-     broader than metadata-only alignment.
+   - **Purpose:** Conservative health and upgrade pass for existing packages.
+   - **Scope:** Named skills/plugins, or all packages in the inventory above when
+     unnamed. Include coupled `README.md` / `AGENTS.md` and, when present,
+     marketplace or plugin manifests.
+   - **Mutation:** Safe, low-ambiguity fixes only. Report strategic or
+     behavior-sensitive candidates; do not invent refresh, lifecycle, hardening,
+     or new-package work.
+   - **Playbooks:** `run-maintenance.md` (unnamed/bare), `skill-upgrade.md`
+     (named packages), `metadata-sync.md` (metadata/docs-only wording).
 2. `harden workflow family`
-   - Use representative sessions, logs, tests, or live failures to repair a
-     connected skill/plugin workflow.
-   - Confirm ownership, authority, handoffs, sources of truth, validation, and
-     closeout before changing contracts.
-   - Require regression coverage for accepted behavior defects.
+   - **Purpose:** Repair a connected multi-skill or skill/plugin workflow after
+     runtime or cross-skill evidence shows ownership, authority, handoff,
+     validation, or closeout defects.
+   - **Scope:** The smallest connected package set that owns the failure.
+   - **Mutation:** Read-only evidence first; edit only after the finding is
+     accepted. Require regression coverage for accepted behavior defects.
+   - **Playbook:** `workflow-family-hardening.md`. Explicit only.
 3. `migrate or retire package`
-   - Merge, rename, move, bundle, replace, or retire existing skills/plugins.
-   - Use `$skill-creator` or `$plugin-creator` first for substantial reshapes,
-     then return here for repo integration, stale-surface cleanup, validation,
-     versioning, install/cache checks, and release reporting.
+   - **Purpose:** Merge, rename, move, bundle, replace, or retire existing
+     skills, plugins, or their coupled maintenance projects.
+   - **Scope:** Old and new owners, callers, install prompts, manifests,
+     marketplace entries, caches, and tests.
+   - **Mutation:** Creator-first for substantial reshapes (`$skill-creator` or
+     `$plugin-creator`), then integration and cleanup here. No aliases for
+     retired identifiers.
+   - **Playbook:** `package-lifecycle.md`. Explicit only.
 4. `audit skill health`
-   - Run a read-only health audit across the repo or the touched packages,
-     covering structural and policy integrity, metadata and discovery,
-     entrypoint size, reference routing, representative invoked-path cost, and
-     applicable validation evidence.
-   - Treat prompt size as diagnostic and use local checks or supplied runtime
-     evidence when deeper prompt-quality, overlap, or runtime evidence is needed.
+   - **Purpose:** Read-only structural, discovery, instruction, reference-path,
+     and validation health check.
+   - **Scope:** Named packages or the full inventory above. Empty plugin sets
+     are healthy when marketplace and docs agree.
+   - **Mutation:** None. Findings are evidence, not edit authority.
+   - **Playbook:** `skill-health.md`.
 5. `review instruction density`
-   - Inspect one or more existing skills or plugins and identify where the same
-     runtime behavior can be achieved with fewer instructions.
-   - Classify each proposal as `safe trim`, `move to reference`,
-     `behavior-risk`, or `leave as-is`.
-   - Return a read-only proposal first; do not refactor, edit, or commit
-     compaction changes until the user explicitly approves that refactor.
+   - **Purpose:** Find behavior-preserving compaction: fewer or better-routed
+     instructions for the same runtime guarantees.
+   - **Scope:** Entrypoint, disclosed references, and metadata that duplicate
+     runtime rules. Optional plugin manifests only when they create confusion.
+   - **Mutation:** Proposal-first (`safe trim`, `move to reference`,
+     `behavior-risk`, `leave as-is`). Edit only after explicit approval.
+   - **Playbook:** `instruction-density-review.md`.
 6. `review skill descriptions`
-   - Inspect `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short
-     descriptions, and README one-liners for length, clarity, selection value,
-     and alignment.
-   - Prefer compact descriptions that identify purpose and trigger family; keep
-     detailed trigger rules and workflow contracts in `SKILL.md` sections or
-     references.
-   - Return proposed wording first when behavior or invocation boundaries could
-     change; apply safe metadata trims directly during approved maintenance
-     passes.
+   - **Purpose:** Tighten discovery wording across `SKILL.md` frontmatter,
+     `agents/openai.yaml`, and README one-liners.
+   - **Scope:** Purpose and trigger family only; keep workflow contracts in the
+     skill body or references.
+   - **Mutation:** Propose first when invocation boundaries could change; apply
+     safe metadata trims during approved maintenance.
+   - **Playbooks:** `metadata-sync.md`; run `instruction-density-review.md`
+     first when the wording change is behavior-sensitive.
 7. `audit codex dependencies`
-   - Verify which skills are Codex-dependent versus portable, keep the repo
-     inventory current, and ensure Codex-specific tools or filesystem contracts
-     are named precisely.
+   - **Purpose:** Classify Codex-dependent versus portable skills and keep
+     required runtime contracts named precisely.
+   - **Scope:** Skills in inventory plus any inventory docs that claim
+     dependency class.
+   - **Mutation:** Audit is evidence-first; apply labeling fixes only under an
+     accepted maintain route.
+   - **Playbook:** `codex-dependency-audit.md`. Explicit only.
 8. `refresh swift-docc references`
-   - Check the bundled Swift-DocC manifest, refresh the local
-     `DocCDocumentation.docc` asset tree when stale, and validate or tighten the
-     local `references/*.md` fast paths.
+   - **Purpose:** Refresh bundled Swift-DocC assets and local fast-path
+     references when the upstream DocC tree is stale.
+   - **Scope:** `skills/swift-docc/` assets, manifest, and `references/*.md`.
+   - **Mutation:** Explicit refresh only; never from bare `run`.
+   - **Playbooks:** `swift-docc-refresh.md`, `swift-docc-runbook.md`.
 9. `refresh swift-api-design references`
-   - Check the bundled Swift API Design manifest, refresh the local guideline
-     source file when stale, and validate the local `references/*.md` routing
-     layer.
+   - **Purpose:** Refresh bundled Swift API Design guideline source and local
+     routing references when stale.
+   - **Scope:** `skills/swift-api-design/` guideline asset, manifest, and
+     `references/*.md`.
+   - **Mutation:** Explicit refresh only; never from bare `run`.
+   - **Playbooks:** `swift-api-design-refresh.md`, `swift-api-design-runbook.md`.
 10. `refresh tanstack intent coverage`
-   - Review the current TanStack Intent registry and relevant TanStack package
-     skill pages for `skills/tanstack/`.
-   - Update local skill metadata, `$tanstack` routing, `references/*.md` fast
-     paths, and related docs only when newly shipped first-party Intent coverage
-     materially changes the right guidance.
-   - Use the current TanStack skill layout: `$tanstack` is the primary
-     entrypoint, with dense product and domain slices living under `references/`
-     instead of separate narrow skill directories.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
+   - **Purpose:** Update `$tanstack` routing and references when newly shipped
+     first-party TanStack Intent coverage changes local guidance.
+   - **Scope:** `skills/tanstack/` metadata and Intent-related references.
+   - **Mutation:** Explicit refresh only; never from bare `run`.
+   - **Playbook:** `tanstack-intent-refresh.md`.
 11. `refresh tanstack skills coverage`
-   - Compare local `skills/tanstack/` product-level references against the
-     upstream `tanstack-skills/tanstack-skills` plugin tree and current
-     TanStack-owned product docs, which may expose new official products first.
-   - Ignore upstream bundle aliases such as `tanstack-all`, `tanstack-core`,
-     `tanstack-data`, and `tanstack-ui` unless the local reusable-skill packaging
-     model intentionally changes.
-   - Verify product-specific API and best-practice details against
-     TanStack-owned docs before updating local runtime guidance.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
+   - **Purpose:** Align local TanStack product references with upstream
+     `tanstack-skills` coverage and TanStack-owned product docs.
+   - **Scope:** `skills/tanstack/` product references. Ignore upstream bundle
+     aliases (`tanstack-all`, `tanstack-core`, `tanstack-data`, `tanstack-ui`)
+     unless local packaging intentionally changes.
+   - **Mutation:** Explicit refresh only; never from bare `run`.
+   - **Playbook:** `tanstack-skills-alignment.md`.
 12. `refresh okf spec`
-   - Check `skills/okf/assets/manifest.json` and the bundled official spec copy
-     against `GoogleCloudPlatform/open-knowledge-format/SPEC.md`.
-   - Refresh `skills/okf/assets/spec.md` and the manifest when stale.
-   - Validate the OKF runtime skill shape, reference links, CLI executable, and
-     tests.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
+   - **Purpose:** Refresh the bundled Open Knowledge Format official spec copy
+     and manifest when upstream `SPEC.md` is newer.
+   - **Scope:** `skills/okf/assets/`, related references, CLI, and tests.
+   - **Mutation:** Explicit refresh only; targeted `maintain okf` may stale-check
+     but must not refresh without refresh authority.
+   - **Playbooks:** `okf-spec-refresh.md`, `okf-spec-runbook.md`.
