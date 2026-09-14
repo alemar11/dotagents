@@ -24,9 +24,12 @@ Implement creates no tasks and never operates claims. Its only delegation is
 the optional UI designer below, with the same policy standalone or composed.
 Preserve any separately established caller-owned budget.
 
-Use test-driven development where practical, especially at pre-agreed seams.
-Run checks covering the changed behavior and repository-required gates. Broaden
-validation only for unresolved risks or failures.
+Continue through implementation, relevant checks, and repair of failures caused
+by the change before returning the local result. Use tests where they protect
+observable behavior, including pre-agreed seams; do not add tests for prose or
+trivial reversible changes. Run repository-required gates and broaden validation
+only for a new change, failure, or unresolved risk. Existing authorization covers
+these local steps; ask only about material unresolved decisions.
 
 ## Optional UI design
 
