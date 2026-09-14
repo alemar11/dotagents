@@ -297,12 +297,26 @@ manually dispatch the publisher with an existing final tag for recovery.
 
 ## Permissions preflight
 
-Before writing or upgrading the workflows, compose `$github-actions` for its
-read-only configuration preflight. The repository must allow GitHub Actions to
-create pull requests, and `release-tag-approval` must exist with the intended
-required reviewers. A blocked or unavailable preflight is advisory: write the
-explicitly requested files, report the missing remote configuration, and do not
-claim the workflow is operationally ready.
+Before writing or upgrading the workflows, inspect repository permissions
+read-only with `gh api repos/<owner>/<repo>/actions/permissions` for Actions
+availability and `gh api repos/<owner>/<repo>/actions/permissions/workflow` for
+workflow defaults and PR creation. Keep Actions-disabled evidence separate
+from a disabled `can_approve_pull_request_reviews` setting; both can prevent
+the controller from operating. PR creation must be permitted, and
+`release-tag-approval` must exist with the intended required reviewers.
+Repository defaults do not establish a job's effective token permissions:
+inspect explicit job-level permissions, event/fork restrictions, and applicable
+organization policy. Branch or tag writes need `contents: write`; PR writes
+need `pull-requests: write` in the job that performs them.
+
+A disabled setting needs configuration; an inaccessible setting is unverified.
+Both are advisory for an authorized local workflow edit: finish the files and
+report the remote prerequisite without changing settings or claiming operational
+readiness. Enabling settings or approving an environment is a separate action
+requiring its own authority. A completed run is evidence of actual behavior.
+
+Consult the [GitHub Actions permissions API](https://docs.github.com/en/rest/actions/permissions)
+for current settings and access requirements.
 
 Because `deployment: false` is used, the approval environment must rely on
 reviewers and wait timers rather than custom deployment protection rules.

@@ -283,8 +283,10 @@ Return:
 - exact published head SHA and draft-state read-back
 - validation performed before publishing
 
-If CI fails or review comments need follow-up, route to
-`$github-actions` or `$github-review-threads` after the
-publish step. Supply the exact repository and PR
-plus one `review_operation`; add `mutation_mode=apply` only for an authorized
-reply, request, review submission, or resolution.
+For CI failures after publication, inspect the failing run and logs with `gh`,
+binding the evidence to the published SHA and run attempt. Distinguish local
+fix validation from a successful remote run; publication alone does not authorize
+reruns or additional pushes. For review follow-up, use `$github-review-threads`
+with the exact repository, PR, and one `review_operation`; add
+`mutation_mode=apply` only for an authorized reply, request, review submission,
+or resolution.

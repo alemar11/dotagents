@@ -37,7 +37,7 @@ that branch:
 | Inspect or migrate stable legacy tags | [Legacy-tag migration](references/migration.md) and [suggestion states](references/states.md) |
 | Apply a confirmed tag through an existing compatible controller | [Existing release-controller dispatch](references/controller-dispatch.md) |
 | Select an existing tag for a GitHub Release | [GitHub Release tag selection](references/release-selection.md), then compose `$github-releases` |
-| Create, review, or upgrade release Actions | compose `$github-actions` configuration preflight when needed, then [release workflow authoring](references/github-actions.md) |
+| Create, review, or upgrade release Actions | [release workflow authoring](references/github-actions.md), including its permissions preflight |
 
 An explicit increment, candidate, final tag, or release branch selects the
 version-and-tag path. An explicit existing tag, GitHub Release, description,
@@ -114,4 +114,3 @@ comparison start before handing off to `$github-releases`.
 ## Skill Dependencies
 
 - `$github-releases` for GitHub Release publication after tag selection.
-- `$github-actions` when authoring or reviewing release-controller workflow permissions.
