@@ -1,232 +1,145 @@
 # GitHub Review Workflows
 
-Use [states.md](states.md) for canonical feedback, request-binding, review,
-recovery, operation-result, reconciliation, and resolution states.
+## Inspect the PR and threads
 
-## Check Or Wait For Automated Review
-
-### Initial automatic review
-
-When automatic Codex review is configured and the caller selects that route,
-opening a PR for review triggers the
-first review without an `@codex review` comment. Bind that cycle to the exact
-typed draft-to-ready transition receipt and published full SHA:
+Read the PR identity and HEAD, then paginate the relevant provider collections:
 
 ```bash
-<skill-root>/scripts/reviews --json ready-check --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file>
-<skill-root>/scripts/reviews --json ready-wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --ready-receipt-file <absolute-ready-receipt-file> --timeout <caller-owned-duration>
+gh pr view <number> --repo <owner/repo> \
+  --json number,url,state,isDraft,headRefOid,headRefName,headRepository,headRepositoryOwner
+gh api --paginate repos/<owner>/<repo>/pulls/<number>/reviews
+gh api --paginate repos/<owner>/<repo>/pulls/<number>/comments
+gh api --paginate repos/<owner>/<repo>/issues/<number>/comments
 ```
 
-`ready-check` reads once. `ready-wait` polls with bounded backoff. Neither posts
-or searches for an explicit request comment. The helper may normalize a clean
-formal review, authenticated terminal comment, or provider-authored PR-level 👍
-reaction created after the ready transition as terminal clean evidence.
-Findings are terminal for that reviewed head. Absence of
-comments, zero unresolved threads, or a generic `not-requested` observation is
-not terminal evidence for this ready-triggered lineage.
+Use `gh api graphql --input <request-json>` for review threads. Query the exact
+repository and PR's `reviewThreads` connection, retaining thread `id`,
+`isResolved`, `isOutdated`, and comments' `id`, `databaseId`, URL, body, author,
+and commit identity. Follow `pageInfo` on both the thread collection and each
+nested comments collection; one page is not proof of absence. GraphQL errors
+or partial data are incomplete evidence even when the process exits zero.
 
-### Explicit review of a ready PR
+Map REST review-comment IDs to their returned GraphQL node IDs and actual
+thread membership. Never derive a node ID from a number. Default to unresolved,
+current threads; include resolved/outdated history when needed to reconcile a
+specific operation or when requested. Return actionable findings with links;
+do not implement fixes as part of this skill.
 
-When the caller requires an explicit review, verify the PR is ready and create
-one typed request for its current full SHA, including the first review when
-automatic review is disabled. After fixes are committed, validated, and pushed,
-request a new review for the changed HEAD. Resume an existing cycle using its
-receipt rather than posting another request. This skill owns the only accepted request
-grammar and returns the complete provider identity receipt:
+## Request or resume Codex review
+
+Read [states.md](states.md) for the record shared with callers. Verify the ready
+PR and expected full HEAD. A draft is deferred to the caller; this skill does
+not mark it ready. Inspect existing requests and reviews before posting.
+Reuse a correlated current-target terminal result or resume a pending cycle;
+missing local records do not prove that no request was sent.
+
+For an authorized new explicit cycle, place `@codex review` in a UTF-8 body file.
+Record the expected HEAD and creation time locally; the mention is a request to
+review the PR, not an API guarantee that execution is pinned to a commit.
+Recheck HEAD immediately before posting, then use:
 
 ```bash
-<skill-root>/scripts/reviews --json request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file>
+gh pr comment <number> --repo <owner/repo> --body-file <request-body-file>
 ```
 
-The generated body is exactly `@codex review <full-40-sha>` followed by the
-versioned request marker and request fingerprint. Callers cannot provide or
-assemble request text. The operation reuses only one exact matching comment;
-plain, markerless, malformed, conflicting, or duplicate requests fail closed.
+Capture and read back the exact returned comment, its author and creation time,
+and recheck PR HEAD. Keep these facts and the original deadline in the review
+record. Do not add private markers or require fingerprints. When explicitly
+asked for a fresh same-HEAD review, record the new cycle separately; otherwise
+reuse the existing one. Overlapping requests that cannot be distinguished are
+ambiguous, not permission to select whichever result is convenient.
 
-In the current review contract, `prepare` and `validate` remain read-only
-packet creation and inspection surfaces. Provider mutations require the exact
-review reservation; this skill owns its atomic one-use consumption and recovery
-state and has no runtime dependency on an orchestrator skill or its ledger.
-After the one-use marker is consumed, a replay performs one read-only lookup:
-only one exact marker/target/body/thread/actor artifact may return a recovered
-receipt. Missing or ambiguous evidence returns the owner-recovery disposition
-from `states.md` and never posts or resolves again.
+After an uncertain request, paginate PR comments and reconcile exact body,
+author, target, and attempt time. Recover only a unique matching artifact.
+If there is no unique proof, report unconfirmed and stop without reposting.
+For old typed receipts or markers, reconcile their referenced GitHub objects;
+do not replay their stored operations or require the retired CLI.
 
-Use the returned receipt for the one-shot read or bounded wait:
+## Check, wait, and terminal evidence
 
-```bash
-<skill-root>/scripts/reviews --json check --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
-<skill-root>/scripts/reviews --json wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
-```
+`check` reads once; `wait` polls until terminal evidence, caller stop, an access
+failure, HEAD drift, or the original deadline. Use the caller's remaining time;
+when none is supplied, establish one 30-minute deadline. Poll with bounded
+backoff, respecting rate limits and keeping individual waits at most 60 seconds.
+Report meaningful changes rather than each unchanged observation. Resume keeps
+the same deadline. At timeout return pending and the record, without requesting
+again or launching background monitoring.
 
-For composition, `<caller-owned-duration>` is the remaining time derived from
-the caller's deadline. This skill does not select, extend, or segment that bound.
+Verify provider author identity from GitHub's account/app metadata, not display
+names or text claiming to be Codex. Correlate formal reviews by `commit_id`,
+author, submission time after the selected request, and associated comments.
+Read the complete review before classifying its verdict; a `COMMENTED` state
+alone does not mean clean. Current-head findings may have no inline comments.
 
-`check` reads once. `wait` requires the complete persisted receipt and polls
-with bounded backoff until it sees `clean` or `findings`, detects a typed
-terminal state or binding failure, or reaches its timeout. The
-current provider adapter is `codex`; provider-specific bot identities,
-acknowledgements, formal reviews, inline findings, authenticated top-level
-terminal comments, clean reactions, and current-head matching belong to the
-CLI rather than this workflow. A terminal comment counts only when it follows
-the matching request, names the expected reviewed commit, and comes from the
-authenticated provider identity. Conflicting terminal outcomes or overlapping
-requests for the same head that prevent safe result correlation return an API
-error rather than an arbitrary result.
+Provider-authored terminal comments must identify the reviewed commit and match
+the selected cycle. Reactions require the exact provider actor and timestamp:
+👀 is acknowledgment only. A provider 👍 can count as clean only when its target
+and timing uniquely associate it with this cycle, the expected HEAD remained
+stable, and no conflicting evidence exists. A bare PR reaction with no provable
+cycle/commit association is insufficient. Missing comments, zero unresolved
+threads, and silence are never clean evidence. Preserve uncertainty when GitHub
+does not expose enough information to prove correlation.
 
-The returned `observation_fingerprint` covers normalized review and request
-evidence but excludes attempts and elapsed time. A caller may persist the
-first observation and later transitions, but must not rewrite control state or
-emit progress for an unchanged fingerprint. Use one bounded `wait`; do not
-build a manual `check` plus shell-sleep loop around it.
+For `ready-check` or `ready-wait`, observe an already-established automatic
+review trigger and its HEAD/time instead of a posted request. Never change draft
+state or post a request on that route. Missing trigger evidence is a correlation
+gap. `terminal-evidence` rechecks the selected cycle's result without writing.
+`review-pr` requires an explicit cycle; automatic evidence does not replace it.
 
-Repeat the fix, push, fresh typed request, and wait cycle within the caller's
-repair budget and acceptance policy; return unresolved findings when it is
-exhausted. A timed-out
-wait returns exit code `124`, the last observed state, attempt count,
-transition count, and unchanged-attempt count; a calling orchestrator decides
-whether to schedule a later heartbeat.
+## Replies, resolution, and other writes
 
-## List Review Context
+Before writing, verify the exact object belongs to the selected PR, recheck HEAD,
+and confirm the action and text are authorized. Put the complete payload in a
+JSON file using a serializer, then use `gh api --input`; do not embed free-form
+text in arguments. These endpoints are distinct:
 
-Resolve `<skill-root>` as the absolute path of the directory containing the owning
-`SKILL.md` before using these commands.
+| Action | Request |
+| --- | --- |
+| Reply to an inline review comment | POST `repos/<owner>/<repo>/pulls/<number>/comments/<root-comment-id>/replies` with `body` |
+| Post PR discussion | POST `repos/<owner>/<repo>/issues/<number>/comments` with `body` |
+| Edit a conversation comment | PATCH `repos/<owner>/<repo>/issues/comments/<comment-id>` with `body` |
+| Edit a review comment | PATCH `repos/<owner>/<repo>/pulls/comments/<comment-id>` with `body` |
+| Submit a formal review | POST `repos/<owner>/<repo>/pulls/<number>/reviews` with `commit_id`, `event`, and `body` |
 
-```bash
-<skill-root>/scripts/reviews --json address --repo <owner/repo> --pr <number>
-<skill-root>/scripts/reviews --json address --repo <owner/repo> --pr <number>
-```
+For inline replies, find the thread's root comment; GitHub does not support
+replying to an existing reply through that endpoint. Never substitute a PR-level
+comment. Formal review events are GitHub-owned values `APPROVE`,
+`REQUEST_CHANGES`, and `COMMENT`; select only the authorized event and exact HEAD.
 
-By default, resolved or outdated review threads are omitted. Add
-`--include-resolved` only when the user asks for full history.
-JSON thread-comment entries include the current full `head_sha` and canonical
-`thread_fingerprint`; pass those typed values to `reviews prepare` for a reply
-or resolution reservation instead of reimplementing the thread hash.
+Resolve a thread only when the caller authorizes resolution and supplies the
+accepted disposition/evidence. For a claimed fix, verify the published commit
+and validation evidence and post/read back an authorized evidence reply first.
+For an explicitly accepted no-change disposition, state that rationale; do not
+invent a fix. Locate the unique thread using returned node IDs and comment
+membership, then use GitHub's `resolveReviewThread` GraphQL mutation with the
+returned thread ID through a JSON request file. Never guess IDs. Read that same
+thread afterward to verify `isResolved`; an already-resolved thread needs no
+write. Check all GraphQL errors as well as returned data.
 
-## Reply To One Review Comment
+After any write, independently read the exact object, compare body, actor,
+target, and review event where relevant, and recheck HEAD. Report successful
+remote effects separately from subsequent HEAD drift. Before retrying a failed
+reply or review submission, inspect exact-target history for an already-applied
+write. Retry only proven missing work; if attribution or nonapplication remains
+uncertain, stop with object links and the uncertainty. Do not undo uncertain
+writes or create replacement comments.
 
-First inspect the current-head result. `review.finding_comment_ids` is the
-addressable inline subset and its length equals `review.findings`; a terminal
-`findings` verdict may legitimately have zero addressable inline findings.
-Reply to exactly one listed REST review-comment id and bind the reply to the
-current full head:
+## Attachments
 
-```bash
-<skill-root>/scripts/reviews --json snapshot
-<skill-root>/scripts/reviews --json reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
-<skill-root>/scripts/reviews --json reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
-```
+For authorized standalone discussion attachments, check native `gh pr comment
+--help` for `--attach` support. Keep body and alt text file-backed and pass only
+caller-selected files. Missing support does not authorize an upgrade or custom
+upload implementation. Use GitHub's current attachment documentation for limits
+and local-file Markdown syntax. Read back the exact comment and media URLs after
+the attempt, including a nonzero exit, and reconcile partial uploads before
+retrying. A discussion attachment is not an inline reply or formal review.
 
-Write reply text to an absolute UTF-8 regular non-symlink file outside the
-repository. The command rejects inline text. Remove temporary message files
-after provider identity, target, body fingerprint, and worktree proof are
-verified.
+## Provider references
 
-Use `--dry-run` unless the user already approved posting or a calling workflow
-supplies `mutation_mode=apply`, the exact PR and comment id, reply body, and
-`review_operation=reply`.
+Consult these when endpoint fields or provider behavior are uncertain:
 
-The successful result contains a typed reply receipt binding repository, PR,
-finding head, reply head, exact finding and reply REST and GraphQL node ids,
-thread id, author, URLs, timestamps, and body and identity fingerprints.
-The helper re-reads the PR head after the reply proof and emits no reusable
-receipt if that post-write head cannot be proven unchanged. Persist a returned
-receipt unchanged.
-
-## Resolve One Actionable Finding
-
-Resolve only after the requested fix and evidence reply are complete:
-
-```bash
-<skill-root>/scripts/reviews --json resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
-<skill-root>/scripts/reviews --json resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
-```
-
-The resolver validates the complete receipt, re-reads the exact REST finding
-and reply, paginates every GraphQL review-thread and comment page, and requires
-one unique thread containing both exact node ids in the exact repository and
-PR. After every mutation attempt it performs one independent exact-thread
-read-back and checks the current head. A proven success reports
-`mutation_attempted=true` and `mutation_may_have_applied=false`; an uncertain
-post-attempt failure reports both as true. `already-resolved`
-is idempotent only after all the same proof succeeds and makes no claim about
-who resolved the thread.
-
-If the mutation may have applied but exact read-back or head proof is
-uncertain, the typed error includes `mutation_may_have_applied=true`. Do not
-retry, undo, or fall back to raw GraphQL. V1 does not resolve no-change
-dispositions.
-
-## Edit Comments Or Submit Reviews
-
-```bash
-<skill-root>/scripts/reviews --json edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
-<skill-root>/scripts/reviews --json submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
-```
-
-Each command verifies the existing target before writing and the returned
-provider object afterward. On an ambiguous write it performs one exact-target
-read-back and fails closed; do not retry it blindly.
-
-## Post Top-Level PR Discussion Comments
-
-Use the helper for normal PR discussion comments. For standalone media comments
-that do not require typed review receipts, use the direct attachment path below.
-The separate typed review-request operation owns request composition, head
-binding, identity, acknowledgment, and waiting.
-
-```bash
-<skill-root>/scripts/reviews --json comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
-<skill-root>/scripts/reviews --json comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
-```
-
-Use `--dry-run` unless the user explicitly asked to post the discussion comment
-or a calling workflow supplies `mutation_mode=apply`, the exact PR, the comment
-body, and `review_operation=comment` for another discussion comment. Use the
-typed `reviews request` operation for automated-review requests. Caller-specific
-authorization and phase fields must be normalized before this boundary.
-
-## Direct Commands
-
-Use direct `gh` only for a genuinely file-backed operation. If no safe
-file-backed operation exists, fail closed and report the unavailable operation.
-
-```bash
-gh pr comment <number> --repo <owner/repo> --body-file <message-file>
-gh pr view <number> --repo <owner/repo> --comments
-```
-
-There is no direct legacy fallback for typed review requests or typed thread
-resolution; use `scripts/reviews` so receipts and exact-head bindings are
-preserved.
-
-### Attachments In Standalone Discussion Comments
-
-For an explicitly authorized top-level PR comment with caller-selected images
-or videos, check `gh pr comment --help` for native `--attach` support. Missing
-support is a capability gap, not permission to upgrade `gh`, install an
-extension, or reproduce the upload endpoint. Check repository push access and
-current media limits in
-[GitHub's attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
-
-```bash
-gh pr comment <number> --repo <owner/repo> \
- --body-file <absolute-message-file> --attach <absolute-image-file>
-```
-
-Keep text and alt text in the body file. Use `![Alt text](<absolute-image-file>)`
-or a standalone `![](<absolute-video-file>)` paragraph, passing the same media
-path to `--attach`; `gh` rewrites local references and appends other attached
-files. Repeat the flag for up to 50 distinct authorized files. Dry runs only
-preview the body and command, without uploads or comment creation.
-
-Capture the returned comment URL and independently read that exact comment
-back to verify its text and stable media URLs, including after a nonzero exit.
-Reconcile partial or uncertain writes before retrying; never repost blindly.
-Verify rendering when available and do not retain signed private delivery URLs.
-
-This path creates an ordinary conversation comment, not a typed review receipt.
-If a caller requires reservations or typed receipts, report attachments as
-unsupported by that helper rather than bypassing its contract. `gh pr comment`
-does not reply to an inline review thread or submit a formal review; do not
-substitute it for those operations or use `--edit-last` for an exact-ID edit.
+- [Review comments and replies](https://docs.github.com/en/rest/pulls/comments)
+- [Formal reviews](https://docs.github.com/en/rest/pulls/reviews)
+- [GraphQL pull requests and thread resolution](https://docs.github.com/en/graphql/reference/pulls)
+- [Codex GitHub review](https://learn.chatgpt.com/docs/third-party/github)
+- [Native attachments](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli)

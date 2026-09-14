@@ -5,91 +5,49 @@ description: "Inspect PR review feedback or request, wait for, reply to, and res
 
 # GitHub Review Threads
 
-Before remote `git`, `gh`, registry, or skill helper commands that contact the
-network, use the runtime's narrowest network-enabled context for that command
-family. Keep local-only git sandboxed. Verify `gh` is runnable (`command -v gh`,
-`gh --version`) and authentication with:
+Manage hosted review operations for one exact repository and PR using
+GitHub CLI directly. This skill ships no CLI. The caller owns code changes,
+local testing, publication, and acceptance of findings. For a one-shot hosted
+Codex review request and result, prefer `$review-pr`, which composes this skill.
 
-```sh
-gh auth status --active --hostname github.com --json hosts \
-  --jq '.hosts["github.com"] | map(select(.active == true) | {state, scopes})'
-```
+## Scope and authorization
 
-Require exactly one active account with `state=success`. Treat
-restricted-environment network failures as inconclusive. Do not install or
-refresh `gh` without explicit authorization. Network permission is not
-mutation authority.
+Resolve the repository, PR, current full HEAD SHA, and requested operation.
+Read-only inspection never authorizes posting, requesting a review, changing
+review state, or resolving threads. An explicit request for one of those actions
+authorizes that action within its stated scope; retain caller authorization
+without another confirmation. Preview requests prepare text and targets only.
 
-## Role
+For composed calls, retain `review_operation` (`inspect`, `check`, `wait`,
+`ready-check`, `ready-wait`, `terminal-evidence`, `request`, `comment`,
+`edit-comment`, `submit-review`, `reply`, or `resolve`). Write-shaped operations
+use `mutation_mode=apply` when authorized and `dry-run` otherwise; omit it for
+pure reads. These are caller inputs, not saved configuration.
 
-Own provider review operations for one pull request: inspect threads, request
-or wait for reviews, reply, edit comments, submit reviews, and resolve threads
-with explicit authority. The caller owns implementing code fixes, local
-validation, and acceptance. This skill may require and verify caller-supplied
-receipts, fingerprints, and worktree evidence before provider mutations; it
-does not implement repository code changes.
+Use authenticated `gh` in an execution context with the required network access.
+Check its availability and active account before hosted operations. Do not
+install, upgrade, or change credentials incidentally. Report unavailable access
+without treating it as evidence about the PR.
 
-For a one-shot hosted Codex review obtain-and-report path, prefer
-`$review-pr`, which composes the request/wait operations from this skill.
-Use this skill directly for inspect, reply, resolve, ready-check/wait, and
-other provider review operations.
+## Execution
 
-Load [references/states.md](references/states.md) before classifying feedback,
-review observations, reconciliation, or resolution results.
+Read the applicable section of [workflows.md](references/workflows.md) for
+inspection, review requests and waits, or discussion writes. Use
+[states.md](references/states.md) for review states and the resumable review
+record shared with callers.
 
-## Transport and CLI
+Keep free-form text in UTF-8 files or serialized JSON request files passed to
+`gh api --input`. Never interpolate provider text into shell commands. Inspect
+the final text before writing and read the exact provider object afterward.
 
-Resolve `<skill-root>` as the absolute path of the directory containing this
-`SKILL.md`. Use `<skill-root>/scripts/reviews` for typed review commands and
-`<skill-root>/scripts/reviews --json snapshot` for worktree fingerprints, backed by
-authenticated `gh`. Keep provider text file-backed and require exact readback.
-Never place a title, body, description, reply, or review text in argv or a
-shell string.
+Use only IDs returned by GitHub for the verified PR. A review thread, inline
+comment, conversation comment, and formal review are different objects.
+Recheck the expected PR HEAD immediately before and after mutations. Stop and
+report drift rather than applying old evidence to a new commit. If a write
+may already have applied, reconcile the exact target before any retry; an
+unconfirmed result never authorizes a duplicate write.
 
-Before an operation, read the matching section of
-[workflows.md](references/workflows.md): review inspection/waiting, thread
-listing, replies, resolution, or other authorized discussion writes. Read
-[script-summary.md](references/script-summary.md) when exact command/schema
-fields or managed `reviews operation` orchestration are needed.
-
-This skill owns immutable one-use mutation reservations and recovery. Preserve
-returned identities, fingerprints, and complete receipts; do not reconstruct
-thread hashes or substitute raw GraphQL. Preparation and validation do not
-authorize execution, and a consumed marker alone never proves provider success.
-
-## Invocation fields
-
-| Field | Allowed values | Default | Meaning |
-| --- | --- | --- | --- |
-| `review_operation` | `inspect`, `check`, `wait`, `ready-check`, `ready-wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation. `ready-check` and `ready-wait` observe the provider review caused by one typed ready transition; they never post a request. |
-| `mutation_mode` | `apply`, `dry-run` | `dry-run` | For write-shaped operations, whether to execute or preview. Omit for pure reads. |
-
-Keep the operation separate from its repository and PR reference. Callers must
-normalize authorization and phase policy before invocation; reject those
-caller-owned fields instead of interpreting them here. Mutating operations
-require `mutation_mode=apply`.
-
-## Authorization
-
-- Inspect, check, wait, ready-check, ready-wait, and terminal-evidence are
-  read-shaped; they never authorize reply, resolve, or a new review request.
-- Post replies, edit comments, submit reviews, or resolve threads only when the
-  user explicitly authorizes publication or a calling workflow supplies exact
-  PR/action authority.
-- Reply only to one returned `finding_comment_ids` entry; resolve by passing the
-  typed reply receipt unchanged. Never assemble a GraphQL thread id or
-  substitute a top-level PR comment for a thread reply.
-- Never accept review evidence from an older head. Preserve returned identities
-  and fingerprints; do not blind-retry mutations.
-
-## Workflow
-
-Open [references/workflows.md](references/workflows.md) for the matching
-`review_operation`. For a composed workflow, require the exact PR target and one
-canonical `review_operation`.
-
-## References
-
-- `references/workflows.md`: inspection, reply, resolution, and direct-command flows.
-- `references/states.md`: feedback, review, reconciliation, and resolution states.
-- `references/script-summary.md`: `scripts/reviews` command and schema contract.
+Return the PR and full observed HEAD, operation performed, exact object links,
+verified result or remaining uncertainty, and the review record when waiting
+or resuming. Review completion is not proof of CI, merge readiness, or code
+acceptance.

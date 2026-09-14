@@ -1,204 +1,54 @@
-# GitHub Review Threads State Contract
+# GitHub Review States and Records
 
-This reference is the canonical owner of feedback, request-binding, review,
-recovery, operation-result, reconciliation, and resolution states. Review
-observations and feedback dispositions are transient. Review reservation
-markers and the operation journal are persisted per-user recovery state; typed
-receipt and result files are caller-persisted artifacts. Pull-request HEAD,
-comments, reviews, threads, reactions, and resolution are external GitHub
-state. Wire schema ids such as `g-review-operation-result:v1` keep their
-historical `g-review-*` names for intentional compatibility.
+This file owns the `review_state` namespace and resumable review record.
+States are transient interpretations of external GitHub evidence. The caller
+retains the record in its existing task context or requested artifact; the skill
+creates no ledger, reservation files, or one-use markers. GitHub owns PR HEAD,
+comments, reviews, reactions, thread IDs, and resolution state.
 
-Standalone media discussion comments published with native `gh --attach` remain
-external GitHub state. Their readback supplies no typed review receipt or
-reservation evidence and cannot satisfy a managed review operation result.
+## Review record
 
-## Contents
+Retain repository and PR URL/number, expected full `head_sha`, request comment
+ID/URL, exact request text, authenticated author, request creation time,
+original deadline, and observed review IDs/URLs with their commit and author.
+An automatic cycle instead records its verified trigger identity/time and HEAD;
+it has no explicit request comment. Keep requested values distinct from provider
+readback. Record the latest observation time and `review_state` separately.
 
-- [Feedback disposition](#feedback-disposition)
-- [Request binding](#request-binding)
-- [Automated review state](#automated-review-state)
-- [Recovery disposition](#recovery-disposition)
-- [Owned operation result](#owned-operation-result)
-- [Mutation reconciliation evidence](#mutation-reconciliation-evidence)
-- [Direct request status](#direct-request-status)
-- [Direct warning-comment status](#direct-warning-comment-status)
-- [Direct reply status](#direct-reply-status)
-- [Direct edit-comment status](#direct-edit-comment-status)
-- [Direct submit-review status](#direct-submit-review-status)
-- [Resolution status](#resolution-status)
+For `review-pr`, preserve the original 30-minute deadline. An old typed receipt
+may supply historical IDs, times, and HEAD, but every external fact must be
+reconciled with GitHub. Do not fabricate missing fields or treat a receipt or
+consumed marker as proof of success. Missing correlation or deadline evidence
+blocks a resumed wait rather than starting a replacement cycle.
 
-## Feedback disposition
+## Review states
 
-| Value | Meaning |
+| `review_state` | Meaning |
 | --- | --- |
-| `actionable` | A current-head change or evidence response is required and belongs to the selected scope. |
-| `already-addressed` | Current code and proof already satisfy the feedback. |
-| `informational` | The comment requires no code or provider-state change. |
-| `obsolete` | The comment no longer applies to the current head or current contract. |
-| `needs-user-decision` | Competing valid outcomes require caller-owned product or scope direction. |
+| `not-requested` | No verified request or automatic trigger is established. |
+| `pending` | A verified cycle has no terminal result; acknowledgment alone stays pending. |
+| `clean` | Correlated terminal provider evidence reports no findings for the expected HEAD. |
+| `findings` | Correlated terminal review evidence reports findings for the expected HEAD. |
+| `stale` | The PR HEAD changed or the selected result belongs to another commit. |
+| `ambiguous` | Multiple cycles, conflicting results, or missing attribution prevent a unique conclusion. |
+| `error` | Provider failure or unavailable access prevents observing the selected cycle; report which. |
 
-## Request binding
+A verified request moves `not-requested` to `pending`. Observation can move
+`pending` to `clean`, `findings`, `stale`, `ambiguous`, or `error`. Clean and
+findings finish the selected cycle; neither authorizes another request.
+Timeout or caller stop retains `pending` and the original deadline. Later
+read-only reconciliation can discover a terminal result without extending the
+wait. Reconcile errors or ambiguity before resuming. HEAD drift requires a
+caller-selected new target; historical evidence stays bound to its old HEAD.
 
-| Value | Meaning |
-| --- | --- |
-| `absent` | No request lineage is expected or observed. |
-| `recognized` | The exact typed request receipt and provider artifact correlate. |
-| `unbound` | Provider text exists without the required typed identity binding. |
-| `invalid` | A typed marker or receipt is malformed or contradicts the target. |
-| `unknown` | The provider evidence cannot establish a binding safely. |
-| `ambiguous` | Multiple plausible or conflicting request artifacts prevent unique correlation. |
+## Feedback and mutations
 
-## Automated review state
+Classify feedback as `actionable`, `already-addressed`, `informational`,
+`obsolete`, or `needs-user-decision`, with evidence. Classification is transient
+and never authorizes resolving a thread.
 
-| Value | Meaning | Terminal | Exit |
-| --- | --- | --- | --- |
-| `not-requested` | No qualifying review request or ready-transition lineage is established. | No | `2` |
-| `acknowledged` | The provider acknowledged the exact request but has no terminal result. | No | `2` |
-| `pending` | The exact review is still in progress. | No | `2` |
-| `clean` | Terminal evidence proves no findings for the exact head and lineage. | Yes | `0` |
-| `findings` | Terminal evidence reports findings for the exact head and lineage. | Yes | `1` |
-| `stale` | The PR head drifted or provider terminal evidence names a different head. | Yes | `3` |
-| `ambiguous` | Conflicting terminal outcomes or overlapping evidence prevent safe selection. | Yes | `4` |
-| `error` | Provider-authored terminal failure evidence exists for the requested head. | Yes | `4` |
-
-An API, authentication, configuration, or correlation error uses the normal
-helper error envelope rather than inventing another review state. Exit `64` is
-invalid arguments and exit `124` is a bounded-wait timeout; the last review
-state stays in the JSON envelope.
-
-## Recovery disposition
-
-| Field | Allowed values | Meaning |
-| --- | --- | --- |
-| `recovery` | `needs-owner` | Exact read-only reconciliation could not prove one unique prior provider artifact; never retry the mutation automatically. |
-
-## Owned operation result
-
-Every `g-review-operation-result:v1` uses one closed `status` plus one outcome
-allowed for its operation.
-
-| Status | Meaning |
-| --- | --- |
-| `completed` | The operation reached an admitted terminal result. |
-| `failed` | A definite terminal failure prevents admission. |
-| `ambiguous` | Conflicting or unreadable evidence prevents a unique result. |
-| `blocked` | Required evidence is missing and owner action is required. |
-
-| Operation | Allowed outcomes |
-| --- | --- |
-| `request` | `created`, `recognized-existing` |
-| `wait` | `clean`, `findings`, `pending-at-deadline`, `request-correlation-failure`, `provider-failure` |
-| `ready-check` | `clean`, `findings`, `pending`, `stale`, `ambiguous`, `provider-failure` |
-| `ready-wait` | `clean`, `findings`, `pending-at-deadline`, `stale`, `ambiguous`, `provider-failure` |
-| `warning` | `posted`, `recognized-existing` |
-| `reply` | `posted`, `recognized-existing` |
-| `resolve` | `resolved`, `already-resolved` |
-| `reconcile-mutation` | `completed-from-readback`, `missing`, `conflicting`, `ambiguous` |
-| `reconcile-terminal` | `clean-verified`, `findings-verified` |
-
-The shipped validator owns the exact legal status/outcome pair and must admit
-every result before caller state changes. In particular,
-`pending-at-deadline` is `completed`, request/provider failures are `failed`,
-mutation `missing` is `blocked`, mutation `conflicting`/`ambiguous` are
-`ambiguous`, and both terminal reconciliation outcomes are `completed`.
-
-## Mutation reconciliation evidence
-
-| Field | Allowed values | Meaning |
-| --- | --- | --- |
-| `marker_state` | `absent`, `exact`, `conflicting` | Whether the one-use journal marker is missing, uniquely matches, or conflicts. |
-| `provider_artifact_state` | `missing`, `unique`, `conflicting`, `ambiguous`, `unreadable` | Result of the one bounded exact provider readback. |
-
-Legal reconciliation outcomes are:
-
-| Outcome | Evidence pair |
-| --- | --- |
-| `completed-from-readback` | `exact` marker plus `unique` provider artifact |
-| `missing` | `absent` or `exact` marker plus `missing` provider artifact |
-| `conflicting` | `conflicting` marker plus `missing` artifact, or `exact` marker plus `conflicting` artifact |
-| `ambiguous` | `exact` marker plus `ambiguous` or `unreadable` artifact |
-
-A marker alone never proves provider success. Only `unique` provider evidence
-may carry a recovered typed result.
-
-## Direct request status
-
-The direct `reviews request` command uses these result statuses:
-
-| Value | Meaning |
-| --- | --- |
-| `dry-run` | Exact request, target, and reservation proof succeeded without a provider mutation. |
-| `reused` | One existing exact request owned by the authenticated actor was proven and reused without mutation. |
-| `posted` | The authorized request was posted and the provider response plus exact readback proved it. |
-| `recovered` | A consumed or ambiguous prior request attempt was proven successful by exact readback without retry. |
-
-Only `reused`, `posted`, and `recovered` carry a complete persistable request
-receipt. These direct statuses project to the managed `request` outcomes
-`recognized-existing` or `created`; they are not those outcomes themselves.
-
-## Direct warning-comment status
-
-The direct timeout-warning `reviews comment` command uses these statuses:
-
-| Value | Meaning |
-| --- | --- |
-| `dry-run` | Exact input, target, and reservation proof succeeded without a provider mutation. |
-| `posted` | The authorized warning comment was posted and exact readback proved it. |
-| `recovered` | A consumed or ambiguous prior warning attempt was proven successful by exact readback without retry. |
-
-These direct statuses project to the managed `warning` outcomes `posted` or
-`recognized-existing`.
-
-## Direct reply status
-
-The direct `reviews reply` command uses these statuses. Only `replied` and
-`recovered` appear in a persisted `g-review-thread-reply:v1` receipt.
-
-| Value | Meaning | Receipt emitted |
-| --- | --- | --- |
-| `dry-run` | Exact input and target proof succeeded without a provider mutation. | No |
-| `replied` | The authorized reply mutation completed and exact readback proved the new reply. | Yes |
-| `recovered` | A consumed prior reply attempt was proven successful by exact readback without retry. | Yes |
-
-These direct-command statuses are distinct from the managed operation's
-canonical `reply` outcomes `posted` and `recognized-existing`.
-
-## Direct edit-comment status
-
-The direct `reviews edit-comment` command uses these statuses:
-
-| Value | Meaning |
-| --- | --- |
-| `dry-run` | Exact target and replacement-text proof succeeded without a provider mutation. |
-| `reused` | The existing comment already had the exact requested body; no mutation was needed. |
-| `edited` | The authorized edit was applied and exact readback proved the result. |
-| `recovered` | An ambiguous edit response was proven successful by one exact readback without retry. |
-
-## Direct submit-review status
-
-The direct `reviews submit-review` command uses these statuses:
-
-| Value | Meaning |
-| --- | --- |
-| `dry-run` | Exact target, event, and body proof succeeded without a provider mutation. |
-| `submitted` | The authorized review was submitted and exact readback proved its event, head, actor, and body. |
-| `recovered` | An ambiguous submission response was proven successful by one exact readback without retry. |
-
-## Resolution status
-
-| Value | Meaning |
-| --- | --- |
-| `dry-run` | Dry-run proof succeeded; no mutation was attempted. |
-| `resolved` | The mutation was attempted and exact readback proves resolution. |
-| `recovered` | A consumed prior attempt was proven successful by exact readback without retry. |
-| `already-resolved` | The thread was already resolved and the full exact-target proof succeeded; no authorship claim is made. |
-
-`resolved` sets `mutation_attempted=true` and
-`mutation_may_have_applied=false`. `recovered` also sets
-`mutation_attempted=true`; it sets `mutation_may_have_applied=false` when the
-current invocation's ambiguous write is proven by exact readback, and `true`
-when a previously consumed reservation is reconciled without retry because the
-prior attempt may have applied. `dry-run` and `already-resolved` set both flags
-to false. An uncertain post-attempt failure reports
-`mutation_may_have_applied=true` in error details and forbids retry.
+Report each mutation as verified, already satisfied without a write, previewed,
+or unconfirmed, with its exact target and readback. An uncertain request or reply
+requires read-only reconciliation; stop if success or nonapplication cannot be
+established. Already-resolved threads do not prove who resolved them. A clean
+review does not imply every thread should be resolved.
