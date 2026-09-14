@@ -5,101 +5,50 @@ description: "Create local Git commits or push them when requested. Use $yeet fo
 
 # Git Commit
 
-Before remote `git` commands that contact the network, use the runtime's
-narrowest network-enabled context for that command family. Keep local-only
-git sandboxed. Network permission is not mutation authority.
+Use direct Git commands. A commit request is local-only; push only when
+requested. A push-only request never stages files or creates commits. Use
+`$yeet` for PR publication. Reuse established scope and authorization.
 
-## Core Rule
+## Preserve the intended change
 
-Use direct `git` commands. Bundled helpers validate fixup targets and adapt
-noninteractive amend-fixup messages; they never stage, commit, rebase, or push.
+Inspect the branch, worktree, and pre-existing staged paths before staging.
+Review the intended diff; stage explicit paths or selected hunks, then verify
+that the staged content matches the requested commit. Split independent
+responsibilities into separate commits. Do not sweep unrelated edits into a
+commit or reset the user's index to make it convenient.
 
-Resolve the user request to
-`commit_operation=commit-only|commit-and-push|push-only`, then use the workflow below.
+For unrelated staged work, use the full-file isolation path in
+[workflows.md](references/workflows.md#unrelated-staged-work) only when the
+intended complete files are authorized. Partial-hunk or ambiguous ownership
+needs a scoped decision; leave unrelated staged content intact.
 
-## Invocation fields
+Use a concise imperative subject, with a body only when rationale or validation
+needs explanation. Complete applicable repository checks before committing.
+Verify the resulting commit and remaining worktree/index. For a requested push,
+verify the intended branch, upstream, and commit range, then the remote result.
+Report local commits and pushed state separately.
 
-| Field | Allowed values | Default | Meaning |
-| --- | --- | --- | --- |
-| `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by this skill. |
-| `commit_kind` | `regular`, `fixup`, `amend-fixup` | `regular` | Commit form for a commit-producing operation. Non-regular kinds require exact `target_commit`. |
+## Targeted commits
 
-`target_commit` is exact factual input, not an option value. Require it for
-`commit_kind=fixup|amend-fixup`, resolve it to one full commit SHA, and omit it
-for `commit_kind=regular` and `commit_operation=push-only`.
+Default to a regular commit. Select `fixup` or `amend-fixup` only when explicitly
+requested or required by repository instructions; review feedback alone does
+not select one. Before either, read
+[workflows.md](references/workflows.md#targeted-fixup-and-amend-fixup) for target
+validation and the noninteractive editor adapter. These operations create a new
+commit; never amend the target in place, autosquash, rebase, or force-push as an
+incidental part of this skill.
 
-| Input evidence | Canonical invocation |
-| --- | --- |
-| `commit`, `commit this`, or `create a commit` | `commit_operation=commit-only` |
-| `commit and push` | `commit_operation=commit-and-push` |
-| `push-only` | `commit_operation=push-only` |
-| `fixup <commit>` | `commit_operation=commit-only`, `commit_kind=fixup`, and exact `target_commit` |
-| `fixup and push <commit>` | `commit_operation=commit-and-push`, `commit_kind=fixup`, and exact `target_commit` |
-| `amend fixup <commit>` | Commit-producing operation plus `commit_kind=amend-fixup` and exact `target_commit` |
+For explicitly authorized issue closure through a regular commit, include
+closing references only for satisfied issues. Do not add them to generated
+fixup messages. Hosted issue edits belong to `$github-issues`.
 
-Escalate to broader diff review or split commits only when the worktree is
-mixed, generated files are involved, or the staged scope is still unclear.
+## Composed invocation
 
-For a commit-producing operation, resolve `commit_kind`. Default to `regular`.
-Select a fixup kind only when the user explicitly requests it or
-target-repository instructions require it; review feedback by itself never
-selects a fixup. Require an exact `target_commit`, resolve it to one ancestor
-commit, and verify that the staged refinement maps cleanly to that target.
-Because Git's generated fixup matcher uses the target subject, require that
-subject to be unique in all history reachable from `HEAD`. Stop when the target
-is missing, ambiguous, outside the current history, subject-ambiguous, or does
-not own the change. Never amend the target in place and never autosquash
-fixup commits.
+These fields let existing callers express the same operations; ordinary user
+requests do not need a structured invocation.
 
-If the user asks for a PR, draft PR, branch publication, or "yeet", use
-`$yeet` instead. `commit_operation=push-only` never creates a commit;
-`commit_operation=commit-and-push` does both operations. When the user
-explicitly authorizes direct-to-main issue closure, use issue-closing commit
-trailers such as `Closes #123` only after staging the intended paths and
-verifying the diff and only with `commit_kind=regular`; never add trailers to
-Git-generated fixup messages. Route GitHub issue comments, labels, type changes,
-follow-up issue creation, or manual closure to `$github-issues`.
-
-## Workflow
-
-For `push-only`, inspect the branch, upstream, and intended existing commit range,
-push within that authority, and verify the remote result. Skip every staging and
-commit step below; unrelated worktree or index changes are not part of that push.
-
-For a commit-producing operation:
-
-1. Inspect the worktree with `git status --short --branch`, then inspect and
-   record the pre-existing index with `git diff --staged --name-status` before
-   running any `git add` command.
-2. If unrelated changes are already staged, stop by default without resetting
-   or rewriting the user's index. Continue only after the unrelated staged work
-   is committed separately, or isolate fully reviewed intended path contents
-   with the path-limited workflow in `references/workflows.md` when that scope
-   is explicit. Do not use path-limited commit isolation for partial-hunk work.
-3. For small cohesive work, inspect only the intended files first. Expand to
-   `git diff --stat` or broader review only when the scope is mixed or unclear.
-4. For `commit_kind=fixup|amend-fixup`, resolve `target_commit` to a full SHA,
-   prove it is an ancestor of `HEAD`, inspect its subject and diff, and confirm
-   that the intended changes belong to that one logical commit.
-5. Stage only intended paths with explicit pathspecs such as
-   `git add -- <path>`.
-6. Re-check `git diff --staged` before committing, and compare its path set with
-   the recorded pre-existing staged set and the intended commit scope.
-7. For `commit_kind=regular`, write a concise imperative subject; add a body when
-   rationale or validation needs explanation. For `fixup`, let Git generate the
-   `fixup!` message. For `amend-fixup`, provide the complete replacement subject
-   and body while preserving Git's target-derived `amend!` matcher; use the
-   bundled editor adapter when execution is noninteractive.
-8. Run the command for the selected kind from `references/workflows.md`.
-9. Verify with `git status --short --branch` and
-   `git log -1 --pretty=fuller`.
-10. For `commit_operation=commit-and-push`, use `git push` or
-    `git push -u origin HEAD` and verify the remote result.
-
-## References
-
-- `references/workflows.md`: commit, split-commit, and push-only workflows.
-- `scripts/replace-amend-fixup-message`: noninteractive editor adapter that
-  preserves Git's target-derived amend-fixup matcher.
-- `scripts/validate-fixup-target`: resolve one ancestor target and reject a
-  subject that could make a later autosquash ambiguous.
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | Requested action; a plain commit request selects `commit-only`. |
+| `commit_kind` | `regular`, `fixup`, `amend-fixup` | Defaults to `regular` for commit creation; omitted for push-only. |
+| `target_commit` | Exact commit reference | Required only for targeted kinds; resolve and validate to one full ancestor SHA. |
