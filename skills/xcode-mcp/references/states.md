@@ -75,7 +75,8 @@ does not imply any authorization transition.
 
 Select the outcome after the requested checks, not at the first running status.
 If a required approval is missing, report `approval-required` even when the
-process is running. For configuration-only work where no connection is attempted,
-omit `launch_outcome` and report launch as untested. Report configuration, tool
+process is running. For status-only inspection or configuration-only work where
+no connection is attempted, omit `launch_outcome` and report observed state or
+untested launch as appropriate. Report configuration, tool
 discovery, requested project access, and observed UI state separately; none is
 inferred from a successful command or another successful check.
