@@ -74,61 +74,28 @@ fn invalid_environment_connection_does_not_fall_back_to_saved_profile() {
 }
 
 #[test]
-fn invalid_changelog_leaves_migration_files_untouched_including_dry_run() {
+fn migration_file_release_is_outside_the_runtime_surface() {
     let root = fixture();
     let migrations = root.path().join("db/migrations");
     fs::create_dir_all(&migrations).unwrap();
     let pending = migrations.join("prerelease.sql");
     let changelog = migrations.join("CHANGELOG.md");
     fs::write(&pending, "SELECT 1;\n").unwrap();
-
-    for content in ["# Invalid changelog\n", "### WIP\n### RELEASED\n"] {
-        fs::write(&changelog, content).unwrap();
-        for dry_run in [true, false] {
-            let mut command = cli(&root);
-            command.args(["migration", "release", "--timestamp", "20260907120000"]);
-            if dry_run {
-                command.arg("--dry-run");
-            }
-            let output = command.output().unwrap();
-            assert!(error_message(&output).contains("## WIP and ## RELEASED"));
-            assert_eq!(fs::read_to_string(&pending).unwrap(), "SELECT 1;\n");
-            assert_eq!(fs::read_to_string(&changelog).unwrap(), content);
-            assert!(!migrations.join("released").exists());
-        }
-    }
-}
-
-#[test]
-fn valid_release_preserves_sql_and_updates_changelog() {
-    let root = fixture();
-    let migrations = root.path().join("db/migrations");
-    fs::create_dir_all(&migrations).unwrap();
-    let pending = migrations.join("prerelease.sql");
-    let changelog = migrations.join("CHANGELOG.md");
-    fs::write(&pending, "SELECT 1;\n").unwrap();
-    let original = "## WIP\n\n### prerelease.sql\n- Example change\n\n## RELEASED\n";
-    fs::write(&changelog, original).unwrap();
-    let mut command = cli(&root);
-    command.args(["migration", "release", "--timestamp", "20260907120000"]);
-    let output = command.arg("--dry-run").output().unwrap();
-    assert!(output.status.success(), "{output:?}");
-    assert_eq!(fs::read_to_string(&pending).unwrap(), "SELECT 1;\n");
-    assert_eq!(fs::read_to_string(&changelog).unwrap(), original);
-    assert!(!migrations.join("released").exists());
+    fs::write(
+        &changelog,
+        "## WIP\n\n### prerelease.sql\n- Example\n\n## RELEASED\n",
+    )
+    .unwrap();
 
     let output = cli(&root)
         .args(["migration", "release", "--timestamp", "20260907120000"])
         .output()
         .unwrap();
-    assert!(output.status.success(), "{output:?}");
-    assert_eq!(fs::read_to_string(&pending).unwrap(), "");
+    assert!(!output.status.success(), "{output:?}");
+    assert_eq!(fs::read_to_string(&pending).unwrap(), "SELECT 1;\n");
     assert_eq!(
-        fs::read_to_string(migrations.join("released/20260907120000.sql")).unwrap(),
-        "SELECT 1;\n"
+        fs::read_to_string(&changelog).unwrap(),
+        "## WIP\n\n### prerelease.sql\n- Example\n\n## RELEASED\n"
     );
-    let updated = fs::read_to_string(&changelog).unwrap();
-    assert!(updated.contains("20260907120000.sql"));
-    assert!(updated.contains("- Example change"));
-    assert!(!updated.contains("### prerelease.sql"));
+    assert!(!migrations.join("released").exists());
 }

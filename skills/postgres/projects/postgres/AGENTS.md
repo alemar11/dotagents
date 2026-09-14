@@ -43,7 +43,7 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 ## Safe maintenance
 
 - Keep the CLI contract stable around the top-level nouns:
-  `doctor`, `profile`, `query`, `activity`, `schema`, `migration`, and `docs`.
+  `doctor`, `profile`, `query`, `activity`, `schema`, and `docs`.
 - Prefer adding behavior in Rust over reintroducing per-task shell wrappers.
 - Keep config migration one-way from legacy `postgres.toml` to canonical
   `config.toml`; do not reintroduce writes to the legacy path. Explicit schema
@@ -51,9 +51,9 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
   Postgres cache, outside the consuming repo, reject symlink traversal through
   descriptor-relative creation, and atomically write canonical config;
   ordinary reads normalize only in memory.
-- Keep the runtime surface focused on SQL, inspection, diagnostics, and
-  migration release; do not reintroduce dump, restore, export, or schema-diff
-  flows into this CLI.
+- Keep the runtime surface focused on SQL, inspection, and diagnostics; do not
+  reintroduce repository migration-file/changelog release, dump, restore,
+  export, or schema-diff flows into this CLI.
 - Rebuild the relevant `../../scripts/bin/postgres-<os>-<arch>` artifacts after
   any change that affects runtime behavior or operator-facing output, then
   verify through `../../scripts/postgres` rather than `target/` binaries.

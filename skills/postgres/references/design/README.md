@@ -12,7 +12,7 @@ Use this quick pass before a deeper schema, migration, or performance review:
 - Operational risk: migrations avoid long blocking locks, long transactions are visible, and destructive actions such as dropping indexes or partitions are explicitly confirmed.
 - Access control: roles are least-privileged, broad `PUBLIC` grants are reviewed, RLS policy columns are indexed, and application traffic does not run as a bypass role.
 - Diagnostics: slow queries, unused or invalid indexes, dead tuples, long transactions, and connection pressure have been checked before changing schema or configuration.
-- Migration validation: every schema change has a pending migration, a cheap post-change verification query, and release handling through `../workflows/migration-guardrails.md`.
+- Schema-change validation: every proposed change accounts for lock and compatibility risk and has a cheap post-change verification query through `../workflows/schema-change-guardrails.md`.
 
 ## Categories
 
@@ -28,6 +28,6 @@ Use this quick pass before a deeper schema, migration, or performance review:
 ## Usage
 Use these references when writing SQL, designing schemas, reviewing migrations, or diagnosing production performance and concurrency issues.
 
-For migration edits, read `../workflows/migration-guardrails.md`; add design
-references only for the affected concern. A migration does not require every
+For schema changes, read `../workflows/schema-change-guardrails.md`; add design
+references only for the affected concern. A change does not require every
 design checklist.

@@ -18,7 +18,6 @@ profile = "local"
 
 [tools.postgres]
 ssl_mode = "disable"
-migrations_path = "db/migrations"
 
 [tools.postgres.profiles.local]
 description = "Local development DB"
@@ -29,7 +28,6 @@ database = "app"
 user = "postgres"
 password = "postgres"
 ssl_mode = "disable"
-migrations_path = "db/migrations"
 ```
 
 ## Notes
@@ -58,6 +56,8 @@ migrations_path = "db/migrations"
 - `[meta]` is intentionally absent from this skill.
 - `pg_bin_dir`, `pg_bin_path`, and `python_bin` are not part of the canonical
   persisted schema.
+- `migrations_path` and legacy `[migrations].path` are not part of the canonical
+  persisted schema; an explicit config migration drops them.
 
 ## Migration Rules
 

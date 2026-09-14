@@ -84,8 +84,6 @@ pub struct PostgresToolConfig {
     #[serde(alias = "access")]
     pub access_mode: Option<AccessMode>,
     #[serde(default)]
-    pub migrations_path: Option<String>,
-    #[serde(default)]
     pub profiles: BTreeMap<String, ProfileConfig>,
 }
 
@@ -98,8 +96,6 @@ pub struct ProfileConfig {
     #[serde(default)]
     #[serde(alias = "access")]
     pub access_mode: Option<AccessMode>,
-    #[serde(default)]
-    pub migrations_path: Option<String>,
     #[serde(default)]
     pub host: Option<String>,
     #[serde(default)]
@@ -123,8 +119,6 @@ struct LegacySkillConfig {
     configuration: LegacyConfiguration,
     #[serde(default)]
     database: LegacyDatabaseConfig,
-    #[serde(default)]
-    migrations: Option<LegacyMigrationsConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -137,12 +131,6 @@ struct LegacyConfiguration {
     pg_bin_path: Option<String>,
     #[serde(default)]
     python_bin: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct LegacyMigrationsConfig {
-    #[serde(default)]
-    path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -167,8 +155,9 @@ struct LegacyDatabaseConfig {
     #[serde(default)]
     #[serde(alias = "access_mode")]
     access: Option<AccessMode>,
-    #[serde(default)]
-    migrations_path: Option<String>,
+    // Consume the retired scalar before flattening the remaining profile tables.
+    #[serde(default, rename = "migrations_path", skip_serializing)]
+    _migrations_path: Option<String>,
     #[serde(flatten)]
     profiles: BTreeMap<String, ProfileConfig>,
 }
@@ -242,7 +231,6 @@ pub struct ResolvedProfile {
     pub url: String,
     pub ssl_mode: SslMode,
     pub access_mode: AccessMode,
-    pub migrations_path: Option<String>,
 }
 
 #[derive(Debug)]
@@ -825,7 +813,10 @@ fn has_legacy_persisted_encoding(raw: &str) -> Result<bool> {
 }
 
 fn table_has_legacy_option_encoding(table: &toml::Table) -> bool {
-    if table.contains_key("sslmode") || table.contains_key("access") {
+    if table.contains_key("sslmode")
+        || table.contains_key("access")
+        || table.contains_key("migrations_path")
+    {
         return true;
     }
     let legacy_ssl_value = table.get("ssl_mode").is_some_and(|value| match value {
@@ -908,10 +899,6 @@ fn migrate_legacy_config(mut legacy: LegacySkillConfig) -> Result<SkillConfig> {
                 url: legacy.database.url,
                 description: legacy.database.description,
                 access_mode: legacy.database.access,
-                migrations_path: legacy
-                    .database
-                    .migrations_path
-                    .or_else(|| legacy.migrations.and_then(|migrations| migrations.path)),
                 profiles: legacy.database.profiles,
             },
         },
@@ -1038,10 +1025,6 @@ pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfi
             .access_mode
             .or(tool.access_mode)
             .unwrap_or(AccessMode::ReadWrite),
-        migrations_path: profile
-            .migrations_path
-            .clone()
-            .or_else(|| tool.migrations_path.clone()),
     })
 }
 
@@ -1213,7 +1196,6 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     let password = prompt("Password", None, true)?;
     let ssl_mode = prompt("ssl_mode (disable/require)", Some("disable"), false)?;
     let description = prompt("Description", Some(""), false)?;
-    let migrations_path = prompt("migrations_path", Some(""), false)?;
 
     let ssl_mode = parse_ssl_mode(&ssl_mode)?;
     let resolved = ResolvedProfile {
@@ -1226,11 +1208,6 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
         url: build_url(&host, port, &database, &user, &password, ssl_mode.as_str())?,
         ssl_mode,
         access_mode: AccessMode::ReadWrite,
-        migrations_path: if migrations_path.is_empty() {
-            None
-        } else {
-            Some(migrations_path.clone())
-        },
     };
 
     if save {
@@ -1239,15 +1216,11 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
         if config.tools.postgres.ssl_mode.is_none() {
             config.tools.postgres.ssl_mode = Some(SslMode::Disable);
         }
-        if config.tools.postgres.migrations_path.is_none() && !migrations_path.is_empty() {
-            config.tools.postgres.migrations_path = Some(migrations_path.clone());
-        }
         config.tools.postgres.profiles.insert(
             profile_name.clone(),
             ProfileConfig {
                 description: resolved.description.clone(),
                 access_mode: Some(resolved.access_mode),
-                migrations_path: resolved.migrations_path.clone(),
                 host: Some(host),
                 port: Some(port),
                 database: Some(database),
@@ -1298,6 +1271,7 @@ python_bin = "/usr/bin/python3"
 
 [database]
 sslmode = "require"
+migrations_path = "db/migrations"
 
 [database.local]
 description = "Local"
@@ -1325,13 +1299,11 @@ path = "db/migrations"
         );
         assert_eq!(config.defaults.profile.as_deref(), Some("local"));
         assert_eq!(
-            config.tools.postgres.migrations_path.as_deref(),
-            Some("db/migrations")
-        );
-        assert_eq!(
             config.tools.postgres.profiles["local"].ssl_mode,
             Some(SslMode::Disable)
         );
+        assert!(!written.contains("migrations_path"));
+        assert!(!written.contains("[migrations]"));
         assert!(written.contains("schema_version = \"3.0.0\""));
         assert!(written.contains("access_mode = \"read-write\""));
         assert!(written.contains("ssl_mode = \"disable\""));
@@ -1512,6 +1484,36 @@ ssl_mode = "disable"
             config.tools.postgres.profiles["local"].ssl_mode,
             Some(SslMode::Require)
         );
+    }
+
+    #[test]
+    fn explicit_migration_drops_retired_paths_from_v3_config() {
+        for section in ["tools.postgres", "tools.postgres.profiles.local"] {
+            let temp = tempdir().unwrap();
+            let path = canonical_config_path(temp.path());
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let raw = format!(
+                "schema_version = \"3.0.0\"\n[{section}]\nmigrations_path = \"db/migrations\"\n"
+            );
+            fs::write(&path, &raw).unwrap();
+            load_config(&path).unwrap();
+            assert_eq!(fs::read_to_string(&path).unwrap(), raw);
+            let result = migrate_for_test(&path, temp.path()).unwrap();
+            assert_eq!(result.migration_outcome, "migrated");
+            assert_eq!(
+                fs::read_to_string(result.backup_path.unwrap()).unwrap(),
+                raw
+            );
+            let written: toml::Value = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            let target = section.split('.').fold(&written, |value, key| &value[key]);
+            assert!(target.get("migrations_path").is_none());
+            assert_eq!(
+                migrate_for_test(&path, temp.path())
+                    .unwrap()
+                    .migration_outcome,
+                "no-change"
+            );
+        }
     }
 
     #[test]

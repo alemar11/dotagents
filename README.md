@@ -42,7 +42,7 @@ as skills.
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format Markdown bundles with the shipped CLI. |
 | `skill-cli-creator` | Create or refactor CLIs shipped inside a skill or plugin bundle. |
 | `tanstack` | Build, debug, review, or migrate TanStack integrations and package APIs. |
-| `postgres` | Inspect Postgres databases, design or run SQL, and manage migrations through the shipped Postgres CLI. |
+| `postgres` | Inspect Postgres databases, design or run SQL, and diagnose PostgreSQL through the shipped CLI. |
 | `swift-api-design` | Design, rename, or review Swift API surfaces using the bundled official API Design Guidelines. |
 | `swift-docc` | Author, review, preview, or publish Swift-DocC symbol documentation, articles, and tutorials. |
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |

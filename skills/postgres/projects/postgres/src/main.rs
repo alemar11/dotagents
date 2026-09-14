@@ -11,7 +11,6 @@ use postgres_skill_cli::db::{
     table_to_json,
 };
 use postgres_skill_cli::docs;
-use postgres_skill_cli::migration::{apply_release, build_release_plan};
 use postgres_skill_cli::output::{print_json, render_table};
 use postgres_skill_cli::tools::{self, ToolSection};
 use serde_json::{Value, json};
@@ -51,7 +50,6 @@ async fn run(cli: &Cli) -> Result<()> {
         Command::Query(command) => query(&cli, command, &skill_root).await,
         Command::Activity(command) => activity(&cli, command, &skill_root).await,
         Command::Schema(command) => schema(&cli, command, &skill_root).await,
-        Command::Migration(command) => migration(&cli, command, &skill_root).await,
         Command::Docs(command) => docs_command(&cli, command).await,
     }
 }
@@ -909,37 +907,6 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
                 json!({"roles": table_to_json(&table)}),
                 &[("Roles", table)],
             )
-        }
-    }
-}
-
-async fn migration(cli: &Cli, command: &MigrationCommand, skill_root: &Path) -> Result<()> {
-    match &command.command {
-        MigrationSubcommand::Release(args) => {
-            let ctx = runtime_context(
-                &RuntimeOptions {
-                    project_root_override: cli.project_root.clone(),
-                    profile_override: cli.profile.clone(),
-                    url_override: cli.url.clone(),
-                },
-                skill_root,
-            )?;
-            ensure_access(
-                &ctx.profile_name,
-                ctx.access_mode,
-                AccessRequirement::Write,
-                "migration release",
-            )?;
-            let plan = build_release_plan(&ctx, args)?;
-            if !plan.dry_run {
-                apply_release(&plan, &args.pending_file)?;
-            }
-            if cli.json {
-                print_json(&plan)
-            } else {
-                println!("{}", serde_json::to_string_pretty(&plan)?);
-                Ok(())
-            }
         }
     }
 }

@@ -1,7 +1,7 @@
 interface:
   display_name: "Postgres"
-  short_description: "Inspect Postgres, write SQL, and manage migrations."
+  short_description: "Inspect Postgres, write SQL, and diagnose the database."
   brand_color: "#0064a5"
   icon_small: "./assets/postgresql-small.svg"
   icon_large: "./assets/postgresql.png"
-  default_prompt: "Use $postgres to inspect the target database or prepare the requested SQL, using its configured profile and PostgreSQL version."
+  default_prompt: "Use $postgres to inspect the target database or prepare and run requested SQL, using its configured profile and PostgreSQL version."

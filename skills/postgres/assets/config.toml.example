@@ -5,7 +5,6 @@ profile = "local"
 
 [tools.postgres]
 ssl_mode = "disable"
-migrations_path = "db/migrations"
 
 [tools.postgres.profiles.local]
 project = "app"
@@ -17,4 +16,3 @@ database = "app_local"
 user = "postgres"
 password = "postgres"
 ssl_mode = "disable"
-migrations_path = "db/migrations"

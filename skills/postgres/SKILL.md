@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Inspect Postgres databases, design or run SQL, and manage migrations through the shipped Postgres CLI.
+description: Inspect Postgres databases, design or run SQL, and diagnose PostgreSQL runtime behavior through the shipped CLI.
 ---
 
 # Postgres
@@ -13,10 +13,14 @@ only when configuration and the conversation leave it ambiguous.
 
 Default remote access to read-only. Applying writes or DDL requires
 authorization for that operation and database; an explicit request can supply
-it. Preparing a requested local migration does not require another approval.
-Before an unauthorized application, prepare the SQL and relevant verification
+it. Preparing requested SQL and relevant verification does not require another
+approval. Before an unauthorized application, present the SQL and verification
 so the user can approve a concrete change. Local profile access guards do not
 replace server roles, grants, or RLS.
+
+SQL-file layout, changelog format, migration-runner selection, and release
+ordering are project- or team-level decisions. Follow the consuming repository's
+instructions; do not infer a prerelease/changelog convention from this skill.
 
 ## Routes
 
@@ -25,8 +29,7 @@ replace server roles, grants, or RLS.
   [config schema](references/runtime/config-schema.md).
 - Environment variables: [environment](references/runtime/environment.md).
 - Inspection queries and database identity: [common workflows](references/workflows/common-workflows.md).
-- Migration edits or release: [migration guardrails](references/workflows/migration-guardrails.md)
-  and [states](references/states.md).
+- Schema changes: [schema-change guardrails](references/workflows/schema-change-guardrails.md).
 - Local connection recovery: [recovery](references/workflows/local-recovery.md).
 - Schema, query, security, concurrency, or diagnostics design:
   [design map](references/design/README.md).

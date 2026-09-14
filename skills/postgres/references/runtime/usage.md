@@ -12,7 +12,7 @@ command surface in the skill package.
 - The CLI is implemented in Rust under `../projects/postgres/`.
 - Runtime operations use direct PostgreSQL connections through the Rust client.
 - The skill is intentionally scoped to connection resolution, SQL execution,
-  schema and catalog inspection, diagnostics, and migration release flow.
+  schema and catalog inspection, and PostgreSQL diagnostics.
 - Dump, restore, export, and schema-diff workflows are intentionally out of
   scope for this runtime surface.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
@@ -116,14 +116,6 @@ Search schema objects:
 ```sh
 DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
   "$POSTGRES_CLI" query find user --types table,column,view
-```
-
-Release a pending migration:
-
-```sh
-DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
-  "$POSTGRES_CLI" migration release \
-  --summary "Add agent-context prompt sections"
 ```
 
 ## JSON mode
@@ -327,25 +319,25 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
     `indexes`, and `sequences`.
   - `schema extensions` supports `--installed` and `--available`; installed
     extensions are the default when neither flag is provided.
-- `migration release`
-  - Move a pending migration file into `released/` and update `CHANGELOG.md`.
 - `docs search`
   - Search official PostgreSQL current docs.
 
 ## Scope boundary
 
 - Use this skill for SQL execution, query review, catalog inspection, and
-  migration workflow support.
+  PostgreSQL diagnostics.
 - Keep backup, restore, export, and schema-diff operations outside this skill.
+- Keep repository SQL-file layout, changelog editing, migration-runner choice,
+  and release sequencing in the consuming project or team workflow.
 - When a request mixes both concerns, answer the Postgres-analysis part here and
   call out the operator workflow separately instead of widening the CLI again.
 
 ## Scratch validation guidance
 
-Use scratch validation when you need end-to-end confidence for a pending
-migration file before touching the real target DB.
+Use scratch validation when you need end-to-end confidence for proposed SQL
+before touching the real target DB.
 
-- If the pending migration file already contains `BEGIN` or `COMMIT`, do not
+- If the SQL already contains `BEGIN` or `COMMIT`, do not
   wrap it in an outer rollback transaction.
 - Prefer a temporary clone database over wrapping the target DB in a
   rollback-only session.
@@ -358,5 +350,5 @@ migration file before touching the real target DB.
 
 - Env vars: `environment.md`
 - Config schema: `config-schema.md`
-- Migration guardrails: `../workflows/migration-guardrails.md`
+- Schema-change guardrails: `../workflows/schema-change-guardrails.md`
 - Design guidance: `../design/README.md`

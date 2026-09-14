@@ -37,8 +37,6 @@ pub enum Command {
     Activity(ActivityCommand),
     #[command(about = "Inspect schema, indexes, roles, and vacuum state")]
     Schema(SchemaCommand),
-    #[command(about = "Release pending migration files into released migrations")]
-    Migration(MigrationCommand),
     #[command(about = "Search official PostgreSQL documentation")]
     Docs(DocsCommand),
 }
@@ -346,43 +344,6 @@ pub struct ExtensionListArgs {
 
     #[arg(long, conflicts_with = "available", help = "List installed extensions")]
     pub installed: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct MigrationCommand {
-    #[command(subcommand)]
-    pub command: MigrationSubcommand,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum MigrationSubcommand {
-    #[command(about = "Move a pending migration file into released/ and update CHANGELOG.md")]
-    Release(MigrationReleaseArgs),
-}
-
-#[derive(Debug, Args, Clone)]
-pub struct MigrationReleaseArgs {
-    #[arg(long, help = "Human summary for the released migration")]
-    pub summary: Option<String>,
-
-    #[arg(
-        long,
-        default_value = "prerelease.sql",
-        help = "Pending migration filename"
-    )]
-    pub pending_file: String,
-
-    #[arg(long, help = "Override migrations directory")]
-    pub migrations_path: Option<PathBuf>,
-
-    #[arg(long, help = "Override generated release filename slug")]
-    pub slug: Option<String>,
-
-    #[arg(long, help = "Override generated timestamp")]
-    pub timestamp: Option<String>,
-
-    #[arg(long, action = ArgAction::SetTrue, help = "Print the release plan without writing files")]
-    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]
