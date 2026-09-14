@@ -39,7 +39,7 @@ as skills.
 | `github-projects` | Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. |
 | `github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
-| `github-review-threads` | Inspect review threads, address selected feedback, and explicitly reply or resolve. |
+| `github-review-threads` | Inspect hosted review feedback and perform authorized request, wait, reply, or resolve operations. |
 | `github-stacked-pr` | Manage stacked branches and dependent pull requests, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `github-stars` | Manage the authenticated user's GitHub stars and star lists. |
 | `crusty` | Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty. |

@@ -170,9 +170,10 @@ read-back and fails closed; do not retry it blindly.
 
 ## Post Top-Level PR Discussion Comments
 
-Use the helper for normal PR discussion comments. The separate typed
-review-request operation owns request composition, head binding, identity,
-acknowledgment, and waiting.
+Use the helper for normal PR discussion comments. For standalone media comments
+that do not require typed review receipts, use the direct attachment path below.
+The separate typed review-request operation owns request composition, head
+binding, identity, acknowledgment, and waiting.
 
 ```bash
 <skill-root>/scripts/reviews --json comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
@@ -198,3 +199,34 @@ gh pr view <number> --repo <owner/repo> --comments
 There is no direct legacy fallback for typed review requests or typed thread
 resolution; use `scripts/reviews` so receipts and exact-head bindings are
 preserved.
+
+### Attachments In Standalone Discussion Comments
+
+For an explicitly authorized top-level PR comment with caller-selected images
+or videos, check `gh pr comment --help` for native `--attach` support. Missing
+support is a capability gap, not permission to upgrade `gh`, install an
+extension, or reproduce the upload endpoint. Check repository push access and
+current media limits in
+[GitHub's attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
+
+```bash
+gh pr comment <number> --repo <owner/repo> \
+ --body-file <absolute-message-file> --attach <absolute-image-file>
+```
+
+Keep text and alt text in the body file. Use `![Alt text](<absolute-image-file>)`
+or a standalone `![](<absolute-video-file>)` paragraph, passing the same media
+path to `--attach`; `gh` rewrites local references and appends other attached
+files. Repeat the flag for up to 50 distinct authorized files. Dry runs only
+preview the body and command, without uploads or comment creation.
+
+Capture the returned comment URL and independently read that exact comment
+back to verify its text and stable media URLs, including after a nonzero exit.
+Reconcile partial or uncertain writes before retrying; never repost blindly.
+Verify rendering when available and do not retain signed private delivery URLs.
+
+This path creates an ordinary conversation comment, not a typed review receipt.
+If a caller requires reservations or typed receipts, report attachments as
+unsupported by that helper rather than bypassing its contract. `gh pr comment`
+does not reply to an inline review thread or submit a formal review; do not
+substitute it for those operations or use `--edit-last` for an exact-ID edit.

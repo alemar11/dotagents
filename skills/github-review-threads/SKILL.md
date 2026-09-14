@@ -1,6 +1,6 @@
 ---
 name: github-review-threads
-description: "Inspect hosted review feedback and perform provider review request, wait, reply, and resolve operations. Posting replies or resolving threads requires authorization."
+description: "Inspect PR review feedback or request, wait for, reply to, and resolve hosted reviews."
 ---
 
 # GitHub Review Threads

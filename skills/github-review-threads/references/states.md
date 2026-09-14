@@ -9,6 +9,10 @@ comments, reviews, threads, reactions, and resolution are external GitHub
 state. Wire schema ids such as `g-review-operation-result:v1` keep their
 historical `g-review-*` names for intentional compatibility.
 
+Standalone media discussion comments published with native `gh --attach` remain
+external GitHub state. Their readback supplies no typed review receipt or
+reservation evidence and cannot satisfy a managed review operation result.
+
 ## Contents
 
 - [Feedback disposition](#feedback-disposition)
