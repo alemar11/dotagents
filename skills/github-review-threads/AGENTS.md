@@ -22,8 +22,8 @@ Callers own implementing code fixes and acceptance.
 
 - `scripts/reviews` is the shipped runnable artifact (existing review verbs plus
   `snapshot`).
-- `scripts/reviews_lib/` holds the implementation. Provider-protocol modules are
-  synced copies of `projects/github-tools/src/github_provider_protocol/`.
+- `scripts/reviews_lib/` owns the implementation, including the provider-text,
+  repository, integrity, and common helper modules. Edit these sources directly.
 - Naming: `reviews_lib` uses underscores as the Python import-syntax
   compatibility exception; the public skill (`github-review-threads`) and
   command (`reviews`) stay lower-kebab.

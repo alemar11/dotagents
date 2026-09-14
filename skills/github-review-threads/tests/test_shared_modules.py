@@ -4,10 +4,10 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from github_provider_protocol.integrity import canonical_json, fingerprint, text_fingerprint
-from github_provider_protocol.repository import is_repo_reference, normalize_remote
+from reviews_lib.integrity import canonical_json, fingerprint, text_fingerprint
+from reviews_lib.repository import is_repo_reference, normalize_remote
 
 
 class RepositoryTests(unittest.TestCase):

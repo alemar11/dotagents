@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from github_provider_protocol.common import GError, run
+from reviews_lib.common import GError, run
 
 
 class CommonProcessTests(unittest.TestCase):
@@ -31,7 +31,7 @@ class CommonProcessTests(unittest.TestCase):
         self.assertEqual(raised.exception.exit_code, 127)
 
     def test_safe_diagnostic_redacts_and_bounds_provider_text(self) -> None:
-        from github_provider_protocol.common import safe_diagnostic
+        from reviews_lib.common import safe_diagnostic
 
         diagnostic = safe_diagnostic("TOKEN=secret-value " + ("x" * 2500))
         assert diagnostic is not None
