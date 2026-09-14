@@ -1,9 +1,9 @@
 # GitHub Output
 
 Read only for optional GitHub publication. The content contract is
-[specification.md](specification.md). `$github-issues` owns issue transport, safe
-file handling, provider operations, and readback; Spec owns the semantic
-projections.
+[specification.md](specification.md). Use authenticated `gh` directly; Spec owns
+the semantic projections. Pass bodies through files and API payloads through
+structured JSON input, preserving literal text without shell interpolation.
 
 ## Projection
 
@@ -39,7 +39,7 @@ integration may require a consumable candidate, and release may require deployed
 behavior. Specify the actual condition without choosing the executor's PR topology.
 
 Preserve existing native relationships. If the user explicitly asks to add or
-remove blockers, that action belongs to `$github-issues` outside the Spec workflow;
+remove blockers, use `gh` directly outside the Spec workflow;
 keep its result separate from the spec publication. Spec must not infer such a request
 from semantic prerequisites. Verify exact linked spec identities and reject
 self-dependencies or cycles in hard prerequisites without creating placeholder
@@ -48,7 +48,7 @@ issues. Issue closure remains distinct from implementation or availability evide
 ## Publish and verify
 
 Before hosted reads or writes, apply the
-[dependency check](../SKILL.md#refine-and-optionally-publish).
+[GitHub access check](../SKILL.md#refine-and-optionally-publish).
 Before each write, apply [hosted-content safety](hosted-content-safety.md)
 to the exact final content, including worker- or provider-originated content.
 

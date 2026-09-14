@@ -17,7 +17,7 @@ effect remains blocked.
 
 These are operation choices, not project configuration. The exact issue or
 repository target is caller/repository data, not another enum. Refinement may
-read an explicitly supplied hosted source through `$github-issues`; a local-only
+read an explicitly supplied hosted source through authenticated `gh`; a local-only
 source constraint still forbids hosted reads. No operation grants
 additional source access or implementation authority.
 

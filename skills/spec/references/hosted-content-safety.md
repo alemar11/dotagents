@@ -2,9 +2,8 @@
 
 Spec owns portable specification content, single-line issue titles, pre-write
 correction and bounded post-write repair. Apply these rules to each specification
-issue and maintenance changelog. `$github-issues` owns transport, mutation,
-receipts and readback. Spec computes corrections and updates the same hosted
-artifact through that skill.
+issue and maintenance changelog. Use authenticated `gh` for transport and
+readback. Spec computes corrections and updates the same hosted artifact.
 
 ## Internal records and hosted content
 
@@ -22,7 +21,7 @@ purpose. Prefer:
 - concise, relevant evidence that can be understood without the originating
   machine, task, prompt, or transcript.
 
-An absolute temporary body-file path used privately by GitHub-skill transport is
+An absolute temporary body-file path used privately by `gh` transport is
 internal operation metadata. It is allowed as an operation argument but must never
 appear inside the hosted file content.
 
@@ -56,7 +55,7 @@ removed.
 ## Single-line title projection
 
 Freeze every intended hosted title as one non-empty semantic line before
-creating a transport artifact. The artifact handed to the owning GitHub skill must
+creating a transport artifact. The artifact submitted through `gh` must
 contain exactly the title's UTF-8 bytes, with no serialization-added trailing
 carriage return or line feed. Remove only those transport-added final line
 terminators; do not silently trim other meaningful title text.
@@ -69,11 +68,11 @@ strip intentional body, comment, or review formatting.
 ## Final pre-write correction
 
 Immediately before every write, inspect the exact final title and body, comment
-or review handed to the owning GitHub skill against the projection and title
+or review submitted through `gh` against the projection and title
 rules above. Check copied content too, and ensure the evidence needed by the
 operation remains intact. Correct failures in the same rendered content and
 repeat the complete check; any later content change requires another check.
-Never hand a known local absolute path to the owning GitHub skill. Omitting
+Never submit a known local absolute path through `gh`. Omitting
 optional local evidence follows the warning rule above and does not require a
 planning question or block the enclosing workflow.
 
@@ -86,8 +85,7 @@ every create or update.
 If readback still contains a local absolute or machine-specific path:
 
 1. compute a corrected projection with the same portable-projection rules;
-2. reserve and attempt one bounded update of that same hosted artifact through
-   the owning GitHub skill;
+2. attempt one bounded update of that same hosted artifact through `gh`;
 3. read the artifact back again and verify that the local path is absent;
 4. retain the correction receipt or an explicit unresolved warning.
 

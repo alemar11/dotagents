@@ -7,4 +7,4 @@ accepted decisions aligned without adding execution progress or PR topology.
 
 For hosted-content changes, run the repository's
 `projects/spec/scripts/validate-hosted-content-safety` and inspect the exact
-publication projection. Keep GitHub transport in the `github-issues` skill.
+publication projection. Use authenticated `gh` directly for GitHub transport.

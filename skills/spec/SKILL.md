@@ -55,7 +55,7 @@ Review and correct the whole artifact before refining or publishing. Preserve
 requested outcomes and decisions, cover every criterion with credible task checks, verify dependency
 feasibility, and ensure each task works with the main spec in a fresh session.
 Same-repository issue links are ordinary references; native blocker management
-belongs to `$github-issues` on explicit request, outside Spec.
+uses `gh` directly on explicit request, outside Spec.
 
 ## Refine and optionally publish
 
@@ -63,13 +63,11 @@ Read [states.md](references/states.md) for operation selection. Load
 [GitHub output](references/github-output.md) only for publication. Refinement
 stays in the conversation and performs no durable write. Publish only after an
 explicit user request.
-Before hosted reads or writes, verify that `$github-issues` is installed and
-reachable by canonical name in the current session. A directory or unrelated
-connector alone does not establish availability. Report the missing dependency
-before the affected operation; never substitute direct provider calls. Before
-every hosted write apply [hosted-content safety](references/hosted-content-safety.md).
-Local-source refinement
-needs no GitHub skill access.
+Use authenticated `gh` directly for hosted reads and writes, verifying the
+intended host and repository before access. Report unavailable CLI access or
+authentication for the affected operation. Before every hosted write apply
+[hosted-content safety](references/hosted-content-safety.md).
+Local-source refinement needs no GitHub access.
 
 For publication, verify the complete GitHub artifact. Reconcile uncertain or
 partial publication against its existing identity before retrying; never claim
@@ -85,6 +83,5 @@ without a planning graph or journal.
 
 ## Skill Dependencies
 
-Material clarification requires installed `$grilling-session`. Hosted reads and
-publication require installed `$github-issues`. Never install or substitute
-dependencies during a run.
+Material clarification requires installed `$grilling-session`. Never install or
+substitute this dependency during a run.

@@ -81,7 +81,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   question with a recommended answer per turn and
   cannot plan workers until the scope is confirmed or the user stops
   grilling.
-- Install `spec` with its `grilling-session` and `github-issues` dependencies.
+- Install `spec` with its `grilling-session` dependency.
   Install `review-pr` with its `github-review-threads` dependency. These
   dependencies must be reachable in the current session; the invoking skills
   never install or substitute them automatically.
@@ -91,7 +91,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   review; use `$crusty` only when explicitly asked for Crusty.
 - `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
 - Spec uses installed `$grilling-session` for material clarification and
-  `$github-issues` for hosted reads and publication when saving to GitHub.
+  authenticated `gh` for hosted reads and publication when saving to GitHub.
 - `learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - `grilling-session` is read-only and explicit or parent-composed. It uses supplied
   context and relevant evidence without requiring Learn or a repository, returns

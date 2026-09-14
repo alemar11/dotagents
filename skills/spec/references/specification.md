@@ -68,7 +68,7 @@ contains the spec, acceptance criteria, ordered task index, and every detailed
 task contract. Task sections inherit the owner repository and own acceptance links and task
 prerequisites. Related specs use ordinary links; prerequisites remain in the
 body, including internal task dependencies. Spec never manages native GitHub
-blocking relationships; explicit user requests belong to `$github-issues`,
+blocking relationships; explicit user requests use `gh` directly,
 outside this contract.
 
 Spec-level prerequisites identify exact same-repository spec references, required
