@@ -1,6 +1,6 @@
 ---
 name: tanstack
-description: Build, debug, review, or migrate applications using TanStack packages.
+description: Build, debug, review, or migrate TanStack integrations and package APIs.
 ---
 
 # TanStack
@@ -8,6 +8,10 @@ description: Build, debug, review, or migrate applications using TanStack packag
 Ground recommendations in the app's installed `@tanstack/*` versions and local
 framework conventions. Verify version-sensitive APIs against installed code or
 current TanStack-owned documentation.
+
+Use product-reference workflows as decision guides for the affected concern.
+A small fix needs only relevant steps and checks; do not redesign surrounding
+state, routing, or configuration merely to follow the whole reference.
 
 Read the product reference for the affected boundary:
 

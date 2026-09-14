@@ -4,4 +4,4 @@ interface:
   icon_small: "./assets/tanstack-small.svg"
   icon_large: "./assets/tanstack.png"
   brand_color: "#0F172A"
-  default_prompt: "Use $tanstack to build, debug, or review TanStack Query, Router, Start, Form, Table, Virtual, and cross-stack data-loading patterns."
+  default_prompt: "Use $tanstack for the affected integration, following the project's installed versions and conventions."

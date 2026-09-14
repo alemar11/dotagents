@@ -2,10 +2,8 @@
 
 Use this reference when a task involves `@tanstack/react-query`, `QueryClient`, `useQuery`, `useSuspenseQuery`, `useMutation`, `queryOptions`, cache invalidation, optimistic updates, or persistence.
 
-This reference currently owns TanStack Query guidance as a local gap-filler. As of the current observed TanStack Intent registry state, TanStack does not publish a first-party Query Intent package.
-Because recent sessions mainly use the macro Query/Router/Start surfaces, keep
-this reference as the Query entrypoint and route out only when Router, Start, or
-cross-stack ownership becomes the actual problem.
+Use this reference for the affected Query behavior. Read Router, Start, or
+integration guidance only when that boundary is involved.
 
 ## What to Optimize For
 
@@ -17,8 +15,8 @@ cross-stack ownership becomes the actual problem.
 
 ## Workflow
 
-1. Identify the cache shape first.
-   Define the canonical key hierarchy before touching hooks or invalidation.
+1. Inspect the affected query keys and their inputs.
+   Change the key hierarchy only when the requested behavior requires it.
 2. Centralize query definitions.
    Prefer query key factories and `queryOptions(...)` helpers for anything reused across components, loaders, or prefetch paths.
 3. Check invalidation and mutation coupling.
