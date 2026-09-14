@@ -1,7 +1,7 @@
 interface:
   display_name: "🗂️ Learn Project Context"
-  short_description: "Save durable repository knowledge when explicitly requested."
+  short_description: "Maintain AGENTS.md and durable repository knowledge."
   brand_color: "#C2410C"
-  default_prompt: "Use $learn to remember a hard repository rule or update durable project knowledge, setting up the minimal local context first when needed."
+  default_prompt: "Use $learn to create, update, or refactor AGENTS.md, or save the requested durable repository knowledge."
 policy:
   allow_implicit_invocation: true

@@ -22,15 +22,13 @@ to write. An explicit instruction to remember, save, or preserve a specific
 durable item is direct capture authority when repository scope and destination
 are unambiguous.
 
-## Setup Prerequisite
+## Destination Prerequisites
 
-Before capturing a rule, apply [context-preflight.md](context-preflight.md). If
-the selected Git root or first-class subproject lacks its required `CONTEXT.md`
-or current canonical Project Context pointer, include the smallest setup
-bootstrap in the capture run. Under direct scoped authority, create or repair
-the root-first context chain and pointers, then capture the rule in the closest
-applicable `AGENTS.md`. Do not expand the prerequisite to full setup or create
-empty conditional surfaces.
+Apply [context-preflight.md](context-preflight.md) for the selected destination.
+For an AGENTS.md rule, read [agents-guidance.md](agents-guidance.md); no context
+bootstrap is required. For a topic, ADR, or other context-bearing destination,
+create or repair only the owning context and indexes needed to make the accepted
+knowledge discoverable. Do not expand a single capture into full setup.
 
 ## Scope Resolution
 
@@ -41,9 +39,8 @@ Determine the narrowest suitable scope before drafting:
    user explicitly approves that target;
 3. never fall back to global because a project target is missing.
 
-For a subpath, prefer the closest existing `AGENTS.md`. If an evidenced
-first-class subproject does not have one, create or propose that local target
-and its root-first context prerequisite rather than silently widening scope.
+For a subpath, prefer the closest applicable `AGENTS.md`. Create a local target
+when distinct rules need that scope, without requiring a parallel context tree.
 
 ## Destination Classification
 
@@ -62,7 +59,8 @@ candidate was mentioned; create it only after the durable target is authorized.
 
 ## Proposal And Confirmation
 
-Before writing, show:
+Prepare the following where material; show the exact proposal when approval or
+an unresolved decision is needed, otherwise apply the authorized capture:
 
 - the absolute target path and scope;
 - the existing section or a proposed new section;
@@ -86,9 +84,8 @@ After authorization:
 2. apply and verify any required minimal setup before the capture target;
 3. update only the selected surface and preserve unrelated custom text;
 4. update `CONTEXT.md` indexes, `adr/index.md`, or short AGENTS pointers when
-   required; when the destination is `AGENTS.md`, ensure each inserted learning
-   bullet ends with ` (Codex learning)` and do not add that marker to unrelated
-   prose;
+   required; keep provenance in the report unless the repository has an
+   explicit attribution convention for its instructions;
 5. read the result back and verify relative links and target existence;
 6. scan for duplicate normative wording and run `git diff --check`;
 7. report `captured`, `deferred`, or `no-durable-change` with destinations and

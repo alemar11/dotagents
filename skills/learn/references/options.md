@@ -2,8 +2,9 @@
 
 # Project Context Option Contract
 
-Load this reference before selecting a Project Context branch or composing a
-domain-context handoff. It owns the complete option registry. Request wording,
+Load this reference for structured handoffs or ambiguous branch selection;
+ordinary requests use the entrypoint's routing table. It owns the complete
+option registry. Request wording,
 write authority, confirmation, repository facts, paths, evidence, decisions,
 and result state are data, not selectable configuration.
 
@@ -18,7 +19,7 @@ and result state are data, not selectable configuration.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned context surface. |
+| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned context surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | Required only for `memory_slice=domain-memory`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for an explicitly composed handoff | Applies only to composed durable context/capture workflows. |
 
@@ -26,10 +27,10 @@ There is no persisted Project Context configuration or generic run-mode field.
 Write authority is derived from the current request or an explicit caller
 handoff and is reported as result data.
 
-The `AGENTS.md` Project Context pointer/evolution check is a derived preflight
-fact for every Learn invocation. It is not a selectable
-`memory_slice`, does not create durable configuration, and does not grant
-write authority.
+The Project Context pointer/evolution check is a derived preflight fact when
+the selected operation reads or changes that context. A standalone AGENTS.md
+rule edit does not require it. The check creates no configuration or authority;
+`agents-pointers` selects an explicit pointer-maintenance request.
 
 `durable-capture` is proposal-first unless the user explicitly asks to
 remember, save, or preserve a specific durable item and its repository scope
@@ -71,6 +72,10 @@ Do not let a caller select or override this classification.
   request; ordinary code review and general AGENTS maintenance do not select it.
 - `agents-compaction` is selected only for an explicit chain-size review or
   compaction request. Crossing a threshold alone never selects it.
+- `agents-guidance` covers general AGENTS.md creation, rule edits, review, and
+  refactoring without requiring byte measurements or Project Context setup.
+  A request to remember one specific rule remains `durable-capture` and uses
+  the same AGENTS.md writing guidance for that destination.
 - A direct `durable-capture` request cannot return `captured` without either an
   explicit save/remember/preserve instruction for an unambiguous scoped item or
   affirmative approval of the exact target and wording.

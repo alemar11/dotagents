@@ -43,6 +43,8 @@ for the rule to apply.
 
 ## Reference Routing
 
+- Read [agents-guidance.md](agents-guidance.md) for AGENTS.md authoring and
+  refactoring; this branch adds only the Code Review Rules contract.
 - Read [code-review-rules/evidence-mining.md](code-review-rules/evidence-mining.md)
   when inspecting previous sessions or other historical evidence, or when a
   repository has no `AGENTS.md` and candidates must be bootstrapped from
@@ -57,8 +59,7 @@ for the rule to apply.
 
 - Use the exact `## Code Review Rules` heading. Optional `###` headings group
   rules by a stable concern such as compatibility, privacy, or data boundaries.
-- Start with at most three new rules in one run. Prefer one strong rule over a
-  broad checklist.
+- Use the smallest consequential rule set that covers the requested scope.
 - Every rule must identify a consequential, non-obvious invariant, why a
   violation matters, and a safe path or valid exception.
 - Prefer durable outcomes, boundaries, and wire contracts over function names
@@ -99,14 +100,14 @@ When the target `AGENTS.md` exists:
 1. Read the complete applicable `## Code Review Rules` section, if present.
 2. Identify duplicates, superseded wording, conflicts, and nearby durable
    invariants that are not yet review rules.
-3. Load [evidence-mining.md](code-review-rules/evidence-mining.md) and inspect
-   bounded repository-scoped history for additional candidates.
+3. Inspect bounded history through [evidence-mining.md](code-review-rules/evidence-mining.md)
+   only when requested or when current evidence leaves a material gap.
 
 When the target does not exist:
 
 1. Load [evidence-mining.md](code-review-rules/evidence-mining.md).
-2. Derive candidates from repository evidence and bounded repository-scoped
-   history.
+2. Derive candidates from repository evidence; add bounded history only when
+   it can resolve missing evidence.
 3. Propose creating the exact target only when at least one candidate survives
    the evidence and evaluation filters, or when the user explicitly requests
    an empty scaffold after being told that it adds no review behavior.

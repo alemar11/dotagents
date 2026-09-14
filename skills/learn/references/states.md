@@ -17,8 +17,8 @@ durable, but they do not persist the workflow's current node.
 | --- | --- | --- |
 | `scope` | Action | Resolve the durable knowledge request, repository scope, and smallest applicable memory slice. |
 | `inspect` | Action | Read the applicable context surfaces and only the evidence needed for the selected operation. |
-| `draft` | Decision | Prepare the exact targets, wording, evidence, unknowns, and links for the result or proposed change. |
-| `confirm` | Decision | Determine whether the exact durable write has the required user or caller authority. |
+| `draft` | Decision | Prepare targets, wording, evidence, and links; proceed to apply when authority and material decisions are already resolved, otherwise report or confirm. |
+| `confirm` | Decision | Resolve missing write authority or a material user decision; existing authorization does not require another question. |
 | `apply` | Action | Apply only the authorized local documentation changes. |
 | `verify` | Validation | Read the changed surfaces back and validate links, indexes, preserved content, and the diff. |
 | `reported` | Terminal | Return a read-only or otherwise non-durable result. |
@@ -30,7 +30,7 @@ durable, but they do not persist the workflow's current node.
 
 | Owner | Values | Class and lifetime | Meaning |
 | --- | --- | --- | --- |
-| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Selectable run field; transient | Selects the smallest Learn-owned knowledge surface. |
+| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Selectable run field; transient | Selects the smallest Learn-owned knowledge surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | Selectable run field; transient | Selects the domain-memory operation. Non-domain slices use `not-applicable`. |
 | `capture_mode` | `inline`, `defer-to-caller` | Selectable handoff field; transient | Either perform an explicitly authorized composed capture or return the capture decision to the caller. |
 | `execution_context` | `fresh-setup`, `existing-project-bootstrap`, `current-project` | Derived run fact; transient | Distinguishes a missing root or selected subproject context, an existing surface awaiting first accepted population, and established context being read or updated. The caller cannot select it. |

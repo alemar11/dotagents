@@ -3,8 +3,9 @@
 # AGENTS.md Compaction
 
 Use this reference only for an explicit AGENTS.md chain-size review or
-compaction request. The workflow produces a proposal first and never writes
-automatically because a threshold was crossed.
+compaction request. A threshold never grants edit authority; an explicit
+refactoring request does. Apply authorized changes through verification without
+asking for approval again.
 
 ## Chain And Measurement
 
@@ -48,7 +49,7 @@ new heading. Classify each section before proposing a move:
 - never move out of `AGENTS.md`: the normative invariant, consequence, and safe
   path required by `## Code Review Rules`.
 
-Apply the [AGENTS.md editorial standard](setup-workflow.md#agentsmd-editorial-standard)
+Apply the [AGENTS.md writing guidance](agents-guidance.md)
 even below the size thresholds. Do not move text merely to lower the byte count.
 Preserve the meaning of custom rules, comments, overrides, significant ordering,
 and unrelated sections.
@@ -80,8 +81,8 @@ After an authorized compaction:
 2. verify every relative link and every indexed file;
 3. scan for duplicate normative rules across root and local `AGENTS.md`,
    `CONTEXT.md`, topic files, and ADRs;
-4. confirm the exact `## Code Review Rules` section remains in the applicable
-   `AGENTS.md`;
+4. preserve any existing `## Code Review Rules` section in its applicable
+   `AGENTS.md`; do not add one merely for compaction;
 5. run `git diff --check` and report the new byte totals;
 6. report retained rules, moved sections, unresolved unknowns, and any content
    deliberately left in place.

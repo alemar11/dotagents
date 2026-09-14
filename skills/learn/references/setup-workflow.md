@@ -44,13 +44,14 @@ Editable sections:
 - `domain-memory`
 - `durable-capture`
 - `translation-memory`
+- `agents-guidance`
 - `agents-pointers`
 - `agents-compaction`
 - `code-review-rules`
 - `done`
 
-For each selected setup section, show the current value first, then
-`keep-current` and the relevant alternatives:
+When a selected setup section needs a user decision, show the current value and
+the relevant alternatives. Otherwise apply the requested update directly:
 
 - `domain-memory`: show the current root `CONTEXT.md`, first-class subproject
   context owners, indexed topic files, scoped routes, and applicable root or
@@ -62,6 +63,8 @@ For each selected setup section, show the current value first, then
 - `agents-pointers`: create a missing canonical pointer block, refresh stale or
   over-copied evolution guidance, or remove duplicate managed pointer blocks
   while preserving unrelated instructions.
+- `agents-guidance`: create or revise the scoped instructions using
+  [agents-guidance.md](agents-guidance.md), without requiring context setup.
 - `code-review-rules`: inspect, propose, or update the exact Code Review Rules
   section in the closest applicable `AGENTS.md`.
 - `durable-capture`: show the candidate, scope, exact destination, and wording
@@ -85,26 +88,16 @@ prompt.
 ## Invocation Preflight
 
 Apply [context-preflight.md](context-preflight.md) before setup. It owns the
-shared context/pointer checks and authority boundary for every Learn branch.
+context/pointer checks for the selected context-bearing work; AGENTS.md-only
+edits use the applicable instruction chain and writing guidance.
 
-## Setup-First Durable Capture
+## Setup for Context-Bearing Capture
 
-For an explicit request to remember, save, or preserve a specific repository
-rule, inspect setup before capture. Learn is minimally ready when the selected
-Git root has root `CONTEXT.md` and the selected context-owning scope has an
-applicable canonical Project Context pointer whose target and evolution
-guidance are current. A first-class subproject rule also requires its local
-`CONTEXT.md` and local pointer.
-
-When either surface is absent or stale, treat minimal setup as a prerequisite,
-not as a separate user-selected slice or `full-setup`. Under direct scoped
-capture authority, create or repair only the minimal evidence-backed root
-context chain and canonical pointers, then write the rule to the closest
-applicable `AGENTS.md`. Do not create empty topic files, ADR trees, translation
-sidecars, or unrelated subproject contexts. If the rule, repository scope,
-destination, wording, or a conflict is materially ambiguous, draft setup and
-capture together and wait for confirmation; after approval, apply and verify
-setup before capture.
+Use [durable-capture.md](durable-capture.md) to select the destination. A standalone
+AGENTS.md rule needs only its applicable instruction chain. When the accepted
+knowledge belongs in a topic, ADR, or context file, establish the minimal owning
+context, pointer, and indexes needed for that destination. Reuse equivalent
+existing routing. Do not create empty sidecars or unrelated subproject contexts.
 
 ## Decision Defaults
 
@@ -128,16 +121,14 @@ setup before capture.
 
 ## AGENTS.md Editorial Standard
 
-When reviewing or editing `AGENTS.md`, make sure each word in the selected text
-justifies its existence. Remove filler, repetition, and generic advice; keep
-wording that changes decisions or preserves required meaning, scope, authority,
-exceptions, and verification. Judge clarity and behavior, not a word-count target.
-Apply this standard within the authorized scope; review-only requests produce
-proposed edits.
+For any AGENTS.md creation or edit, read the canonical
+[writing and maintenance guidance](agents-guidance.md). It owns rule selection,
+conditional reading, authorization, completion, and refactoring criteria.
 
 ## Draft Checklist
 
-Before writing, show only applicable items from this list:
+Use applicable items below to prepare the change. Show an exact proposal when
+a material decision or approval is missing; authorized work proceeds to edits:
 
 - current settings summary for review mode;
 - before/after summary for proposed changes;
@@ -197,7 +188,8 @@ For an explicit setup or update request:
 
 ## AGENTS.md Pointer Block
 
-Use this shape as the managed block. Include only sections whose target
+Use this shape for a new managed block; preserve equivalent existing headings
+and routing. Include only sections whose target
 surface exists, is derived at runtime, or is authorized in the selected slice;
 preserve unrelated custom prose outside the block. Omit `Localization` unless
 `TRANSLATION.md` exists or is authorized; never create a broken pointer:
@@ -207,8 +199,9 @@ preserve unrelated custom prose outside the block. Omit `Localization` unless
 
 ### Domain memory
 
-`CONTEXT.md` is the shared-context entry point. Read it first, then follow its
-`Scoped Contexts` table when relevant. When the project evolves, update only
+For shared purpose, terminology, or cross-package boundaries, start with
+`CONTEXT.md` and follow the matching scope and topic links. When authorized
+work changes that shared context, update only
 evidence-backed shared purpose, vocabulary, durable project rules, boundaries,
 known state, explicit unknowns, scope routing, and topic/ADR indexes; route
 conditional detail to indexed `project-context/` topics and accepted
@@ -228,8 +221,9 @@ resolve `<relative-root-context>` from the subproject directory:
 
 ### Domain memory
 
-Read the repository-root [`CONTEXT.md`](<relative-root-context>) first, then
-this subproject's `CONTEXT.md`. Maintain shared purpose, vocabulary, rules,
+For project context, start with the repository-root
+[`CONTEXT.md`](<relative-root-context>), then this subproject's `CONTEXT.md`.
+Maintain shared purpose, vocabulary, rules,
 boundaries, routing, and cross-project decisions at the repository root;
 maintain only subproject-specific deltas, local topics, and local ADRs here.
 Keep always-active subproject rules in this `AGENTS.md`; exclude tentative
@@ -263,7 +257,7 @@ Summarize only the applicable fields:
   updated indexes and links;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
-- `AGENTS.md` Project Context pointer owner and state, including whether the
+- `AGENTS.md` Project Context pointer owner and state when inspected, including whether the
   evolution rule was current, updated, or deferred;
 - Code Review Rules target, rule count, evaluation state, history coverage, and
   result when selected;

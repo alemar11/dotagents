@@ -1,7 +1,13 @@
 # Context Preflight
 
-Run this local preflight for every Learn invocation, before the
-selected branch. It is derived run state, not a second `memory_slice`:
+Resolve the applicable instructions for the selected target, reusing evidence
+already read. For AGENTS.md-only work (`agents-guidance`, standalone rule capture,
+Code Review Rules, or compaction without context extraction), that is sufficient
+unless the change depends on context links or ownership. Do not require
+CONTEXT.md creation or pointer normalization for such an edit.
+
+For context-bearing work, run the following relevant checks before the selected
+branch. They are derived facts, not a second `memory_slice`:
 
 1. Resolve the actual root-to-target `AGENTS.md` chain. Repository-root
    `AGENTS.md` owns the root `CONTEXT.md` pointer. Each evidenced first-class
@@ -12,10 +18,11 @@ selected branch. It is derived run state, not a second `memory_slice`:
    routes and indexes as required by the selected operation. If it does not
    exist, distinguish an authorized setup that will create it from a missing
    surface that must be reported.
-3. Inspect each applicable canonical `## Agent skills` / `### Domain memory`
-   block and classify it as `current`, `missing`, `stale`, `duplicated`, or
-   `not-applicable`. `stale` includes a missing root-first instruction, a
-   missing evolution rule, stale paths, or copied conditional detail.
+3. Inspect each applicable Project Context pointer, accepting equivalent local
+   wording without requiring canonical headings. Classify it as `current`,
+   `missing`, `stale`, `duplicated`, or `not-applicable`. `stale` includes a missing
+   root-first instruction, a missing evolution rule, stale paths, or copied
+   conditional detail.
 4. When an owning `CONTEXT.md` exists, or authorized setup will create it,
    check whether its managed pointer needs a change. For a missing, stale, or
    duplicated pointer, read the [pointer templates](setup-workflow.md#agentsmd-pointer-block)
