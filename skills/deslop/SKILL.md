@@ -5,17 +5,17 @@ description: Audit and safely remove low-value repository code. Use only when ex
 
 # Deslop
 
-Audit this repository for low-value code: redundant tests, trivial wrappers,
+Audit the requested scope for low-value code: redundant tests, trivial wrappers,
 dead abstractions, duplicate helpers, stale comments, and unnecessary ceremony.
 Verify each removal is safe, make the smallest cleanup, run focused tests and
-lint, and report what changed with evidence. Inspect every major directory
-before finishing.
+lint, and report what changed with evidence. A review-only request stays read-only.
 
 ## Coverage and judgment
 
-Inventory the repository's major directories, including source, tests, tooling,
-configuration and documentation. Inspect each one's purpose and representative
-contents, then trace cleanup candidates through their callers and dependencies.
+For a repository-wide request, inventory its major directories, including source,
+tests, tooling, configuration and documentation. For a named path or component,
+limit coverage to that scope and relevant callers. Inspect each area's purpose
+and representative contents, then trace candidates through callers and dependencies.
 Track coverage during the audit; report inaccessible or excluded areas and why.
 Generated and vendored directories need an ownership check, not manual cleanup.
 Do not claim a repository-wide audit is complete with major areas uninspected.
@@ -47,5 +47,6 @@ effect on confidence.
 
 Report changed paths, why each cleanup is safe, the checks run and their results,
 and major-directory coverage. Group related removals when they share evidence.
-Invocation authorizes local cleanup; commits and publication require user
+Ordinary invocation authorizes local cleanup unless the user limits it to review;
+commits and publication require user
 authorization. Execute in the current task without creating workers.
