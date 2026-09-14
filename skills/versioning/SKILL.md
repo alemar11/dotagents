@@ -36,7 +36,7 @@ that branch:
 | Calculate patch, minor, major, candidate, or final proposals | [Suggestion workflow](references/suggestions.md) and [suggestion states](references/states.md) |
 | Inspect or migrate stable legacy tags | [Legacy-tag migration](references/migration.md) and [suggestion states](references/states.md) |
 | Apply a confirmed tag through an existing compatible controller | [Existing release-controller dispatch](references/controller-dispatch.md) |
-| Select an existing tag for a GitHub Release | [GitHub Release tag selection](references/release-selection.md), then compose `$github-releases` |
+| Select an existing tag for a GitHub Release | [GitHub Release tag selection](references/release-selection.md); use `gh` directly for the requested release operation |
 | Create, review, or upgrade release Actions | [release workflow authoring](references/github-actions.md), including its permissions preflight |
 
 An explicit increment, candidate, final tag, or release branch selects the
@@ -82,8 +82,11 @@ Legacy tags without `v` remain read-only calculation or migration sources.
  different commit, a finalized release line, or any noncanonical result.
 7. Prefer a compatible installed approval-gated release controller and read
  [its dispatch contract](references/controller-dispatch.md) before starting
- it. When none exists, use the direct tag workflow owned by
- `$github-releases`. Verify the resulting ref and commit independently.
+ it. When none exists, create the authorized annotated tag at the exact
+ verified target SHA with direct Git, using a file-backed tag message. Push
+ only the exact tag when authorized; verify the resulting local and remote
+ ref and peeled commit independently. Do not rely on the current HEAD or
+ overwrite an existing tag.
 
 If the current branch is neither the provider's default branch nor an exact
 `release/vX.Y.Z` branch and the user supplied no clear version or migration
@@ -109,8 +112,4 @@ Report the selected version, exact tag, branch or ref, commit SHA, derived
 state, and whether the result is only a proposal or an independently verified
 mutation. Keep user intent, immediate provider receipts, and verified final
 state distinct. For GitHub Releases, also report the selected existing tag and
-comparison start before handing off to `$github-releases`.
-
-## Skill Dependencies
-
-- `$github-releases` for GitHub Release publication after tag selection.
+comparison start, then use `gh` directly for any authorized release operation.

@@ -35,7 +35,6 @@ as skills.
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `github-status` | Summarize issue and pull-request queues read-only, or inspect one PR's exact-head delivery readiness, merge policy, checks, and automation state. |
 | `github-issues` | Manage GitHub issues, native CLI media attachments, relationships, label/type classification, and taxonomy proposals. |
-| `github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
 | `github-review-threads` | Inspect hosted review feedback and perform authorized request, wait, reply, or resolve operations. |
 | `github-stacked-pr` | Manage stacked branches and dependent pull requests, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
@@ -140,7 +139,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/git-commit skills/yeet skills/github-status skills/github-issues skills/github-releases skills/versioning skills/github-review-threads skills/github-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
+Use $skill-installer to install skills from alemar11/dotagents --path skills/git-commit skills/yeet skills/github-status skills/github-issues skills/versioning skills/github-review-threads skills/github-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
 ```
 
 Install one reusable skill by passing only its path:
@@ -169,7 +168,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill yeet \
   --skill github-status \
   --skill github-issues \
-  --skill github-releases \
   --skill versioning \
   --skill github-review-threads \
   --skill github-stacked-pr \

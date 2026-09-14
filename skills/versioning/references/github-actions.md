@@ -260,9 +260,9 @@ interactive G release contract while authoring it:
 - keep creation idempotent, update no existing notes implicitly, and verify the
  resulting release identity and state.
 
-Interactive creation and improvement outside Actions remain owned by
-`$github-releases`. The reusable publisher must not become a general release
-editor or historical backfill workflow.
+Interactive release creation and improvement outside Actions use `gh` directly
+under the user's authorization. The reusable publisher must not become a
+general release editor or historical backfill workflow.
 
 The exact checkout contract is:
 

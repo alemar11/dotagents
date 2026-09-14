@@ -2,8 +2,8 @@
 
 Read this reference when the requested outcome is a GitHub Release, release
 notes, release assets, or a release-description update. This file owns only
-existing-tag and comparison-range selection; `$github-releases` owns the
-release lifecycle and mutations.
+existing-tag and comparison-range selection. Use `gh` directly for authorized
+release operations; ordinary notes or asset edits need no version calculation.
 
 Verify provider-owned tags and releases first. A release request never implies
 tag creation. If the requested tag is absent, stop and route the new tag
@@ -27,5 +27,8 @@ same-line RC for a prerelease. Verify both refs and the range. If there is no
 unambiguous predecessor, report that fact and let the user select an explicit
 existing start tag.
 
-After resolving the exact existing tag and comparison range, compose
-`$github-releases`, which remains the canonical owner of the release lifecycle.
+After resolving the exact existing tag and comparison range, use `gh` directly
+within the requested scope. Ordinary release creation defaults to a draft;
+explicit create-and-publish requests may publish immediately. Verify the release,
+tag, draft/prerelease state, and requested notes or assets after mutation;
+reconcile uncertain effects before retrying.
