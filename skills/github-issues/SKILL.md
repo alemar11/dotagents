@@ -57,8 +57,8 @@ and reconcile uncertain effects before retrying. Report exact issue URLs,
 verified changes or proposals, and unresolved evidence; do not infer success
 from a write receipt.
 
-Use `$github-status` for issue/PR queues. Ordinary code or history
-investigation needs no skill.
+Use `gh` directly for issue/PR queues. Ordinary code or history investigation
+needs no skill.
 
 ## Invocation fields
 
