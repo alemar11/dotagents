@@ -201,10 +201,10 @@ Close out by saying explicitly:
 
 ## Existing PR
 
-Read the existing PR including its body and base. For title or body edits,
-write the complete reviewed request object to an absolute JSON file and send
-it through `gh api --input`; do not use `gh pr edit` with free-form text in
-argv.
+Read the existing PR including its body and base. For title edits, or body edits
+without new attachments, write the complete reviewed request object to an
+absolute JSON file and send it through `gh api --input`; do not use
+`gh pr edit` with free-form text in argv.
 
 ```bash
 gh pr view <number> --repo <owner/repo> \
@@ -222,6 +222,40 @@ keep it draft. After the normal push updates this PR, verify its full head SHA,
 unchanged draft state, unchanged base, and complete issue linkage. If the caller
 also needs a stack relationship, invoke `$github-stacked-pr` separately after this
 publication readback.
+
+## PR Attachments
+
+For caller-selected images or videos, verify `gh pr edit --help` exposes
+`--attach` before publication. Use native `gh` uploads; do not install an
+extension or use a custom upload endpoint. Missing support blocks the attachment
+step and does not authorize upgrading `gh`. Check repository push access and
+current media type and size limits in
+[GitHub's attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
+
+Although `gh pr create` supports `--attach`, retain `publish open` for new PRs
+so title/body transport and exact-head verification remain intact. Create with
+prose that omits unpublished local media references, then attach to the verified
+PR. For existing PRs, retain the same head, base, and draft-state checks.
+
+```bash
+gh pr edit <number> --repo <owner/repo> --attach <absolute-image-file>
+gh pr edit <number> --repo <owner/repo> \
+ --body-file <absolute-complete-body-file> --attach <absolute-image-file>
+```
+
+Choose append-only or complete-body replacement as requested. In a replacement
+file, use `![Alt text](<absolute-image-file>)`, or a standalone
+`![](<absolute-video-file>)` paragraph for a video, with the same path supplied
+to `--attach`. `gh` rewrites local references and appends unreferenced files.
+Repeat the flag for distinct files, up to 50. Keep alt text in the body file.
+
+Upload only authorized files in apply mode. A dry run prepares the final body
+and command without executing it. After the edit, including a nonzero exit,
+read the exact PR back and verify media URLs, preserved text and closing refs,
+full head SHA, base, and draft state. Check rendering when available and retain
+stable Markdown URLs rather than private signed delivery URLs. Report partial
+uploads separately from PR publication; reconcile before retrying only proven
+missing work, never recreate the PR. Attachment work finishes before closeout.
 
 ## Safe Retry
 

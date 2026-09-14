@@ -33,6 +33,10 @@ Resolve `<skill-root>` as the absolute path of the directory containing this
 shell strings and argv. Worktree fingerprints use
 `<skill-root>/scripts/publish --json snapshot`.
 
+For caller-selected images or videos, read the attachment section in
+[workflows.md](references/workflows.md#pr-attachments). Use native
+`gh pr edit --attach` after the PR identity is verified.
+
 For issue-only work or no publishable changes, use the relevant owning skill
 instead of running publication. Single-PR publication does not imply stack
 management. Yeet does not infer, verify, link, or manage a stack; a caller that
