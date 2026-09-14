@@ -6,9 +6,9 @@ workflows. Keep the executable publish contract in `SKILL.md` and
 
 ## Ownership boundaries
 
-- Delegate local staging and commit authoring to `$git-commit`, issue lifecycle
-  to `$github-issues`, and review follow-up to `$github-review-threads`. Do not
-  duplicate those transports here.
+- Delegate local staging and commit authoring to `$git-commit` and review
+  follow-up to `$github-review-threads`. Use authenticated `gh` directly for
+  explicitly requested issue lifecycle operations.
 - `scripts/publish` owns structured local preflight, snapshot, and PR creation;
   file-backed authenticated `gh` operations own existing-PR lifecycle changes.
 - `$github-stacked-pr` owns the explicit two-PR stack relationship; Yeet publishes

@@ -186,11 +186,10 @@ gh issue list --state open --limit 50 --json number,title,state,url
 ```
 
 If there are no relevant local changes to stage, do not create an empty commit,
-branch, push, or PR. Route issue creation, comments, labels, type changes,
-relationships, or closure to `$github-issues` with
-`mutation_mode=apply`, the exact repository and issue target, and one matching
-`issue_operation` per write. Then verify the result with
-`$github-issues` or direct read-only `gh issue view` / `gh issue list`.
+branch, push, or PR. Perform explicitly requested issue operations with `gh`
+against the exact repository and issue target. Use file-backed bodies or
+structured JSON input for text. Read back the affected issue to verify the
+result; reconcile ambiguous writes before retrying.
 
 Close out by saying explicitly:
 
