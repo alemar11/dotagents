@@ -12,7 +12,7 @@ not a runtime dependency and must not be imported by skill scripts.
   markers (`skills/` plus this project), not by `Path.parents[N]` depth, then
   copies those files into `skills/yeet/scripts/publish_lib/` and
   `skills/github-review-threads/scripts/reviews_lib/`.
-- Runtime skills must use their local copies only. Stack, stars, and attachment
+- Runtime skills must use their local copies only. Stack and stars
   keep narrow local helpers and do not consume this protocol package.
 
 ## Naming

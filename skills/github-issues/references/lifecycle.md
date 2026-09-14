@@ -6,21 +6,16 @@ Read for exact issue operations and before applying selected classification.
 
 Use authenticated `gh` for every provider read and write. Use high-level `gh`
 commands when every free-form provider field is file-backed; otherwise use a
-reviewed JSON request through `gh api --input`. Use the shipped attachment
-uploader for binary uploads. Before the first provider operation, complete the skill host and authentication checks.
-
-Resolve `<skill-root>` as the absolute path of the directory containing the owning
-`SKILL.md`. For every attachment upload, use only:
-
-```bash
-<skill-root>/scripts/attachment-upload --repo <owner/repo> --file <absolute-file>
-```
+reviewed JSON request through `gh api --input`. For images and videos, use
+native `gh --attach` with the patterns in [workflows.md](workflows.md#attachments).
+Before the first provider operation, complete the skill host and authentication
+checks.
 
 ## Core Rules
 
 - Use authenticated `gh` directly or through file-backed `gh api --input`
- requests. Use the `attachment-upload` helper as the only attachment
- transport; never reproduce its token or HTTP logic.
+ requests. Let native `--attach` own media uploads and URL insertion; do not
+ use an extension or reproduce token or HTTP upload logic.
 - Confirm repository context before mutation, using the current checkout or an
  explicit `--repo <owner>/<repo>`.
 - Keep issue titles, bodies, label descriptions, comments, and other free-form
@@ -35,9 +30,8 @@ Resolve `<skill-root>` as the absolute path of the directory containing the owni
  state, and cleans up.
 - Treat issue attachments as part of one authorized create, edit, or comment
  operation. Upload only the exact caller-selected files to the exact target
- repository, place each returned stable attachment URL in that operation's
- Markdown, and verify the raw body contains the same URL. Never infer or
- upload additional local files.
+ repository, let `gh` insert the stable attachment URLs, and read back the
+ exact published body or comment. Never infer or upload additional local files.
 - Do not upload attachments during a dry run. Return the planned upload and
  Markdown placement without creating a remote asset.
 - Keep attachment credentials and private delivery URLs secret. Never print

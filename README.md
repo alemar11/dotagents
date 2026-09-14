@@ -35,7 +35,7 @@ as skills.
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `github-actions` | Diagnose or explicitly fix failing GitHub Actions checks. |
 | `github-status` | Summarize issue and pull-request queues read-only, or inspect one PR's exact-head delivery readiness, merge policy, checks, and automation state. |
-| `github-issues` | Manage GitHub issues, attachments, relationships, label/type classification, and taxonomy proposals. |
+| `github-issues` | Manage GitHub issues, native CLI media attachments, relationships, label/type classification, and taxonomy proposals. |
 | `github-projects` | Manage GitHub Projects, fields, items, repository or team links, templates, and lifecycle. |
 | `github-releases` | Inspect, plan, publish, and validate releases, tags, notes, assets, and packages. |
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |

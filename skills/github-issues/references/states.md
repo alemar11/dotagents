@@ -2,10 +2,14 @@
 
 This reference owns transient dependency, classification, and taxonomy results.
 No local workflow state is persisted. GitHub assignments, catalogs, issue
-lifecycle, and relationships remain external provider state; temporary body
-files are transport artifacts. `mutation_mode` and `issue_operation` belong to
-this skill's invocation fields. Branch selection is derived from the request,
-not stored configuration.
+lifecycle, attachments, and relationships remain external provider state;
+temporary body files are transport artifacts. `mutation_mode` and
+`issue_operation` belong to this skill's invocation fields. Branch selection is
+derived from the request, not stored configuration.
+
+An issue or comment may be published with only some requested attachments even
+when `gh` exits nonzero. Report the independently observed publication and
+missing media separately; a process exit code is not an attachment state.
 
 ## Native dependency result
 

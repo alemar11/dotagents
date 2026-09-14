@@ -29,7 +29,7 @@ when interpreting native dependency, classification, or taxonomy results.
 ## Shared boundaries
 
 Before contacting GitHub, use the runtime's narrowest network-enabled context
-for `gh` and helper commands. Verify `gh` is runnable (`command -v gh`,
+for `gh` commands. Verify `gh` is runnable (`command -v gh`,
 `gh --version`) and authentication with:
 
 ```sh
@@ -42,10 +42,9 @@ restricted-environment network failures as inconclusive. Do not install or
 refresh `gh` without explicit authorization. Network permission is not
 mutation authority.
 
-Use authenticated `gh`; binary uploads use only
-`<skill-root>/scripts/attachment-upload` documented in the lifecycle branch.
-Resolve `<skill-root>` as the absolute path of the directory containing this
-`SKILL.md`.
+Use authenticated `gh`, including native `--attach` for images and videos as
+documented in the lifecycle branch. Check the selected command's help for
+attachment support before publishing media.
 
 Resolve the exact repository and target before mutation. Preserve existing
 user authority: explicit write instructions authorize their scope; a preview

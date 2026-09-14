@@ -111,80 +111,67 @@ rm -rf "$tmpdir"
 
 ## Attachments
 
-Treat an issue-body or comment attachment as two linked mutations: upload the
-exact file to the exact target repository, then include the returned stable URL
-in the authorized create, edit, or comment Markdown. Do not upload during a dry
-run. Return a redacted command preview and the intended Markdown placement
-instead.
+Use native `gh --attach` for caller-selected images and videos in an authorized
+issue create, edit, or comment operation. Check the installed command's
+`--help` for `--attach`; version output alone does not establish support. If
+missing, report the capability gap without installing an extension, upgrading
+`gh`, or falling back to a custom upload endpoint.
 
-GitHub documents the supported attachment types, size limits, repository
-visibility behavior, and H.264 compatibility recommendation in
-[Attaching files](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/attaching-files).
-The browser-backed upload capability is not a documented public REST API, so
-treat it as a capability that may change. The shipped CLI validates the
-repository's numeric provider identity, keeps the token out of arguments and
-output, sends the binary body without shell interpolation, accepts only one
-stable `https://github.com/user-attachments/assets/...` URL, and fails closed
-on any other result.
+[GitHub's CLI attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli)
+documents support on `gh issue create`, `gh issue edit`, `gh issue comment`,
+`gh pr create`, `gh pr edit`, and `gh pr comment`. Uploads require push access
+to the repository. The CLI supports images and videos, not every file accepted
+by the web interface; check current supported types and size limits before
+publication. Do not disguise an unsupported file by changing its extension.
 
-Before upload:
+Resolve the exact repository and caller-selected regular files. Keep body text
+and image alt text in a non-interpolating UTF-8 body file. Use the same absolute
+media paths in Markdown and `--attach` so resolution does not depend on the body
+file's directory. An image reference such as `![Login error](/tmp/login.png)`
+is rewritten to its uploaded URL, retaining that alt text. For a video player,
+put `![](/tmp/repro.mp4)` alone in its paragraph. Files absent from the body are
+appended; repeated `--attach` flags allow up to 50 distinct files per command.
 
-1. Require `mutation_mode=apply` for the owning create, edit, or comment
- operation.
-2. Resolve the exact target repository.
-3. Require the exact caller-selected regular file and, when inference is
- unavailable or an override is needed, its filename or MIME type.
-4. Check the current GitHub-supported type and size limits. Do not rename an
- unsupported file to disguise its type.
-5. Complete the direct-`gh` preflight and keep shell tracing disabled.
-
-Resolve `<skill-root>` as the absolute path of the directory containing the
-owning `SKILL.md`. Preview the validated local file and Markdown placement
-without network access or upload by adding `--dry-run`:
+Choose the command for the authorized operation:
 
 ```bash
-<skill-root>/scripts/attachment-upload
- --repo <owner/repo> \
- --file <absolute-file-path> \
- --dry-run
+# Append media while preserving the current issue body.
+gh issue edit <number-or-url> --repo <owner/repo> --attach <absolute-image-file>
+
+# Replace with the reviewed complete body and rewrite its local media references.
+gh issue edit <number-or-url> --repo <owner/repo> \
+ --body-file <absolute-body-file> --attach <absolute-image-file> --attach <absolute-video-file>
+
+# Post one comment with its media.
+gh issue comment <number-or-url> --repo <owner/repo> \
+ --body-file <absolute-message-file> --attach <absolute-image-file>
 ```
 
-For an authorized apply operation, omit `--dry-run`. Override the published
-filename or inferred MIME type only when needed:
+For a new issue, retain the file-backed JSON create above so titles stay out of
+argv. Check `gh issue edit --help` before creation, create and read back the
+issue with prose that omits unpublished local media references, then attach to
+that exact issue with `gh issue edit --attach`. For inline placement, supply the
+complete final body file in that edit. These are parts of the same authorized
+create request; do not create an extra comment to host the assets. If the edit
+fails, retain and report the created issue identity.
 
-```bash
-<skill-root>/scripts/attachment-upload
- --repo <owner/repo> \
- --file <absolute-file-path> \
- --name <filename-with-extension> \
- --content-type <supported-mime-type>
-```
+For `mutation_mode=dry-run`, prepare the files, command preview, and intended
+placement without executing any upload or mutation. Do not treat a mutating
+command's `--dry-run` as an upload preview; `gh pr create --dry-run` may still
+push Git changes.
 
-The successful JSON envelope contains the repository's numeric ID, a
-byte-count and SHA-256 file proof, and the stable URL. Treat that URL as an
-upload receipt, not publication proof. Place it in the exact issue body or
-comment and read that target back. Use Markdown image syntax with the
-attachment URL for images, Markdown link syntax with the attachment URL for
-non-media files, and the bare attachment URL on its own line for video so
-GitHub renders a player. Image syntax does not render the video player.
+Capture stdout, stderr, and exit status. Creation or editing can publish the
+successful attachments while exiting nonzero for failed uploads. After any
+write attempt, read the exact issue or comment back, including after an error.
+Verify the expected stable attachment URLs and placement, preserved text, and
+absence of unresolved local media references. When a rendered interface is
+available, confirm the media loads. Report published and missing attachments
+separately; reconcile uncertain effects before retrying only proven missing
+work. Never replay creation or a comment blindly.
 
-Playwright commonly records WebM. When broad playback compatibility matters,
-transcode it before upload:
-
-```bash
-ffmpeg -i in.webm -c:v libx264 -pix_fmt yuv420p out.mp4
-```
-
-After publication, verify the raw Markdown contains the exact stable URL. When
-the rendered interface is available, also confirm that the image or video
-loads. Private repositories may resolve the stable URL to an expiring signed
-delivery URL; never store or report that resolved URL.
-
-Report a definite rejected response as a failure. Report a missing capability,
-authentication failure, access failure, unsupported type, or invalid repository
-ID as unavailable. When the upload may have succeeded but the response is
-missing, malformed, or inconclusive, report the uncertainty and do not retry
-blindly; an automatic retry can create an orphaned duplicate attachment.
+Private media may resolve to expiring signed delivery URLs. Retain only the
+stable URLs from the published Markdown; do not print tokens, enable shell
+tracing around credentials, or store private delivery URLs.
 
 ## Issue Types
 
