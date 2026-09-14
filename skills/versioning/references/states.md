@@ -16,16 +16,17 @@ from the selected mode, the current tags, and the requested release line.
 | `source-missing` | Derived | The legacy source tag is listed but its commit object cannot be resolved locally. |
 | `nothing-to-migrate` | Derived | No stable legacy tags exist, so migration has no work. |
 | `canonical-format` | Derived | The exact requested application tag matches `vX.Y.Z` or `vX.Y.Z-rc.N`; availability and confirmation still require separate checks. |
-| `blocked-noncanonical` | Mutation gate | The requested application tag is outside the canonical format. Explain the mismatch and stop; confirmation can never authorize this tag. |
-| `confirmation-required` | Mutation gate | Any tag application needs explicit confirmation of the exact tag, operation, and commit. |
+| `blocked-noncanonical` | Mutation gate | The requested tag is outside this helper/controller's supported format. Report the limitation without silently replacing the user's convention. |
+| `confirmation-required` | Mutation gate | Tag application needs authority for the exact tag, operation, and commit; existing explicit instructions can satisfy it. |
 | `invalid-input` | Transient error | The requested mode, line, or tag does not match the canonical contract. |
 
 `main` and `release` are selectable calculation modes, not persisted release
 states. The helper remains read-only in every state. Every JSON preview also
-reports `tag_application=explicit-confirmation-required`; a suggestion is not
-authorization to create or push a tag. A validation failure instead reports
-`tag_application=blocked-noncanonical` and exits nonzero so automation fails
-closed.
+reports `tag_application=explicit-confirmation-required`; the read-only helper
+does not know whether the conversation already supplied that authority. A
+suggestion alone does not authorize creating or pushing a tag. A validation
+failure instead reports `tag_application=blocked-noncanonical` and exits nonzero
+so automation fails closed.
 
 ## GitHub Actions resolver states
 

@@ -12,7 +12,9 @@ this convention without touching application code.
 This skill owns the convention, read-only calculation, and explicit migration
 of stable legacy tags. It never moves or deletes a tag. Its helper only creates
 previews; applying any tag is a separate mutation that requires explicit
-confirmation of the exact proposal. Creating a canonical alias is subject to
+authorization for the exact proposal. Existing instructions can supply it when
+the tag, operation, and target commit are unambiguous; do not ask again for the
+same unchanged operation. Creating a canonical alias is subject to
 the same gate and requires source and target verification before and after the
 write.
 
@@ -40,8 +42,8 @@ that branch:
 An explicit increment, candidate, final tag, or release branch selects the
 version-and-tag path. An explicit existing tag, GitHub Release, description,
 notes, or assets selects the GitHub Release path. If the word “release” does
-not distinguish them, ask whether the user wants a new version/tag or a GitHub
-Release for an existing tag before proposing or mutating anything.
+not distinguish them, use the conversation and relevant repository evidence
+first. Ask only if the intended version/tag or GitHub Release remains ambiguous.
 
 ## Canonical gate
 
@@ -55,10 +57,10 @@ Before any tag enters confirmation or mutation, validate its exact spelling:
 scripts/version-suggestions --mode validate --application-tag <tag> --json
 ```
 
-Only `canonical-format` may proceed. `blocked-noncanonical` is terminal even
-when the user confirms or asks to preserve a project convention. Explain the
-mismatch, but never silently normalize it or reuse authority for the rejected
-tag. A canonical replacement is a new proposal requiring its own confirmation.
+Only `canonical-format` is supported by this helper and its release controllers.
+For `blocked-noncanonical`, report that capability boundary without replacing
+the user's requested convention. Do not silently normalize the tag or reuse
+its authority for a different proposal.
 Legacy tags without `v` remain read-only calculation or migration sources.
 
 ## Runtime workflow
@@ -73,7 +75,8 @@ Legacy tags without `v` remain read-only calculation or migration sources.
  blocking state without entering a mutation path.
 5. For tag application, validate the exact tag and show a preview containing
  the tag, operation, target commit, selected branch or ref, and relevant
- source ref. Ask for explicit confirmation of that exact proposal.
+ source ref. Ask for confirmation only when the existing request does not
+ authorize that exact operation or a material choice remains unresolved.
 6. Immediately before a confirmed write, refresh the authoritative refs and
  re-run exact-tag validation. Stop on drift, ambiguity, an existing tag at a
  different commit, a finalized release line, or any noncanonical result.

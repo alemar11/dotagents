@@ -23,8 +23,9 @@ produces `nothing-to-migrate`; an unresolved source or conflicting target is a
 hard stop.
 
 The plan is not mutation authority. After showing the source tag, target tag,
-exact commit, and intended remote operation, obtain explicit confirmation of
-that exact alias. Immediately before the write, re-read both refs and require
+exact commit, and intended remote operation, obtain confirmation only if the
+existing request does not already authorize that exact alias and scope.
+Immediately before the write, re-read both refs and require
 the target to be absent. Create only the missing canonical tag at the resolved
 source commit, then read both refs again and require them to resolve to the
 same commit. Never overwrite an existing canonical tag.

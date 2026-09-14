@@ -15,10 +15,11 @@ exact proposal, and gates mutation through `release-tag-approval`. Workflow
 filenames and human-readable option text may vary by project; select by the
 semantic prefixes and verified behavior rather than guessing from a filename.
 
-Starting the controller is a remote mutation. A request to create or apply a
-tag does not authorize dispatch until the exact tag, source SHA, workflow, ref,
-and semantic operation have been previewed and explicitly confirmed. Dispatch
-authorizes only the controller run. It does not authorize approving the
+Starting the controller is a remote mutation. Establish the exact tag, source
+SHA, workflow, ref, and semantic operation before dispatch. Reuse existing
+authorization for that exact run; when it is missing or the resolved proposal
+differs from the request, show the proposal and ask about the unresolved action.
+Dispatch authorizes only the controller run. It does not authorize approving the
 environment, bypassing reviewers, publishing a GitHub Release, or manually
 starting the repository publisher.
 
