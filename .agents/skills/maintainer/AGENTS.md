@@ -24,8 +24,8 @@ references; this file governs package maintenance.
   skill before repository integration.
 - Keep runtime skills independent from this package. Only repository-level
   guidance may route explicit maintenance work here.
-- Keep instruction-density reviews proposal-first and wait for approval before
-  compaction refactors.
+- Keep review-only requests read-only. An explicit request to apply findings or
+  refactor instructions authorizes that scoped work without another approval.
 - Treat plugins as optional. An empty marketplace and absent `plugins/*` tree
   are valid. Include repo-root `projects/*` and skill-local
   `skills/*/projects/*` when those packages own editable maintenance source.

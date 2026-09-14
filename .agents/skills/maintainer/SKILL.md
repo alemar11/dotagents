@@ -1,6 +1,6 @@
 ---
 name: maintainer
-description: Manually audit, maintain, and re-engineer existing repo skills, optional plugins, and coupled maintenance projects through health checks, targeted upgrades, workflow hardening, package lifecycle work, validation, and explicit refreshes.
+description: Audit or maintain this repository's skills, plugins, and coupled tools when explicitly invoked.
 ---
 
 # Maintainer
@@ -18,7 +18,8 @@ through one routed control plane:
 - A bare `run`, `run your tasks`, or equivalent imperative starts a
   conservative repo-wide maintenance pass.
 - Named packages stay targeted; explicit metadata wording stays metadata-only.
-- Health and instruction-density audits are read-only evidence passes.
+- Review-only requests are read-only. Audit-and-fix or refactoring requests
+  continue through scoped edits and verification under the existing authority.
 - Runtime failures, package lifecycle work, and domain refreshes use their
   explicit routes and never expand from a bare run.
 - Brand-new skills start with `$skill-creator`. Substantial public skill or
@@ -64,8 +65,8 @@ canonical `result` and `change_state` values and actionable findings.
 
 ## Execution Boundaries
 
-- Direct `audit` and instruction-density routes remain read-only; their findings
-  are evidence, not automatic cleanup authority.
+- Findings alone grant no edit authority. Honor an explicit request to apply
+  them, and ask only about material unresolved scope or behavior decisions.
 - A bare maintenance run may apply only safe, low-ambiguity improvements with a
   concrete rationale. Report strategic, behavior-sensitive, or high-ambiguity
   candidates for approval.

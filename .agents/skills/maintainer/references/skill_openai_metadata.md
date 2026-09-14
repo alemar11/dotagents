@@ -17,12 +17,15 @@ interface:
   icon_small: "assets/icon-32.png"
   icon_large: "assets/icon-128.png"
   brand_color: "#123456"
-  default_prompt: "You are a helpful specialist for this skill."
+  default_prompt: "Use $my-skill to complete the requested workflow."
 ```
 
 Notes:
 - Icons must be relative paths under the skill's `assets/` directory.
-- Keep `short_description` concise and user-facing; use `SKILL.md` for trigger wording.
+- Keep `short_description` within 25–64 characters and user-facing; use
+  `SKILL.md` for trigger wording. Keep `default_prompt` a short example that
+  mentions `$<skill-name>`, without copying the skill's workflow into metadata.
+- Preserve invocation policy and unrelated dependencies when editing metadata.
 
 ## Metadata Maintenance Checklist
 

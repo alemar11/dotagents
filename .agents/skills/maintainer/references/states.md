@@ -12,7 +12,7 @@ evidence.
 | --- | --- |
 | `maintain` | Run conservative general maintenance, a targeted package upgrade, or metadata alignment according to the matched scope. |
 | `audit` | Inspect skill or repository health, policy, structure, or pre-release evidence read-only. |
-| `instruction-density` | Review behavior-preserving compaction opportunities and stop for approval before edits. |
+| `instruction-density` | Identify behavior-preserving instruction improvements; apply only when the request authorizes refactoring. |
 | `description-review` | Review discovery descriptions or metadata wording. |
 | `workflow-hardening` | Repair a connected workflow defect established by runtime or cross-skill evidence. |
 | `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package. |
@@ -21,8 +21,8 @@ evidence.
 | `okf-spec` | Compare or explicitly refresh the bundled OKF specification. |
 
 Select one or more route modes from the request using
-`maintenance-router.md`. Mixed requests preserve that router's canonical
-execution order; route selection never widens mutation authority.
+`maintenance-router.md`. Mixed requests follow the dependencies between their
+selected operations; route selection never widens mutation authority.
 
 ## Closeout result
 

@@ -9,7 +9,9 @@ connected skills or plugins.
 - Use local repository checks and supplied runtime evidence when portfolio or
   session evidence is required. A reproducible test failure, supplied log, or observed live failure may be
   sufficient for its own claim. All evidence gathering remains read-only;
-  Maintainer owns edits only after the finding is accepted for implementation.
+  Maintainer applies evidenced findings within an explicit repair request;
+  findings from a review-only run remain proposals. Ask only about material
+  unresolved changes to behavior or scope.
 - Start with current repo state and cheap history, then memory summaries. Inspect
   at least one representative raw session before claiming runtime misuse,
   missed invocation, incorrect routing, or excessive cost.
@@ -39,8 +41,9 @@ connected skills or plugins.
 5. If the fix changes public package identity, removes/merges a package, or
    substantially redistributes responsibility, route through `$skill-creator`
    or `$plugin-creator` first, then use `package-lifecycle.md`.
-6. Update the owning contracts and add regression proof that tests normalized
-   behavior rather than wording alone.
+6. Update the owning contracts. Use affected behavioral regression tests for
+   executable changes; validate prose contracts statically and add a bounded
+   scenario only when static inspection leaves a meaningful uncertainty.
 7. Select validation lanes from `validation-matrix.md`. Use bounded disposable
    repositories for high-risk composed workflows when static contracts cannot
    prove routing, mutation, recovery, or closeout behavior.

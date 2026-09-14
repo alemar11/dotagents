@@ -56,8 +56,8 @@ changing Git history.
 - With push-only authority, do not stage or commit. Verify the existing commit
   range and push only those commits.
 - With PR or other publication authority, use the matching publication workflow
-  and its own scope rules. Do not infer commit authority from a bare PR request,
-  or PR/publication authority from commit or push authority.
+  and its own scope rules, including necessary commits authorized by that
+  workflow. Commit or push authority alone does not authorize PR publication.
 - Prefer `$git-commit` for authorized local commits and `$yeet` for
   authorized single-PR publication when those skills are installed. Direct
   scoped `git` is the fallback for explicitly authorized commit/push operations
@@ -69,6 +69,9 @@ changing Git history.
   attempted command; verify resulting state.
 
 ## Final Report
+
+Keep human reports concise and omit inapplicable detail. Preserve `result` and
+`change_state` for callers; include the remaining fields only when relevant.
 
 - `result`: `<canonical value from states.md>`
 - `change_state`: `<canonical value from states.md>`

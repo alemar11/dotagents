@@ -8,6 +8,8 @@ for structural, discovery, instruction, reference-path, and validation health.
 
 - A direct `audit` request is read-only: report findings without editing,
   staging, committing, or publishing.
+- An explicit audit-and-fix request continues through the authorized maintenance
+  route after evidence gathering; do not stop at findings when edits are requested.
 - When `run-maintenance.md` calls this playbook, return evidence first. The
   maintenance workflow may apply only safe, low-ambiguity findings and must
   defer strategic or behavior-sensitive changes.
@@ -31,8 +33,9 @@ for structural, discovery, instruction, reference-path, and validation health.
      document them;
    - aligned repo guidance, Codex-dependency classification, and portable
      fallbacks.
-3. Run the repository's structural commands below and any package-owned
-   validation scripts for the selected roots.
+3. For instruction quality, use the decision criteria in
+   [instruction-density-review.md](instruction-density-review.md). Run only
+   structural commands and package validators relevant to the audited scope.
 
 4. Interpret size without turning it into a correctness gate:
 
@@ -43,7 +46,7 @@ for structural, discovery, instruction, reference-path, and validation health.
    | `high-density` | 4,001-5,000 estimated tokens. |
    | `over-guideline` | More than 5,000 estimated tokens or at least 500 lines. |
 
-   The helper estimates tokens as `ceil(SKILL.md UTF-8 bytes / 4)`. Size alone
+   Estimate tokens as `ceil(SKILL.md UTF-8 bytes / 4)` when needed. Size alone
    is diagnostic and never produces `result=fail`.
 5. Separate the three costs:
    - `catalog_cost`: always-visible name, description, and discovery path;
@@ -82,7 +85,7 @@ Add these health details to the common report in `release-checklist.md`:
 
 - packages and roots inspected;
 - structural and policy proof;
-- portfolio command and entrypoint bands;
+- entrypoint measurements when size was part of the review;
 - representative invoked paths when reviewed;
 - evidence sources used for health conclusions;
 - blocking findings, warnings, and deferred maintenance.

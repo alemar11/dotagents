@@ -31,8 +31,8 @@ Default package inventory for unnamed repo-wide work:
      runtime or cross-skill evidence shows ownership, authority, handoff,
      validation, or closeout defects.
    - **Scope:** The smallest connected package set that owns the failure.
-   - **Mutation:** Read-only evidence first; edit only after the finding is
-     accepted. Require regression coverage for accepted behavior defects.
+   - **Mutation:** Inspect evidence first, then apply repairs within the explicit
+     request. Select proof for the affected behavior through the validation matrix.
    - **Playbook:** `workflow-family-hardening.md`. Explicit only.
 3. `migrate or retire package`
    - **Purpose:** Merge, rename, move, bundle, replace, or retire existing
@@ -55,8 +55,8 @@ Default package inventory for unnamed repo-wide work:
      instructions for the same runtime guarantees.
    - **Scope:** Entrypoint, disclosed references, and metadata that duplicate
      runtime rules. Optional plugin manifests only when they create confusion.
-   - **Mutation:** Proposal-first (`safe trim`, `move to reference`,
-     `behavior-risk`, `leave as-is`). Edit only after explicit approval.
+   - **Mutation:** Review-only requests produce proposals; explicit refactoring
+     or audit-and-fix requests authorize scoped edits and verification.
    - **Playbook:** `instruction-density-review.md`.
 6. `review skill descriptions`
    - **Purpose:** Tighten discovery wording across `SKILL.md` frontmatter,

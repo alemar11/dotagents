@@ -6,8 +6,8 @@ union of its lanes; one successful lane never substitutes for another.
 | Change type | Required proof |
 | --- | --- |
 | Docs or metadata | Parse touched YAML/frontmatter, verify descriptions and repo docs, check links/references, run `git diff --check`. |
-| Runtime skill contract | Run focused contract/regression tests, verify composed handoffs and trigger/mutation boundaries, validate the skill package. |
-| Composed workflow | Run focused contract suites plus bounded disposable-repo scenarios when static checks cannot prove routing, authority, recovery, or closeout. Remove fixtures and verify cleanup. |
+| Runtime skill instructions | Statically review affected handoffs, triggers, authority, completion, and reference paths; validate metadata. Use existing behavioral tests only when affected, and a bounded scenario only for uncertainty static review cannot resolve. Do not add prose tests. |
+| Composed workflow | Review affected routing, authority, recovery, and closeout contracts. Run existing contract suites when their executable behavior is affected; use bounded disposable-repo scenarios only for uncertainty static checks cannot resolve. Remove fixtures and verify cleanup. |
 | Embedded CLI | Run its tests, shipped `--help`, `--version`, `--json doctor`, and one safe fixture/dry-run/read-only operation. |
 | Plugin | Apply the required semantic version bump, align embedded CLI version, rebuild deterministically, run plugin tests, reinstall, compare source/cache artifacts, and prove from before/after status that reinstall introduced no checkout changes. |
 | Migration or removal | Scan callers/dependencies/install docs, verify replacement discovery, prove retired surfaces are absent, and test the chosen compatibility policy. |
@@ -25,6 +25,9 @@ union of its lanes; one successful lane never substitutes for another.
   skipped proof with its blocker.
 - A required lane that cannot run is `result=fail` unless the user explicitly accepts a
   narrower delivery result.
+- Reuse passing checks across selected lanes. Broaden or repeat validation only
+  after a new change, failure, or unresolved risk; prose edits alone do not
+  require executable suites, hosted runs, or model experiments.
 
 ## Scenario Safety
 

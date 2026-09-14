@@ -35,15 +35,16 @@ playbook dispatch rather than a second value registry.
 2. Named existing packages resolve to targeted `maintain` with
    `skill-upgrade.md`; explicit metadata/docs wording resolves to
    `metadata-sync.md`.
-3. Runtime or cross-skill evidence resolves to `workflow-hardening`. Keep all
-   evidence gathering read-only until the finding is accepted.
+3. Runtime or cross-skill evidence resolves to `workflow-hardening`. Inspect
+   first, then repair evidenced defects within the user's authorized scope.
 4. Public identity, ownership, or package-removal changes resolve to
    `package-lifecycle`, with `$skill-creator` or `$plugin-creator` first for a
    substantial reshape.
-5. Instruction-density review runs before any behavior-sensitive compaction and
-   stops for approval before mutation.
-6. Health audits resolve to `audit` and remain read-only. A generic maintenance
-   run may consume their safe findings through `skill-upgrade.md`.
+5. Instruction-density review establishes which behavior must survive a
+   refactor. Apply requested edits directly; ask only about material unresolved
+   changes to scope or behavior.
+6. Health audits resolve to read-only `audit`. An audit-and-fix request or a
+   generic maintenance run consumes authorized findings through `skill-upgrade.md`.
 7. Codex dependency, domain refresh, and OKF routes run only when explicitly
    requested. Targeted `maintain okf` may run the stale check but must not
    refresh the bundled spec without explicit refresh authority.
@@ -52,16 +53,11 @@ playbook dispatch rather than a second value registry.
 
 ## Mixed Requests
 
-Run accepted categories in this order:
-
-1. `instruction-density` and stop for approval before mutation;
-2. `workflow-hardening`;
-3. `package-lifecycle` with creator-first routing when required;
-4. `maintain`;
-5. `description-review`;
-6. `codex-deps`;
-7. explicit `refresh` or `okf-spec`;
-8. `audit` and common closeout.
+Select only the categories needed by the request. Establish behavior and
+ownership before restructuring, resolve lifecycle changes before syncing
+metadata, and validate the resulting artifact after edits. Reuse evidence
+across routes instead of rerunning a full audit for each playbook. A request to
+review and make needed updates supplies edit authority for that scope.
 
 ## Task Isolation
 
