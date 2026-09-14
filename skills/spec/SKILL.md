@@ -59,10 +59,10 @@ belongs to `$github-issues` on explicit request, outside Spec.
 
 ## Refine and optionally publish
 
-Read [states.md](references/states.md) and [GitHub output](references/github-output.md)
-for operation selection and optional publication. Refinement stays in the
-conversation and performs no durable write. Publish only after an explicit user
-request.
+Read [states.md](references/states.md) for operation selection. Load
+[GitHub output](references/github-output.md) only for publication. Refinement
+stays in the conversation and performs no durable write. Publish only after an
+explicit user request.
 Before hosted reads or writes, verify that `$github-issues` is installed and
 reachable by canonical name in the current session. A directory or unrelated
 connector alone does not establish availability. Report the missing dependency
