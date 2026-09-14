@@ -1,7 +1,7 @@
 # Yeet Maintenance
 
 This skill owns publication orchestration over focused commit and GitHub
-workflows. Keep the executable publish contract in `SKILL.md` and
+workflows. Keep the publication contract in `SKILL.md` and
 `references/workflows.md`.
 
 ## Ownership boundaries
@@ -9,8 +9,8 @@ workflows. Keep the executable publish contract in `SKILL.md` and
 - Delegate local staging and commit authoring to `$git-commit` and review
   follow-up to `$github-review-threads`. Use authenticated `gh` directly for
   explicitly requested issue lifecycle operations.
-- `scripts/publish` owns structured local preflight, snapshot, and PR creation;
-  file-backed authenticated `gh` operations own existing-PR lifecycle changes.
+- Git and authenticated `gh` own execution; this skill ships no CLI. Keep
+  preflight, file-backed text transport, and publication readback in the workflow.
 - `$github-stacked-pr` owns the explicit two-PR stack relationship; Yeet publishes
   one branch/PR and never infers or invokes that relationship. Yeet retains
   ownership of the current branch push, PR body, draft-state preservation, and
@@ -25,18 +25,3 @@ workflows. Keep the executable publish contract in `SKILL.md` and
   mutation unless explicitly authorized.
 - Preserve exact-head revalidation immediately before publication and the
   recovery/read-back evidence required after ambiguous remote results.
-
-## Executable maintenance
-
-- `scripts/publish` is the shipped runnable artifact (`preflight`, `open`,
-  `snapshot`, `doctor`).
-- `scripts/publish_lib/` holds the implementation. Provider-protocol modules
-  (`common.py`, `repository.py`, `integrity.py`, `provider_text.py`) are synced
-  copies of `projects/github-tools/src/github_provider_protocol/`; run
-  `projects/github-tools/scripts/sync-provider-protocol` after protocol edits
-  and never hand-edit the copies.
-- Naming: `publish_lib` uses underscores as the Python import-syntax
-  compatibility exception; the public skill (`yeet`) and command (`publish`)
-  stay lower-kebab.
-- Validate with `python3 -m unittest discover -s skills/yeet/tests -v` and
-  `scripts/publish --help|--version|--json doctor`.

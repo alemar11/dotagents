@@ -2,17 +2,25 @@
 
 ## Publish New Work
 
-Complete this read-only preflight before staging, committing, or pushing:
+Before staging, committing, or pushing, inspect the checkout with Git and `gh`:
 
 ```bash
-<skill-root>/scripts/publish --json preflight --repo <owner/repo>
+git rev-parse --show-toplevel
+git branch --show-current
+git rev-parse HEAD
+git status --porcelain=v1
+git remote get-url origin
+git config --get branch.<branch>.remote
+git config --get branch.<branch>.merge
+gh repo view --json nameWithOwner,defaultBranchRef
+gh pr list --repo <owner/repo> --head <owner>:<branch> --state open --limit 2 \
+ --json number,url,isDraft,headRefName,headRepositoryOwner,headRepository,baseRefName
 ```
 
-The shared command owns the branch, status, origin, upstream, authenticated
-GitHub API, default-branch, and matching open-PR checks. Run the complete
-command with scoped network permission from the outset. Do not replace it with
-an ad hoc group of raw `git` and `gh` commands or run only its authentication
-check in the restricted sandbox.
+Resolve placeholders from observed values and check authentication as required
+by `SKILL.md`. An absent upstream configuration is allowed only as described
+below. Record the full HEAD SHA and worktree state; do not stash or discard
+unrelated changes to make publication pass.
 
 Apply all of these gates before continuing:
 
@@ -27,7 +35,7 @@ Apply all of these gates before continuing:
  first push may establish `origin/<branch>`. If either is present, require both
  and require exactly `origin` plus `refs/heads/<branch>`; stop on a different
  remote or branch.
-- Require successful `gh auth status` from the network-capable shared preflight
+- Require successful `gh auth status` in a network-enabled context
  before any push. A result from a restricted sandbox is inconclusive and must
  not be used to diagnose or change credentials.
 - Record whether the PR lookup returns zero or one open PR. Stop if it returns
@@ -97,13 +105,13 @@ delivery verification.
 
 Render one line per issue under this exact PR-description section:
 
-`markdown
+```markdown
 ## Issues
 
 Closes #10
 Closes #123
 Closes octo-org/octo-repo#100
-`
+```
 
 Use repository-local shorthand only when the issue and PR share the same
 repository. Use `Closes <owner>/<repository>#<number>` for every cross-repository
@@ -129,50 +137,60 @@ overall user request includes publishing. Do not stage or commit directly in
 Yeet: `$git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the
 delegated `$git-commit` call push; Yeet retains sole ownership of push after its
-second publish preflight. Do not force `commit_kind=regular`: let Git Commit
+second preflight. Do not force `commit_kind=regular`: let Git Commit
 apply its canonical default and honor an explicit or target-repository fixup
 requirement only with an exact target.
 
-After commit creation, rerun the complete publish preflight above immediately
+After commit creation, rerun the complete preflight above immediately
 before any push. Branch, remote, upstream, authentication, and PR state may
 have changed while the commit was prepared. Only then publish:
 
+Record the full intended commit SHA. Fetch the verified origin branch when it
+exists and compare it with local HEAD; stop if local HEAD is behind or diverged.
+Recheck HEAD and the worktree after fetching. Push only the verified branch,
+without force, using an explicit destination:
+
 ```bash
-git push # verified existing origin/<branch> upstream
-git push -u origin HEAD # only when the preflight found no upstream
-gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
- --json number,title,url,isDraft,headRefName,headRepositoryOwner
-<skill-root>/scripts/publish --json snapshot
-<skill-root>/scripts/publish --json open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --base <pr-base-branch> --draft --expected-worktree-fingerprint <sha256>
+git push origin HEAD:refs/heads/<branch>
+# For the first push only:
+git push -u origin HEAD:refs/heads/<branch>
 ```
 
-Use explicit pathspecs for staging. Run only one of the two push commands. Run
-`publish open` only when the post-push lookup still returns no PR. It sends
-title and body through JSON stdin, verifies exact UTF-8 byte fingerprints and
-the returned PR target, and performs one exact-head read-back after an
-ambiguous response. Do not retry it blindly.
+Run only the applicable command. Verify the remote branch SHA equals the
+recorded commit, then repeat the exact-head open-PR lookup. If HEAD, branch,
+remote, upstream, or worktree changed unexpectedly, reconcile before continuing.
+A newly appeared matching PR must be read and reused with its base and draft
+state preserved; stop on ambiguity or an explicit-base mismatch.
 
-Before `publish open`, require the body file to contain the complete canonical
-`## Issues` section whenever `closing_issue_refs` is nonempty. After creation,
-read back the PR description and require every expected `Closes` line exactly
-once. The base read-back must equal the selected `<pr-base-branch>` regardless
-of whether that branch is the repository default.
+When no PR exists, write a complete JSON request file with `title`, `body`,
+`head`, `base`, and `draft: true`. Use a JSON serializer to preserve literal
+text; the title must be one nonempty line without a trailing line terminator.
+Inspect the final text, repository template, and verified closing references.
+Immediately before creating, recheck local HEAD, remote branch SHA, worktree
+state, and the absence of a matching PR. Then create once:
 
-When the post-push lookup returns an existing PR, do not run `publish open
---draft` and do not invoke any draft-state lifecycle mutation. Require its
-post-update `isDraft` value to equal the pre-push value. An existing ready PR
-therefore remains ready while its branch and optional title/body are updated.
-Require its base to equal the pre-push base or the explicitly requested base;
-Yeet never silently retargets an existing PR.
+```bash
+gh api --method POST repos/<owner>/<repo>/pulls --input <absolute-request-json>
+```
 
-After the post-push lookup returns the exact existing PR or `publish open`
-returns the exact newly created PR, require the PR head to equal the full
-published commit SHA. Verify the exact repository, PR, base, full published head
-SHA, draft state, and issue linkage. Yeet stops after this publication evidence.
-It must not
-request or wait for an automated Codex review. A composing workflow may invoke
-`$github-review-threads` separately using this exact publication evidence;
-the ready transition and any automatic provider review remain outside Yeet.
+For an existing PR, use the Existing PR procedure below. Never change its base
+or draft state. After either operation, independently read the exact PR back:
+
+```bash
+gh pr view <number> --repo <owner/repo> \
+ --json number,url,title,body,headRefName,headRefOid,headRepository,headRepositoryOwner,baseRefName,isDraft
+```
+
+Verify repository and PR identity, head branch and full published SHA, selected
+base, expected draft state, exact intended title/body, and every expected closing
+line exactly once. Recheck local HEAD and worktree state after publication;
+report an unexpected change separately from the observed remote result. A
+successful create response alone is not verified publication. Follow Safe Retry
+below for errors or uncertain effects.
+
+Yeet stops after publication and requested attachments. A composing caller may
+invoke `$github-review-threads` or `$github-stacked-pr` separately with the exact
+repository, PR, and published SHA; Yeet does not request or wait for review.
 
 ## No Publishable Local Work
 
@@ -231,8 +249,7 @@ step and does not authorize upgrading `gh`. Check repository push access and
 current media type and size limits in
 [GitHub's attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
 
-Although `gh pr create` supports `--attach`, retain `publish open` for new PRs
-so title/body transport and exact-head verification remain intact. Create with
+For new PRs, use the file-backed creation procedure above. Create with
 prose that omits unpublished local media references, then attach to the verified
 PR. For existing PRs, retain the same head, base, and draft-state checks.
 
@@ -263,9 +280,13 @@ missing work, never recreate the PR. Attachment work finishes before closeout.
  explicitly authorizes history rewriting for the named branch.
 - If a push reports a network or transport error, compare the local commit with
  the remote branch before retrying; the remote may already have accepted it.
-- If `publish open` reports an ambiguous write, preserve its read-back evidence
- and stop. It already performed the only automatic exact-head read-back; do
- not issue another create attempt.
+- After an uncertain PR creation, perform one lookup by exact head repository
+ and branch, then read the unique candidate. Verify its target, text, draft
+ state, published SHA, and available author/creation-time evidence against the
+ attempted write. If absent, ambiguous, or mismatched, report the unresolved
+ result and stop; do not issue another create attempt.
+- After an uncertain update, read the same PR and compare its current text with
+ the intended request before retrying. Never create a replacement PR.
 - On any changed branch, remote, upstream, authentication, or PR state, stop and
  rerun the full preflight rather than continuing from stale assumptions.
 

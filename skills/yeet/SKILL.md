@@ -26,12 +26,10 @@ Publish one branch and PR. Compose `$git-commit` for commit authoring; Yeet owns
 the push, base selection, PR body, and publication readback. Reuse an existing
 suitable commit and matching PR.
 
-Resolve `<skill-root>` as the absolute path of the directory containing this
-`SKILL.md`. Use `<skill-root>/scripts/publish --json preflight` and
-`<skill-root>/scripts/publish --json open` for a new PR; use file-backed
-`gh api --input` for existing title/body changes. Keep provider text out of
-shell strings and argv. Worktree fingerprints use
-`<skill-root>/scripts/publish --json snapshot`.
+Use Git and authenticated `gh` directly; Yeet ships no CLI. Create and update
+PRs through file-backed `gh api --input` requests. Keep provider text out of
+shell strings and argv. Record and recheck the branch, full HEAD SHA, and
+worktree state around publication.
 
 For caller-selected images or videos, read the attachment section in
 [workflows.md](references/workflows.md#pr-attachments). Use native
