@@ -1,5 +1,5 @@
 interface:
   display_name: "Swift-DocC"
-  short_description: "Write, structure, review, and publish Swift-DocC docs using local summaries."
+  short_description: "Write, review, and publish Swift-DocC documentation."
   brand_color: "#A16207"
   default_prompt: "Use $swift-docc for this documentation task and consult the relevant local summary or bundled source."
