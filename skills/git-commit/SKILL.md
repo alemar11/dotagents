@@ -40,7 +40,7 @@ incidental part of this skill.
 
 For explicitly authorized issue closure through a regular commit, include
 closing references only for satisfied issues. Do not add them to generated
-fixup messages. Hosted issue edits belong to `$github-issues`.
+fixup messages. Use `gh` directly for separately authorized hosted issue edits.
 
 ## Composed invocation
 
