@@ -1,12 +1,14 @@
 ---
 name: discourse
-description: Configure the Discourse MCP server for Codex or Cursor, globally or for one project, and verify its tools and authentication.
+description: Set up, repair, or verify Discourse MCP configuration and authentication for Codex or Cursor.
 ---
 
 # Discourse MCP
 
-Use this skill when the user asks to set up, repair, inspect, or use Discourse
-through its MCP server. The local server is launched with `npx` and requires a
+Use this skill for MCP setup, repair, or connection inspection. Ordinary
+Discourse reads and writes use the connected tools and do not require setup.
+Keep inspection read-only; a setup or repair request authorizes relevant
+configuration changes. The local server is launched with `npx` and requires a
 working Node.js/npm installation. The package may request authentication or
 additional configuration when it starts; follow the package's current prompts
 and never place tokens in a repository file.
@@ -19,12 +21,13 @@ Node.js/npm prerequisite and stop.
 
 Prefer project scope so the repository declares the tool it needs and teammates
 can reproduce the setup. Inspect existing entries first, preserve unrelated
-servers and credentials, and replace an existing entry only when the user asks.
+servers and credentials. Reuse the requested scope or existing configuration;
+project scope is the default only for new setup without an established scope.
 
 ### Project scope (recommended)
 
-For Codex, merge this block into `<project>/.codex/config.toml` and commit it
-when the project should share the setup:
+For Codex, merge this block into `<project>/.codex/config.toml`. Commit only
+when requested:
 
 ```toml
 [mcp_servers.discourse]
@@ -35,8 +38,7 @@ args = ["-y", "@discourse/mcp@latest"]
 Codex project configuration is loaded for trusted projects and is merged with
 the user-level configuration.
 
-For Cursor, merge this entry into `<project>/.cursor/mcp.json` and commit it only
-when the project should share the server:
+For Cursor, merge this entry into `<project>/.cursor/mcp.json`:
 
 ```json
 {
