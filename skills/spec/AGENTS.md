@@ -5,6 +5,6 @@
 these contracts. Keep criteria, paired verification checks, prerequisites, and
 accepted decisions aligned without adding execution progress or PR topology.
 
-For hosted-content changes, run the repository's
-`projects/spec/scripts/validate-hosted-content-safety` and inspect the exact
-publication projection. Use authenticated `gh` directly for GitHub transport.
+For hosted-content changes, inspect the exact publication projection against
+`references/hosted-content-safety.md`. Use authenticated `gh` directly for GitHub
+transport.
