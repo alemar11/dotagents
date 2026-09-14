@@ -1,5 +1,0 @@
-interface:
-  display_name: "GitHub Issues"
-  short_description: "Manage and classify issues or propose taxonomy"
-  brand_color: "#1D4ED8"
-  default_prompt: "Use $github-issues for the requested issue operation, metadata classification, or read-only taxonomy proposal."
