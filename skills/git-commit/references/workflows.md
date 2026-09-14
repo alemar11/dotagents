@@ -39,8 +39,7 @@ git status --short --branch
 git log -1 --pretty=fuller
 ```
 
-Keep this command order when practical so session evidence stays easy to
-recognize during audits. The first staged-path read must happen before any
+The first staged-path read must happen before any
 `git add`; otherwise pre-existing staged work is indistinguishable from the
 newly selected commit scope.
 

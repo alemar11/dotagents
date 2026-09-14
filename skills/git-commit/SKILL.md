@@ -11,9 +11,8 @@ git sandboxed. Network permission is not mutation authority.
 
 ## Core Rule
 
-Use direct `git` commands. The only bundled helper is the target-aware editor
-adapter for noninteractive amend-fixup messages; it never stages, commits,
-rebases, or pushes.
+Use direct `git` commands. Bundled helpers validate fixup targets and adapt
+noninteractive amend-fixup messages; they never stage, commit, rebase, or push.
 
 Resolve the user request to
 `commit_operation=commit-only|commit-and-push|push-only`, then use the workflow below.
@@ -63,6 +62,12 @@ follow-up issue creation, or manual closure to `$github-issues`.
 
 ## Workflow
 
+For `push-only`, inspect the branch, upstream, and intended existing commit range,
+push within that authority, and verify the remote result. Skip every staging and
+commit step below; unrelated worktree or index changes are not part of that push.
+
+For a commit-producing operation:
+
 1. Inspect the worktree with `git status --short --branch`, then inspect and
    record the pre-existing index with `git diff --staged --name-status` before
    running any `git add` command.
@@ -80,8 +85,8 @@ follow-up issue creation, or manual closure to `$github-issues`.
    `git add -- <path>`.
 6. Re-check `git diff --staged` before committing, and compare its path set with
    the recorded pre-existing staged set and the intended commit scope.
-7. For `commit_kind=regular`, write a concise imperative subject and a body with
-   summary, rationale, and validation. For `fixup`, let Git generate the
+7. For `commit_kind=regular`, write a concise imperative subject; add a body when
+   rationale or validation needs explanation. For `fixup`, let Git generate the
    `fixup!` message. For `amend-fixup`, provide the complete replacement subject
    and body while preserving Git's target-derived `amend!` matcher; use the
    bundled editor adapter when execution is noninteractive.
@@ -89,8 +94,7 @@ follow-up issue creation, or manual closure to `$github-issues`.
 9. Verify with `git status --short --branch` and
    `git log -1 --pretty=fuller`.
 10. For `commit_operation=commit-and-push`, use `git push` or
-    `git push -u origin HEAD`; for `push-only`, verify the existing commit range
-    and push without staging or committing.
+    `git push -u origin HEAD` and verify the remote result.
 
 ## References
 
