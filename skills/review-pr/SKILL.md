@@ -49,13 +49,13 @@ Report unavailable or uncertain correction separately from the review result.
 ## Result and caller handoff
 
 Return the PR URL, expected and observed full HEAD, exact explicit request
-identity and unchanged review receipt/deadline, `review_pr_result`, provider verdict,
+identity and unchanged review record/deadline, `review_pr_result`, provider verdict,
 findings with provider links when present, and any pending state or blocker.
 Report the provider result faithfully; do not adjudicate findings or turn
 review completion into acceptance of the code. A clean response is review
 evidence, not proof of CI, spec completion, or merge readiness.
 
-The caller supplies its exact published ready candidate and any existing review receipt.
+The caller supplies its exact published ready candidate and any existing review record.
 Return the result directly to that caller, which decides whether
 to repair, rebut, defer, or accept, manages agents and budgets, and invokes this
 skill again when the next published candidate needs hosted review. Standalone

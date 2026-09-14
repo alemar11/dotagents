@@ -2,7 +2,7 @@
 
 Default request-and-wait and explicit inspect-only scope are caller instructions,
 not persisted configuration. The skill has no saved workflow position: resume
-reconstructs the exact PR/HEAD, `$github-review-threads` request receipt, original
+reconstructs the exact PR/HEAD, `$github-review-threads` request record, original
 deadline, and observed provider evidence. It owns no agents, implementation, or
 repair state.
 
@@ -10,13 +10,13 @@ repair state.
 | --- | --- |
 | `completed` | `$github-review-threads` established a terminal clean or findings verdict for the selected explicit request and expected current HEAD. |
 | `inspected` | Read-only inspection returned available review evidence and gaps without requesting or waiting. |
-| `pending` | The selected review remains unanswered at the original deadline or caller stop; retain the receipt and deadline. |
+| `pending` | The selected review remains unanswered at the original deadline or caller stop; retain the record and deadline. |
 | `deferred` | A draft PR or unresolved target selection requires caller action before requesting/waiting. |
 | `blocked` | Required capability, request correlation, target stability, or provider evidence prevents responsible monitoring. |
 
 A completed review is not an accepted implementation. Findings are returned to
 the caller, not converted to repair-required or an adjudicated verdict here.
-Provider verdicts, finding identities, request receipts and deadlines remain
+Provider verdicts, finding identities, request records and deadlines remain
 `$github-review-threads`-owned evidence; retain them unchanged in the caller
 handoff.
 

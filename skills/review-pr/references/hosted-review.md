@@ -2,9 +2,9 @@
 
 Read for inspection, requests, waits, and resume. [states.md](states.md) owns
 result meanings. `$github-review-threads` owns provider parsing, explicit request
-identity, receipt recovery, bounded waiting, and terminal evidence. Use its
-focused review operations rather than implementing another provider adapter or
-waiter.
+identity, record recovery, bounded waiting, and terminal evidence. Use its
+workflow and canonical review record rather than defining another provider
+contract. The dependency uses direct `gh` and has no custom CLI.
 
 ## Select the exact request
 
@@ -14,14 +14,14 @@ has not bound it), current ready state, and available explicit request lineage.
 - Reuse a verified terminal explicit review for this target, whether clean or
   findings, and return it without another request or wait.
 - Resume a matching pending explicit request through `$github-review-threads`
-  with its original receipt and deadline. Do not repost merely because Codex has
+  with its original record and deadline. Do not repost merely because Codex has
   not answered yet.
 - When no applicable explicit lineage exists, reconcile prior uncertain effects,
   then request review and wait. Automatic/ready-triggered reviews or results for
   an older HEAD do not satisfy this skill's explicit current-target contract.
 
 Inspect-only scope overrides request-and-wait and reports missing evidence as a
-gap. Missing local receipt output alone never proves no request exists. Recover
+gap. Missing local record output alone never proves no request exists. Recover
 an existing request through `$github-review-threads` when supported; if its
 identity/correlation cannot be established, report blocked rather than
 duplicating the request.
@@ -34,7 +34,7 @@ No local candidate review is required by this skill. The caller supplies any
 local gate before invoking it.
 
 Use one request identity per intended cycle and preserve the complete review
-receipt.
+record.
 Reconcile uncertain request effects before any retry. Only an explicitly requested
 fresh cycle may replace a verified existing same-target lineage. If the expected
 HEAD changes during the run, return the drift to the caller; never silently
@@ -61,6 +61,6 @@ results, and ambiguous correlation cannot stand in for terminal evidence.
 provider result forms; do not infer completion yourself.
 
 Infrastructure failures or unreconciled effects return blocked with the exact
-available receipt and evidence. Preserve provider verdict separately from the
+available record and evidence. Preserve provider verdict separately from the
 monitoring result. No CI check, local code review, or delivery acceptance gate
 is part of this monitor, and no workflow position is stored in a new ledger.
