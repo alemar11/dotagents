@@ -1,6 +1,6 @@
 ---
 name: learn
-description: "Maintain AGENTS.md and durable repository knowledge when explicitly requested."
+description: "Maintain AGENTS.md and durable repository knowledge when requested or when the user states hard repository rules or important assumptions intended to guide future work."
 ---
 
 # Learn Project Context
@@ -17,6 +17,18 @@ provider transport, task graphs, or worker configuration. It may inspect local
 evidence and modify only authorized context surfaces. It never contacts a
 hosted provider and has no publish mode. Work in the invoking session, without
 creating tasks or subagents, whether invoked directly or by another skill.
+
+## Trigger selection
+
+Also select Learn when the user states a hard repository rule or an important
+repository assumption intended to guide future work, even without `$learn` or
+a request to remember it. Route these statements to durable capture. For
+example, “Hard rule: all database access goes through the repository layer”
+or “This repository assumes one tenant per deployment” qualifies when stated
+as an established constraint. Preserve assumptions as assumptions, not verified
+facts. One-task instructions, quoted examples, and tentative ideas do not
+qualify. Selection alone does not authorize a write; apply the authority rules
+below.
 
 ## Select and load one branch
 
@@ -63,7 +75,7 @@ Apply these authority rules:
 Use established user or caller authority without asking again. When scope,
 wording, destination, or a conflict leaves a material decision unresolved, draft
 the exact change and ask only about that decision; continue unaffected work.
-Never infer capture from ordinary conversation, tentative ideas, raw session
+Never infer write authority from trigger selection, tentative ideas, raw session
 text, secrets, or file churn.
 
 ## Workflow graph
@@ -74,7 +86,7 @@ below owns entry conditions and edges for this entrypoint.
 
 | node_id | kind | entry condition | transitions | terminal state |
 | --- | --- | --- | --- | --- |
-| scope | action | explicit repository-knowledge request | inspect, blocked | none |
+| scope | action | repository-knowledge request or qualifying user-stated rule or assumption | inspect, blocked | none |
 | inspect | action | repository scope and memory slice resolved | draft, blocked | none |
 | draft | decision | evidence and intended target are known | reported, apply, confirm | none |
 | confirm | decision | a material decision or write authority remains unresolved | apply, deferred, blocked | none |

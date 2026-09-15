@@ -3,7 +3,8 @@
 # Durable Capture
 
 Use this reference for `memory_slice=durable-capture` when the user states a
-correction, preference, policy, accepted decision, localization convention, or
+hard repository rule, important repository assumption, correction, preference,
+policy, accepted decision, localization convention, or
 other knowledge intended to survive the current task.
 
 ## Durability Filter

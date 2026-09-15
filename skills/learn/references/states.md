@@ -15,7 +15,7 @@ durable, but they do not persist the workflow's current node.
 
 | Node | Kind | Plain description |
 | --- | --- | --- |
-| `scope` | Action | Resolve the durable knowledge request, repository scope, and smallest applicable memory slice. |
+| `scope` | Action | Resolve the durable knowledge request or qualifying user-stated rule or assumption, repository scope, and smallest applicable memory slice. |
 | `inspect` | Action | Read the applicable context surfaces and only the evidence needed for the selected operation. |
 | `draft` | Decision | Prepare targets, wording, evidence, and links; proceed to apply when authority and material decisions are already resolved, otherwise report or confirm. |
 | `confirm` | Decision | Resolve missing write authority or a material user decision; existing authorization does not require another question. |
@@ -44,7 +44,7 @@ durable, but they do not persist the workflow's current node.
 | Compaction section disposition | keep in AGENTS.md, move to the owning `project-context/<topic>.md`, never move out of AGENTS.md | Proposal decision; transient | Separates always-active rules from conditional detail while preserving root/subproject ownership and the normative Code Review Rules contract. |
 | ADR `Status` | `Accepted` | Persisted domain state | Learn creates only accepted, load-bearing ADRs and records this status in the ADR index. |
 | Setup presentation | `Unknown`, `keep-current`, `done` | Presentation only; transient | `Unknown` marks absent or ambiguous display data; the other values control the setup conversation. They are not workflow or domain states. |
-| `allow_implicit_invocation` | `true` | Persisted skill metadata | Lets explicit save/remember/preserve requests select Learn without naming it. |
+| `allow_implicit_invocation` | `true` | Persisted skill metadata | Lets repository-knowledge requests and qualifying user-stated rules or assumptions select Learn without naming it; selection grants no write authority. |
 
 `knowledge_delta`, `write_authority`, destinations, evidence, confirmation,
 before/after blocks, and unresolved questions are run data rather than enum

@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `learn` | Create, update, or refactor AGENTS.md and maintain requested durable repository knowledge. |
+| `learn` | Maintain AGENTS.md and durable repository knowledge; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
 | `explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional research subagents. |
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
