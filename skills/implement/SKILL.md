@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement and validate selected local work or a bounded workflow assignment, without PR publication."
+description: "Implement and validate software features and fixes from a spec, ticket, or direct request, without PR publication."
 ---
 
 # Implement
