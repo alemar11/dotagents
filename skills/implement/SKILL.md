@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement and validate software features and fixes from a spec, ticket, or direct request, without PR publication."
+description: "Implement software features and fixes requiring coordinated code changes and behavioral validation, from a spec, ticket, or direct request. Do not auto-select for isolated mechanical edits, formatting, copy changes, simple configuration adjustments, or minor UI tweaks. Explicit invocation may cover any selected scope. Ends at local validation without PR publication."
 ---
 
 # Implement

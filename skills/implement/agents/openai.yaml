@@ -1,6 +1,6 @@
 interface:
   display_name: "🛠️ Implement"
-  short_description: "Implement and validate software features and fixes."
+  short_description: "Implement and validate substantial software changes."
   brand_color: "#4338CA"
   default_prompt: "Use $implement to implement and validate the selected work in the current repository or assigned worktree, commit only when authorized, and return the candidate to any caller-owned review gate without publication."
 policy:

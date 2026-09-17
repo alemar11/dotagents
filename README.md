@@ -29,7 +29,7 @@ as skills.
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
-| `implement` | Implement and validate software features and fixes from a spec, ticket, issue, or direct request, and commit only when authorized, without orchestration or publication. |
+| `implement` | Implement software features and fixes requiring coordinated code changes and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
