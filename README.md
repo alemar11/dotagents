@@ -35,7 +35,6 @@ as skills.
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
-| `github-review-threads` | Inspect hosted review feedback and perform authorized request, wait, reply, or resolve operations. |
 | `github-stacked-pr` | Manage stacked branches and dependent pull requests, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `crusty` | Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty. |
 | `ms-roberts` | Use when medium or long user-authored English prompts contain grammar errors; append corrections and learning tips after the main answer. |
@@ -82,12 +81,12 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   cannot plan workers until the scope is confirmed or the user stops
   grilling.
 - Install `spec` with its `grilling-session` dependency.
-  Install `review-pr` with its `github-review-threads` dependency. These
-  dependencies must be reachable in the current session; the invoking skills
+  Skill dependencies must be reachable in the current session; the invoking skills
   never install or substitute them automatically.
-- `review-pr` obtains one hosted Codex review result for a PR. Use
-  `$github-review-threads` for inspect, reply, resolve, and other provider
-  review operations. Use `$adversarial-review` for local independent change
+- `review-pr` obtains one hosted Codex review result for a PR through
+  authenticated `gh`, with no other skill dependency. Other authorized review
+  discussion and resolution operations use `gh` directly. Use
+  `$adversarial-review` for local independent change
   review; use `$crusty` only when explicitly asked for Crusty.
 - `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
 - Spec uses installed `$grilling-session` for material clarification and
@@ -138,7 +137,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/github-review-threads skills/github-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/github-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
 ```
 
 Install one reusable skill by passing only its path:
@@ -167,7 +166,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill git-commit \
   --skill yeet \
   --skill versioning \
-  --skill github-review-threads \
   --skill github-stacked-pr \
   --skill crusty \
   --skill ms-roberts \

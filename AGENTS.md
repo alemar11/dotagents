@@ -130,7 +130,7 @@ Scope rebuildable caches to `~/.cache/dotagents/skills/<skill>/` or
 `~/.cache/dotagents/plugins/<plugin>/`; bundled-skill caches belong under the
 plugin's `skills/<skill>/` subdirectory. Do not store user configuration there.
 Durable one-use state that is not rebuildable cache may keep a documented
-historical path (for example `github-review-threads` reservation and journal
+historical path (for example the retired review CLI's reservation and journal
 roots under `~/.cache/dotagents/plugins/g/...`). Do not relocate those roots
 without an explicit migration that preserves consumed markers.
 

@@ -6,9 +6,9 @@ workflows. Keep the publication contract in `SKILL.md` and
 
 ## Ownership boundaries
 
-- Delegate local staging and commit authoring to `$git-commit` and review
-  follow-up to `$github-review-threads`. Use authenticated `gh` directly for
-  explicitly requested issue lifecycle operations.
+- Delegate local staging and commit authoring to `$git-commit`. The caller
+  owns review follow-up, using `$review-pr` for a hosted Codex review or
+  authenticated `gh` for explicitly requested discussion and issue operations.
 - Git and authenticated `gh` own execution; this skill ships no CLI. Keep
   preflight, file-backed text transport, and publication readback in the workflow.
 - `$github-stacked-pr` owns the explicit two-PR stack relationship; Yeet publishes

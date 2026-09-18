@@ -106,7 +106,7 @@ closeout.
 Open [references/workflows.md](references/workflows.md) for publish, existing-PR,
 retry, and no-publishable-work procedures. Yeet must not request or wait for an
 automated Codex review; a composing caller that needs one invokes
-`$github-review-threads` separately using the exact repository, PR, and full
+`$review-pr` separately using the exact repository, PR, and full
 published head SHA from Yeet's publication evidence.
 
 ## Skill Dependencies

@@ -10,9 +10,9 @@ the calling session/task, standalone or composed by another workflow, with the s
 behavior in both cases. Do not create tasks or subagents. No spec, local checkout,
 implementation context, candidate-review receipt, or repair budget is required.
 
-Prefer this skill for a one-shot obtain-and-report hosted review. Use
-`$github-review-threads` directly for inspect, reply, resolve, and other
-provider review operations beyond that path.
+Use authenticated `gh` directly for this one-shot obtain-and-report hosted
+review. General discussion replies and thread resolution remain caller-owned
+operations outside this skill.
 
 ## Scope and authority
 
@@ -32,18 +32,17 @@ The calling task owns those follow-up actions under its own authority.
 
 Read [states.md](references/states.md) for result meanings and
 [hosted-review.md](references/hosted-review.md) before inspection, requests,
-waiting or resume. Before hosted access, verify that `$github-review-threads`
-is installed and reachable by canonical name in the current session. A local
-directory or unrelated connector alone does not establish availability. If
-unavailable, report the dependency and stop the affected operation; do not
-substitute direct provider calls.
+waiting or resume. Before hosted access, verify `gh` availability and the active
+account in the execution environment. If access is unavailable, report the
+limitation; do not install, upgrade, change credentials, or substitute another
+access method incidentally.
 
 Keep the review request limited to the verified PR, commit, and relevant review
 scope. Exclude local absolute paths, internal prompts, and machine or task
 details, including those copied from tool output. Inspect the exact request
 before sending and its provider readback afterward. For a leaked local path,
-attempt at most one authorized correction of the same request through
-`$github-review-threads`; never post a second review request as a content repair.
+attempt at most one authorized correction of the same request through `gh api`;
+never post a second review request as a content repair.
 Report unavailable or uncertain correction separately from the review result.
 
 ## Result and caller handoff
@@ -60,10 +59,3 @@ Return the result directly to that caller, which decides whether
 to repair, rebut, defer, or accept, manages agents and budgets, and invokes this
 skill again when the next published candidate needs hosted review. Standalone
 invocation reports the same evidence directly to the user in the calling task.
-
-## Skill Dependencies
-
-`$github-review-threads` supplies exact review requests, inspection, bounded
-waiting, and reconciliation. Compose only those operations; its reply/resolution
-operations are outside this skill's scope. Never install,
-refresh, or substitute the dependency during a run.

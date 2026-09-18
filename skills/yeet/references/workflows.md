@@ -189,7 +189,7 @@ successful create response alone is not verified publication. Follow Safe Retry
 below for errors or uncertain effects.
 
 Yeet stops after publication and requested attachments. A composing caller may
-invoke `$github-review-threads` or `$github-stacked-pr` separately with the exact
+invoke `$review-pr` or `$github-stacked-pr` separately with the exact
 repository, PR, and published SHA; Yeet does not request or wait for review.
 
 ## No Publishable Local Work
@@ -306,7 +306,7 @@ Return:
 For CI failures after publication, inspect the failing run and logs with `gh`,
 binding the evidence to the published SHA and run attempt. Distinguish local
 fix validation from a successful remote run; publication alone does not authorize
-reruns or additional pushes. For review follow-up, use `$github-review-threads`
-with the exact repository, PR, and one `review_operation`; add
-`mutation_mode=apply` only for an authorized reply, request, review submission,
-or resolution.
+reruns or additional pushes. The caller can use `$review-pr` for a hosted Codex
+review of the exact repository, PR, and published SHA. Other explicitly
+requested review actions use authenticated `gh` directly; publication does not
+authorize replies, formal review submissions, or thread resolution.
