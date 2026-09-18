@@ -21,6 +21,14 @@ pub struct Cli {
     #[arg(long, global = true, help = "Use a one-off PostgreSQL connection URL")]
     pub url: Option<String>,
 
+    #[arg(
+        long,
+        global = true,
+        value_name = "MODE",
+        help = "Override local access_mode: read, write, or read-write"
+    )]
+    pub access_mode: Option<String>,
+
     #[command(subcommand)]
     pub command: Command,
 }
@@ -223,6 +231,30 @@ mod tests {
     }
 
     #[test]
+    fn query_find_accepts_case_insensitive_and_trimmed_types() {
+        let cli = Cli::try_parse_from([
+            "postgres",
+            "query",
+            "find",
+            "demo",
+            "--types",
+            "TABLE, view",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Query(QueryCommand {
+                command: QuerySubcommand::Find(args),
+            }) => {
+                assert_eq!(
+                    args.types,
+                    vec![FindObjectType::Table, FindObjectType::View]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
     fn docs_search_accepts_positional_or_named_limit() {
         let positional =
             Cli::try_parse_from(["postgres", "docs", "search", "transaction isolation", "3"])
@@ -257,6 +289,33 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
     }
+
+    #[test]
+    fn catalog_commands_accept_limit_and_full() {
+        let inspect =
+            Cli::try_parse_from(["postgres", "schema", "inspect", "--limit", "5"]).unwrap();
+        match inspect.command {
+            Command::Schema(SchemaCommand {
+                command: SchemaSubcommand::Inspect(args),
+            }) => {
+                assert_eq!(args.limit, 5);
+                assert!(!args.full);
+                assert_eq!(args.row_limit().unwrap(), Some(5));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let full = Cli::try_parse_from(["postgres", "schema", "inspect", "--full"]).unwrap();
+        match full.command {
+            Command::Schema(SchemaCommand {
+                command: SchemaSubcommand::Inspect(args),
+            }) => {
+                assert!(args.full);
+                assert_eq!(args.row_limit().unwrap(), None);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -275,6 +334,10 @@ pub struct QueryPlanArgs {
 
     #[arg(long, action = ArgAction::SetTrue, help = "Run EXPLAIN ANALYZE")]
     pub analyze: bool,
+}
+
+fn parse_find_object_type(value: &str) -> Result<FindObjectType, String> {
+    <FindObjectType as ValueEnum>::from_str(value.trim(), true)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -319,9 +382,39 @@ pub struct FindArgs {
         long,
         value_enum,
         value_delimiter = ',',
+        value_parser = parse_find_object_type,
+        ignore_case = true,
         help = "Object types to search: schema, table, view, column, function, procedure"
     )]
     pub types: Vec<FindObjectType>,
+
+    #[command(flatten)]
+    pub catalog: CatalogBoundArgs,
+}
+
+#[derive(Debug, Args)]
+pub struct CatalogBoundArgs {
+    #[arg(long, default_value_t = 100, help = "Maximum rows to return")]
+    pub limit: u32,
+
+    #[arg(
+        long,
+        action = ArgAction::SetTrue,
+        help = "Return all matching rows"
+    )]
+    pub full: bool,
+}
+
+impl CatalogBoundArgs {
+    pub fn row_limit(&self) -> anyhow::Result<Option<u32>> {
+        if self.full {
+            return Ok(None);
+        }
+        if self.limit == 0 {
+            anyhow::bail!("--limit must be greater than 0");
+        }
+        Ok(Some(self.limit))
+    }
 }
 
 #[derive(Debug, Args)]
@@ -337,7 +430,7 @@ pub enum ActivitySubcommand {
     #[command(about = "List active sessions in pg_stat_activity")]
     ActiveQueries(LimitArgs),
     #[command(about = "Show blocked and blocking sessions")]
-    Locks,
+    Locks(CatalogBoundArgs),
     #[command(about = "List top pg_stat_statements entries by total time")]
     Slow(LimitArgs),
     #[command(about = "List active queries older than a minute threshold")]
@@ -409,7 +502,7 @@ pub enum SchemaSubcommand {
     #[command(
         about = "Inspect tables, columns, constraints, indexes, views, routines, and extensions"
     )]
-    Inspect,
+    Inspect(CatalogBoundArgs),
     #[command(about = "List focused schema object groups")]
     List(SchemaListCommand),
     #[command(about = "List available or installed extensions")]
@@ -427,7 +520,7 @@ pub enum SchemaSubcommand {
     #[command(about = "Show vacuum and analyze status for user tables")]
     VacuumStatus,
     #[command(about = "List roles and key role attributes")]
-    Roles,
+    Roles(CatalogBoundArgs),
 }
 
 #[derive(Debug, Args)]
@@ -439,17 +532,17 @@ pub struct SchemaListCommand {
 #[derive(Debug, Subcommand)]
 pub enum SchemaListSubcommand {
     #[command(about = "List user-visible base, partitioned, and foreign tables")]
-    Tables,
+    Tables(CatalogBoundArgs),
     #[command(about = "List user-visible views")]
-    Views,
+    Views(CatalogBoundArgs),
     #[command(about = "List user-visible schemas")]
-    Schemas,
+    Schemas(CatalogBoundArgs),
     #[command(about = "List user-defined triggers")]
-    Triggers,
+    Triggers(CatalogBoundArgs),
     #[command(about = "List user-visible indexes")]
-    Indexes,
+    Indexes(CatalogBoundArgs),
     #[command(about = "List user-visible sequences")]
-    Sequences,
+    Sequences(CatalogBoundArgs),
 }
 
 #[derive(Debug, Args)]

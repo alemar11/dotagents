@@ -14,7 +14,7 @@ pub fn selected_find_types(types: &[FindObjectType]) -> Vec<FindObjectType> {
     selected
 }
 
-pub fn build_find_sql(pattern: &str, types: &[FindObjectType]) -> String {
+pub fn build_find_sql(pattern: &str, types: &[FindObjectType], limit: Option<u32>) -> String {
     let pattern = escape_literal(&format!("%{pattern}%"));
     let selected = selected_find_types(types);
     let include_schema = selected.contains(&FindObjectType::Schema);
@@ -66,6 +66,10 @@ pub fn build_find_sql(pattern: &str, types: &[FindObjectType]) -> String {
         branches.push(routine_branch(include_function, include_procedure));
     }
 
+    let limit_sql = match limit {
+        Some(limit) => format!("\nlimit {limit}"),
+        None => String::new(),
+    };
     format!(
         "with p as (
   select '{pattern}'::text as pat
@@ -74,7 +78,7 @@ select object_type, object_schema, object_name, details
 from (
 {}
 ) as results
-order by object_type, object_schema, object_name;",
+order by object_type, object_schema, object_name{limit_sql};",
         branches.join("\n  union all\n")
     )
 }
@@ -125,7 +129,7 @@ mod tests {
     #[test]
     fn omitted_types_search_every_supported_class() {
         assert_eq!(selected_find_types(&[]), FindObjectType::ALL.to_vec());
-        let sql = build_find_sql("demo", &[]);
+        let sql = build_find_sql("demo", &[], Some(100));
         assert!(sql.contains("select 'schema'::text as object_type"));
         assert!(sql.contains("c.relkind in ('r', 'p')"));
         assert!(sql.contains("c.relkind in ('v', 'm')"));
@@ -169,7 +173,7 @@ mod tests {
             ),
         ];
         for (object_type, expected, rejected) in cases {
-            let sql = build_find_sql("demo", &[object_type]);
+            let sql = build_find_sql("demo", &[object_type], Some(100));
             assert!(sql.contains(expected), "{object_type:?}: {sql}");
             assert!(!sql.contains(rejected), "{object_type:?}: {sql}");
             assert!(sql.contains("as object_type"), "{object_type:?}: {sql}");
@@ -182,10 +186,17 @@ mod tests {
 
     #[test]
     fn pattern_quotes_are_escaped_and_types_are_not_interpolated() {
-        let sql = build_find_sql("o'reilly; drop", &[FindObjectType::View]);
+        let sql = build_find_sql("o'reilly; drop", &[FindObjectType::View], None);
         assert!(sql.contains("'%o''reilly; drop%'"));
         assert!(!sql.contains("o'reilly; drop"));
         assert!(!sql.contains("regexp_replace(lower("));
         assert!(!sql.contains("regexp_split_to_array"));
+        assert!(!sql.contains("\nlimit "));
+    }
+
+    #[test]
+    fn find_sql_applies_optional_row_limit() {
+        let sql = build_find_sql("demo", &[FindObjectType::Table], Some(25));
+        assert!(sql.contains("\nlimit 25;"));
     }
 }

@@ -71,6 +71,57 @@ fn invalid_environment_connection_does_not_fall_back_to_saved_profile() {
     assert!(output.status.success(), "{output:?}");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert!(json["url"].as_str().unwrap().ends_with("/explicit"));
+    assert_eq!(json["access_mode"], "read");
+}
+
+#[test]
+fn doctor_fails_when_config_cannot_be_resolved() {
+    let root = fixture();
+    fs::write(
+        root.path().join(".skills/postgres/config.toml"),
+        "this is not valid toml [[[",
+    )
+    .unwrap();
+    let output = cli(&root).arg("doctor").output().unwrap();
+    let message = error_message(&output);
+    assert!(
+        message.to_ascii_lowercase().contains("toml")
+            || message.to_ascii_lowercase().contains("parse"),
+        "{message}"
+    );
+}
+
+#[test]
+fn one_off_access_mode_flag_and_env_override_read_default() {
+    let root = fixture();
+    let output = cli(&root)
+        .args([
+            "--url",
+            "postgresql://fixture:fixture@127.0.0.1:1/explicit",
+            "--access-mode",
+            "write",
+            "profile",
+            "resolve",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["access_mode"], "write");
+
+    let output = cli(&root)
+        .env("DB_ACCESS_MODE", "read-write")
+        .args([
+            "--url",
+            "postgresql://fixture:fixture@127.0.0.1:1/explicit",
+            "profile",
+            "resolve",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["access_mode"], "read-write");
 }
 
 #[test]

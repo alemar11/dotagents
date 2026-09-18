@@ -10,9 +10,16 @@ the skill package.
 - `DB_PROFILE`
   - Saved profile name from `config.toml`.
 - `DB_URL`
-  - One-off connection URL. Takes precedence over saved profiles.
+  - One-off connection URL. Takes precedence over saved profiles. Defaults to
+    local `access_mode=read`.
+- `DB_ACCESS_MODE`
+  - One-off local access guard: `read`, `write`, or `read-write`. Applies only
+    to `--url` / `DB_URL` connections. Default: `read`. `--access-mode`
+    overrides this and also overrides a saved profile for that invocation.
 - `DB_APPLICATION_NAME`
   - Session `application_name`. Default: `codex-postgres-skill`.
+- `DB_CONNECT_TIMEOUT_MS`
+  - TCP/TLS connect timeout in milliseconds. Default: `10000`.
 - `DB_STATEMENT_TIMEOUT_MS`
   - Session statement timeout.
 - `DB_LOCK_TIMEOUT_MS`

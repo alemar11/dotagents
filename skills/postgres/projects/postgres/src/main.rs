@@ -2,13 +2,13 @@ use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use postgres_skill_cli::cli::*;
 use postgres_skill_cli::config::{
-    AccessMode, RuntimeOptions, application_name, bootstrap_profile, canonical_config_path,
-    migrate_config_file, parse_legacy_ssl_mode, parse_ssl_mode, redact_connection_url,
+    AccessMode, RuntimeOptions, bootstrap_profile, canonical_config_path, migrate_config_file,
+    parse_access_mode, parse_legacy_ssl_mode, parse_ssl_mode, redact_connection_url,
     runtime_context, update_ssl_mode,
 };
 use postgres_skill_cli::db::{
     DbClient, QueryExecution, QueryTable, escape_literal, execution_to_json, expect_non_empty,
-    table_to_json,
+    table_to_json, with_row_limit,
 };
 use postgres_skill_cli::docs;
 use postgres_skill_cli::find::build_find_sql;
@@ -323,19 +323,10 @@ fn lock_strength_starts_at(tokens: &[Token]) -> bool {
 }
 
 async fn doctor(cli: &Cli, skill_root: &Path) -> Result<()> {
-    let runtime = runtime_context(
-        &RuntimeOptions {
-            project_root_override: cli.project_root.clone(),
-            profile_override: cli.profile.clone(),
-            url_override: cli.url.clone(),
-        },
-        skill_root,
-    );
-    let runtime_info = runtime.ok();
-
+    let runtime = runtime_context(&runtime_options(cli)?, skill_root)?;
     let output = json!({
-        "application_name": application_name(),
-        "runtime": runtime_info,
+        "application_name": runtime.application_name,
+        "runtime": runtime,
     });
     if cli.json {
         print_json(&output)
@@ -435,14 +426,7 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
             }
         }
         ProfileSubcommand::Resolve => {
-            let ctx = runtime_context(
-                &RuntimeOptions {
-                    project_root_override: cli.project_root.clone(),
-                    profile_override: cli.profile.clone(),
-                    url_override: cli.url.clone(),
-                },
-                skill_root,
-            )?;
+            let ctx = runtime_context(&runtime_options(cli)?, skill_root)?;
             if cli.json {
                 print_json(&ctx)
             } else {
@@ -489,7 +473,7 @@ union all select 'application_name', current_setting('application_name');",
                 .await?;
             render(
                 cli.json,
-                json!({"info": table_to_json(&table)}),
+                json!({"info": table_to_json(&table)?}),
                 &[("Connection Info", table)],
             )
         }
@@ -549,7 +533,7 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
             let table = db.query(&format!("{prefix} {sql}")).await?;
             render(
                 cli.json,
-                json!({"plan": table_to_json(&table)}),
+                json!({"plan": table_to_json(&table)?}),
                 &[("Explain", table)],
             )
         }
@@ -562,11 +546,15 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
         QuerySubcommand::Find(args) => {
             require_db_access(&db, AccessRequirement::Read, "query find")?;
             let table = db
-                .query(&build_find_sql(&args.pattern, &args.types))
+                .query(&build_find_sql(
+                    &args.pattern,
+                    &args.types,
+                    args.catalog.row_limit()?,
+                ))
                 .await?;
             render(
                 cli.json,
-                json!({"matches": table_to_json(&table)}),
+                json!({"matches": table_to_json(&table)?}),
                 &[("Matches", table)],
             )
         }
@@ -588,7 +576,7 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
             let table = db.query(&format!("select pid, usename as user_name, datname as db, state, wait_event_type, wait_event, now() - query_start as query_age, now() - xact_start as xact_age, left(query, 200) as query from pg_stat_activity where pid <> pg_backend_pid() and state <> 'idle' order by query_start desc nulls last limit {};", args.limit)).await?;
             render(
                 cli.json,
-                json!({"activity": table_to_json(&table)}),
+                json!({"activity": table_to_json(&table)?}),
                 &[("Activity", table)],
             )
         }
@@ -596,11 +584,19 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
             let table = tools::list_active_queries(&db, args.limit).await?;
             render_named_table(cli.json, "active_queries", "Active Queries", table)
         }
-        ActivitySubcommand::Locks => {
-            let table = db.query("select blocked.pid as blocked_pid, blocked.usename as blocked_user, blocking.pid as blocking_pid, blocking.usename as blocking_user, now() - blocked.query_start as blocked_duration, blocked.query as blocked_query, blocking.query as blocking_query from pg_stat_activity blocked join pg_stat_activity blocking on blocking.pid = any(pg_blocking_pids(blocked.pid)) order by blocked_duration desc;").await?;
+        ActivitySubcommand::Locks(args) => {
+            let chars = query_text_max_chars()?;
+            let table = db
+                .query(&with_row_limit(
+                    &format!(
+                        "select blocked.pid as blocked_pid, blocked.usename as blocked_user, blocking.pid as blocking_pid, blocking.usename as blocking_user, now() - blocked.query_start as blocked_duration, left(blocked.query, {chars}) as blocked_query, left(blocking.query, {chars}) as blocking_query from pg_stat_activity blocked join pg_stat_activity blocking on blocking.pid = any(pg_blocking_pids(blocked.pid)) order by blocked_duration desc;"
+                    ),
+                    args.row_limit()?,
+                ))
+                .await?;
             render(
                 cli.json,
-                json!({"locks": table_to_json(&table)}),
+                json!({"locks": table_to_json(&table)?}),
                 &[("Locks", table)],
             )
         }
@@ -617,7 +613,7 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
             let table = db.query(&format!("select calls, round({total}::numeric, 2) as total_ms, round({mean}::numeric, 2) as mean_ms, rows, left(query, {chars}) as query from pg_stat_statements where dbid = (select oid from pg_database where datname = current_database()) order by {total} desc limit {};", args.limit)).await?;
             render(
                 cli.json,
-                json!({"slow_queries": table_to_json(&table)}),
+                json!({"slow_queries": table_to_json(&table)?}),
                 &[("Slow Queries", table)],
             )
         }
@@ -625,7 +621,7 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
             let table = db.query(&format!("select pid, usename as user_name, datname as db, state, now() - query_start as query_age, left(query, 200) as query from pg_stat_activity where state = 'active' and query_start is not null and now() - query_start > interval '{} minutes' order by query_start asc limit {};", args.minutes, args.limit)).await?;
             render(
                 cli.json,
-                json!({"long_running": table_to_json(&table)}),
+                json!({"long_running": table_to_json(&table)?}),
                 &[("Long Running Queries", table)],
             )
         }
@@ -652,30 +648,30 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
     let db = db_client(cli, skill_root).await?;
     require_db_access(&db, AccessRequirement::Read, "schema command")?;
     match &command.command {
-        SchemaSubcommand::Inspect => schema_inspect(cli, &db).await,
+        SchemaSubcommand::Inspect(args) => schema_inspect(cli, &db, args).await,
         SchemaSubcommand::List(args) => match &args.command {
-            SchemaListSubcommand::Tables => {
-                let table = tools::list_tables(&db).await?;
+            SchemaListSubcommand::Tables(bounds) => {
+                let table = tools::list_tables(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "tables", "Tables", table)
             }
-            SchemaListSubcommand::Views => {
-                let table = tools::list_views(&db).await?;
+            SchemaListSubcommand::Views(bounds) => {
+                let table = tools::list_views(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "views", "Views", table)
             }
-            SchemaListSubcommand::Schemas => {
-                let table = tools::list_schemas(&db).await?;
+            SchemaListSubcommand::Schemas(bounds) => {
+                let table = tools::list_schemas(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "schemas", "Schemas", table)
             }
-            SchemaListSubcommand::Triggers => {
-                let table = tools::list_triggers(&db).await?;
+            SchemaListSubcommand::Triggers(bounds) => {
+                let table = tools::list_triggers(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "triggers", "Triggers", table)
             }
-            SchemaListSubcommand::Indexes => {
-                let table = tools::list_indexes(&db).await?;
+            SchemaListSubcommand::Indexes(bounds) => {
+                let table = tools::list_indexes(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "indexes", "Indexes", table)
             }
-            SchemaListSubcommand::Sequences => {
-                let table = tools::list_sequences(&db).await?;
+            SchemaListSubcommand::Sequences(bounds) => {
+                let table = tools::list_sequences(&db, bounds.row_limit()?).await?;
                 render_named_table(cli.json, "sequences", "Sequences", table)
             }
         },
@@ -702,7 +698,7 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
             let table = db.query(&format!("with sized_tables as (select schemaname, relname, relid, pg_total_relation_size(relid) as total_bytes, pg_relation_size(relid) as table_bytes from pg_stat_user_tables) select schemaname, relname, pg_size_pretty(total_bytes) as total_size, pg_size_pretty(table_bytes) as table_size, pg_size_pretty(total_bytes - table_bytes) as index_size from sized_tables order by total_bytes desc limit {};", args.limit)).await?;
             render(
                 cli.json,
-                json!({"table_sizes": table_to_json(&table)}),
+                json!({"table_sizes": table_to_json(&table)?}),
                 &[("Table Sizes", table)],
             )
         }
@@ -711,8 +707,8 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
             let unused = db.query(&format!("with sized_indexes as (select s.schemaname, s.relname, s.indexrelname, s.idx_scan, pg_relation_size(s.indexrelid) as index_bytes from pg_stat_user_indexes s join pg_index i on i.indexrelid = s.indexrelid where s.idx_scan = 0 and i.indisprimary = false and i.indisunique = false) select schemaname, relname, indexrelname, idx_scan, pg_size_pretty(index_bytes) as index_size from sized_indexes order by index_bytes desc limit {};", args.limit)).await?;
             if cli.json {
                 print_json(&json!({
-                    "missing_index_candidates": table_to_json(&missing),
-                    "unused_indexes": table_to_json(&unused)
+                    "missing_index_candidates": table_to_json(&missing)?,
+                    "unused_indexes": table_to_json(&unused)?
                 }))
             } else {
                 println!(
@@ -736,7 +732,7 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
             let table = db.query("with fk_constraints as (select c.oid as constraint_oid, c.conrelid, c.conname, c.conkey as fk_attnums, array_agg(a.attname order by cols.ordinality) as fk_columns from pg_constraint c join lateral unnest(c.conkey) with ordinality as cols(attnum, ordinality) on true join pg_attribute a on a.attrelid = c.conrelid and a.attnum = cols.attnum and a.attisdropped = false where c.contype = 'f' group by c.oid, c.conrelid, c.conname, c.conkey), supporting_indexes as (select i.indrelid as conrelid, array_agg(idx_col.attnum order by idx_col.ordinality) filter (where idx_col.ordinality <= i.indnkeyatts and idx_col.attnum > 0) as index_key_attnums from pg_index i cross join lateral unnest(i.indkey::smallint[]) with ordinality as idx_col(attnum, ordinality) where i.indpred is null and i.indisvalid and i.indisready group by i.indrelid, i.indexrelid, i.indnkeyatts) select fk.conrelid::regclass as table_name, fk.conname as constraint_name, array_to_string(fk.fk_columns, ', ') as fk_columns from fk_constraints fk where not exists (select 1 from supporting_indexes si where si.conrelid = fk.conrelid and array_length(si.index_key_attnums, 1) >= array_length(fk.fk_attnums, 1) and si.index_key_attnums[1:array_length(fk.fk_attnums, 1)] = fk.fk_attnums) order by table_name::text, constraint_name;").await?;
             render(
                 cli.json,
-                json!({"missing_fk_indexes": table_to_json(&table)}),
+                json!({"missing_fk_indexes": table_to_json(&table)?}),
                 &[("Missing FK Indexes", table)],
             )
         }
@@ -744,15 +740,15 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
             let table = db.query("select relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze from pg_stat_user_tables order by last_analyze nulls first;").await?;
             render(
                 cli.json,
-                json!({"vacuum_status": table_to_json(&table)}),
+                json!({"vacuum_status": table_to_json(&table)?}),
                 &[("Vacuum / Analyze Status", table)],
             )
         }
-        SchemaSubcommand::Roles => {
-            let table = db.query("with roles as (select r.oid, r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, r.rolconnlimit, r.rolvaliduntil from pg_roles r) select r.rolname as role, r.rolcanlogin as can_login, r.rolsuper as superuser, r.rolcreatedb as createdb, r.rolcreaterole as createrole, r.rolinherit as inherit, r.rolreplication as replication, r.rolbypassrls as bypassrls, r.rolconnlimit as conn_limit, r.rolvaliduntil as valid_until, coalesce(string_agg(m.rolname, ', ' order by m.rolname), '') as member_of from roles r left join pg_auth_members am on am.member = r.oid left join pg_roles m on m.oid = am.roleid group by r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, r.rolconnlimit, r.rolvaliduntil order by r.rolname;").await?;
+        SchemaSubcommand::Roles(args) => {
+            let table = db.query(&with_row_limit("with roles as (select r.oid, r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, r.rolconnlimit, r.rolvaliduntil from pg_roles r) select r.rolname as role, r.rolcanlogin as can_login, r.rolsuper as superuser, r.rolcreatedb as createdb, r.rolcreaterole as createrole, r.rolinherit as inherit, r.rolreplication as replication, r.rolbypassrls as bypassrls, r.rolconnlimit as conn_limit, r.rolvaliduntil as valid_until, coalesce(string_agg(m.rolname, ', ' order by m.rolname), '') as member_of from roles r left join pg_auth_members am on am.member = r.oid left join pg_roles m on m.oid = am.roleid group by r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, r.rolconnlimit, r.rolvaliduntil order by r.rolname;", args.row_limit()?)).await?;
             render(
                 cli.json,
-                json!({"roles": table_to_json(&table)}),
+                json!({"roles": table_to_json(&table)?}),
                 &[("Roles", table)],
             )
         }
@@ -791,15 +787,20 @@ async fn docs_command(cli: &Cli, command: &DocsCommand) -> Result<()> {
 }
 
 async fn db_client(cli: &Cli, skill_root: &Path) -> Result<DbClient> {
-    let ctx = runtime_context(
-        &RuntimeOptions {
-            project_root_override: cli.project_root.clone(),
-            profile_override: cli.profile.clone(),
-            url_override: cli.url.clone(),
-        },
-        skill_root,
-    )?;
+    let ctx = runtime_context(&runtime_options(cli)?, skill_root)?;
     Ok(DbClient::new(ctx))
+}
+
+fn runtime_options(cli: &Cli) -> Result<RuntimeOptions> {
+    Ok(RuntimeOptions {
+        project_root_override: cli.project_root.clone(),
+        profile_override: cli.profile.clone(),
+        url_override: cli.url.clone(),
+        access_mode_override: match cli.access_mode.as_deref() {
+            Some(value) => Some(parse_access_mode(value)?),
+            None => None,
+        },
+    })
 }
 
 fn render(json_mode: bool, payload: Value, sections: &[(&str, QueryTable)]) -> Result<()> {
@@ -818,7 +819,7 @@ fn render(json_mode: bool, payload: Value, sections: &[(&str, QueryTable)]) -> R
 
 fn render_named_table(json_mode: bool, key: &str, title: &str, table: QueryTable) -> Result<()> {
     let mut payload = serde_json::Map::new();
-    payload.insert(key.to_string(), table_to_json(&table));
+    payload.insert(key.to_string(), table_to_json(&table)?);
     render(json_mode, Value::Object(payload), &[(title, table)])
 }
 
@@ -826,8 +827,8 @@ fn render_named_sections(json_mode: bool, key: &str, sections: &[ToolSection]) -
     if json_mode {
         let sections_payload = sections
             .iter()
-            .map(|section| (section.key.to_string(), table_to_json(&section.table)))
-            .collect::<serde_json::Map<_, _>>();
+            .map(|section| Ok((section.key.to_string(), table_to_json(&section.table)?)))
+            .collect::<Result<serde_json::Map<_, _>>>()?;
         let mut payload = serde_json::Map::new();
         payload.insert(key.to_string(), Value::Object(sections_payload));
         print_json(&Value::Object(payload))
@@ -846,7 +847,7 @@ fn render_query_run(json_mode: bool, sql: &str, execution: &QueryExecution) -> R
     if json_mode {
         print_json(&json!({
             "query": sql,
-            "statements": execution_to_json(execution)["statements"].clone(),
+            "statements": execution_to_json(execution)?["statements"].clone(),
         }))
     } else {
         for (index, statement) in execution.statements.iter().enumerate() {
@@ -914,22 +915,23 @@ fn parse_query_text_max_chars(value: Option<&str>) -> Result<u32> {
         .with_context(|| "DB_QUERY_TEXT_MAX_CHARS must be a non-negative integer.".to_string())
 }
 
-async fn schema_inspect(cli: &Cli, db: &DbClient) -> Result<()> {
+async fn schema_inspect(cli: &Cli, db: &DbClient, args: &CatalogBoundArgs) -> Result<()> {
+    let limit = args.row_limit()?;
     let sections = [
-        ("Tables", db.query("select table_schema, table_name, table_type from information_schema.tables where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name;").await?),
-        ("Columns", db.query("select table_schema, table_name, ordinal_position, column_name, data_type, udt_name, is_nullable, column_default from information_schema.columns where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name, ordinal_position;").await?),
-        ("Primary Keys", db.query("select tc.table_schema, tc.table_name, kcu.column_name, kcu.ordinal_position from information_schema.table_constraints tc join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema not in ('pg_catalog', 'information_schema') order by tc.table_schema, tc.table_name, kcu.ordinal_position;").await?),
-        ("Foreign Keys", db.query("select tc.table_schema, tc.table_name, kcu.column_name, ccu.table_schema as foreign_table_schema, ccu.table_name as foreign_table_name, ccu.column_name as foreign_column_name, rc.update_rule, rc.delete_rule from information_schema.table_constraints tc join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name and ccu.table_schema = tc.table_schema join information_schema.referential_constraints rc on rc.constraint_name = tc.constraint_name and rc.constraint_schema = tc.table_schema where tc.constraint_type = 'FOREIGN KEY' and tc.table_schema not in ('pg_catalog', 'information_schema') order by tc.table_schema, tc.table_name, kcu.column_name;").await?),
-        ("Indexes", db.query("select schemaname, tablename, indexname, indexdef from pg_indexes where schemaname not in ('pg_catalog', 'information_schema') order by schemaname, tablename, indexname;").await?),
-        ("Views", db.query("select schemaname, viewname, left(definition, 400) as definition from pg_views where schemaname not in ('pg_catalog', 'information_schema') order by schemaname, viewname;").await?),
-        ("Functions", db.query("select n.nspname as function_schema, p.proname as function_name, pg_get_function_identity_arguments(p.oid) as arguments, pg_get_function_result(p.oid) as return_type, l.lanname as language, left(pg_get_functiondef(p.oid), 400) as definition from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_language l on l.oid = p.prolang where n.nspname not in ('pg_catalog', 'information_schema') and p.prokind = 'f' order by n.nspname, p.proname;").await?),
-        ("Extensions", db.query("select extname, extversion, extrelocatable from pg_extension order by extname;").await?),
+        ("Tables", db.query(&with_row_limit("select table_schema, table_name, table_type from information_schema.tables where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name;", limit)).await?),
+        ("Columns", db.query(&with_row_limit("select table_schema, table_name, ordinal_position, column_name, data_type, udt_name, is_nullable, column_default from information_schema.columns where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name, ordinal_position;", limit)).await?),
+        ("Primary Keys", db.query(&with_row_limit("select tc.table_schema, tc.table_name, kcu.column_name, kcu.ordinal_position from information_schema.table_constraints tc join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema not in ('pg_catalog', 'information_schema') order by tc.table_schema, tc.table_name, kcu.ordinal_position;", limit)).await?),
+        ("Foreign Keys", db.query(&with_row_limit("select tc.table_schema, tc.table_name, kcu.column_name, ccu.table_schema as foreign_table_schema, ccu.table_name as foreign_table_name, ccu.column_name as foreign_column_name, rc.update_rule, rc.delete_rule from information_schema.table_constraints tc join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name and ccu.table_schema = tc.table_schema join information_schema.referential_constraints rc on rc.constraint_name = tc.constraint_name and rc.constraint_schema = tc.table_schema where tc.constraint_type = 'FOREIGN KEY' and tc.table_schema not in ('pg_catalog', 'information_schema') order by tc.table_schema, tc.table_name, kcu.column_name;", limit)).await?),
+        ("Indexes", db.query(&with_row_limit("select schemaname, tablename, indexname, indexdef from pg_indexes where schemaname not in ('pg_catalog', 'information_schema') order by schemaname, tablename, indexname;", limit)).await?),
+        ("Views", db.query(&with_row_limit("select schemaname, viewname, left(definition, 400) as definition from pg_views where schemaname not in ('pg_catalog', 'information_schema') order by schemaname, viewname;", limit)).await?),
+        ("Functions", db.query(&with_row_limit("select n.nspname as function_schema, p.proname as function_name, pg_get_function_identity_arguments(p.oid) as arguments, pg_get_function_result(p.oid) as return_type, l.lanname as language, left(pg_get_functiondef(p.oid), 400) as definition from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_language l on l.oid = p.prolang where n.nspname not in ('pg_catalog', 'information_schema') and p.prokind = 'f' order by n.nspname, p.proname;", limit)).await?),
+        ("Extensions", db.query(&with_row_limit("select extname, extversion, extrelocatable from pg_extension order by extname;", limit)).await?),
     ];
     if cli.json {
         let payload = sections
             .iter()
-            .map(|(title, table)| ((*title).to_string(), table_to_json(table)))
-            .collect::<serde_json::Map<_, _>>();
+            .map(|(title, table)| Ok(((*title).to_string(), table_to_json(table)?)))
+            .collect::<Result<serde_json::Map<_, _>>>()?;
         print_json(&Value::Object(payload))
     } else {
         for (index, (title, table)) in sections.iter().enumerate() {
@@ -1021,7 +1023,7 @@ async fn destructive_pids(
     let table = db.query(&sql).await?;
     render(
         cli.json,
-        json!({"result": table_to_json(&table)}),
+        json!({"result": table_to_json(&table)?}),
         &[("Result", table)],
     )
 }

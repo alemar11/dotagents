@@ -140,7 +140,17 @@ Rules:
 
 Contract:
 
-- `doctor` returns `application_name` and `runtime`.
+- `doctor` returns `application_name` and `runtime` when config resolves.
+  Invalid or missing config is a non-zero failure with the standard error
+  object; doctor does not succeed with `runtime: null`.
+- `query run` JSON objects key rows by column name. Duplicate column names
+  are rejected instead of silently overwriting keys. Human table output is
+  unchanged.
+- `query find --types` accepts the canonical lowercase names and is
+  case-insensitive; comma-separated values are trimmed.
+- `query find`, `schema inspect`, `schema list`, `schema roles`, and
+  `activity locks` default to `--limit 100`. Pass `--full` to return every
+  matching row. `activity locks` truncates query text.
 - `profile` commands return profile- or connection-specific objects such as the
   resolved runtime context or `{ "status": "ok", ... }` for connection checks.
 - `query run` returns the submitted SQL plus a `statements` array, with one
@@ -246,6 +256,9 @@ Project-root precedence:
 Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
 `access_mode = "read-write"` under `[tools.postgres.profiles.<name>]`.
 
+- `--url` and `DB_URL` one-off connections default to `read`. Override with
+  `--access-mode` or, for one-off URLs only, `DB_ACCESS_MODE`. `--access-mode`
+  also overrides a saved profile for that invocation without rewriting config.
 - Missing `access_mode` values are backward compatible and resolve to
   `read-write`.
 - Loading a v1, `2.0.0`, or `2.1.0` config normalizes it to
@@ -318,16 +331,22 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
 - `query find`
   - Search schemas, tables, views, columns, functions, and procedures by name.
   - `--types` accepts only `schema`, `table`, `view`, `column`, `function`, and
-    `procedure`. Omit it to search all of those classes, including views and
+    `procedure`. Matching is case-insensitive and comma values are trimmed.
+    Omit it to search all of those classes, including views and
     materialized views.
-- `activity overview|active-queries|locks|slow|long-running|cancel|terminate|cancel-pid|terminate-pid|pg-stat-top|replication-slots`
-  - Runtime diagnostics and query control.
+  - Defaults to `--limit 100`; pass `--full` for an unbounded result.
 - `schema inspect|list|extensions|table-sizes|index-health|invalid-indexes|top-bloated-tables|missing-fk-indexes|vacuum-status|roles`
   - Schema and catalog inspection.
+  - `schema inspect`, `schema list`, and `schema roles` default to
+    `--limit 100`; pass `--full` for an unbounded result.
   - `schema list` supports `tables`, `views`, `schemas`, `triggers`,
     `indexes`, and `sequences`.
   - `schema extensions` supports `--installed` and `--available`; installed
     extensions are the default when neither flag is provided.
+- `activity overview|active-queries|locks|slow|long-running|cancel|terminate|cancel-pid|terminate-pid|pg-stat-top|replication-slots`
+  - Runtime diagnostics and query control.
+  - `activity locks` defaults to `--limit 100`, truncates query text, and
+    accepts `--full`.
 - `docs search`
   - Search official PostgreSQL current docs.
   - Accepts a trailing positional `LIMIT` or `--limit`. The default is 10, and

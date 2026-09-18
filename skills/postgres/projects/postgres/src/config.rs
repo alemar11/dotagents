@@ -32,11 +32,12 @@ pub struct RuntimeContext {
     pub application_name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RuntimeOptions {
     pub project_root_override: Option<PathBuf>,
     pub profile_override: Option<String>,
     pub url_override: Option<String>,
+    pub access_mode_override: Option<AccessMode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -183,6 +184,32 @@ impl AccessMode {
     }
 }
 
+pub fn parse_access_mode(value: &str) -> Result<AccessMode> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "read" => Ok(AccessMode::Read),
+        "write" => Ok(AccessMode::Write),
+        "read-write" | "read_write" => Ok(AccessMode::ReadWrite),
+        _ => bail!("Invalid access_mode value '{value}'. Expected read, write, or read-write."),
+    }
+}
+
+pub fn resolve_one_off_access_mode(
+    cli_override: Option<AccessMode>,
+    env_value: Option<&str>,
+) -> Result<AccessMode> {
+    if let Some(mode) = cli_override {
+        return Ok(mode);
+    }
+    match env_value.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => parse_access_mode(value),
+        None => Ok(AccessMode::Read),
+    }
+}
+
+fn one_off_access_mode(cli_override: Option<AccessMode>) -> Result<AccessMode> {
+    resolve_one_off_access_mode(cli_override, env::var("DB_ACCESS_MODE").ok().as_deref())
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Default, PartialEq, Eq)]
 pub enum SslMode {
     #[default]
@@ -319,7 +346,7 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
             profile_name,
             url,
             ssl_mode,
-            access_mode: AccessMode::ReadWrite,
+            access_mode: one_off_access_mode(options.access_mode_override)?,
             url_source: "env".to_string(),
             application_name: application_name(),
         });
@@ -351,7 +378,7 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
         profile_name: resolved.name,
         url: resolved.url,
         ssl_mode: resolved.ssl_mode,
-        access_mode: resolved.access_mode,
+        access_mode: options.access_mode_override.unwrap_or(resolved.access_mode),
         url_source: "config".to_string(),
         application_name: application_name(),
     })
@@ -1194,9 +1221,11 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     let user = prompt("User", None, false)?;
     let password = prompt("Password", None, true)?;
     let ssl_mode = prompt("ssl_mode (disable/require)", Some("disable"), false)?;
+    let access_mode = prompt("access_mode (read/write/read-write)", Some("read"), false)?;
     let description = prompt("Description", Some(""), false)?;
 
     let ssl_mode = parse_ssl_mode(&ssl_mode)?;
+    let access_mode = parse_access_mode(&access_mode)?;
     let resolved = ResolvedProfile {
         name: profile_name.clone(),
         description: if description.is_empty() {
@@ -1206,7 +1235,7 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
         },
         url: build_url(&host, port, &database, &user, &password, ssl_mode.as_str())?,
         ssl_mode,
-        access_mode: AccessMode::ReadWrite,
+        access_mode,
     };
 
     if save {
@@ -1986,6 +2015,28 @@ password = "postgres"
         assert_eq!(parse_ssl_mode("require").unwrap(), SslMode::Require);
         assert!(parse_ssl_mode("true").is_err());
         assert_eq!(parse_legacy_ssl_mode("true").unwrap(), SslMode::Require);
+    }
+
+    #[test]
+    fn one_off_access_mode_defaults_to_read_and_honors_overrides() {
+        assert_eq!(
+            resolve_one_off_access_mode(None, None).unwrap(),
+            AccessMode::Read
+        );
+        assert_eq!(
+            resolve_one_off_access_mode(Some(AccessMode::Write), Some("read")).unwrap(),
+            AccessMode::Write
+        );
+        assert_eq!(
+            resolve_one_off_access_mode(None, Some(" read-write ")).unwrap(),
+            AccessMode::ReadWrite
+        );
+        assert!(resolve_one_off_access_mode(None, Some("admin")).is_err());
+        assert_eq!(parse_access_mode("READ").unwrap(), AccessMode::Read);
+        assert_eq!(
+            parse_access_mode("read_write").unwrap(),
+            AccessMode::ReadWrite
+        );
     }
 
     #[test]

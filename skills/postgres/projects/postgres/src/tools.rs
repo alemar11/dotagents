@@ -1,4 +1,4 @@
-use crate::db::{DbClient, QueryExecution, QueryTable};
+use crate::db::{DbClient, QueryExecution, QueryTable, with_row_limit};
 use anyhow::Result;
 
 pub struct ToolSection {
@@ -59,28 +59,28 @@ pub async fn list_active_queries(db: &DbClient, limit: u32) -> Result<QueryTable
     db.query(&format!("select pid, usename as user_name, datname as database, state, wait_event_type, wait_event, now() - query_start as query_age, now() - xact_start as transaction_age, left(query, 300) as query from pg_stat_activity where pid <> pg_backend_pid() and state = 'active' order by query_start asc nulls last limit {limit};")).await
 }
 
-pub async fn list_tables(db: &DbClient) -> Result<QueryTable> {
-    db.query("select n.nspname as table_schema, c.relname as table_name, case c.relkind when 'r' then 'base table' when 'p' then 'partitioned table' when 'f' then 'foreign table' else c.relkind::text end as table_type, pg_get_userbyid(c.relowner) as owner from pg_class c join pg_namespace n on n.oid = c.relnamespace where c.relkind in ('r', 'p', 'f') and n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname, c.relname;").await
+pub async fn list_tables(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select n.nspname as table_schema, c.relname as table_name, case c.relkind when 'r' then 'base table' when 'p' then 'partitioned table' when 'f' then 'foreign table' else c.relkind::text end as table_type, pg_get_userbyid(c.relowner) as owner from pg_class c join pg_namespace n on n.oid = c.relnamespace where c.relkind in ('r', 'p', 'f') and n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname, c.relname;", limit)).await
 }
 
-pub async fn list_views(db: &DbClient) -> Result<QueryTable> {
-    db.query("select schemaname as view_schema, viewname as view_name, viewowner as owner, left(definition, 400) as definition from pg_views where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, viewname;").await
+pub async fn list_views(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select schemaname as view_schema, viewname as view_name, viewowner as owner, left(definition, 400) as definition from pg_views where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, viewname;", limit)).await
 }
 
-pub async fn list_schemas(db: &DbClient) -> Result<QueryTable> {
-    db.query("select n.nspname as schema_name, pg_get_userbyid(n.nspowner) as owner, has_schema_privilege(n.oid, 'USAGE') as has_usage from pg_namespace n where n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname;").await
+pub async fn list_schemas(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select n.nspname as schema_name, pg_get_userbyid(n.nspowner) as owner, has_schema_privilege(n.oid, 'USAGE') as has_usage from pg_namespace n where n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname;", limit)).await
 }
 
-pub async fn list_triggers(db: &DbClient) -> Result<QueryTable> {
-    db.query("select n.nspname as table_schema, c.relname as table_name, t.tgname as trigger_name, pg_get_triggerdef(t.oid, true) as definition, t.tgenabled as enabled from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where not t.tgisinternal and n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname, c.relname, t.tgname;").await
+pub async fn list_triggers(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select n.nspname as table_schema, c.relname as table_name, t.tgname as trigger_name, pg_get_triggerdef(t.oid, true) as definition, t.tgenabled as enabled from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where not t.tgisinternal and n.nspname <> 'information_schema' and n.nspname not like 'pg_%' order by n.nspname, c.relname, t.tgname;", limit)).await
 }
 
-pub async fn list_indexes(db: &DbClient) -> Result<QueryTable> {
-    db.query("select schemaname as table_schema, tablename as table_name, indexname as index_name, indexdef as definition from pg_indexes where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, tablename, indexname;").await
+pub async fn list_indexes(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select schemaname as table_schema, tablename as table_name, indexname as index_name, indexdef as definition from pg_indexes where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, tablename, indexname;", limit)).await
 }
 
-pub async fn list_sequences(db: &DbClient) -> Result<QueryTable> {
-    db.query("select schemaname as sequence_schema, sequencename as sequence_name, sequenceowner as owner, data_type, start_value, min_value, max_value, increment_by, cycle, cache_size, last_value from pg_sequences where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, sequencename;").await
+pub async fn list_sequences(db: &DbClient, limit: Option<u32>) -> Result<QueryTable> {
+    db.query(&with_row_limit("select schemaname as sequence_schema, sequencename as sequence_name, sequenceowner as owner, data_type, start_value, min_value, max_value, increment_by, cycle, cache_size, last_value from pg_sequences where schemaname <> 'information_schema' and schemaname not like 'pg_%' order by schemaname, sequencename;", limit)).await
 }
 
 pub async fn list_available_extensions(db: &DbClient) -> Result<QueryTable> {

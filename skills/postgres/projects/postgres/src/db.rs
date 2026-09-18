@@ -1,10 +1,15 @@
 use crate::config::{RuntimeContext, SslMode, update_ssl_mode};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
-use tokio_postgres::NoTls;
+use std::time::Duration;
 use tokio_postgres::SimpleQueryMessage;
+use tokio_postgres::tls::MakeTlsConnect;
+use tokio_postgres::{Client, Connection, NoTls, Socket};
 use tokio_postgres_rustls::MakeRustlsConnect;
+
+const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 10_000;
+const MAX_CONNECT_TIMEOUT_MS: u64 = 86_400_000;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct QueryTable {
@@ -99,7 +104,7 @@ impl DbClient {
                 .with_root_certificates(roots)
                 .with_no_client_auth();
             let connector = MakeRustlsConnect::new(tls);
-            let (client, connection) = tokio_postgres::connect(url, connector).await?;
+            let (client, connection) = connect_client(url, connector).await?;
             tokio::spawn(async move {
                 let _ = connection.await;
             });
@@ -109,7 +114,7 @@ impl DbClient {
                 .await
                 .with_context(|| "Failed to execute SQL query".to_string())
         } else {
-            let (client, connection) = tokio_postgres::connect(url, NoTls).await?;
+            let (client, connection) = connect_client(url, NoTls).await?;
             tokio::spawn(async move {
                 let _ = connection.await;
             });
@@ -126,6 +131,52 @@ fn auto_update_ssl_mode_enabled() -> bool {
     ["DB_AUTO_UPDATE_SSL_MODE", "DB_AUTO_UPDATE_SSLMODE"]
         .iter()
         .any(|key| std::env::var(key).ok().as_deref() == Some("1"))
+}
+
+async fn connect_client<T>(url: &str, tls: T) -> Result<(Client, Connection<Socket, T::Stream>)>
+where
+    T: MakeTlsConnect<Socket>,
+{
+    let timeout = connect_timeout()?;
+    let mut config: tokio_postgres::Config = url
+        .parse()
+        .map_err(|error| anyhow!("Invalid connection URL: {error}"))?;
+    config.connect_timeout(timeout);
+    tokio::time::timeout(timeout, config.connect(tls))
+        .await
+        .map_err(|_| {
+            anyhow!(
+                "timed out connecting to PostgreSQL after {}ms",
+                timeout.as_millis()
+            )
+        })?
+        .map_err(Into::into)
+}
+
+fn connect_timeout() -> Result<Duration> {
+    parse_connect_timeout_ms(std::env::var("DB_CONNECT_TIMEOUT_MS").ok().as_deref())
+}
+
+pub fn parse_connect_timeout_ms(value: Option<&str>) -> Result<Duration> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(Duration::from_millis(DEFAULT_CONNECT_TIMEOUT_MS));
+    };
+    let millis: u64 = value
+        .parse()
+        .with_context(|| "DB_CONNECT_TIMEOUT_MS must be a positive integer.".to_string())?;
+    if millis == 0 || millis > MAX_CONNECT_TIMEOUT_MS {
+        bail!("DB_CONNECT_TIMEOUT_MS must be between 1 and {MAX_CONNECT_TIMEOUT_MS}.");
+    }
+    Ok(Duration::from_millis(millis))
+}
+
+pub fn with_row_limit(sql: &str, limit: Option<u32>) -> String {
+    let sql = sql.trim();
+    let sql = sql.strip_suffix(';').unwrap_or(sql).trim_end();
+    match limit {
+        Some(limit) => format!("{sql} limit {limit};"),
+        None => format!("{sql};"),
+    }
 }
 
 async fn apply_session_settings(
@@ -156,13 +207,18 @@ async fn apply_session_settings(
     Ok(())
 }
 
-pub fn table_to_json(table: &QueryTable) -> Value {
+pub fn table_to_json(table: &QueryTable) -> Result<Value> {
     let rows = table
         .rows
         .iter()
         .map(|row| {
             let mut map = Map::new();
             for (index, column) in table.columns.iter().enumerate() {
+                if map.contains_key(column) {
+                    bail!(
+                        "Duplicate JSON column name '{column}'. Rename the selected columns so JSON object keys are unique."
+                    );
+                }
                 map.insert(
                     column.clone(),
                     row.get(index)
@@ -172,33 +228,30 @@ pub fn table_to_json(table: &QueryTable) -> Value {
                         .unwrap_or(Value::Null),
                 );
             }
-            Value::Object(map)
+            Ok(Value::Object(map))
         })
-        .collect::<Vec<_>>();
-    json!({
+        .collect::<Result<Vec<_>>>()?;
+    Ok(json!({
         "columns": table.columns,
         "rows": rows,
-    })
+    }))
 }
 
-pub fn execution_to_json(execution: &QueryExecution) -> Value {
-    let statements = execution
-        .statements
-        .iter()
-        .map(|statement| {
-            json!({
-                "statement": statement.statement,
-                "row_count": statement.row_count,
-                "result": table_to_json(&QueryTable {
-                    columns: statement.columns.clone(),
-                    rows: statement.rows.clone(),
-                }),
-            })
-        })
-        .collect::<Vec<_>>();
-    json!({
+pub fn execution_to_json(execution: &QueryExecution) -> Result<Value> {
+    let mut statements = Vec::new();
+    for statement in &execution.statements {
+        statements.push(json!({
+            "statement": statement.statement,
+            "row_count": statement.row_count,
+            "result": table_to_json(&QueryTable {
+                columns: statement.columns.clone(),
+                rows: statement.rows.clone(),
+            })?,
+        }));
+    }
+    Ok(json!({
         "statements": statements,
-    })
+    }))
 }
 
 pub fn escape_literal(value: &str) -> String {
@@ -292,5 +345,43 @@ mod tests {
         assert!(execution.statements[0].rows.is_empty());
         assert_eq!(execution.statements[1].statement, 2);
         assert_eq!(execution.statements[1].row_count, 2);
+    }
+
+    #[test]
+    fn table_json_rejects_duplicate_column_names() {
+        let unique = QueryTable {
+            columns: vec!["id".to_string(), "name".to_string()],
+            rows: vec![vec![Some("1".to_string()), Some("a".to_string())]],
+        };
+        let json = table_to_json(&unique).unwrap();
+        assert_eq!(json["rows"][0]["id"], "1");
+        assert_eq!(json["rows"][0]["name"], "a");
+
+        let duplicate = QueryTable {
+            columns: vec!["id".to_string(), "id".to_string()],
+            rows: vec![vec![Some("1".to_string()), Some("2".to_string())]],
+        };
+        let error = table_to_json(&duplicate).unwrap_err();
+        assert!(format!("{error:#}").contains("Duplicate JSON column name 'id'"));
+    }
+
+    #[test]
+    fn connect_timeout_defaults_and_validates() {
+        assert_eq!(
+            parse_connect_timeout_ms(None).unwrap(),
+            Duration::from_millis(10_000)
+        );
+        assert_eq!(
+            parse_connect_timeout_ms(Some(" 1500 ")).unwrap(),
+            Duration::from_millis(1500)
+        );
+        assert!(parse_connect_timeout_ms(Some("0")).is_err());
+        assert!(parse_connect_timeout_ms(Some("bad")).is_err());
+    }
+
+    #[test]
+    fn row_limit_appends_or_preserves_sql() {
+        assert_eq!(with_row_limit("select 1;", Some(5)), "select 1 limit 5;");
+        assert_eq!(with_row_limit("select 1", None), "select 1;");
     }
 }
