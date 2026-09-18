@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub CLI"
+  short_description: "Use gh for GitHub reads and writes"
+  default_prompt: "Use $gh for this GitHub task, suggesting installation if the CLI is missing."
