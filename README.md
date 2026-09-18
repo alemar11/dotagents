@@ -29,7 +29,7 @@ as skills.
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
-| `implement` | Implement software features and fixes requiring coordinated code changes and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
+| `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `gh` | Route GitHub reads and writes through the authenticated CLI; suggest macOS or Linux installation when it is missing. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
@@ -103,9 +103,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   only supplied or local sources. GitHub is the sole saved-spec authority.
 
 - Engineering skills retain the same delegation policy standalone and composed. Implement
-  implements and validates, then commits only with user or composed-assignment
-  authority; independent review is a separate caller-owned gate, with no
-  reviewer delegation inside Implement.
+  implements, self-reviews, and validates, then commits only with user or
+  composed-assignment authority; independent review is a separate caller-owned
+  gate, with no reviewer delegation inside Implement.
 - `review-pr` reuses a completed current-target review, resumes a pending
   request, or requests and waits when needed. It returns the provider result to
   the calling task, standalone or composed, with no subagents, repairs, CI or

@@ -24,12 +24,12 @@ Implement creates no tasks and never operates claims. Its only delegation is
 the optional UI designer below, with the same policy standalone or composed.
 Preserve any separately established caller-owned budget.
 
-Continue through implementation, relevant checks, and repair of failures caused
-by the change before returning the local result. Use tests where they protect
-observable behavior, including pre-agreed seams; do not add tests for prose or
-trivial reversible changes. Run repository-required gates and broaden validation
-only for a new change, failure, or unresolved risk. Existing authorization covers
-these local steps; ask only about material unresolved decisions.
+Continue through implementation, self-review, relevant checks, and repair of
+failures caused by the change before returning the local result. Use tests where
+they protect observable behavior, including pre-agreed seams; do not add tests
+for prose or trivial reversible changes. Run repository-required gates and
+broaden validation only for a new change, failure, or unresolved risk. Existing
+authorization covers these local steps; ask only about material unresolved decisions.
 
 ## Optional UI design
 
@@ -55,6 +55,33 @@ Implement owns the code and verifies the rendered UI in the browser or relevant
 native interface, including responsive behavior and accessibility appropriate
 to the change. A design proposal does not establish implementation quality;
 report any unavailable visual verification.
+
+## Required self-review
+
+Before handoff, inspect the complete implementation diff and affected code in
+context, including relevant callers. The implementer owns this review in both
+standalone and composed work; keep it within the selected scope.
+
+- Verify the selected requirements, relevant boundary and failure cases, and
+  compatibility with existing callers and contracts.
+- Justify new abstractions, wrappers, dependencies, and configuration through
+  actual requirements or existing conventions. Reuse existing helpers when
+  their behavior fits; remove unnecessary machinery and duplication introduced
+  by the change.
+- Keep functions and files focused on coherent responsibilities. Extract code
+  when it improves understanding or ownership, not to meet arbitrary size limits.
+- Check that tests assert meaningful observable behavior and would fail for
+  the intended regression. Avoid mirroring implementation details or duplicating
+  equivalent coverage; retain tests protecting distinct boundaries or scenarios.
+- Keep comments consistent with the final behavior. Explain non-obvious decisions
+  and constraints, update comments invalidated by the change, and avoid narrating
+  obvious code.
+
+Before removing existing code or tests, verify callers, contracts, side effects,
+applicable dynamic registration, and remaining behavioral coverage. Small wrappers
+and simple tests are not inherently redundant; retain uncertain candidates.
+Repair issues within the selected scope and validate resulting changes before
+handoff. Disclose unresolved issues or unavailable checks and their impact.
 
 ## Review and handoff
 
