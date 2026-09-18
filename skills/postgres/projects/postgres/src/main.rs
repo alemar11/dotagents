@@ -11,6 +11,7 @@ use postgres_skill_cli::db::{
     table_to_json,
 };
 use postgres_skill_cli::docs;
+use postgres_skill_cli::find::build_find_sql;
 use postgres_skill_cli::output::{print_json, render_table};
 use postgres_skill_cli::tools::{self, ToolSection};
 use serde_json::{Value, json};
@@ -45,12 +46,12 @@ async fn run(cli: &Cli) -> Result<()> {
     let skill_root = resolve_skill_root()?;
 
     match &cli.command {
-        Command::Doctor => doctor(&cli, &skill_root).await,
-        Command::Profile(command) => profile(&cli, command, &skill_root).await,
-        Command::Query(command) => query(&cli, command, &skill_root).await,
-        Command::Activity(command) => activity(&cli, command, &skill_root).await,
-        Command::Schema(command) => schema(&cli, command, &skill_root).await,
-        Command::Docs(command) => docs_command(&cli, command).await,
+        Command::Doctor => doctor(cli, &skill_root).await,
+        Command::Profile(command) => profile(cli, command, &skill_root).await,
+        Command::Query(command) => query(cli, command, &skill_root).await,
+        Command::Activity(command) => activity(cli, command, &skill_root).await,
+        Command::Schema(command) => schema(cli, command, &skill_root).await,
+        Command::Docs(command) => docs_command(cli, command).await,
     }
 }
 
@@ -119,12 +120,12 @@ fn ensure_access(
     requirement: AccessRequirement,
     operation: &str,
 ) -> Result<()> {
-    let allowed = match (access_mode, requirement) {
-        (AccessMode::ReadWrite, _) => true,
-        (AccessMode::Read, AccessRequirement::Read) => true,
-        (AccessMode::Write, AccessRequirement::Write) => true,
-        _ => false,
-    };
+    let allowed = matches!(
+        (access_mode, requirement),
+        (AccessMode::ReadWrite, _)
+            | (AccessMode::Read, AccessRequirement::Read)
+            | (AccessMode::Write, AccessRequirement::Write)
+    );
     if allowed {
         return Ok(());
     }
@@ -225,7 +226,8 @@ fn classify_sql_statement_access(statement: &[Token]) -> AccessRequirement {
         return AccessRequirement::ReadWrite;
     }
     match word.value.to_ascii_lowercase().as_str() {
-        "select" | "show" | "values" | "table" => AccessRequirement::Read,
+        "select" | "values" | "table" => classify_select_like_access(statement),
+        "show" => AccessRequirement::Read,
         "explain" => classify_explain_access(&statement[1..]),
         "insert" | "update" | "delete" | "merge" | "create" | "alter" | "drop" | "truncate"
         | "grant" | "revoke" | "call" | "do" | "refresh" | "reindex" | "vacuum" | "analyze" => {
@@ -262,168 +264,62 @@ fn classify_explain_access(mut tokens: &[Token]) -> AccessRequirement {
     AccessRequirement::ReadWrite
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{
-        AccessRequirement, classify_sql_access, ensure_access, parse_query_text_max_chars,
-        resolve_skill_root_from, sanitize_error_message,
+fn classify_select_like_access(statement: &[Token]) -> AccessRequirement {
+    if contains_unquoted_keyword(statement, "into") {
+        return AccessRequirement::Write;
+    }
+    if has_row_locking_clause(statement) {
+        return AccessRequirement::ReadWrite;
+    }
+    AccessRequirement::Read
+}
+
+fn contains_unquoted_keyword(tokens: &[Token], keyword: &str) -> bool {
+    tokens
+        .iter()
+        .any(|token| is_unquoted_keyword(token, keyword))
+}
+
+fn is_unquoted_keyword(token: &Token, keyword: &str) -> bool {
+    match token {
+        Token::Word(word) if word.quote_style.is_none() => word.value.eq_ignore_ascii_case(keyword),
+        _ => false,
+    }
+}
+
+fn has_row_locking_clause(tokens: &[Token]) -> bool {
+    for index in 0..tokens.len() {
+        if !is_unquoted_keyword(&tokens[index], "for") {
+            continue;
+        }
+        if lock_strength_starts_at(&tokens[index + 1..]) {
+            return true;
+        }
+    }
+    false
+}
+
+fn lock_strength_starts_at(tokens: &[Token]) -> bool {
+    let Some(first) = tokens.first() else {
+        return false;
     };
-    use postgres_skill_cli::config::AccessMode;
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn masks_password_in_postgres_url() {
-        let message = "Failed to connect to postgresql://postgres:secret@localhost:5432/app";
-        assert_eq!(
-            sanitize_error_message(message),
-            "Failed to connect to postgresql://postgres:***@localhost:5432/app"
-        );
+    if is_unquoted_keyword(first, "update") || is_unquoted_keyword(first, "share") {
+        return true;
     }
-
-    #[test]
-    fn masks_password_key_value_pairs() {
-        let message = "password=secret PGPASSWORD=hunter2";
-        assert_eq!(
-            sanitize_error_message(message),
-            "password=*** PGPASSWORD=***"
-        );
+    if is_unquoted_keyword(first, "no")
+        && tokens
+            .get(1)
+            .is_some_and(|token| is_unquoted_keyword(token, "key"))
+        && tokens
+            .get(2)
+            .is_some_and(|token| is_unquoted_keyword(token, "update"))
+    {
+        return true;
     }
-
-    #[test]
-    fn masks_password_query_parameters_in_errors() {
-        let message = "postgresql://postgres@localhost/app?password=secret&sslpassword=tls-secret";
-        assert_eq!(
-            sanitize_error_message(message),
-            "postgresql://postgres@localhost/app?password=***&sslpassword=***"
-        );
-    }
-
-    #[test]
-    fn resolves_skill_root_from_the_shipped_executable_layout() {
-        let temp = tempdir().unwrap();
-        let skill_root = temp.path().join("postgres-skill");
-        let executable = skill_root.join("scripts/bin/postgres-linux-x86_64");
-        fs::create_dir_all(executable.parent().unwrap()).unwrap();
-        fs::write(skill_root.join("SKILL.md"), "# Postgres").unwrap();
-        fs::write(skill_root.join("scripts/postgres"), "#!/bin/sh").unwrap();
-        fs::write(&executable, "binary").unwrap();
-
-        assert_eq!(resolve_skill_root_from(&executable).unwrap(), skill_root);
-    }
-
-    #[test]
-    fn query_text_max_chars_defaults_and_validates() {
-        assert_eq!(parse_query_text_max_chars(None).unwrap(), 300);
-        assert_eq!(parse_query_text_max_chars(Some("512")).unwrap(), 512);
-        assert!(parse_query_text_max_chars(Some("bad")).is_err());
-    }
-
-    #[test]
-    fn sql_access_classifier_detects_obvious_read_write_and_ambiguous_sql() {
-        assert_eq!(classify_sql_access("select 1"), AccessRequirement::Read);
-        assert_eq!(
-            classify_sql_access("-- comment\nshow server_version"),
-            AccessRequirement::Read
-        );
-        assert_eq!(
-            classify_sql_access("insert into users(id) values (1)"),
-            AccessRequirement::Write
-        );
-        assert_eq!(
-            classify_sql_access("create table example(id int)"),
-            AccessRequirement::Write
-        );
-        assert_eq!(
-            classify_sql_access("explain (analyze, buffers) update users set active = true"),
-            AccessRequirement::Write
-        );
-        assert_eq!(
-            classify_sql_access("explain select * from users"),
-            AccessRequirement::Read
-        );
-        assert_eq!(
-            classify_sql_access("select 1; update users set active = true"),
-            AccessRequirement::ReadWrite
-        );
-        assert_eq!(
-            classify_sql_access("with x as (select 1) select * from x"),
-            AccessRequirement::ReadWrite
-        );
-    }
-
-    #[test]
-    fn sql_access_classifier_ignores_semicolons_inside_strings_and_comments() {
-        for sql in [
-            "SELECT 'hello;world' AS message",
-            "SELECT 'it''s; still a string'",
-            r"SELECT E'it\'s; still a string'",
-            r#"SELECT 1 AS "quoted;identifier""#,
-            "SELECT $$hello;world$$",
-            "SELECT $tag$hello;world$tag$",
-            "SELECT $tag$hello;$other$world$tag$",
-            "SELECT 'hello;世界'",
-            r"SELECT U&'\D83D\DE00;hello'",
-            r"SELECT U&'\path;hello' UESCAPE '!'",
-            "-- ignored; DELETE FROM users\nSELECT 1",
-            "/* outer; /* nested; */ still a comment; */ SELECT 1",
-            "SELECT 1 /* ignored; DELETE FROM users */; SELECT 2",
-            "SELECT 1; -- ignored; DELETE FROM users",
-            "EXPLAIN /* ignored; */ (FORMAT JSON) SELECT ';'",
-        ] {
-            assert_eq!(classify_sql_access(sql), AccessRequirement::Read, "{sql}");
-            let mixed = format!("{sql}\n; DELETE FROM users");
-            assert_eq!(
-                classify_sql_access(&mixed),
-                AccessRequirement::ReadWrite,
-                "{mixed}"
-            );
-        }
-    }
-
-    #[test]
-    fn sql_access_classifier_treats_unterminated_tokens_as_ambiguous() {
-        for sql in [
-            "SELECT 'hello;world",
-            "SELECT $$hello;world",
-            "SELECT 1 /* open",
-        ] {
-            assert_eq!(
-                classify_sql_access(sql),
-                AccessRequirement::ReadWrite,
-                "{sql}"
-            );
-        }
-    }
-
-    #[test]
-    fn access_guard_allows_only_matching_access_modes() {
-        assert!(ensure_access("local", AccessMode::Read, AccessRequirement::Read, "query").is_ok());
-        assert!(
-            ensure_access("local", AccessMode::Read, AccessRequirement::Write, "query").is_err()
-        );
-        assert!(
-            ensure_access(
-                "local",
-                AccessMode::Write,
-                AccessRequirement::Write,
-                "query"
-            )
-            .is_ok()
-        );
-        assert!(
-            ensure_access("local", AccessMode::Write, AccessRequirement::Read, "query").is_err()
-        );
-        assert!(
-            ensure_access(
-                "local",
-                AccessMode::ReadWrite,
-                AccessRequirement::ReadWrite,
-                "query"
-            )
-            .is_ok()
-        );
-    }
+    is_unquoted_keyword(first, "key")
+        && tokens
+            .get(1)
+            .is_some_and(|token| is_unquoted_keyword(token, "share"))
 }
 
 async fn doctor(cli: &Cli, skill_root: &Path) -> Result<()> {
@@ -435,10 +331,7 @@ async fn doctor(cli: &Cli, skill_root: &Path) -> Result<()> {
         },
         skill_root,
     );
-    let runtime_info = match runtime {
-        Ok(ctx) => Some(ctx),
-        Err(_) => None,
-    };
+    let runtime_info = runtime.ok();
 
     let output = json!({
         "application_name": application_name(),
@@ -668,53 +561,8 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
         }
         QuerySubcommand::Find(args) => {
             require_db_access(&db, AccessRequirement::Read, "query find")?;
-            let pattern = escape_literal(&format!("%{}%", args.pattern));
-            let types = args.types.clone().unwrap_or_default();
             let table = db
-                .query(&format!(
-                    "with p as (
-  select '{pattern}'::text as pat,
-         regexp_replace(lower('{types}'), '\\s+', '', 'g')::text as raw_types
-),
-f as (
-  select case when p.raw_types = '' then null::text[] else regexp_split_to_array(p.raw_types, ',') end as types from p
-),
-results as (
-  select 'schema'::text as object_type, n.nspname::text as object_schema, n.nspname::text as object_name, 'schema'::text as details
-  from pg_namespace n
-  where n.nspname <> 'information_schema' and n.nspname not like 'pg_%'
-    and (select types is null or 'schema' = any(types) from f)
-    and n.nspname ilike (select pat from p)
-  union all
-  select 'table', n.nspname::text, c.relname::text,
-         case c.relkind when 'r' then 'table' when 'p' then 'partitioned table' else c.relkind::text end
-  from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where c.relkind in ('r', 'p')
-    and n.nspname <> 'information_schema' and n.nspname not like 'pg_%'
-    and (select types is null or 'table' = any(types) from f)
-    and c.relname ilike (select pat from p)
-  union all
-  select 'column', cols.table_schema::text, (cols.table_name || '.' || cols.column_name)::text,
-         (cols.data_type || coalesce(' ' || cols.udt_name, ''))::text
-  from information_schema.columns cols
-  where cols.table_schema <> 'information_schema' and cols.table_schema not like 'pg_%'
-    and (select types is null or 'column' = any(types) from f)
-    and (cols.table_name ilike (select pat from p) or cols.column_name ilike (select pat from p))
-  union all
-  select case proc.prokind when 'p' then 'procedure' else 'function' end,
-         n.nspname::text,
-         proc.proname::text,
-         (proc.proname || '(' || pg_get_function_identity_arguments(proc.oid) || ') returns ' || pg_get_function_result(proc.oid))::text
-  from pg_proc proc
-  join pg_namespace n on n.oid = proc.pronamespace
-  where n.nspname <> 'information_schema' and n.nspname not like 'pg_%'
-    and (select types is null or 'function' = any(types) or 'procedure' = any(types) from f)
-    and proc.proname ilike (select pat from p)
-)
-select object_type, object_schema, object_name, details
-from results
-order by object_type, object_schema, object_name;"
-                ))
+                .query(&build_find_sql(&args.pattern, &args.types))
                 .await?;
             render(
                 cli.json,
@@ -911,10 +759,20 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
     }
 }
 
+fn resolve_docs_search_limit(args: &DocsSearchArgs) -> Result<usize> {
+    match (args.limit, args.named_limit) {
+        (Some(positional), Some(named)) if positional != named => {
+            bail!("docs search positional LIMIT ({positional}) and --limit ({named}) disagree")
+        }
+        (Some(limit), _) | (_, Some(limit)) => Ok(limit),
+        (None, None) => Ok(10),
+    }
+}
+
 async fn docs_command(cli: &Cli, command: &DocsCommand) -> Result<()> {
     match &command.command {
         DocsSubcommand::Search(args) => {
-            let results = docs::search(&args.query, args.limit).await?;
+            let results = docs::search(&args.query, resolve_docs_search_limit(args)?).await?;
             if cli.json {
                 print_json(&json!({ "results": results }))
             } else if results.is_empty() {
@@ -1057,7 +915,7 @@ fn parse_query_text_max_chars(value: Option<&str>) -> Result<u32> {
 }
 
 async fn schema_inspect(cli: &Cli, db: &DbClient) -> Result<()> {
-    let sections = vec![
+    let sections = [
         ("Tables", db.query("select table_schema, table_name, table_type from information_schema.tables where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name;").await?),
         ("Columns", db.query("select table_schema, table_name, ordinal_position, column_name, data_type, udt_name, is_nullable, column_default from information_schema.columns where table_schema not in ('pg_catalog', 'information_schema') order by table_schema, table_name, ordinal_position;").await?),
         ("Primary Keys", db.query("select tc.table_schema, tc.table_name, kcu.column_name, kcu.ordinal_position from information_schema.table_constraints tc join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema not in ('pg_catalog', 'information_schema') order by tc.table_schema, tc.table_name, kcu.ordinal_position;").await?),
@@ -1166,4 +1024,236 @@ async fn destructive_pids(
         json!({"result": table_to_json(&table)}),
         &[("Result", table)],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        AccessRequirement, classify_sql_access, ensure_access, parse_query_text_max_chars,
+        resolve_docs_search_limit, resolve_skill_root_from, sanitize_error_message,
+    };
+    use postgres_skill_cli::cli::DocsSearchArgs;
+    use postgres_skill_cli::config::AccessMode;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn masks_password_in_postgres_url() {
+        let message = "Failed to connect to postgresql://postgres:secret@localhost:5432/app";
+        assert_eq!(
+            sanitize_error_message(message),
+            "Failed to connect to postgresql://postgres:***@localhost:5432/app"
+        );
+    }
+
+    #[test]
+    fn masks_password_key_value_pairs() {
+        let message = "password=secret PGPASSWORD=hunter2";
+        assert_eq!(
+            sanitize_error_message(message),
+            "password=*** PGPASSWORD=***"
+        );
+    }
+
+    #[test]
+    fn masks_password_query_parameters_in_errors() {
+        let message = "postgresql://postgres@localhost/app?password=secret&sslpassword=tls-secret";
+        assert_eq!(
+            sanitize_error_message(message),
+            "postgresql://postgres@localhost/app?password=***&sslpassword=***"
+        );
+    }
+
+    #[test]
+    fn resolves_skill_root_from_the_shipped_executable_layout() {
+        let temp = tempdir().unwrap();
+        let skill_root = temp.path().join("postgres-skill");
+        let executable = skill_root.join("scripts/bin/postgres-linux-x86_64");
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(skill_root.join("SKILL.md"), "# Postgres").unwrap();
+        fs::write(skill_root.join("scripts/postgres"), "#!/bin/sh").unwrap();
+        fs::write(&executable, "binary").unwrap();
+
+        assert_eq!(resolve_skill_root_from(&executable).unwrap(), skill_root);
+    }
+
+    #[test]
+    fn query_text_max_chars_defaults_and_validates() {
+        assert_eq!(parse_query_text_max_chars(None).unwrap(), 300);
+        assert_eq!(parse_query_text_max_chars(Some("512")).unwrap(), 512);
+        assert!(parse_query_text_max_chars(Some("bad")).is_err());
+    }
+
+    #[test]
+    fn sql_access_classifier_detects_obvious_read_write_and_ambiguous_sql() {
+        assert_eq!(classify_sql_access("select 1"), AccessRequirement::Read);
+        assert_eq!(
+            classify_sql_access("-- comment\nshow server_version"),
+            AccessRequirement::Read
+        );
+        assert_eq!(
+            classify_sql_access("insert into users(id) values (1)"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("create table example(id int)"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("explain (analyze, buffers) update users set active = true"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("explain select * from users"),
+            AccessRequirement::Read
+        );
+        assert_eq!(
+            classify_sql_access("select 1; update users set active = true"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("with x as (select 1) select * from x"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("select 1 as value into classifier_bypass"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("SELECT * INTO TEMP TABLE staging FROM users"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("explain select 1 into classifier_bypass"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("select * from users for update"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("select * from users for share"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("select * from users for no key update"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("select * from users for key share"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("select 'into' as label, 1 as \"into\""),
+            AccessRequirement::Read
+        );
+        assert_eq!(
+            classify_sql_access("select my_writing_function()"),
+            AccessRequirement::Read
+        );
+    }
+
+    #[test]
+    fn sql_access_classifier_ignores_semicolons_inside_strings_and_comments() {
+        for sql in [
+            "SELECT 'hello;world' AS message",
+            "SELECT 'it''s; still a string'",
+            r"SELECT E'it\'s; still a string'",
+            r#"SELECT 1 AS "quoted;identifier""#,
+            "SELECT $$hello;world$$",
+            "SELECT $tag$hello;world$tag$",
+            "SELECT $tag$hello;$other$world$tag$",
+            "SELECT 'hello;世界'",
+            r"SELECT U&'\D83D\DE00;hello'",
+            r"SELECT U&'\path;hello' UESCAPE '!'",
+            "-- ignored; DELETE FROM users\nSELECT 1",
+            "/* outer; /* nested; */ still a comment; */ SELECT 1",
+            "SELECT 1 /* ignored; DELETE FROM users */; SELECT 2",
+            "SELECT 1; -- ignored; DELETE FROM users",
+            "EXPLAIN /* ignored; */ (FORMAT JSON) SELECT ';'",
+        ] {
+            assert_eq!(classify_sql_access(sql), AccessRequirement::Read, "{sql}");
+            let mixed = format!("{sql}\n; DELETE FROM users");
+            assert_eq!(
+                classify_sql_access(&mixed),
+                AccessRequirement::ReadWrite,
+                "{mixed}"
+            );
+        }
+    }
+
+    #[test]
+    fn sql_access_classifier_treats_unterminated_tokens_as_ambiguous() {
+        for sql in [
+            "SELECT 'hello;world",
+            "SELECT $$hello;world",
+            "SELECT 1 /* open",
+        ] {
+            assert_eq!(
+                classify_sql_access(sql),
+                AccessRequirement::ReadWrite,
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn access_guard_allows_only_matching_access_modes() {
+        assert!(ensure_access("local", AccessMode::Read, AccessRequirement::Read, "query").is_ok());
+        assert!(
+            ensure_access("local", AccessMode::Read, AccessRequirement::Write, "query").is_err()
+        );
+        assert!(
+            ensure_access(
+                "local",
+                AccessMode::Write,
+                AccessRequirement::Write,
+                "query"
+            )
+            .is_ok()
+        );
+        assert!(
+            ensure_access("local", AccessMode::Write, AccessRequirement::Read, "query").is_err()
+        );
+        assert!(
+            ensure_access(
+                "local",
+                AccessMode::ReadWrite,
+                AccessRequirement::ReadWrite,
+                "query"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn docs_search_limit_uses_either_flag_and_rejects_conflicts() {
+        let positional = DocsSearchArgs {
+            query: "transaction isolation".to_string(),
+            limit: Some(3),
+            named_limit: None,
+        };
+        assert_eq!(resolve_docs_search_limit(&positional).unwrap(), 3);
+
+        let named = DocsSearchArgs {
+            query: "transaction isolation".to_string(),
+            limit: None,
+            named_limit: Some(5),
+        };
+        assert_eq!(resolve_docs_search_limit(&named).unwrap(), 5);
+
+        let default = DocsSearchArgs {
+            query: "transaction isolation".to_string(),
+            limit: None,
+            named_limit: None,
+        };
+        assert_eq!(resolve_docs_search_limit(&default).unwrap(), 10);
+
+        let conflict = DocsSearchArgs {
+            query: "transaction isolation".to_string(),
+            limit: Some(3),
+            named_limit: Some(5),
+        };
+        assert!(resolve_docs_search_limit(&conflict).is_err());
+    }
 }

@@ -99,3 +99,25 @@ fn migration_file_release_is_outside_the_runtime_surface() {
     );
     assert!(!migrations.join("released").exists());
 }
+
+#[test]
+fn query_find_rejects_malformed_types_before_connecting() {
+    let root = fixture();
+    for types in ["view'", "view;", "index"] {
+        let output = cli(&root)
+            .args(["query", "find", "demo", "--types", types])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{types}: {output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("invalid value") || stderr.contains("possible values"),
+            "{types}: {stderr}"
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !stdout.contains("Failed to execute SQL query"),
+            "{types}: {stdout}"
+        );
+    }
+}

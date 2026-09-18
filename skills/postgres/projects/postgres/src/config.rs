@@ -1079,14 +1079,13 @@ pub fn resolve_project_root(override_root: Option<PathBuf>, skill_root: &Path) -
         .arg("rev-parse")
         .arg("--show-toplevel")
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !root.is_empty() {
-                let root_path = PathBuf::from(root);
-                if !root_path.starts_with(skill_root) {
-                    return Ok(root_path);
-                }
+        let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !root.is_empty() {
+            let root_path = PathBuf::from(root);
+            if !root_path.starts_with(skill_root) {
+                return Ok(root_path);
             }
         }
     }
@@ -1630,8 +1629,10 @@ password = "postgres"
         let same_path = Path::new("/tmp/config.toml");
         let legacy_path = Path::new("/tmp/postgres.toml");
 
-        let mut original = SkillConfig::default();
-        original.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
+        let original = SkillConfig {
+            schema_version: Some(LATEST_SCHEMA_VERSION.to_string()),
+            ..Default::default()
+        };
         let migrated = original.clone();
 
         assert!(!should_save_loaded_config(

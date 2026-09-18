@@ -49,7 +49,7 @@ pub async fn search(query: &str, limit: usize) -> Result<Vec<DocsSearchResult>> 
 
 fn parse_results(html: &str, limit: usize) -> Result<Vec<DocsSearchResult>> {
     let matcher = Regex::new(
-        r#"\d+\.\s*<a href="(https://www\.postgresql\.org/docs/current/[^"]+)">(.+?)</a>.*?<div>(.*?)</div>"#,
+        r#"(?s)\d+\.\s*<a href="(https://www\.postgresql\.org/docs/current/[^"]+)">(.+?)</a>.*?\[.*?\]\s*<br/>\s*<div>(.*?)</div>"#,
     )
     .unwrap();
     let tag_regex = Regex::new(r"<[^>]+>").unwrap();
@@ -92,9 +92,101 @@ fn parse_results(html: &str, limit: usize) -> Result<Vec<DocsSearchResult>> {
 }
 
 fn clean_html(value: &str) -> String {
-    let value = value
-        .replace("&quot;", "\"")
-        .replace("&amp;", "&")
-        .replace("&#39;", "'");
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
+    decode_html_entities(value)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn decode_html_entities(value: &str) -> String {
+    let mut decoded = String::with_capacity(value.len());
+    let mut remaining = value;
+    while let Some(start) = remaining.find('&') {
+        decoded.push_str(&remaining[..start]);
+        let after_amp = &remaining[start + 1..];
+        let Some(end) = after_amp.find(';') else {
+            decoded.push('&');
+            remaining = after_amp;
+            continue;
+        };
+        let entity = &after_amp[..end];
+        if let Some(replacement) = decode_html_entity(entity) {
+            decoded.push_str(&replacement);
+            remaining = &after_amp[end + 1..];
+        } else {
+            decoded.push('&');
+            remaining = after_amp;
+        }
+    }
+    decoded.push_str(remaining);
+    decoded
+}
+
+fn decode_html_entity(entity: &str) -> Option<String> {
+    match entity {
+        "amp" => Some("&".to_string()),
+        "lt" => Some("<".to_string()),
+        "gt" => Some(">".to_string()),
+        "quot" => Some("\"".to_string()),
+        "apos" => Some("'".to_string()),
+        "nbsp" => Some(" ".to_string()),
+        "copy" => Some("©".to_string()),
+        other if other.starts_with('#') => decode_numeric_entity(&other[1..]),
+        _ => None,
+    }
+}
+
+fn decode_numeric_entity(value: &str) -> Option<String> {
+    let code = if let Some(hex) = value.strip_prefix('x').or_else(|| value.strip_prefix('X')) {
+        u32::from_str_radix(hex, 16).ok()?
+    } else {
+        value.parse().ok()?
+    };
+    char::from_u32(code).map(String::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clean_html, parse_results};
+
+    const CURRENT_SEARCH_HTML: &str = include_str!("../tests/fixtures/docs-search-current.html");
+
+    #[test]
+    fn parses_multiline_postgresql_search_results() {
+        let results = parse_results(CURRENT_SEARCH_HTML, 5).unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(
+            results[0].title,
+            "PostgreSQL: Documentation: 18: 13.2. Transaction Isolation"
+        );
+        assert_eq!(
+            results[0].url,
+            "https://www.postgresql.org/docs/current/transaction-iso.html"
+        );
+        assert!(results[0].snippet.contains("Transaction Isolation"));
+        assert_eq!(
+            results[1].title,
+            "PostgreSQL: Documentation: 18: SET TRANSACTION"
+        );
+        assert!(results[1].snippet.contains("serializable transaction"));
+        assert_eq!(results[2].snippet, "Quotes \" and apostrophes ' plus &.");
+    }
+
+    #[test]
+    fn respects_result_limit() {
+        let results = parse_results(CURRENT_SEARCH_HTML, 1).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results[0].url,
+            "https://www.postgresql.org/docs/current/transaction-iso.html"
+        );
+    }
+
+    #[test]
+    fn decodes_standard_html_entities() {
+        assert_eq!(
+            clean_html("A&nbsp;&amp;&nbsp;B &quot;quoted&quot; &#39;ok&#39; &#x3C;tag&#x3E;"),
+            "A & B \"quoted\" 'ok' <tag>"
+        );
+    }
 }

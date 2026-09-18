@@ -1,4 +1,4 @@
-use clap::{ArgAction, Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -176,6 +176,87 @@ mod tests {
             })
         ));
     }
+
+    #[test]
+    fn query_find_accepts_enumerated_types() {
+        let cli = Cli::try_parse_from([
+            "postgres",
+            "query",
+            "find",
+            "demo",
+            "--types",
+            "schema,table,view,column,function,procedure",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Query(QueryCommand {
+                command: QuerySubcommand::Find(args),
+            }) => {
+                assert_eq!(args.pattern, "demo");
+                assert_eq!(
+                    args.types,
+                    vec![
+                        FindObjectType::Schema,
+                        FindObjectType::Table,
+                        FindObjectType::View,
+                        FindObjectType::Column,
+                        FindObjectType::Function,
+                        FindObjectType::Procedure,
+                    ]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn query_find_rejects_unknown_or_malformed_types() {
+        for types in ["view'", "view;", "index", "table,drop"] {
+            let err = Cli::try_parse_from(["postgres", "query", "find", "demo", "--types", types])
+                .unwrap_err();
+            let message = err.to_string();
+            assert!(
+                message.contains("invalid value") || message.contains("possible values"),
+                "{types}: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn docs_search_accepts_positional_or_named_limit() {
+        let positional =
+            Cli::try_parse_from(["postgres", "docs", "search", "transaction isolation", "3"])
+                .unwrap();
+        match positional.command {
+            Command::Docs(DocsCommand {
+                command: DocsSubcommand::Search(args),
+            }) => {
+                assert_eq!(args.query, "transaction isolation");
+                assert_eq!(args.limit, Some(3));
+                assert_eq!(args.named_limit, None);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let named = Cli::try_parse_from([
+            "postgres",
+            "docs",
+            "search",
+            "transaction isolation",
+            "--limit",
+            "5",
+        ])
+        .unwrap();
+        match named.command {
+            Command::Docs(DocsCommand {
+                command: DocsSubcommand::Search(args),
+            }) => {
+                assert_eq!(args.limit, None);
+                assert_eq!(args.named_limit, Some(5));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -196,13 +277,51 @@ pub struct QueryPlanArgs {
     pub analyze: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[value(rename_all = "lower")]
+pub enum FindObjectType {
+    Schema,
+    Table,
+    View,
+    Column,
+    Function,
+    Procedure,
+}
+
+impl FindObjectType {
+    pub const ALL: [Self; 6] = [
+        Self::Schema,
+        Self::Table,
+        Self::View,
+        Self::Column,
+        Self::Function,
+        Self::Procedure,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Schema => "schema",
+            Self::Table => "table",
+            Self::View => "view",
+            Self::Column => "column",
+            Self::Function => "function",
+            Self::Procedure => "procedure",
+        }
+    }
+}
+
 #[derive(Debug, Args)]
 pub struct FindArgs {
     #[arg(help = "Case-insensitive object-name search pattern")]
     pub pattern: String,
 
-    #[arg(long, help = "Comma-separated object types to search")]
-    pub types: Option<String>,
+    #[arg(
+        long,
+        value_enum,
+        value_delimiter = ',',
+        help = "Object types to search: schema, table, view, column, function, procedure"
+    )]
+    pub types: Vec<FindObjectType>,
 }
 
 #[derive(Debug, Args)]
@@ -363,6 +482,13 @@ pub struct DocsSearchArgs {
     #[arg(help = "Documentation search query")]
     pub query: String,
 
-    #[arg(default_value_t = 10, help = "Maximum results to return")]
-    pub limit: usize,
+    #[arg(help = "Maximum results to return")]
+    pub limit: Option<usize>,
+
+    #[arg(
+        long = "limit",
+        value_name = "LIMIT",
+        help = "Maximum results to return"
+    )]
+    pub named_limit: Option<usize>,
 }

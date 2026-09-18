@@ -270,6 +270,12 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
 - Ambiguous SQL or SQL that mixes reads and writes requires `read-write`.
   Statement boundaries respect quoted strings, identifiers, dollar-quoted
   bodies, and comments; unrecognized or unterminated tokens are conservative.
+- `SELECT ... INTO` creates a table and is classified as write. Row-locking
+  clauses (`FOR UPDATE`, `FOR SHARE`, `FOR NO KEY UPDATE`, `FOR KEY SHARE`)
+  are classified as read-write.
+- Function calls inside `SELECT` are not treated as writes by the local
+  classifier. PostgreSQL roles, grants, RLS, and server settings remain
+  authoritative for function side effects.
 - Access modes are CLI safety guards only. PostgreSQL roles, grants, RLS, and
   server-side read-only settings remain authoritative.
 
@@ -310,7 +316,10 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
   - Return a non-executing JSON query plan by default; use `--analyze` to run
     `EXPLAIN ANALYZE`.
 - `query find`
-  - Search common schema objects by name.
+  - Search schemas, tables, views, columns, functions, and procedures by name.
+  - `--types` accepts only `schema`, `table`, `view`, `column`, `function`, and
+    `procedure`. Omit it to search all of those classes, including views and
+    materialized views.
 - `activity overview|active-queries|locks|slow|long-running|cancel|terminate|cancel-pid|terminate-pid|pg-stat-top|replication-slots`
   - Runtime diagnostics and query control.
 - `schema inspect|list|extensions|table-sizes|index-health|invalid-indexes|top-bloated-tables|missing-fk-indexes|vacuum-status|roles`
@@ -321,6 +330,8 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
     extensions are the default when neither flag is provided.
 - `docs search`
   - Search official PostgreSQL current docs.
+  - Accepts a trailing positional `LIMIT` or `--limit`. The default is 10, and
+    the allowed range is 1-20.
 
 ## Scope boundary
 
