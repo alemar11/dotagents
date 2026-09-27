@@ -10,6 +10,15 @@ explicitly requests another method. Prefer native subcommands; use `gh api`
 for REST or GraphQL operations without a suitable subcommand. This includes
 reading repository files, issues, pull requests, reviews, Actions, and releases.
 
+Quote `gh api` endpoints containing query strings or shell metacharacters:
+
+```sh
+gh api 'repos/OWNER/REPO/git/trees/REF?recursive=1'
+```
+
+A zsh `no matches found` error occurs before gh runs; fix endpoint quoting
+before investigating GitHub access.
+
 Do not substitute GitHub connectors, browser automation, or direct HTTP
 requests. If `gh` cannot complete an operation, explain the concrete limitation
 instead of silently changing access methods. Public installation documentation
@@ -18,6 +27,9 @@ and package downloads may be accessed without `gh` when needed for setup.
 Use `git` for repository operations such as clone, fetch, pull, and push. Apply
 this access policy alongside existing workflow skills; it does not replace
 their publication, review, or authorization rules.
+
+For local image or video uploads to issues, pull requests, or comments, read
+[attachment guidance](references/attachments.md).
 
 ## Availability
 
