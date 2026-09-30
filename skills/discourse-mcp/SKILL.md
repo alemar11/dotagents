@@ -1,6 +1,6 @@
 ---
-name: discourse
-description: Set up, repair, or verify Discourse MCP configuration and authentication for Codex or Cursor.
+name: discourse-mcp
+description: Configure, authenticate, troubleshoot, and verify the Discourse MCP server connection in Codex or Cursor. Use for MCP setup and connection issues; ordinary forum reads and writes use the connected tools directly.
 ---
 
 # Discourse MCP

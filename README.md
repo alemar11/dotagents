@@ -49,7 +49,7 @@ as skills.
 | `ghostty` | Inspect or arrange Ghostty terminals and edit configuration or keybindings when explicitly requested. |
 | `herdr` | Inspect or control Herdr terminal workspaces, panes, and agents when the user explicitly asks to use Herdr. |
 | `hopper` | Configure and verify Hopper Disassembler MCP for Codex or Cursor globally or per project. |
-| `discourse` | Configure and verify Discourse MCP for Codex or Cursor globally or per project. |
+| `discourse-mcp` | Set up, troubleshoot, and verify the Discourse MCP connection in Codex or Cursor, including configuration and authentication. |
 | `xcode-mcp` | Explicitly configure, launch, or diagnose Apple's native headless Xcode MCP server. |
 | `xcode-skills` | Explicitly install or update Xcode's embedded skills in a target repository. |
 | `xcode-whats-new` | Explicitly read official release notes for the active, latest, or requested stable or beta Xcode. |
@@ -137,7 +137,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop
 ```
 
 Install one reusable skill by passing only its path:
@@ -178,7 +178,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill swift-docc \
   --skill youtube \
   --skill hopper \
-  --skill discourse \
+  --skill discourse-mcp \
   --skill xcode-mcp \
   --skill xcode-skills \
   --skill xcode-whats-new \

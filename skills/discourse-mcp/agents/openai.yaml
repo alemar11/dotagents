@@ -1,0 +1,5 @@
+interface:
+  display_name: "💬 Discourse MCP"
+  short_description: "Set up and troubleshoot Discourse MCP connections"
+  default_prompt: "Use $discourse-mcp to set up, troubleshoot, or verify the Discourse MCP connection in Codex or Cursor."
+  brand_color: "#3B82F6"
