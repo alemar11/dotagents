@@ -1,9 +1,9 @@
 ---
-name: github-stacked-pr
+name: gh-stacked-pr
 description: "Manage stacked Git branches and dependent pull requests through the stack CLI wrapper."
 ---
 
-# GitHub Stacked PR
+# GH Stacked PR
 
 Before remote `git`, `gh`, registry, or skill helper commands that contact the
 network, use the runtime's narrowest network-enabled context for that command

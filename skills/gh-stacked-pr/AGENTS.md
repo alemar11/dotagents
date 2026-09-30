@@ -1,4 +1,4 @@
-# GitHub Stacked PR Maintenance
+# GH Stacked PR Maintenance
 
 This skill owns stack-level routing and operational guidance for the wrapper
 around `github/gh-stack`. Keep single-PR publication policy in Yeet and the
@@ -30,7 +30,7 @@ typed command contract with `scripts/stack`.
 - `scripts/stack_lib/` holds the implementation and local helpers (not the
   shared provider protocol).
 - Naming: `stack_lib` uses underscores as the Python import-syntax
-  compatibility exception; the public skill (`github-stacked-pr`) and command
+  compatibility exception; the public skill (`gh-stacked-pr`) and command
   (`stack`) stay lower-kebab.
-- Validate with `python3 -m unittest discover -s skills/github-stacked-pr/tests -v`
+- Validate with `python3 -m unittest discover -s skills/gh-stacked-pr/tests -v`
   and `scripts/stack --help|--version|--json doctor` plus `--json ensure`.

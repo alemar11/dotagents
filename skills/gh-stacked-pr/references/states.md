@@ -1,6 +1,6 @@
-# GitHub Stacked PR States
+# GH Stacked PR States
 
-Namespace: `github-stacked-pr.extension_status`. These values are derived from
+Namespace: `gh-stacked-pr.extension_status`. These values are derived from
 `scripts/stack --json ensure` / `extension_status` observations. They are not
 persisted workflow checkpoints.
 
