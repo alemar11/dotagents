@@ -17,7 +17,7 @@ the local `skills/tanstack/` skill.
 - Treat `skills/tanstack/` as one broad reusable skill surface for the TanStack
   portfolio.
 - Product-level references are stable routing units for AI, Charts, CLI,
-  Config, DB, Devtools, Form, Highlight, Hotkeys, Markdown, Pacer, Query,
+  Config, DB, Devtools, Form, Highlight, Hotkeys, Intent, Markdown, Pacer, Query,
   Ranger, Router, Start, Store, Table, and Virtual.
 - `references/integration.md` owns cross-stack composition guidance.
 - `references/router.md`, `references/start.md`, and `references/cli.md` own
@@ -85,8 +85,11 @@ surfaces when they exist.
 3. TanStack Intent docs:
    - `https://tanstack.com/intent/latest/docs`
    - `https://tanstack.com/intent/latest/docs/registry`
-   - Use these to confirm current Intent packaging, discovery, validation, and
-     staleness mechanics.
+   - `https://tanstack.com/intent/latest/docs/getting-started/quick-start-consumers`
+   - `https://tanstack.com/intent/latest/docs/concepts/configuration`
+   - `https://tanstack.com/intent/latest/docs/concepts/trust-model`
+   - Use these to confirm current Intent packaging, discovery, permissions,
+     validation, and staleness mechanics.
 4. Product docs on `latest` endpoints:
    - `https://tanstack.com/charts/latest/docs`
    - `https://tanstack.com/hotkeys/latest/docs`

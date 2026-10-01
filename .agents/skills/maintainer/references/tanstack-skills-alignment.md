@@ -24,7 +24,7 @@ the current official TanStack product docs.
   `tanstack-all`.
 - Product-level references are the coverage units: `ai.md`, `charts.md`, `cli.md`,
   `config.md`, `db.md`, `devtools.md`, `form.md`, `highlight.md`, `hotkeys.md`,
-  `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`,
+  `intent.md`, `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`,
   `store.md`, `table.md`, and `virtual.md`.
 - Focused Router, Start, and CLI concerns live under focused
   `references/*.md` files when their narrower concern is already known.
@@ -69,6 +69,7 @@ the current official TanStack product docs.
    - `https://tanstack.com/form/latest/docs`
    - `https://tanstack.com/highlight/latest/docs`
    - `https://tanstack.com/hotkeys/latest/docs`
+   - `https://tanstack.com/intent/latest/docs`
    - `https://tanstack.com/markdown/latest/docs`
    - `https://tanstack.com/pacer/latest/docs`
    - `https://tanstack.com/query/latest/docs`
