@@ -20,9 +20,13 @@ matching official docs before implementation.
 
 ## Workflow
 
-1. Inventory the command and its scope.
+1. Inventory the command, scope, and key identity.
    Decide whether the shortcut is global, focused-container, modal, or
    route-specific, and identify browser or operating-system conflicts.
+   Logical bindings follow `event.key` (`Mod+S`); physical bindings follow
+   `event.code` (`Mod+[KeyS]` or `{ code: 'KeyS', mod: true }`).
+   Choose deliberately for non-US layouts; object bindings use `key` or `code`,
+   never both.
 2. Use portable shortcut notation.
    Prefer `Mod` for Command on macOS and Control on Windows or Linux when the
    product intends the same semantic shortcut across platforms.
@@ -42,8 +46,10 @@ matching official docs before implementation.
 - Keep privileged or destructive actions behind the same confirmation and
   authorization path used by visible controls.
 - Store user-configured bindings in application state; use recording only as
-  the input mechanism.
-- Format shortcuts for the active platform instead of hard-coding glyphs.
+  the input mechanism. Current recorders default to `recordBy: 'code'`; choose
+  `'key'` explicitly when recording the produced character is intended.
+- Use `formatForDisplay` for the active platform instead of hard-coding glyphs.
+  A label does not change a binding's logical or physical identity.
 - Add devtools only when their debugging value justifies the extra package.
 
 ## Avoid
@@ -56,6 +62,9 @@ matching official docs before implementation.
 
 ## Verification
 
-Use current TanStack Hotkeys overview, installation, framework quick-start,
-scoping, sequence, recording, formatting, and devtools docs. Verify pointer,
-keyboard, focus, editable-field, and cross-platform behavior in the target UI.
+Use current TanStack Hotkeys [overview](https://tanstack.com/hotkeys/latest/docs/overview),
+installation, framework quick-start, scoping, sequence, recording, formatting,
+and devtools docs. Current packages are ESM-only ES2022 and need Node.js 20+
+when used in Node; inspect installed `dist` declarations rather than assuming
+`src` or CommonJS exports exist. Verify focus, editable-field, IME, repeat,
+cleanup, keyboard-layout, and cross-platform behavior in the target UI.

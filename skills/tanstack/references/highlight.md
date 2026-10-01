@@ -5,9 +5,11 @@ highlighting, explicit language registration, SSR-safe code rendering, theme
 generation, line or range annotations, framework code blocks, or Markdown
 pipelines.
 
-TanStack Highlight is a pre-1.0, synchronous highlighter optimized for blogs
-and documentation. Inspect the installed version and supported languages before
-depending on exact package subpaths or output contracts.
+TanStack Highlight now ships a 1.x synchronous highlighter optimized for blogs
+and documentation. Existing 0.x ranges do not select 1.x; inspect the installed
+version and supported languages before upgrading. The 1.0 release preserves
+0.1 entry points and APIs, but parser fixes can change token spans and colors
+without changing source text or the semantic HTML contract.
 
 ## Ownership Boundaries
 
@@ -16,7 +18,9 @@ depending on exact package subpaths or output contracts.
 - The application owns which languages ship, code-source trust, CSS placement,
   container markup, copy controls, line numbers, and product presentation.
 - Markdown owns its `<pre><code>` tree when the two products integrate;
-  Highlight supplies trusted inner token markup through the documented adapter.
+  `createTanStackMarkdownHighlighter` from `@tanstack/highlight/markdown`
+  supplies escaped inner token markup. See [Markdown](markdown.md) for the
+  parser and content-trust boundary.
 
 ## Workflow
 
@@ -24,8 +28,9 @@ depending on exact package subpaths or output contracts.
    Register only the languages the product renders and include embedded
    dependencies such as JavaScript or CSS when HTML examples need them.
 2. Create one reusable highlighter.
-   Keep it at module scope and use the same configured instance during SSR and
-   client rendering; no asynchronous initialization is required.
+   Keep it at module scope and use the same version, registrations, and options
+   during SSR and client rendering; no asynchronous initialization is required.
+   Do not re-highlight server-rendered blocks merely to hydrate them.
 3. Generate theme CSS once.
    Select light and dark themes, define the dark-mode selector, and install the
    returned CSS at the application boundary.
@@ -42,7 +47,10 @@ depending on exact package subpaths or output contracts.
   `themes/*` over broad convenience imports.
 - Reuse the highlighter and theme CSS rather than rebuilding them per render.
 - Keep source language explicit; do not assume automatic language detection.
-- Preserve the stable semantic HTML tree and style its classes externally.
+- Preserve the stable semantic HTML tree and style its classes externally;
+  exact token boundaries and complete HTML snapshots are not frozen in 1.x.
+- Treat language definitions and theme CSS as trusted application configuration.
+  Bound untrusted code sizes or isolate expensive work off the UI thread.
 
 ## Avoid
 
@@ -54,6 +62,8 @@ depending on exact package subpaths or output contracts.
 
 ## Verification
 
-Use current TanStack Highlight overview, installation, quick-start, language,
-theme, annotation, Markdown-pipeline, and comparison docs. When available, use
-the installed first-party Intent skill matching the target integration.
+Use current TanStack Highlight installation, language, theme, annotation,
+Markdown-pipeline, and [v1 migration](https://tanstack.com/highlight/latest/docs/guides/migrating-to-v1)
+docs. The runtime package is ESM-only, supports Node.js 18+, and needs no
+framework peers. Prefer the installed first-party Intent skill matching the
+target integration; [Intent](intent.md) owns discovery and trust guidance.
