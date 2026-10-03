@@ -10,6 +10,23 @@ explicitly requests another method. Prefer native subcommands; use `gh api`
 for REST or GraphQL operations without a suitable subcommand. This includes
 reading repository files, issues, pull requests, reviews, Actions, and releases.
 
+For a single repository file without cloning, prefer `gh repo read-file`:
+
+```sh
+gh repo read-file path/to/file --repo OWNER/REPO --ref REF
+```
+
+This command is currently in preview; check the installed command's help. If
+the CLI lacks it, request raw content through `gh api`:
+
+```sh
+gh api 'repos/OWNER/REPO/contents/path/to/file?ref=REF' \
+  -H 'Accept: application/vnd.github.raw+json'
+```
+
+When piping a fetch into a decoder or filter, preserve gh's failure status;
+use `set -o pipefail` in Bash or zsh so a later command cannot mask a failed read.
+
 Quote `gh api` endpoints containing query strings or shell metacharacters:
 
 ```sh
@@ -30,6 +47,9 @@ their publication, review, or authorization rules.
 
 For local image or video uploads to issues, pull requests, or comments, read
 [attachment guidance](references/attachments.md).
+
+For Actions job logs, including completed jobs in an active workflow, read
+[Actions log guidance](references/actions-logs.md).
 
 ## Availability
 
