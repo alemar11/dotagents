@@ -30,11 +30,28 @@ evidence. The owner maps this report to its own review result and transitions.
 
 ## Brief
 
-> Review <complete draft path or contents> against <requirements, accepted
-> decisions, and specification contract>. Check missing or partial requirements,
+> Review the complete supplied draft against the caller-accepted requirements
+> and <specification contract>. Check missing or partial requirements,
 > scope creep, contradictory ownership or interfaces, unsupported design
 > assumptions, task coverage, prerequisite feasibility, and whether checks prove
 > the intended behavior. Read only; do not rewrite the
 > draft or delegate. Return concise findings citing the requirement and draft
 > location, their impact, and the smallest correction; distinguish defects from
 > judgment calls. If clean, state what you checked and any evidence limitations.
+
+For inline content, use these blocks under the brief, following the
+[helper brief rules](subagents.md). Keep the specification contract and review
+instructions outside the artifact; include prior findings as source material
+when checking a correction. These blocks do not change the saved spec format.
+
+```xml
+<accepted-requirements>
+{Caller-accepted requirements and decisions}
+</accepted-requirements>
+<artifact-under-review>
+{Complete current draft and task details, with their identity and locations}
+</artifact-under-review>
+<source-material>
+{Supporting evidence or prior findings, each with its source and location}
+</source-material>
+```
