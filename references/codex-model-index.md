@@ -11,10 +11,12 @@ active runtime.
 | skill | model | reason | description |
 | --- | --- | --- | --- |
 | [`$explore`](../skills/explore/SKILL.md) | `configured/default` | `configured/default` | Invoking App task or CLI session acting as the read-only Explore controller; its active model and reasoning are intentionally retained. |
+| [`$why`](../skills/why/SKILL.md) | `configured/default` | `configured/default` | The invoking session owns the historical investigation and synthesis, retaining its active model and reasoning. |
 | [`$architect`](../skills/architect/SKILL.md) | Inherit | Inherit | The invoking session owns design, task planning, and review with its configured model and reasoning; no separate planner. Optional helpers follow the skill-local briefs. |
 | [`$adversarial-review`](../skills/adversarial-review/SKILL.md) | `configured/default` | `configured/default` | Independent read-only reviewer profile supplied by the caller or composed workflow; the skill does not select a model or reasoning value. |
 | [`$implement`](../skills/implement/SKILL.md) | `configured/default` | `configured/default` | Executes in the current task or caller-selected developer subagent; does not select or change its profile. |
 | Explore research helpers | `configured/default` | `configured/default` | [Research delegation](../skills/explore/references/orchestration.md) inherits host defaults or explicit user choices. |
+| Why evidence helpers | `configured/default` | `configured/default` | [Historical evidence research](../skills/why/SKILL.md#follow-relevant-evidence) inherits host defaults or explicit user choices; helpers are optional and read-only. |
 | Architect research and design review helpers | `configured/default` | `configured/default` | [Architect helpers](../skills/architect/references/subagents.md) prescribe no model or reasoning level. |
 | Implement design helper | `configured/default` | `configured/default` | [Designer role](../skills/implement/references/designer.md) inherits host defaults or explicit user choices. |
 

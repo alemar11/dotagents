@@ -26,6 +26,7 @@ as skills.
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
+| `why` | Reconstruct historical design rationale from code history and related records, separating documented reasons from inference. |
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `architect` | Design feature behavior, ownership and interfaces, then a verifiable task plan; publish the specification to GitHub when requested. |
@@ -87,6 +88,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - Install `architect` with its `grilling-session` dependency.
   Skill dependencies must be reachable in the current session; the invoking skills
   never install or substitute them automatically.
+- `why` is a standalone read-only investigation, also usable by a planning or
+  research caller. It follows relevant historical sources without requiring a
+  provider or an exhaustive source sweep. Optional evidence helpers inherit
+  host defaults; the invoking session owns synthesis. GitHub reads use `gh`.
 - `review-pr` obtains one hosted Codex review result for a PR through
   authenticated `gh`, with no other skill dependency. Other authorized review
   discussion and resolution operations use `gh` directly. Use
@@ -153,7 +158,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/test-audit skills/prototype
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/test-audit skills/prototype
 ```
 
 Install one reusable skill by passing only its path:
@@ -203,6 +208,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill learn \
   --skill grilling-session \
   --skill explore \
+  --skill why \
   --skill adversarial-review \
   --skill review-pr \
   --skill architect \

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Why"
+  short_description: "Trace design decisions to their historical evidence."
+  default_prompt: "Use $why to investigate why this design exists, citing the historical evidence and distinguishing documented reasons from inference."
