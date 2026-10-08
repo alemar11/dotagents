@@ -1,7 +1,7 @@
 # Explore Research Delegation
 
-Read after Grilling Session returns `refined` or `user-stopped`. The invoking
-session owns the investigation and final answer.
+Read when the interview is `not-needed`, `refined`, or `user-stopped` under
+[states.md](states.md). The invoking session owns the investigation and final answer.
 
 ## Choose useful assignments
 
@@ -24,7 +24,9 @@ Adapt this brief to each assignment:
 > Git or hosted state, save artifacts, interview the user, or delegate further.
 > Return a concise answer with source or file citations, supporting evidence,
 > competing explanations, and anything you could not establish. Distinguish
-> observations from inferences. Stop when the question is answered or identify
+> observations from inferences. Prefer the primary source that owns each claim
+> and flag claims that could only be checked against secondary sources.
+> Stop when the question is answered or identify
 > the specific missing evidence.
 
 Provide enough context to answer independently, not an entire transcript.

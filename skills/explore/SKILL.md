@@ -9,9 +9,9 @@ description: "Run an explicitly requested read-only exploration in the current t
 
 Activate only for explicit `$explore`, Explore UI selection, or an equivalent
 instruction to execute this workflow, never an ordinary mention or implicit
-planning match. Follow this sequence in the invoking task or session: context
-preparation, direct exploration, Grilling Session, remaining investigation,
-then a conversational report. Retain its working directory
+planning match. Prepare context and explore directly in the invoking task or
+session. Use Grilling Session only for unresolved user decisions, then complete
+any remaining investigation and report here. Retain its working directory
 and context; no replacement controller, visible task, fork, transfer brief,
 saved-project lookup or surface classification is needed.
 
@@ -27,7 +27,8 @@ Return findings here without saving a file. If the user requests a saved report
 or switches to implementation, finish Explore and perform that separately
 authorized work through its owning workflow. Read
 [states.md](references/states.md) before interpreting interview, worker or outcome
-state. No workers are created before Grilling Session finishes.
+state. Create workers only once scope is settled or the user has stopped the
+interview with enough direction to continue.
 
 ## Context preparation
 
@@ -57,19 +58,23 @@ does not call Learn again.
    Keep this pass bounded to what makes the next decisions informed, rather
    than exhaustively researching every branch. If the subject or access cannot
    be established, ask only the clarification needed to begin.
-2. Briefly share the useful findings, separating observations from hypotheses,
-   and compose `$grilling-session` using that evidence and the conversation.
-   Focus its questions on unresolved intent, scope, constraints, and tradeoffs.
-   Do not ask the user for facts the exploration already established or invent
-   ambiguity to prolong the interview. Exploration findings are provisional
-   until checked against the user's intent.
-3. Ask one question per turn until Grilling Session returns `refined`, the user
+2. Assess whether a material decision about intent, scope, constraints, or
+   tradeoffs still needs the user. When the request and existing conversation
+   settle those decisions, mark the interview `not-needed` and continue to
+   investigation or synthesis. Missing factual evidence is research work, not
+   a reason to request confirmation of an already clear task.
+   Otherwise, briefly share useful findings, separating observations from
+   hypotheses, and compose `$grilling-session` with the evidence and unresolved
+   decisions. Do not invent ambiguity or ask for facts available in the sources.
+3. When an interview is needed, ask one question per turn until it returns
+   `refined`, the user
    stops with `user-stopped`, or the interview is `blocked`. Create no workers
    while the interview is awaiting an answer. A blocked interview fails Explore
    before worker creation.
-4. Use the confirmed scope, or best-supported interpretation after the user
+4. Use the established scope, or best-supported interpretation after the user
    stops, to guide the investigation. Preserve unconfirmed items and apply the
-   read-only scope gate again.
+   read-only scope gate again. A skipped interview requires no final user
+   confirmation; it does not remove unresolved evidence from the report.
 5. Read [references/orchestration.md](references/orchestration.md), determine
    the useful subagent count and assignments, and investigate the remaining
    questions. Reuse the initial exploration; revisit findings only when answers
@@ -82,6 +87,12 @@ does not call Learn again.
 
 ## Output contract
 
+Ground material claims in the primary source that owns them: current code and
+tests for repository behavior, official documentation for external contracts,
+and authoritative records for current state. Place citations beside the claims
+they support. Mark inferences and disclose unavailable primary evidence rather
+than treating a secondary summary or helper conclusion as verified fact.
+
 Use the [output template](references/output-template.md) to distinguish
 observations, inferences, missing evidence and assumptions, with scope, sources,
 results, worker evidence, risks, confidence and the next action. Do not report
@@ -92,5 +103,6 @@ In every case, report `Changes made: None`.
 ## Skill Dependencies
 
 Explore requires the installed `$learn` skill for read-only context
-preparation and `$grilling-session` for decision refinement. It never
+preparation. `$grilling-session` is required only when user decisions need
+refinement; its absence does not block the `not-needed` path. Explore never
 installs or refreshes these dependencies during a run.

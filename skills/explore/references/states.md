@@ -9,18 +9,25 @@ worker-slot state machine.
 
 | State | Meaning | Next step |
 | --- | --- | --- |
-| `not-started` | Context preparation or initial direct exploration is in progress. | Begin informed clarification, or report a blocking dependency. |
+| `not-started` | Context preparation or initial direct exploration is in progress. | Assess whether user decisions need clarification, or report a blocking dependency. |
+| `not-needed` | The request and existing conversation settle intent and scope; no material user decision remains. | Investigate remaining factual questions or synthesize sufficient evidence without user confirmation. |
 | `awaiting-answer` | A material question needs the user's answer. | Continue the interview after the answer; do not create research helpers yet. |
 | `refined` | The scope is confirmed. | Investigate remaining questions or synthesize sufficient evidence. |
 | `user-stopped` | The user ended the interview before confirmation. | Proceed from the best-supported scope, preserving unconfirmed items. |
 | `blocked` | The interview cannot proceed responsibly. | Report overall `failed`. |
 
-Preparation precedes `not-started` to `awaiting-answer`, `refined`, or `blocked`.
+Preparation precedes `not-started` to `not-needed`, `awaiting-answer`, `refined`,
+or `blocked`. Use `not-needed` only after assessing the request against initial
+evidence; it records that no interview occurred, not a user-confirmed brief.
 Each answer may lead to another `awaiting-answer`, `refined`, `user-stopped`, or
 `blocked`. Do not invent questions when existing evidence and user direction
-already settle scope. Research delegation begins only after `refined` or
-`user-stopped`. A missing required Learn dependency leaves the interview
-`not-started` and the overall outcome `failed`.
+already settle scope. Research delegation begins only after `not-needed`,
+`refined`, or `user-stopped`. If later evidence exposes a material user decision,
+stop dependent investigation and transition to `awaiting-answer`; preserve
+independent work already in flight and create no new helpers during the
+interview. A missing required Learn dependency leaves the interview
+`not-started` and the overall outcome `failed`. Missing Grilling Session causes
+`blocked` only when an interview is required; it does not affect `not-needed`.
 
 ## Overall outcome
 
