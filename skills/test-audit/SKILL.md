@@ -8,6 +8,21 @@ description: "Use when writing, changing, reviewing, or pruning tests to prevent
 Keep tests that detect meaningful failures and remove maintenance cost that
 adds no protection. Optimize for confidence, not deletion count.
 
+## Invocation and scope
+
+Act on the task and scope already established in the conversation. When
+`$test-audit` is invoked without either, start a read-only audit of existing
+tests in the current repository. Inspect its instructions, test layout, and
+production owners, then investigate high-confidence low-value candidates.
+Report findings with the evidence described below and state which areas were
+examined; this default does not require an exhaustive campaign or ledger.
+If no tests are found, report that result.
+
+Begin the audit rather than replying with a capability menu or asking what to
+assess. Ask for a target only when the available context does not identify one
+repository. A bare invocation does not authorize edits or deletion; preserve
+any explicit writing, cleanup, or review-only scope already established.
+
 For ordinary test writing or changes, apply the authoring gate, low-value
 patterns, retention bar, and relevant validation only. Keep the reasoning
 proportionate; no ledger, historical investigation, or suite inventory is
@@ -126,9 +141,3 @@ retained. Disclose baseline failures and unavailable checks. For pruning,
 separate production/tooling changes from test/support line counts; do not use
 line reduction as proof of correctness. Follow existing authorization for
 commits or publication; skill invocation alone grants neither.
-
-## Attribution
-
-Adapted from OpenClaw's [Test Audit](https://github.com/openclaw/openclaw/blob/80930af448ebabc84174146b56bc106d37fab3b4/.agents/skills/test-audit/SKILL.md)
-and [Test-pruning campaign](https://github.com/openclaw/openclaw/blob/80930af448ebabc84174146b56bc106d37fab3b4/.agents/skills/test-audit/CAMPAIGN.md),
-with repository-specific tooling and delivery assumptions removed.

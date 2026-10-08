@@ -31,7 +31,7 @@ as skills.
 | `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
-| `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage, from focused changes to whole subsystems. |
+| `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
 | `gh` | Route GitHub reads and writes through the authenticated CLI; suggest macOS or Linux installation when it is missing. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
