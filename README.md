@@ -23,9 +23,9 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `learn` | Maintain AGENTS.md and durable repository knowledge; also triggers on user-stated hard repository rules and important durable assumptions. |
-| `grilling-session` | Refine a topic or handoff through repository-grounded questions with concrete recommended answers. |
-| `explore` | Explore evidence, refine the question, and investigate read-only in the current task or session with optional research subagents. |
+| `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
+| `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
+| `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
@@ -68,19 +68,21 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 ## Skill Dependencies
 
-- `explore` explores relevant evidence in the current task or session before
-  Grilling Session, then investigates remaining questions using the existing
-  conversation. The entire investigation is strictly read-only.
+- `explore` explores relevant evidence in the current task or session, clarifies
+  material user decisions when needed, then investigates remaining questions.
+  Clear requests proceed without an interview or final confirmation. The
+  entire investigation is strictly read-only.
   It never creates visible tasks or prepares a controller transfer handoff.
   Independent evidence work may use subagents with focused research briefs,
   subject to user constraints and host capacity. Workers cannot invoke Explore
   or delegate further. Research helpers prescribe no model or reasoning level.
 - Install `explore` with its `grilling-session` and `learn` dependencies.
   Explore invokes Learn for a read-only Project Context pass before exploration,
-  then invokes Grilling Session with the gathered evidence. The current task or session asks the user one
-  question with a recommended answer per turn and
-  cannot plan workers until the scope is confirmed or the user stops
-  grilling.
+  then invokes Grilling Session only when user decisions need refinement.
+  A required interview asks one question with a recommendation per turn.
+  Workers can begin once scope is already established, the interview confirms
+  it, or the user stops grilling. Grilling Session is not required for the
+  direct investigation path.
 - Install `spec` with its `grilling-session` dependency.
   Skill dependencies must be reachable in the current session; the invoking skills
   never install or substitute them automatically.
@@ -93,6 +95,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - Spec uses installed `$grilling-session` for material clarification and
   authenticated `gh` for hosted reads and publication when saving to GitHub.
 - `learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
+- A requested Learn retrospective proposes environment improvements from
+  observed session evidence. Accepted lessons use existing capture authority;
+  implementing tooling fixes remains separate work.
 - `grilling-session` is read-only and explicit or parent-composed. It uses supplied
   context and relevant evidence without requiring Learn or a repository, returns
   a transient refined handoff, and
