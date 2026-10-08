@@ -153,9 +153,12 @@ completed preparatory task with the requested feature outcome. Separate
 preservation obligations from new behavior.
 
 Prefer an existing verification boundary that exercises the relevant external
-behavior. Propose a new boundary only with a concrete adequacy reason. Review
-the feature-level outcome as well as individual task checks: task completion
-alone never proves the whole feature works.
+behavior. Propose a new boundary only with a concrete adequacy reason. When the
+choice materially affects confidence, explain what the boundary proves and
+which important risks need another boundary. Reuse accepted testing decisions;
+routine boundary choices do not require separate approval. Review the
+feature-level outcome as well as individual task checks: task completion alone
+never proves the whole feature works.
 
 ## Rendering
 
