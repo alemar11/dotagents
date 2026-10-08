@@ -1,5 +1,7 @@
 # <Feature title>
 
+<!-- Template for new or consolidated specs. For legacy revisions, preserve task locations under references/existing-specs.md. -->
+
 <a id="spec"></a>
 
 ## Why

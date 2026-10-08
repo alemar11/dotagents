@@ -42,3 +42,11 @@ owners; Architect preserves them during revision.
 Keep refinement and publication results separate. A refined spec remains in the
 conversation until explicit publication is requested. No result proves that a
 label, monitor or worker has started.
+
+`published` and `no-op` require verified content that meets the specification
+and hosted-content rules. Observed content that remains nonconforming yields
+`publication_result=failed`, even when `readback=verified`: observation alone
+does not prove conformity. If final provider state is unknown, report
+`publication_result=ambiguous` and `readback=ambiguous`. An unresolved repair
+blocks publication completion without discarding completed refinement or
+preventing unaffected work on other selected specs.

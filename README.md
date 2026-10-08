@@ -113,7 +113,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   ownership and contracts, and compares alternatives when a consequential choice
   needs them. It produces a design and task plan without implementation or runnable
   prototypes. It saves coherent specs with stable task identities, recommended
-  order, real prerequisites, and completion checks. GitHub is the only saved destination;
+  order, real prerequisites, and completion checks. Targeted revisions preserve legacy
+  task issues unless consolidation is requested. GitHub is the only saved destination;
   no-write previews stay in the conversation and require no GitHub skill access when using
   only supplied or local sources. GitHub is the sole saved-spec authority.
 

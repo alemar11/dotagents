@@ -29,12 +29,18 @@ Retiring a task removes it from the active index with an explicit historical
 reference; preserve its identity and attributable execution history.
 Retirement invalidates any prior delivery evidence relying on it.
 
-For a pre-existing spec with separate task issues, read all linked contracts and
-consolidate them into the same spec issue when revising. Preserve task IDs,
-progress, and historical source links; verify complete incorporation before
-treating the embedded sections as authoritative. Do not create more task issues,
-close or delete old ones, or remove old relationships without explicit scope.
-Reconcile active delivery assignments before transferring their progress owner.
+For a pre-existing spec with separate task issues, preserve that structure for
+targeted revisions. Read the linked contracts for coverage and dependency review;
+revise only affected contracts in their existing artifacts within the requested
+scope. This compatibility exception permits updates to existing task issues,
+not creation of new ones or transfer of progress ownership.
+
+Consolidate tasks into the spec issue only when the requested scope includes
+consolidation. Preserve task IDs, progress, and historical source links;
+reconcile active delivery assignments before transferring their progress owner.
+Verify complete incorporation before treating embedded sections as authoritative.
+Closing or deleting old issues or removing provider relationships requires its
+own explicit scope.
 
 When an older spec includes cross-repository work or links, do not split it or
 create companion issues. Draft a local-only revision for its owner repository.

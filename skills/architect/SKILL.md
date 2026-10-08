@@ -5,39 +5,33 @@ description: "Design features and substantial changes in one repository, from us
 
 # Architect
 
-Turn the current discussion, supplied references or an existing spec into an
-implementable design: observable behavior, ownership and contracts, reasoned
-decisions, and the smallest verifiable task plan. Keep the specification in the
-current conversation by default. Publish one GitHub issue per spec with all
-tasks embedded only when the user explicitly requests publication.
+Turn the discussion, supplied references or an existing spec into an
+implementable design and verifiable task plan. Keep it in the conversation;
+publish to GitHub only on explicit request.
 
 ## Scope and execution
 
-Select exactly one implementation repository, defaulting to the current one
-when it matches. Resolve an unclear target before drafting. Report other
-repository work as out of scope; do not split it into companion specs or add
-cross-repository issue references. Planning does not implement, create branches
-or PRs, change execution progress, or implicitly start implementation.
+Use the single-repository scope in
+[specification.md](references/specification.md), defaulting to the current
+repository when it matches and resolving an unclear target before drafting.
+Planning does not implement, create branches or PRs, change execution progress,
+or authorize runnable prototypes.
 
 Work in the invoking session. When the outcome is clear,
 rename this task to `📚 Architect · <outcome>` if supported; failure is a
 reported limitation, not a blocker. Do not create or fork a planner task or use
-titles as identity. Optional research, alternative designs, and draft review
-follow [subagent briefs](references/subagents.md). Adapt the selected brief with
-the exact question, relevant paths or source contents, accepted decisions,
-scope limits, and expected findings.
-Research independent unknowns in parallel; give the reviewer the complete draft
-and requirements once available. Keep research evidence distinct from review
-findings, assess both, and retain ownership of the spec. When helpers are
-unavailable or prohibited, perform the work locally and disclose any lost
+titles as identity. Use [subagent briefs](references/subagents.md) only when
+delegating research, alternatives, or draft review. Retain ownership of the
+spec; if helpers are unavailable or prohibited, work locally and disclose lost
 review independence.
 
 ## Design the outcome before the tasks
 
-Read [specification.md](references/specification.md) for content, identity and
-review requirements. Reuse conversation evidence and accepted decisions;
-inspect relevant code and repository instructions to resolve remaining facts.
-For revisions, first apply [existing-specs.md](references/existing-specs.md).
+Read the specification contract for content, identity and review requirements.
+Reuse accepted decisions and evidence; inspect relevant code and repository
+instructions for remaining facts. For revisions, first apply
+[existing-specs.md](references/existing-specs.md), including its compatibility
+rules for separate task issues.
 
 Start by refining the brief in the current conversation. Invoke the installed
 `$grilling-session` skill when material choices need user input;
@@ -47,39 +41,22 @@ an existing design needs only the affected decisions rechecked.
 Ordinary answer waits are nonterminal; missing essential evidence blocks only
 affected work after unaffected authorized work is completed.
 
-Start with a realistic user journey or caller example and its observable
-result. Ground it in the relevant current behavior and accepted constraints.
-When the change introduces or alters state, responsibilities, interfaces, or
-module boundaries, read [design.md](references/design.md) to settle ownership,
-invariants, failure behavior, and consequential alternatives before splitting
-the work. Keep depth proportional: a straightforward change can have a short
-design and one task. Do not manufacture architecture or competing proposals.
+Start from realistic usage and its observable result. Read
+[design.md](references/design.md) when changing state, responsibilities,
+interfaces, or module boundaries. Settle the design before splitting the work;
+a straightforward change can have a short design and one task.
 
-Separate product choices requiring user judgment from facts that source research
-can settle and empirical questions requiring an experiment. Planning does not
-authorize runnable prototypes or product edits. For an unresolved empirical
-question, identify the smallest useful experiment and the decision it gates;
-use separately authorized evidence when available and continue unaffected
-planning. Do not claim the dependent design is ready without that evidence.
+Separate user choices, researchable facts, and empirical questions. For missing
+empirical evidence, name the smallest experiment and the decision it gates;
+use separately authorized evidence and continue unaffected planning.
 
-Draft with [spec.md](templates/spec.md): problem, usage, observable behavior,
-scope, design and accepted decisions, acceptance criteria and embedded tasks.
-Once the design is coherent, use
-[task-decomposition.md](references/task-decomposition.md) when creating or changing
-tasks: prefer narrow end-to-end outcomes, real prerequisites and checks that
-prove behavior. Keep task dependencies separate from worker, branch and PR
-topology, which belong to the execution caller.
+Draft with [spec.md](templates/spec.md). Use
+[task-decomposition.md](references/task-decomposition.md) when creating or
+changing tasks; execution topology belongs to the caller.
 
-Review and correct the design and complete task plan before handoff or
-publication. Preserve requested outcomes and decisions, cover every criterion
-with credible task checks, verify dependency feasibility, and ensure each task
-works with the main spec in a fresh session.
-Check that realistic usage fits the proposed contracts, state has clear owners,
-and the design does not require callers to coordinate hidden implementation
-steps. If review disproves a design assumption, revise the affected decision
-and its tasks together; do not patch the task list around an incoherent design.
-Same-repository issue links are ordinary references; native blocker management
-uses `gh` directly on explicit request, outside Architect.
+Review and correct the complete design and task plan against the specification
+contract before handoff or publication. If review disproves an assumption,
+revise the decision and its tasks together.
 
 ## Refine and optionally publish
 
@@ -92,11 +69,6 @@ intended host and repository before access. Report unavailable CLI access or
 authentication for the affected operation. Before every hosted write apply
 [hosted-content safety](references/hosted-content-safety.md).
 Local-source refinement needs no GitHub access.
-
-For publication, verify the complete GitHub artifact. Reconcile uncertain or
-partial publication against its existing identity before retrying; never claim
-publication from the conversational draft. Architect publication never creates,
-updates or removes GitHub labels and never starts delivery.
 
 Return the refined spec or published link, a concise task summary, material
 assumptions, review/publication results and exact remaining blockers or questions.

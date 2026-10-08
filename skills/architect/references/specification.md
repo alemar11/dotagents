@@ -1,21 +1,16 @@
 # Feature Specification Contract
 
-Read before authoring, reviewing, saving, or consuming an Architect
-specification. This is the canonical content and identity contract; templates project it into readable
-Markdown. Output references own storage and transport, not feature meaning.
+Read before authoring, reviewing, saving, or consuming a spec. This file owns
+content and identity; templates render it, and output references own transport.
 
 ## Main specification
 
-One invocation targets exactly one repository; every spec and task it produces
-belongs there. An explicit batch may contain several independent specs in that
-repository. Do not create parent issues, task issues, set registries, companion
-specs in other repositories, or cross-repository issue references. Same-repository
-spec links remain ordinary references, distinct from prerequisites.
-
-When the request spans repositories, select the clearly intended local scope or
-resolve the target before drafting. Return other repository work to the caller
-as out of scope without planning or publishing it. Do not silently drop those
-requirements or claim the local spec covers the complete cross-repository outcome.
+Every spec and task in an invocation belongs to one selected repository; an
+explicit batch may contain several independent specs there. Return work for
+other repositories as out of scope without silently dropping its requirements
+or claiming full coverage. Do not create parent issues, task issues, set
+registries, companion specs in other repositories, or cross-repository issue
+references. Historical references follow [existing-specs.md](existing-specs.md).
 
 A complete spec records:
 
@@ -26,16 +21,14 @@ A complete spec records:
 - ownership, domain invariants, and boundary contracts where the change affects
   them, with rationale and material tradeoffs rather than an exhaustive code plan;
 - observable feature acceptance criteria covered by task verification checks;
-- an ordered task index and the detailed contract for every task;
+- an ordered task index and each task's embedded or linked detailed contract;
 - prerequisites outside the selected spec when relevant, with exact source
   references and the evidence required to satisfy them.
 
-Use the project's vocabulary. Include user stories only when they clarify
-behavior; a refactor or infrastructure spec can describe interfaces, invariants,
-and operational outcomes directly. Small changes may express usage and design
-in a few sentences within the behavior section. Omit empty optional sections;
-do not require a diagram, API sketch, or alternative for every spec. Design
-reasoning follows [design.md](design.md) when relevant to the changed boundaries.
+Use project vocabulary and proportional detail: a small change may express
+usage and design within the behavior section. User stories, diagrams, API
+sketches and alternatives are not mandatory formats. Design reasoning follows
+[design.md](design.md) when relevant to changed boundaries.
 
 ## Interfaces and readiness
 
@@ -70,29 +63,25 @@ than list positions. When wording changes, update affected references together
 and preserve the accepted obligation; record material replacements or removals
 in a compact revision note. Keep source links beside supported claims.
 
-One GitHub issue is authoritative for each spec and
-contains the spec, acceptance criteria, ordered task index, and every detailed
-task contract. Task sections inherit the owner repository and own acceptance links and task
-prerequisites. Related specs use ordinary links; prerequisites remain in the
-body, including internal task dependencies. Architect never manages native GitHub
-blocking relationships; explicit user requests use `gh` directly,
-outside this contract.
+New and consolidated specs keep all content in one authoritative GitHub issue.
+Legacy specs may retain separate task issues under [existing-specs.md](existing-specs.md);
+targeted revisions do not require migration. Tasks inherit the owner repository
+and own acceptance links and task prerequisites. Related specs use ordinary
+links; prerequisites remain in bodies. Architect never manages native GitHub
+blocking relationships; explicit requests use `gh` outside this contract.
 
-Spec-level prerequisites identify exact same-repository spec references, required
-implementation outcomes or evidence, and the activity and scope they gate.
-Do not require issue closure or merge when a usable PR candidate supplies the
-needed outcome. Preserve explicitly required merge or deployment conditions. Task-specific
-prerequisites outside the spec stay with their tasks. The executor checks both; a dependency
-does not authorize implementing the prerequisite or expanding selection.
+Spec-level prerequisites name exact same-repository references, required outcomes
+or evidence, and the activity and scope gated: implementation, integration,
+publication, merge or deployment. Shared scope or recommended order is not a
+dependency. An agreed interface may permit parallel implementation; a usable
+candidate may satisfy integration without issue closure or merge. Preserve
+explicit merge or deployment requirements. Task-specific prerequisites stay
+with their tasks; the executor checks both without expanding selection.
 
-Revision rules live in [existing-specs.md](existing-specs.md).
-Planning never overwrites executor-owned progress or claims implementation
-completion from a drafted task list.
-
-Preserved executor-owned progress and provider status are excluded from semantic contract identity and do not advance
-`spec_revision`; all requirements, decisions and task contracts remain included.
-Implementation readiness metadata is outside the Architect contract and is owned by
-the execution caller.
+Preserve executor-owned progress and provider status; neither advances
+`spec_revision`. Requirements, decisions and task contracts do. Implementation
+readiness metadata belongs to the execution caller, and a completed spec proves
+no implementation. Revision rules live in [existing-specs.md](existing-specs.md).
 
 ## Task contract
 
@@ -111,11 +100,9 @@ prerequisites, and completion checks without the drafting conversation.
 | `blocked_by` | Other task IDs in this spec that supply real prerequisites, each with the required outcome or evidence. |
 | `external_prerequisites` | Prerequisites outside this spec but within its repository, with exact artifact references and required evidence, or none. The established field name is retained; it does not permit cross-repository issue links or expand selection. |
 
-The spec task index is an ordered list of task IDs, titles, and detail links.
-It owns membership and recommended order; task details own all other task
-fields. Do not duplicate acceptance links or dependency
-descriptions in the index. Read every task to establish coverage and the full
-dependency graph. Task titles in the index mirror their details.
+The ordered index owns task membership and recommended order, listing only IDs,
+titles matching their details, and detail links. Task details own other fields;
+read every task to establish coverage and the full dependency graph.
 
 A task is identified by its containing spec reference plus `task_id`; within
 one spec, `task_id` is sufficient. Display position may change independently.
@@ -132,48 +119,34 @@ task boundaries, recommended order, or prerequisites.
 
 ## Decisions and validation
 
-Derive the task plan from a coherent design. Relevant examples of usage must
-fit its interfaces and failure semantics; ownership and invariants must remain
-consistent across task boundaries. Compare alternatives only when they resolve
-a consequential uncertainty, and record the evidence and tradeoff behind the
-chosen shape. A dependent decision is not ready while essential empirical
-evidence is missing; name the required observation and continue independent work.
+Review usage against interfaces and failure semantics, and ownership and
+invariants across tasks. Callers must not coordinate hidden implementation
+steps. A dependent decision is not ready while essential empirical evidence is
+missing; name the required observation and continue independent work.
 
-Preserve accepted public API, schema, compatibility, ownership, security,
-architecture, migration, and testing decisions when they constrain the outcome.
-Record the decision, consequence, and evidence or authority. Existing accepted
-decisions, choices explicitly delegated to the planner, and safe explicit
-assumptions may proceed without a new interview. Material unresolved choices
-return through Grilling Session before publishing a ready spec.
-
-Distinguish binding decisions from implementation suggestions. Binding
-decisions are part of the spec contract; suggestions are optional approaches
-that an implementer may replace while preserving outcomes and constraints.
-Never turn a source's proposed solution into an accepted requirement without
-supporting authority. Do not fill a template by inventing decisions.
+Preserve accepted API, schema, compatibility, ownership, security, architecture,
+migration and testing decisions. Record their consequences and evidence or
+authority; distinguish them from safe assumptions and replaceable implementation
+suggestions. A source's proposal is not an accepted requirement without authority.
+Clarification follows the entrypoint; do not invent decisions to fill a template.
 
 Use precise interfaces or a compact schema/state example when prose would lose
 an accepted contract. Relevant repository-relative paths may cite current
 evidence; they are not an exhaustive edit list. Leave incidental helpers,
 commands, worker assignment, and Git operations to implementation.
 
-Every acceptance criterion describes observable success. Task checks supply
-credible verification methods and collectively cover all criteria, including
-assembled feature behavior where needed. Add
-current-behavior evidence when it affects scope, regression preservation,
-migration, feasibility, or verification; do not require a baseline field on
-every criterion. Label an unverified material baseline as unknown and investigate
-it when a decision depends on it. Never invent failure evidence or confuse a
-completed preparatory task with the requested feature outcome. Separate
-preservation obligations from new behavior.
+Task checks must collectively prove the feature criteria, including assembled
+behavior where needed. Cite current behavior when scope, regression preservation,
+migration, feasibility or verification depends on it; no per-criterion baseline
+field is required. Investigate material unknown baselines, never invent failure
+evidence, and distinguish preservation obligations from new behavior.
 
 Prefer an existing verification boundary that exercises the relevant external
 behavior. Propose a new boundary only with a concrete adequacy reason. When the
-choice materially affects confidence, explain what the boundary proves and
-which important risks need another boundary. Reuse accepted testing decisions;
-routine boundary choices do not require separate approval. Review the
-feature-level outcome as well as individual task checks: task completion alone
-never proves the whole feature works.
+choice materially affects confidence, explain what it proves and which risks
+need another boundary. Routine boundary choices need no separate approval.
+Task completion, especially preparatory work, alone never proves the assembled
+feature works.
 
 ## Rendering
 
@@ -184,7 +157,8 @@ no dependency. Lead with the problem and observable behavior; put compact identi
 metadata at the end. Use concrete WHEN / THEN scenarios only where they clarify
 a criterion, not as a second mandatory requirements list. Keep the task index
 free of progress checkboxes and do not seed an execution progress section during
-planning. Issue bodies embed task sections under `## Task details`.
-Use `<a id="task-<task_id>"></a>`, H3 task titles, and H4 subsections, with a
-fixed `spec` anchor for task back-links within the document. The ordered index
-links to task anchors. GitHub output owns transport and metadata.
+planning. New or consolidated issue bodies embed tasks under `## Task details`;
+legacy indexes retain links to existing task artifacts until consolidation.
+For embedded tasks, use `<a id="task-<task_id>"></a>`, H3 task titles and H4
+subsections, with a fixed `spec` anchor for back-links; the index links to these
+task anchors. GitHub output owns transport and metadata.
