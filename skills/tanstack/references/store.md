@@ -2,6 +2,11 @@
 
 Use this reference when a task involves TanStack Store, framework-agnostic reactive state, immutable store updates, derived state, selectors, subscriptions, or React/Vue/Solid/Angular/Svelte store adapters.
 
+Current docs use `createStore(initialValue)`, `createStore(() => derivedValue)`,
+and React's `useSelector(store, selector)`. `useStore` is a deprecated alias in
+the current React adapter. Check installed exports before changing older
+`Store`/`Derived` or subscription code; the docs still track v0.
+
 ## What to Optimize For
 
 - A small store boundary with explicit ownership.
@@ -21,6 +26,8 @@ Use this reference when a task involves TanStack Store, framework-agnostic react
    Subscribe components to the smallest stable state slice.
 5. Test derived and subscription behavior.
    Verify consumers update when they should and stay quiet when unrelated state changes.
+   Release manual subscriptions with their returned `unsubscribe` handle;
+   use `batch(...)` when several updates should notify subscribers together.
 
 ## Review Checklist
 
@@ -39,4 +46,7 @@ Use this reference when a task involves TanStack Store, framework-agnostic react
 
 ## Verification
 
-Use current TanStack Store docs for core APIs, derived state, and framework adapters. For server-state or collection-like data, compare against TanStack Query and TanStack DB before choosing Store.
+Use the official [core quick start](https://tanstack.com/store/latest/docs/quick-start)
+and [React quick start](https://tanstack.com/store/latest/docs/framework/react/quick-start)
+for construction, derivation, subscriptions, and adapter APIs. For server-state
+or collection-like data, compare against Query and DB before choosing Store.

@@ -4,11 +4,11 @@ Use this map after `$tanstack` triggers. Open only the smallest reference that m
 
 ## Product References
 
-- `ai.md`: provider-agnostic streaming, tools, structured output, multimodal messages, workflows, and AG-UI integration.
+- `ai.md`: streaming, tools, typed decisions, media, persistence, resumable streams, memory, MCP, sandboxes, runtime skills, and AG-UI integration.
 - `charts.md`: typed chart definitions, marks, channels, D3 scales and transforms, responsive SVG or Canvas rendering, SSR, interaction, and accessibility.
 - `cli.md`: scaffolding, add-ons, ecosystem discovery, custom add-ons, and machine-readable docs lookup.
 - `config.md`: package build, lint, versioning, publishing, and shared JavaScript or TypeScript configuration.
-- `db.md`: client-first collections, live queries, sync adapters, and optimistic mutations.
+- `db.md`: scoped collection clients, live queries, sync adapters, optimistic mutations, persistence, and offline transactions.
 - `devtools.md`: centralized devtools panels, plugins, framework integration, and production-safe diagnostics.
 - `form.md`: typed fields, arrays, validation, custom errors, reactivity, resets, and React Hook Form migrations.
 - `highlight.md`: selective syntax highlighting, explicit language registration, themes, SSR, annotations, and Markdown pipelines.
@@ -16,14 +16,22 @@ Use this map after `$tanstack` triggers. Open only the smallest reference that m
 - `integration.md`: Query + Router + Start ownership, loader prefetch, and SSR hydration boundaries.
 - `intent.md`: dependency-packaged skills, workspace discovery, allowlists, consumer guidance setup, and agent-hook boundaries.
 - `markdown.md`: deterministic Markdown parsing and HTML, React, or Octane rendering with explicit extension and security boundaries.
-- `pacer.md`: debouncing, throttling, rate limiting, queuing, batching, and async control.
+- `pacer.md`: debouncing, throttling, rate limiting, queuing, batching, async control, and Pacer Lite boundaries.
 - `query.md`: query keys, `queryOptions`, cache policy, invalidation, optimistic updates, and SSR-safe data flows.
 - `ranger.md`: headless single-range and multi-range sliders, custom steps, interpolation, drag behavior, and accessibility.
 - `router.md`: type registration, route trees, loaders, search params, navigation, auth guards, and code splitting.
 - `start.md`: execution model, server functions, middleware, environment boundaries, auth, and SSR-safe behavior.
 - `store.md`: framework-agnostic reactive state, immutable updates, selectors, derived state, and adapters.
 - `table.md`: headless tables, columns, row models, sorting, filtering, pagination, selection, and virtualization.
-- `virtual.md`: virtualized lists, grids, tables, scroll containers, dynamic measurement, overscan, and stable item identity.
+- `virtual.md`: virtualized lists, grids, tables, chat anchoring, dynamic measurement, overscan, and stable item identity.
+- `workflow.md`: early Alpha durable execution, replay, approvals, signals, schedules, persistence, and host adapters.
+
+The product map covers the [official library catalog](https://tanstack.com/libraries)
+plus Ranger and Workflow, which currently have public source documentation but
+are hidden from that catalog. For legacy `react-charts`, use `charts.md` to
+plan migration while preserving the installed library's API. Retired TanStack
+MCP and Create TS Router App entrypoints route through `cli.md`. Upstream skill
+bundles such as `tanstack-all` are packaging groups, not additional libraries.
 
 ## Focused CLI References
 

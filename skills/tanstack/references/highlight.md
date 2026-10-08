@@ -27,6 +27,9 @@ without changing source text or the semantic HTML contract.
 1. Inventory the real language set.
    Register only the languages the product renders and include embedded
    dependencies such as JavaScript or CSS when HTML examples need them.
+   Version 1.1 adds selective Swift, Java, Kotlin, Rust, Ruby, C#, Dart, Lua,
+   and Perl definitions; check the [language inventory](https://tanstack.com/highlight/latest/docs/language-inventory)
+   against the installed version rather than assuming every 1.x includes them.
 2. Create one reusable highlighter.
    Keep it at module scope and use the same version, registrations, and options
    during SSR and client rendering; no asynchronous initialization is required.
@@ -57,7 +60,9 @@ without changing source text or the semantic HTML contract.
 - Registering every available language by default.
 - Re-highlighting solely because the color theme changed.
 - Passing Highlight's complete wrapper into a Markdown callback that already
-  owns `<pre><code>`.
+  owns `<pre><code>`. Use `/remark` for mdast pipelines and `/rehype` for
+  existing HAST code blocks; `languages/markdown` highlights Markdown source
+  and does not replace those rendering adapters.
 - Assuming TextMate grammar compatibility or editor-grade semantic tokens.
 
 ## Verification

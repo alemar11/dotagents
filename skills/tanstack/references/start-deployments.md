@@ -14,7 +14,9 @@ packaging, or environment-sensitive Start behavior.
 
 Workflow:
 1. Identify the deployment target and its constraints.
-2. Check which Start assumptions depend on that target.
+2. Check the target and bundler pair. Start supports Vite and Rsbuild, but a
+   provider-specific adapter may require one; the documented Cloudflare Workers
+   setup currently uses the Cloudflare Vite plugin.
 3. Keep deployment advice scoped to runtime packaging and environment tradeoffs.
 
 Do not use this section for general framework setup, server-only runtime
@@ -25,3 +27,5 @@ Escalate to:
 
 Verification: verify against current TanStack Start deployment guidance when
 exact target support or packaging behavior matters.
+
+Source: [Start hosting](https://tanstack.com/start/latest/docs/framework/react/guide/hosting).

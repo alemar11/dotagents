@@ -25,7 +25,7 @@ the current official TanStack product docs.
 - Product-level references are the coverage units: `ai.md`, `charts.md`, `cli.md`,
   `config.md`, `db.md`, `devtools.md`, `form.md`, `highlight.md`, `hotkeys.md`,
   `intent.md`, `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`,
-  `store.md`, `table.md`, and `virtual.md`.
+  `store.md`, `table.md`, `virtual.md`, and `workflow.md`.
 - Focused Router, Start, and CLI concerns live under focused
   `references/*.md` files when their narrower concern is already known.
 - `integration.md` owns cross-stack Query, Router, Start, and broader
@@ -79,6 +79,8 @@ the current official TanStack product docs.
    - `https://tanstack.com/store/latest/docs`
    - `https://tanstack.com/table/latest/docs`
    - `https://tanstack.com/virtual/latest/docs`
+   - `https://github.com/TanStack/workflow/tree/main/docs` (source guidance while
+     Workflow remains hidden from the public catalog)
 3. Installed package metadata only when docs and upstream skills do not make
    current package names or status clear enough.
 

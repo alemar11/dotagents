@@ -1,6 +1,6 @@
 # TanStack Router
 
-Use this reference when a task involves `@tanstack/react-router`, route trees, `createFileRoute`, `createRouter`, `beforeLoad`, `loader`, `loaderDeps`, `validateSearch`, `Link`, `useNavigate`, or lazy route files.
+Use this reference when a task involves `@tanstack/react-router`, `@tanstack/solid-router`, route trees, `createFileRoute`, `createRouter`, `beforeLoad`, `loader`, `loaderDeps`, `validateSearch`, `Link`, `useNavigate`, or lazy route files.
 
 Use this umbrella reference when the Router scope is broad, mixed, or still unclear.
 Recent session evidence shows this umbrella is the common useful entrypoint;
@@ -26,7 +26,7 @@ to benefit from a narrower contract.
 4. Tighten search params.
    Prefer `validateSearch` and typed updates over ad hoc string parsing.
 5. Recheck navigation ergonomics.
-   Use `from` to narrow hook types when a component is route-specific, and use lazy route files when splitting is intended.
+   Use `from` to narrow hook types when a component is route-specific, and prefer bundler-driven automatic code splitting when supported.
 
 ## Macro Guides
 
@@ -55,7 +55,7 @@ to benefit from a narrower contract.
 - Register the router type once and let inference flow through the app.
 - Prefer validated search params over raw `URLSearchParams` style handling.
 - Use `beforeLoad` for auth gates and route-level preconditions.
-- Keep critical route config in the main route file and move heavy components to lazy files when appropriate.
+- Keep critical route config eager. Prefer automatic code splitting for supported file-based bundler setups; use manual lazy files when needed.
 - Prefer route loaders for route-owned fetching, especially when paired with TanStack Query preloading.
 - Use `from` on hooks and links when narrowing improves precision and TypeScript performance.
 

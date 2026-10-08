@@ -2,7 +2,10 @@
 
 Use this reference when a task involves TanStack Config, package build tooling, lint or formatting configuration, release or publishing setup, shared TypeScript package configuration, or repository package-quality workflows.
 
-TanStack Config is a package/tooling surface. Verify exact commands and config file names against the installed package and current docs before changing a repository's release pipeline.
+TanStack Config is a package/tooling surface with ESLint, Publish, and Vite
+utilities. Its current documented prerequisites are Node.js 20.17+, Git, GitHub
+CLI, and pnpm 10+; pnpm is the only supported package manager. Check the installed
+package before changing a repository's build or release pipeline.
 
 ## What to Optimize For
 
@@ -16,7 +19,8 @@ TanStack Config is a package/tooling surface. Verify exact commands and config f
 1. Identify the package boundary.
    Check whether the repo is a single package, workspace, library package, or app package.
 2. Inspect existing scripts and config.
-   Prefer existing package-manager conventions and CI commands before introducing new config.
+   Confirm pnpm compatibility before adopting Config. Preserve an existing
+   package manager unless its migration is part of the task.
 3. Add shared config only where it removes real duplication.
    Keep package-specific exceptions local and documented by command names, not long prose.
 4. Validate generated outputs.
@@ -42,3 +46,5 @@ TanStack Config is a package/tooling surface. Verify exact commands and config f
 ## Verification
 
 Verify exact TanStack Config APIs, command names, and supported package-manager behavior against current TanStack Config docs and the target repo's installed package versions.
+
+Source: [Config overview and prerequisites](https://tanstack.com/config/latest/docs/overview).

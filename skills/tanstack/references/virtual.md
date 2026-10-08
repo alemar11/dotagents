@@ -23,6 +23,13 @@ Use this reference when a task involves TanStack Virtual, `useVirtualizer`, larg
 5. Tune and test.
    Check fast scroll, resize, data changes, prepend/append behavior, and accessibility of rendered content.
 
+For chat, logs, and streaming feeds, check installed support for the current
+[end-anchoring APIs](https://tanstack.com/virtual/latest/docs/chat):
+`anchorTo: 'end'` preserves keyed items across prepends, while `followOnAppend`
+follows new output only when already near the end. Use stable `getItemKey`
+values and dynamic measurement for growing messages; avoid a second manual
+scroll-offset compensation layer around that behavior.
+
 ## Review Checklist
 
 - Is `getScrollElement` correct and stable?
@@ -42,4 +49,7 @@ Use this reference when a task involves TanStack Virtual, `useVirtualizer`, larg
 
 ## Verification
 
-Use current TanStack Virtual docs for React adapter APIs, scroll containers, dynamic measurement, lanes/grids, window virtualization, and integration patterns with TanStack Table.
+Use the official [Virtualizer API](https://tanstack.com/virtual/latest/docs/api/virtualizer)
+for React adapter APIs, scroll containers, dynamic measurement, lanes/grids,
+window virtualization, and integration patterns with TanStack Table. Match
+newer options to the installed version before replacing existing scrolling logic.

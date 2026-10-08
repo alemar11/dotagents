@@ -16,19 +16,25 @@ Intent is optional tooling, not a runtime dependency of `$tanstack` or the app.
 ## Workflow
 
 1. Inspect the installed CLI version, package manager, workspace root, and
-   existing Intent policy. Prefer the lockfile-pinned binary when reproducibility
-   matters; documentation examples using `@latest` can run a different CLI.
+   existing Intent policy. The current CLI requires Node.js 20.12.0+.
+   Prefer the lockfile-pinned binary when reproducibility matters; examples
+   using `@latest` can run a different CLI.
 2. Run `intent list` (or `intent list --json`) from the workspace root and load
    only the most specific relevant `<package>#<skill>` with `intent load`.
    Use discovered identifiers rather than guessing package or skill names.
-   A missing registry listing does not prove an installed package lacks skills.
+   The public registry indexes npm packages asynchronously; a missing listing
+   does not prove an installed package lacks skills. Read the actual installed
+   package, not a newer registry version, for version-aligned guidance.
 3. For requested consumer setup, preview `intent install --dry-run` and review
    the proposed policy and guidance destination before writing. First-run
    permission selection requires an interactive terminal; report that limitation
    rather than broadening permissions to bypass it.
 4. Preserve existing permissions. Use `intent install --review` for requested
    changes; plain `install` updates guidance without changing an effective policy.
-   Keep hook installation separately authorized and scoped to the intended agent.
+   Default setup writes discovery/loading guidance; use `--map` only when
+   explicit task mappings are wanted. Keep hook installation separately
+   authorized and scoped to the intended agent; verify activation in that
+   agent because writing hook configuration alone does not activate it.
 5. Verify the saved policy, managed guidance block, and a permitted skill load.
    If guidance fails after confirmed permissions are saved, inspect both files
    before retrying: permission writes are not rolled back automatically.

@@ -12,9 +12,13 @@ Use this reference when a task involves TanStack Devtools, devtools panels, libr
 ## Workflow
 
 1. Identify the framework and installed TanStack libraries.
-   Match devtools plugins to actual package usage.
+   Match the shell adapter and plugins to actual package usage. Current setup
+   docs cover React, Preact, Solid, Vue, Svelte, and Angular; plugin rendering
+   contracts differ across adapters. Devtools remains an alpha surface.
 2. Decide the exposure model.
-   Gate devtools by environment, debug flag, or local-only entrypoint as appropriate.
+   The `@tanstack/devtools-vite` plugin strips devtools from production by
+   default; mount it first in the Vite plugin list. For other build tools,
+   explicitly exclude devtools from production.
 3. Wire devtools near the owning providers.
    Place Query, Router, Form, DB, or shared devtools components where they can read the correct context.
 4. Check SSR and production builds.
@@ -40,3 +44,5 @@ Use this reference when a task involves TanStack Devtools, devtools panels, libr
 ## Verification
 
 Verify exact package names, plugin APIs, and framework setup against current TanStack Devtools docs and the target app's installed TanStack packages.
+
+Sources: [Setup](https://tanstack.com/devtools/latest/docs/quick-start), [Vite plugin](https://tanstack.com/devtools/latest/docs/vite-plugin), and [production behavior](https://tanstack.com/devtools/latest/docs/production).

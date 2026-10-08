@@ -13,9 +13,14 @@ Use this section when the task is specifically about Start middleware, reusable
 request shaping, or cross-cutting concerns like auth and headers.
 
 Workflow:
-1. Move shared request logic into middleware when it truly applies broadly.
+1. Choose request middleware for SSR, HTTP routes, and server functions; choose
+   function middleware for server-function input validation or client hooks.
+   Request middleware cannot depend on function middleware.
 2. Keep auth or header shaping ownership out of scattered components.
-3. Separate middleware concerns from route-local guards when both exist.
+3. Preserve server-function same-origin protection when customizing startup.
+   Current docs require explicitly installing `createCsrfMiddleware()` when
+   defining `src/start.ts`; verify support and defaults in the installed version.
+   Check proxy/public-origin behavior rather than disabling origin checks.
 
 Do not use this section for Router-only guards, server function implementation
 details, or end-to-end session coordination across layers.
@@ -36,3 +41,5 @@ packaging decisions, or Query hydration/loader coordination across the stack.
 
 Verification: verify against current TanStack Start middleware and server-core
 guidance when exact APIs or ordering behavior matter.
+
+Sources: [Middleware](https://tanstack.com/start/latest/docs/framework/react/guide/middleware) and [server-function origin protection](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions).

@@ -15,7 +15,8 @@ redirects, or route-level access checks.
 Workflow:
 1. Place route preconditions in guards, not scattered components.
 2. Make redirect behavior explicit and testable.
-3. Keep auth ownership clear between Router guards and Start middleware.
+3. Treat `beforeLoad` as a UI gate. Independently authorize each server function,
+   server route, or API serving private data; clients can call it directly.
 
 Do not use this section for middleware-wide Start auth concerns, navigation
 ergonomics unrelated to guards, or cross-stack session coordination.
@@ -36,3 +37,5 @@ boundaries outside Router concerns, or Query mutation error policy.
 Verification: if the task blends Router guards with Start middleware or
 cross-stack session state, use `integration.md`; otherwise verify against
 current Router guard, not-found, and error-boundary guidance.
+
+Sources: [Authenticated routes](https://tanstack.com/router/latest/docs/guide/authenticated-routes) and [not-found errors](https://tanstack.com/router/latest/docs/guide/not-found-errors).

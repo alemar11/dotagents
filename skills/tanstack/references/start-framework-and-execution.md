@@ -14,7 +14,9 @@ React framework and is not yet narrowed to server functions, middleware, or
 deployment.
 
 Workflow:
-1. Confirm the task is really about React Start as the framework surface.
+1. Confirm the framework adapter and build tool. Start supports Vite and
+   Rsbuild; use React-specific APIs here and the Solid docs for
+   `@tanstack/solid-start`.
 2. Place the concern into the right Start subdomain before making code-level
    recommendations.
 3. Keep React-specific Start advice separate from lower-level core runtime
@@ -43,3 +45,5 @@ Workflow:
 
 Verification: verify against current TanStack React Start, Start core, or
 execution-model guidance when exact APIs or runtime boundaries matter.
+
+Sources: [Start overview](https://tanstack.com/start/latest/docs/framework/react/overview) and [execution model](https://tanstack.com/start/latest/docs/framework/react/guide/execution-model).

@@ -31,7 +31,9 @@ profile before adopting or migrating; a 0.x dependency range will not select 1.x
    it necessary; review link, image, and executable-URL handling.
 3. Parse once when content is reused.
    Cache or serialize the deterministic document for build-time or repeated
-   rendering instead of reparsing unchanged source across boundaries.
+   rendering instead of reparsing unchanged source across boundaries. Store
+   the producing package version with persisted ASTs and rebuild caches when
+   adopting parser fixes; the AST is not a versioned interchange protocol.
 4. Add extensions deliberately.
    Keep docs presets, component mappings, heading anchors, AI-stream behavior,
    and highlighting explicit at the parser and renderer boundary. Pass the same
@@ -74,6 +76,9 @@ Use the official [installation](https://tanstack.com/markdown/latest/docs/instal
 [security](https://tanstack.com/markdown/latest/docs/core-concepts/security),
 [AI streaming](https://tanstack.com/markdown/latest/docs/guides/ai-streaming), and
 [highlighting](https://tanstack.com/markdown/latest/docs/guides/syntax-highlighting)
-docs. The 1.0 package ships first-party Intent skills for rendering, React,
-Octane, docs features, extensions, and production pipelines; prefer the matching
-installed skill for version-aligned detail via [Intent](intent.md).
+docs and the [1.x compatibility contract](https://tanstack.com/markdown/latest/docs/project/version-one).
+Octane 0.1.12 requires React 19 when both frameworks are installed; omit the
+optional Octane peer in React 18 applications. The 1.0 package ships first-party
+Intent skills for rendering, React, Octane, docs features, extensions, and
+production pipelines; prefer the matching installed skill for version-aligned
+detail via [Intent](intent.md).

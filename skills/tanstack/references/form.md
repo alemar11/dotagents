@@ -9,7 +9,9 @@ Use current official TanStack Form docs for exact APIs. TanStack Form favors typ
 - Complete typed `defaultValues` and field paths.
 - Controlled headless fields using `field.state.value`, `field.handleChange`, and `field.handleBlur`.
 - Validation timing that matches product behavior instead of blindly copying another library's mode.
-- Fine-grained reactivity through `form.Subscribe` or `useStore(form.store, selector)`.
+- Fine-grained reactivity through `form.Subscribe` or
+  `useSelector(form.store, selector)` from `@tanstack/react-form`. Current docs
+  deprecate `useStore`; retain it only when the installed version requires it.
 - Reusable app-specific form components through `createFormHook` or existing local wrappers.
 
 ## React Hook Form Migration Rules
@@ -43,6 +45,9 @@ Use current official TanStack Form docs for exact APIs. TanStack Form favors typ
 - Are errors read from `field.state.meta.errors`, `field.state.meta.errorMap`, or form `errorMap` intentionally?
 - Is `disableErrorFlat` used when source-specific error rendering matters?
 - Do subscriptions use selectors instead of reading whole form state?
+- Is `canSubmit` interpreted correctly before interaction? It can initially
+  be true; add an explicit pristine-state condition only when the product
+  requires an edit before submitting.
 - Are array item keys and array helper calls stable enough for add/remove/reorder flows?
 
 ## Avoid
@@ -56,3 +61,7 @@ Use current official TanStack Form docs for exact APIs. TanStack Form favors typ
 ## Verification
 
 Check current TanStack Form docs for Quick Start, Basic Concepts, Validation, Dynamic Validation, Async Initial Values, Arrays, Linked Fields, Reactivity, Listeners, Custom Errors, Submission Handling, Form Composition, Debugging, and framework-specific SSR or TanStack Start guidance.
+The official [reactivity guide](https://tanstack.com/form/latest/docs/framework/react/guides/reactivity)
+owns subscription migration, including the `{ compare }` options shape;
+[validation](https://tanstack.com/form/latest/docs/framework/react/guides/validation)
+owns validation timing and submission eligibility.

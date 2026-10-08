@@ -4,6 +4,8 @@ Use this reference when a task involves `@tanstack/react-query`, `QueryClient`, 
 
 Use this reference for the affected Query behavior. Read Router, Start, or
 integration guidance only when that boundary is involved.
+React's current docs target v5; match the installed framework adapter and
+version before applying examples or migration advice.
 
 ## What to Optimize For
 
@@ -24,7 +26,10 @@ integration guidance only when that boundary is involved.
 4. Review fetch behavior.
    Ensure query functions are abort-aware when practical and do not hide dependencies outside the key.
 5. Verify SSR and router integration.
-   If Router or Start is involved, prefer loader prefetch with `ensureQueryData(...)` and component reads with `useSuspenseQuery(...)`.
+   Share query options between loader prefetch and `useSuspenseQuery(...)`.
+   Current Start guidance uses `queryClient.query(...)` with Query 5.102+;
+   preserve version-appropriate APIs such as `ensureQueryData(...)` in older
+   projects. Read [integration.md](integration.md) for the SSR boundary.
 
 ## Default Rules
 
@@ -33,9 +38,14 @@ integration guidance only when that boundary is involved.
 - Prefer `queryOptions(...)` when the same query is used in multiple places.
 - Include every cache-relevant input in the query key.
 - Use `placeholderData` and `initialData` deliberately; they solve different problems.
+- Distinguish freshness from retention: `staleTime` controls freshness and
+  `gcTime` collects inactive queries. `Infinity` still permits invalidation;
+  `staleTime: 'static'` blocks invalidation-driven refetches when supported.
 - Keep optimistic updates reversible and scoped.
 - Make mutation side effects explicit: update cache, invalidate cache, or both.
 - Disable or tune retries for operations where repeated failure is expensive or noisy.
+- For SSR, create an isolated server `QueryClient` per request and hydrate the
+  browser cache; never share user-specific cached data through a server singleton.
 
 ## Review Checklist
 
@@ -61,4 +71,8 @@ integration guidance only when that boundary is involved.
 
 ## Verification
 
-When exact current API names matter, verify against the current TanStack Query docs before claiming a pattern is authoritative. Do not imply there is a first-party TanStack Query Intent package unless one is actually present in the installed project or current upstream registry.
+Check the official [defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults),
+[query options](https://tanstack.com/query/latest/docs/framework/react/guides/query-options),
+and [SSR guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr)
+for the installed adapter. Use first-party Intent skills when discovered in
+the installed project or current registry; do not infer coverage from another product.

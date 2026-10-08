@@ -17,6 +17,8 @@ matching official docs before implementation.
   command execution, discoverability, and product-specific conflict policy.
 - Use the framework adapter for application UI. Install the core package
   directly only for framework-free usage; adapters re-export the core surface.
+  Choose the documented adapter for Alpine, Angular, Ember, Lit, Octane, Preact,
+  React, Solid, Svelte, or Vue; devtools availability differs by framework.
 
 ## Workflow
 
@@ -65,6 +67,7 @@ matching official docs before implementation.
 Use current TanStack Hotkeys [overview](https://tanstack.com/hotkeys/latest/docs/overview),
 installation, framework quick-start, scoping, sequence, recording, formatting,
 and devtools docs. Current packages are ESM-only ES2022 and need Node.js 20+
-when used in Node; inspect installed `dist` declarations rather than assuming
-`src` or CommonJS exports exist. Verify focus, editable-field, IME, repeat,
+when used in Node, except the Octane adapter, which needs Node.js 22.22.2+
+and Octane 0.1.36+ within 0.1. Inspect installed `dist` declarations rather than
+assuming `src` or CommonJS exports exist. Verify focus, editable-field, IME, repeat,
 cleanup, keyboard-layout, and cross-platform behavior in the target UI.

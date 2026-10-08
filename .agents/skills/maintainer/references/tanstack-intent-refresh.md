@@ -18,7 +18,7 @@ the local `skills/tanstack/` skill.
   portfolio.
 - Product-level references are stable routing units for AI, Charts, CLI,
   Config, DB, Devtools, Form, Highlight, Hotkeys, Intent, Markdown, Pacer, Query,
-  Ranger, Router, Start, Store, Table, and Virtual.
+  Ranger, Router, Start, Store, Table, Virtual, and Workflow.
 - `references/integration.md` owns cross-stack composition guidance.
 - `references/router.md`, `references/start.md`, and `references/cli.md` own
   dense workflow routing through local focused `references/*.md` files rather

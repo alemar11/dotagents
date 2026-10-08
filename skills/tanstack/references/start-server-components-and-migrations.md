@@ -13,7 +13,9 @@ Use this section when the task is specifically about TanStack Start server
 components, their setup, or their experimental constraints.
 
 Workflow:
-1. Confirm that the app is intentionally using the server component feature set.
+1. Confirm React and explicit RSC opt-in; server components are experimental
+   and disabled by default. Check the installed Start, React, and bundler
+   versions against the feature requirements.
 2. Check setup, rendering boundaries, and client/server composition rules.
 3. Keep recommendations conservative because the feature is experimental.
 
@@ -36,3 +38,5 @@ clear, or Query integration redesign after migration.
 
 Verification: verify against current TanStack Start server-component or
 migration guidance before treating any pattern as stable.
+
+Source: [Server components](https://tanstack.com/start/latest/docs/framework/react/guide/server-components).

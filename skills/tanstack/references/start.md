@@ -1,6 +1,10 @@
 # TanStack Start
 
-Use this reference when a task involves `@tanstack/react-start`, `createServerFn`, middleware, server routes, SSR, hydration, environment variables, cookies, or auth flows in a TanStack Start app.
+Use this reference when a task involves `@tanstack/react-start`, `@tanstack/solid-start`, `createServerFn`, middleware, server routes, SSR, hydration, environment variables, cookies, or auth flows in a TanStack Start app.
+
+Framework-neutral boundaries apply to React and Solid; the focused examples
+are React-oriented. Check Solid-specific docs before translating hooks, plugin
+setup, or framework APIs.
 
 Use this umbrella reference when the Start scope spans multiple framework concerns
 or when the exact subdomain is still unclear. For targeted work, read the

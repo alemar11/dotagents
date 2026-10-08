@@ -13,6 +13,12 @@ Use this quick map when you know the intent but not the reference file:
 - **Ask “what does the CLI support?” / machine-readable docs** → `cli-docs-and-library-metadata.md`
 - **Framework architecture (not CLI)** → `router.md`, `start.md`, `query.md`, `integration.md`
 
+Legacy `create-tsrouter-app` / `create-tanstack-app` scaffolding belongs in
+`cli-scaffolding.md`. The old `tanstack mcp` server was removed; migrate its
+discovery operations to CLI JSON commands in
+`cli-docs-and-library-metadata.md`. The app-level `mcp` add-on remains a separate
+option for applications that host their own endpoints.
+
 ## What to Optimize For
 
 - Correct CLI workflow selection before constructing commands.
@@ -56,3 +62,5 @@ Use this quick map when you know the intent but not the reference file:
 ## Verification
 
 When exact flags, JSON shapes, or CLI capability boundaries matter, verify against the current `@tanstack/cli` docs or installed first-party CLI Intent skills.
+
+Sources: [CLI reference](https://tanstack.com/cli/latest/docs/cli-reference) and [MCP migration](https://tanstack.com/cli/latest/docs/mcp-migration).

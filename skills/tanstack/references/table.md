@@ -22,8 +22,9 @@ shape unless the task explicitly includes migration.
 2. Define columns carefully.
    Use stable accessors, IDs, headers, cells, and metadata; avoid recreating column definitions unnecessarily.
 3. Configure features and row models deliberately.
-   In v9, register only the feature plugins and row-model factories the table
-   uses. In v8, preserve the installed API rather than translating examples
+   In v9 React, use `useTable` and `tableFeatures(...)`; the core row model is
+   included automatically, while optional features and their row-model slots
+   are registered explicitly. In v8, preserve the installed API rather than translating examples
    mechanically from v9.
 4. Control state where needed.
    Sync table state to URL, server params, or app state only when product behavior requires it.
@@ -52,3 +53,6 @@ Use current TanStack Table docs and, when available for the installed package,
 its first-party Intent skills for feature registration, column definitions,
 row models, feature state, controlled state, migration, and framework adapter
 APIs. For large tables, also verify TanStack Virtual integration guidance.
+Start with the official [React quick start](https://tanstack.com/table/latest/docs/framework/react/quick-start)
+and [v9 migration guide](https://tanstack.com/table/latest/docs/framework/react/guide/migrating)
+when changing API generations.

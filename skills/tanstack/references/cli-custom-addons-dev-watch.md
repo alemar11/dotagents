@@ -9,7 +9,10 @@ Owns:
 
 Workflow:
 1. Confirm the task is about custom add-on or template development.
-2. Set up the correct init, compile, and watch loop.
+2. Use `tanstack add-on init`, `tanstack add-on compile`, and
+   `tanstack add-on dev` for add-ons. Templates have separate
+   `tanstack template init` / `compile` commands. Check the installed CLI
+   before assuming that template and add-on watch behavior are identical.
 3. Keep guidance scoped to CLI authoring mechanics, not framework design.
 
 Do not use this guide for installing existing add-ons, app scaffolding for end
@@ -18,3 +21,5 @@ authoring.
 
 Verification: verify against current `@tanstack/cli` add-on authoring guidance
 when exact commands or watch-mode constraints matter.
+
+Source: [Creating add-ons](https://tanstack.com/cli/latest/docs/creating-add-ons).

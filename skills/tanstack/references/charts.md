@@ -6,10 +6,11 @@ D3 scales or transforms, responsive chart rendering, SVG or Canvas output,
 chart interaction, accessibility, SSR, or migration from another chart
 library.
 
-TanStack Charts is an Alpha `0.x` product; APIs may break between minor releases.
-Inspect the installed version and use its release-source documentation before
-relying on version-sensitive APIs. The `latest` docs follow unreleased `main`,
-not necessarily the published package.
+TanStack Charts 1.x follows the stable compatibility contract; existing `0.x`
+installations retain the Alpha policy. Inspect the installed version and use
+its release-source documentation: `latest` docs follow unreleased `main`.
+Treat migration from legacy `react-charts` as a library migration, not a package
+rename; verify chart definitions, interaction, rendering, and accessibility.
 
 ## Ownership Boundaries
 
@@ -42,15 +43,16 @@ not necessarily the published package.
    definition, and reused or expensive transforms in framework memoization or
    the application's data layer.
 4. Keep definitions stable.
-   Define static charts outside component render. For changing inputs, keep one
-   dynamic definition stable and pass the current input rather than rebuilding
-   the definition on every render.
+   Define static charts outside component render. For changing inputs, memoize
+   the complete definition over the data and callbacks it captures, rebuilding
+   it when those values change. Use the `chart` builder for surface-dependent
+   decisions; it reads resolved dimensions rather than owning application data.
 5. Choose the rendering surface deliberately.
    Prefer the default accessible SVG path. Use the explicit Canvas entry only
    when its rendering tradeoffs are justified, and verify SSR and hydration
    behavior for the selected adapter.
 6. Verify accessibility and interaction.
-   Supply a meaningful accessible label, preserve stable datum keys, test
+   Supply the required `ariaLabel`, preserve stable datum keys, test
    keyboard focus, and keep selection callbacks connected to application-owned
    actions and state.
 
@@ -64,7 +66,10 @@ not necessarily the published package.
 - Keep server-safe definitions behind `/universal` or exact capability entries
   when browser-host imports must remain unreachable.
 - Use a fixed height or aspect ratio with responsive width unless the product
-  layout requires fixed dimensions.
+  layout requires fixed dimensions. Supply `initialWidth` for deterministic
+  responsive SSR; keep data, formatters, dimensions, and IDs aligned during
+  hydration. Check adapter support: Alpine is browser-only and Lit hydration
+  is not yet a verified contract.
 - Treat native tooltips as optional presentation. Keep permissions, business
   actions, and durable selection state outside the chart runtime.
 - During migrations, preserve analytical meaning, interaction, accessibility,
@@ -78,13 +83,15 @@ not necessarily the published package.
 - Assuming Canvas is the default or that it behaves like server-rendered SVG.
 - Copying APIs from unreleased `main` documentation into a project pinned to an
   older published release.
-- Treating an Alpha package as production-stable without an explicit risk
-  decision and focused validation.
+- Assuming the 1.x compatibility contract upgrades an installed `0.x` package
+  or makes experimental React Native capabilities stable.
 
 ## Verification
 
 Use the official [installation](https://tanstack.com/charts/latest/docs/installation),
 [scales](https://tanstack.com/charts/latest/docs/concepts/scales-and-d3), and
-[stability](https://tanstack.com/charts/latest/docs/stability) docs to locate the
+[compatibility](https://tanstack.com/charts/latest/docs/compatibility) docs to locate the
 matching release-source guidance. Verify exact exports, adapter behavior,
 accessibility, rendering, and migration contracts against the installed version.
+For data updates and hydration, consult [chart definitions](https://tanstack.com/charts/latest/docs/concepts/chart-definitions)
+and [SSR](https://tanstack.com/charts/latest/docs/guides/ssr-and-hydration).

@@ -30,6 +30,7 @@ Read the product reference for the affected boundary:
 - Charts and visualization: [Charts](references/charts.md).
 - Keyboard shortcuts and recording: [Hotkeys](references/hotkeys.md).
 - Dependency-packaged skills and agent setup: [Intent](references/intent.md).
+- Durable workflows, approvals, and replay: [Workflow](references/workflow.md).
 - Other products or narrower concerns: [reference map](references/README.md).
 
 Load focused subreferences only for the relevant concern. Preserve application

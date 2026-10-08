@@ -59,9 +59,9 @@ as skills.
 
 ### TanStack References
 
-The reusable `tanstack` skill covers TanStack AI, Charts, CLI, Config, DB, Devtools, Form, Highlight, Hotkeys, Intent, Markdown, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and cross-stack integration from one `$tanstack` invocation surface.
+The reusable `tanstack` skill covers TanStack AI, Charts, CLI, Config, DB, Devtools, Form, Highlight, Hotkeys, Intent, Markdown, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, Workflow, and cross-stack integration from one `$tanstack` invocation surface. Workflow has public source guidance but remains early Alpha and hidden from the public library catalog.
 
-- Product references live under `skills/tanstack/references/`: `ai.md`, `charts.md`, `cli.md`, `config.md`, `db.md`, `devtools.md`, `form.md`, `highlight.md`, `hotkeys.md`, `integration.md`, `intent.md`, `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`, `store.md`, `table.md`, `virtual.md`.
+- Product references live under `skills/tanstack/references/`: `ai.md`, `charts.md`, `cli.md`, `config.md`, `db.md`, `devtools.md`, `form.md`, `highlight.md`, `hotkeys.md`, `integration.md`, `intent.md`, `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`, `store.md`, `table.md`, `virtual.md`, `workflow.md`.
 - Router references include `router-routing-structure.md`, `router-navigation-and-search.md`, `router-data-loading-and-ssr.md`, `router-auth-and-failures.md`, and `router-plugin-and-splitting.md`.
 - Start references include `start-framework-and-execution.md`, `start-server-functions-and-routes.md`, `start-middlewares-and-server-core.md`, `start-server-components-and-migrations.md`, and `start-deployments.md`.
 - CLI references include `cli-scaffolding.md`, `cli-addons-existing-app.md`, `cli-ecosystem-integrations.md`, `cli-custom-addons-dev-watch.md`, and `cli-docs-and-library-metadata.md`.

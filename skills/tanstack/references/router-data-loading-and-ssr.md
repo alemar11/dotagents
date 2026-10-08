@@ -28,8 +28,10 @@ behavior, hydration boundaries, or manual SSR wiring.
 Workflow:
 1. Confirm whether the app is using Router SSR directly or via Start.
 2. Keep hydration boundaries consistent with the actual runtime model.
-3. Avoid mixing Start-first SSR assumptions into plain Router SSR without
-   evidence.
+3. Use redirects for server-side navigation decisions. Under the current SSR
+   request history, `router.navigate()` and `router.commitLocation()` do not
+   change the request location. Check the installed version before migrating
+   older manual SSR wiring.
 
 Do not use this section for full Start SSR/server runtime concerns, Query cache
 dehydration across Router and Start, or route-level code splitting unrelated to
@@ -40,3 +42,5 @@ Escalate to:
 
 Verification: verify against current Router loader or SSR docs when exact APIs
 matter.
+
+Sources: [Data loading](https://tanstack.com/router/latest/docs/guide/data-loading) and [SSR](https://tanstack.com/router/latest/docs/guide/ssr).

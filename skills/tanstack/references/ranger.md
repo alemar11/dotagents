@@ -18,7 +18,9 @@ TanStack Ranger is a headless utility. It does not own visual styling; the app m
 2. Choose interpolation and update timing.
    Use default, custom, or logarithmic interpolation only when product requirements justify it.
 3. Wire headless state to UI.
-   Keep Ranger-derived props and app event handlers clear at the thumb/track boundary.
+   Connect `useRanger` to the track through `getRangerElement`; render
+   `handles()` with its keyboard, mouse, and touch handlers. Keep controlled
+   values in sync through `onChange`, adding `onDrag` when live updates are needed.
 4. Add accessibility behavior.
    Ensure labels, keyboard support, focus, ARIA values, and disabled state are correct.
 5. Test pointer and keyboard flows.
@@ -41,4 +43,7 @@ TanStack Ranger is a headless utility. It does not own visual styling; the app m
 
 ## Verification
 
-Use current TanStack Ranger docs for React adapter APIs, custom steps, custom styles, logarithmic interpolation, and update-on-drag behavior.
+Use the official [quick start](https://tanstack.com/ranger/latest/docs/quick-start)
+and [update-on-drag API](https://tanstack.com/ranger/latest/docs/framework/react/api/update-on-drag)
+for adapter wiring. Verify custom steps and logarithmic interpolation against
+the installed adapter; the app still owns accessible markup and labels.

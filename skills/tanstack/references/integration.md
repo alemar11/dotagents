@@ -13,6 +13,7 @@ Start with the macro-area umbrellas unless the user names a narrower concern:
 - `start.md` for server functions, middleware, SSR, hydration, env boundaries, and deployment-sensitive framework behavior.
 - `cli.md` for scaffolding, add-ons, library metadata, and custom add-on workflows.
 - `integration.md` for Query + Router + Start ownership, loader prefetch, and hydration boundaries.
+- `workflow.md` for durable server orchestration, persisted steps, and retry/recovery boundaries beyond a single request.
 
 Use focused references only after the task has collapsed to one specific
 concern, such as Router search params or Start server functions. Do not open
@@ -42,15 +43,21 @@ matching product reference such as `form.md`, `table.md`,
 3. Standardize query definitions.
    Reuse shared `queryOptions(...)` helpers between loaders, prefetch, and component hooks.
 4. Align preloading and reads.
-   Prefer `ensureQueryData(...)` in loaders and `useSuspenseQuery(...)` or equivalent reads in components.
+   Reuse the same query options in loaders and components. Current Start
+   examples use `queryClient.query(...)` with Query 5.102+; older targets may use
+   `ensureQueryData(...)`. Match the installed API and choose whether the
+   loader awaits the query or allows the SSR integration to stream it.
 5. Verify SSR behavior.
-   If Start SSR is in play, dehydrate and hydrate the same query cache deliberately.
+   Prefer the supported `setupRouterSsrQueryIntegration` adapter when available
+   (`@tanstack/react-router-ssr-query` for React). It coordinates streaming and
+   hydration and wraps the query provider by default; use
+   `wrapQueryClient: false` only when supplying your own provider.
 
 ## Default Rules
 
-- Keep one `QueryClient` per app boundary unless there is a strong reason not to.
+- Create a fresh `QueryClient` per SSR request and keep the browser instance stable. Never share a server singleton across users.
 - When Router and Query are paired, let Query own freshness and cache semantics.
-- Set Router preload freshness deliberately when Query is the real cache owner.
+- Set `defaultPreloadStaleTime: 0` when Query owns preload freshness so settled Router preloads do not bypass Query freshness checks.
 - Avoid fetching the same resource once in a loader and again in a component with a different key or policy.
 - Share query factories across loader and component layers.
 
@@ -83,3 +90,5 @@ matching product reference such as `form.md`, `table.md`,
 ## Verification
 
 If `@tanstack/intent` is available, compare integration patterns against the installed Router and Start skills before locking in a recommendation. Otherwise verify against current TanStack docs for Query, Router, and Start together.
+
+Sources: [Router Query integration](https://tanstack.com/router/latest/docs/integrations/query) and [Start Query integration](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query).

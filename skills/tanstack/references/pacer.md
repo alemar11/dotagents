@@ -20,14 +20,18 @@ TanStack Pacer is currently a beta-area product. Verify exact primitive and hook
 3. Define leading/trailing and cancellation behavior.
    Be explicit about when work runs, what is dropped, and how pending work is flushed or canceled.
 4. Wire lifecycle cleanup.
-   Ensure React or framework adapters dispose pending timers and in-flight async work correctly.
+   For async debouncers, `cancel()` clears pending calls and `abort()` handles
+   active work; the operation must consume its abort signal to stop underlying
+   I/O. A custom React `onUnmount` replaces default cleanup, so preserve both
+   responsibilities when applicable.
 5. Test with time control.
    Use fake timers or deterministic timing tests for edge cases.
 
 ## Review Checklist
 
 - Does the chosen primitive match debounce vs throttle vs rate-limit semantics?
-- Are leading/trailing behavior and max-wait behavior intentional?
+- Are leading/trailing behavior intentional? `useDebouncer` has no `maxWait`
+  option; choose throttling when continuous input must still execute periodically.
 - Is async work protected from stale result commits?
 - Are pending timers canceled on unmount or input replacement?
 - Are high-frequency events batched or queued without unbounded memory growth?
@@ -41,4 +45,12 @@ TanStack Pacer is currently a beta-area product. Verify exact primitive and hook
 
 ## Verification
 
-Verify current TanStack Pacer docs for primitive names, framework adapter APIs, and beta caveats before changing timing-sensitive code.
+Check the official [overview](https://tanstack.com/pacer/latest/docs/overview),
+[React debouncing](https://tanstack.com/pacer/latest/docs/framework/react/guides/debouncing),
+and [async debouncing](https://tanstack.com/pacer/latest/docs/framework/react/guides/async-debouncing)
+against installed beta packages. Callback-only hooks do not expose instance
+controls; select reactive state explicitly when using full utility hooks.
+
+`@tanstack/pacer-lite` targets libraries needing smaller bundles and omits
+reactivity, framework adapters, devtools, and some advanced options. Prefer
+regular Pacer packages for applications that need those capabilities.
