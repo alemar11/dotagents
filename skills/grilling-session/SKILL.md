@@ -36,14 +36,16 @@ questioning cannot continue.
 
 - Ask exactly one question per turn.
 - Pair that question with one concrete recommended answer and a concise reason
-  it is the best current default. End by asking the user to accept it or state
-  what should change.
+  it is the best current default. Word the question so "yes" accepts the
+  recommendation, and invite the user to state what should change.
 - Make the recommendation falsifiable and specific enough to correct. Mark it
   provisional when evidence is incomplete; never hide uncertainty or present
   an unsupported preference as repository fact.
 - Ask the highest-leverage unanswered question first: desired outcome, user or
   actor, success boundary, invariant, non-goal, failure behavior, tradeoff, or
-  evidence requirement.
+  evidence requirement. Select only questions whose material prerequisites are
+  settled; resolve an earlier decision or missing fact before asking a question
+  that depends on it. Continue with independent questions where possible.
 - Prefer concrete scenarios, counterexamples, and forced tradeoffs over broad
   invitations such as "tell me more."
 - Challenge contradictions, vague nouns, hidden assumptions, and solutions
@@ -51,7 +53,9 @@ questioning cannot continue.
   adversarial or performative.
 - Do not ask for facts available in the repository or supplied handoff.
 - After each answer, update the working interpretation silently. Briefly expose
-  a correction only when it changes the meaning of the next question.
+  a correction only when it changes the meaning of the next question. When an
+  earlier answer changes, revisit conclusions that depended on it and reopen
+  any material ambiguity before treating those conclusions as settled.
 - Continue until no material ambiguity remains, the user asks to stop, or the
   session is blocked. Never choose a fixed question count.
 - Before declaring the brief refined, ask one final confirmation question that
@@ -68,7 +72,7 @@ canonical conditions governing these node contracts.
 | node_id | kind | purpose | entry_conditions | inputs | outputs | transitions | stop_if | side_effects | terminal_states |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | context-read | action | Use supplied context and inspect relevant evidence when needed. | explicit invocation or authorized parent handoff | topic, conversation, or supplied handoff | available context and evidence limitations | frame, blocked | essential evidence is unavailable and responsible questioning cannot continue | read, transient | none |
-| frame | decision | Infer the subject and select the highest-leverage ambiguity. | available context assessed | supplied brief and context evidence | working interpretation and next ambiguity | question, blocked | no coherent topic can be selected without unavailable user input | transient | none |
+| frame | decision | Infer the subject and select the highest-leverage ambiguity with settled prerequisites. | available context assessed | supplied brief and context evidence | working interpretation and next ambiguity | question, blocked | no coherent topic can be selected without unavailable user input | transient | none |
 | question | action | Ask exactly one focused question with a recommended answer, then incorporate the user's response. | one material ambiguity or final confirmation remains | working interpretation and latest user answer | recommendation, concise rationale, and updated interpretation or stop request | question, confirm, reported, blocked | required user input cannot be obtained | transient | none |
 | confirm | decision | Present the compact interpretation for final user confirmation. | no known material ambiguity remains | working interpretation | confirmation, correction, or stop request | question, complete, reported | none | transient | none |
 | complete | terminal | Return the user-confirmed refined handoff. | user confirms the compact interpretation | confirmed brief and evidence | refined handoff | none | terminal | none | complete |

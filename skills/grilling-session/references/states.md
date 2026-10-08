@@ -9,7 +9,7 @@ checkpoint, run ledger, write preference, or repository-owned state.
 | Node | Kind | Plain description |
 | --- | --- | --- |
 | `context-read` | Action | Use supplied context and inspect relevant evidence only when needed. |
-| `frame` | Decision | Infer the subject and identify the highest-value ambiguity. |
+| `frame` | Decision | Infer the subject and identify the highest-value ambiguity with settled prerequisites. |
 | `question` | Action | Ask exactly one focused question with a concrete recommended answer and incorporate the user's response. |
 | `confirm` | Decision | Present the compact interpretation as one final confirmation question. |
 | `complete` | Terminal | Return the user-confirmed refined handoff. |
@@ -39,12 +39,12 @@ This matrix owns every edge condition for the [entrypoint registry](../SKILL.md#
 | --- | --- | --- |
 | context-read | frame | available context supports framing the topic, including topics without a repository. |
 | context-read | blocked | essential evidence is unavailable and no responsible question can proceed. |
-| frame | question | one coherent topic and its next material ambiguity are known. |
+| frame | question | one coherent topic and its next material ambiguity are known, with the question's material prerequisites settled. |
 | frame | blocked | a coherent topic cannot be selected and user input is unavailable. |
-| question | question | the latest answer leaves another material ambiguity. |
+| question | question | the latest answer leaves or reopens a material ambiguity; select the next question with settled prerequisites. |
 | question | confirm | no known material ambiguity remains. |
 | question | reported | the user asks to stop. |
 | question | blocked | required user input cannot be obtained. |
-| confirm | question | the user corrects or extends the compact interpretation. |
+| confirm | question | the user corrects or extends the compact interpretation; revisit dependent conclusions and select the next question with settled prerequisites. |
 | confirm | complete | the user confirms the compact interpretation. |
 | confirm | reported | the user asks to stop without confirming. |
