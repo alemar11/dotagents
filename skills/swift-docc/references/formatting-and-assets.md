@@ -5,6 +5,7 @@ Use this page for DocC markup, tables, images, layout, and page appearance.
 | Topic | Use when | Local source |
 | --- | --- | --- |
 | Formatting your documentation content | You need Markdown and page-content authoring rules. | [Local source](../assets/DocCDocumentation.docc/formatting-your-documentation-content.md) |
+| Annotating code listings | You need line numbers, highlighted or struck-out lines, wrapping, or control of the copy button. | [Local source](../assets/DocCDocumentation.docc/formatting-your-documentation-content.md#annotate-code-listings) |
 | Adding tables of data | You need table syntax or layout rules. | [Local source](../assets/DocCDocumentation.docc/adding-tables-of-data.md) |
 | Other formatting options | You need notes, asides, or other non-basic formatting primitives. | [Local source](../assets/DocCDocumentation.docc/other-formatting-options.md) |
 | Adding images | You need image naming, light/dark variants, or authored image references. | [Local source](../assets/DocCDocumentation.docc/adding-images.md) |

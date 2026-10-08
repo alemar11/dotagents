@@ -1,8 +1,8 @@
 {
   "repo": "swiftlang/swift-docc",
   "ref": "main",
-  "resolved_commit": "f160765a0687d4c93f6a915c934c57af28797e54",
+  "resolved_commit": "d2ffda030e2945244c7b3ceb339d9f6693d58f4d",
   "source_subpath": "Sources/docc/DocCDocumentation.docc",
-  "downloaded_at": "2026-08-30T10:51:02.193716+00:00",
+  "downloaded_at": "2026-10-08T17:21:03.939472+00:00",
   "official_base_url": "https://www.swift.org/documentation/docc"
 }
