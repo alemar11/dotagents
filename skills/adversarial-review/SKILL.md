@@ -32,6 +32,15 @@ materially improve correctness, readability, or maintenance. Prefer the simplest
 design that satisfies the requirements; do not flag stylistic preferences or
 introduce abstractions solely to eliminate repetition.
 
+## Optional blast-radius analysis
+
+Read [blast-radius.md](references/blast-radius.md) when the caller requests an
+impact analysis or the change provides a concrete reason to inspect indirect
+effects, such as shared contracts, persisted data, cache behavior, lifecycle,
+or concurrency. Keep the investigation tied to the selected change. This
+deepens the review; it does not create a mandatory extra pass, launch helpers,
+or expand the reviewer's read-only authority.
+
 ## Result
 
 Return one disposition selected by the calling workflow, normally `clean`,

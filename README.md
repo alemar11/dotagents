@@ -27,7 +27,7 @@ as skills.
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
 | `why` | Reconstruct historical design rationale from code history and related records, separating documented reasons from inference. |
-| `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
+| `adversarial-review` | Pressure-test a software change read-only, with optional blast-radius analysis of indirect effects and safety assumptions. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `architect` | Design feature behavior, ownership and interfaces, then a verifiable task plan; publish the specification to GitHub when requested. |
 | `prototype` | Build an isolated runnable experiment in the project's real stack to resolve a UI, interaction, logic, or state-model question. |
@@ -92,6 +92,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   research caller. It follows relevant historical sources without requiring a
   provider or an exhaustive source sweep. Optional evidence helpers inherit
   host defaults; the invoking session owns synthesis. GitHub reads use `gh`.
+- `adversarial-review` loads its blast-radius reference when requested or when
+  the change warrants it. It returns any required writable experiment to the
+  caller; it does not create probes or expand its read-only authority.
 - `review-pr` obtains one hosted Codex review result for a PR through
   authenticated `gh`, with no other skill dependency. Other authorized review
   discussion and resolution operations use `gh` directly. Use
