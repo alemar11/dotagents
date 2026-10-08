@@ -20,6 +20,11 @@ and validation requirements. Verify the actual target before mutation; report
 an unresolved mismatch to the owner. Preserve unrelated work and never add
 unselected prerequisites or change requirements to make checks pass.
 
+When a ticket reference is supplied without its contents, fetch it through the
+repository's established tracker access. Verify its owning project or repository
+and identifier against the selected work before editing, and identify the ticket
+in the progress update. Ask only if the target remains ambiguous.
+
 Implement creates no tasks and never operates claims. Its only delegation is
 the optional UI designer below, with the same policy standalone or composed.
 Preserve any separately established caller-owned budget.
@@ -30,6 +35,10 @@ they protect observable behavior, including pre-agreed seams; do not add tests
 for prose or trivial reversible changes. Run repository-required gates and
 broaden validation only for a new change, failure, or unresolved risk. Existing
 authorization covers these local steps; ask only about material unresolved decisions.
+
+When choosing a test boundary materially affects confidence, briefly explain
+what it proves and which important risks need another boundary. Reuse accepted
+testing decisions; routine boundary choices do not require separate approval.
 
 ## Optional UI design
 
