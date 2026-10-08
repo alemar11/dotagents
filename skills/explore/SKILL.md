@@ -32,20 +32,17 @@ interview with enough direction to continue.
 
 ## Context preparation
 
-Before initial exploration, compose `$learn` in a strictly read-only context
-inspection using `memory_slice=domain-memory`,
-`domain_operation=periodic-review`, and `capture_mode=defer-to-caller`.
-Require it to read the applicable `AGENTS.md` chain, root `CONTEXT.md`, matched
-first-class subproject context, and only topic files or ADRs relevant to the
-subject. Reuse current evidence already gathered in this conversation. Do not
-request setup, repair, compaction, or capture.
+Read the applicable `AGENTS.md` chain and root `CONTEXT.md` when present, then
+follow its scoped routes to the subproject context, topic files or ADRs relevant
+to the question. Reuse current evidence already gathered in this conversation.
+If no repository context exists, continue from the supplied conversation and
+available sources; report only gaps that affect the investigation.
 
-Explore owns this dependency. If Learn is unavailable, report that blocker
-before exploration or worker creation. If no repository context exists,
-continue from the supplied conversation and sources, recording that no
-established project knowledge was found. Keep findings in the current
-conversation for exploration and the subsequent interview; Grilling Session
-does not call Learn again.
+Use project knowledge to orient the investigation, not to start a maintenance
+review. If a stale or conflicting statement affects the answer, report it with
+the current evidence. Do not invoke Learn, audit context pointers, or prepare
+documentation repairs as an exploration prerequisite. Keep findings in the
+conversation for the investigation and any subsequent interview.
 
 ## Required sequence
 
@@ -75,11 +72,12 @@ does not call Learn again.
    stops, to guide the investigation. Preserve unconfirmed items and apply the
    read-only scope gate again. A skipped interview requires no final user
    confirmation; it does not remove unresolved evidence from the report.
-5. Read [references/orchestration.md](references/orchestration.md), determine
-   the useful subagent count and assignments, and investigate the remaining
-   questions. Reuse the initial exploration; revisit findings only when answers
-   or new evidence change their assumptions. If the existing evidence is
-   sufficient, synthesize directly without another research pass.
+5. Investigate remaining questions directly. When independent evidence work
+   would benefit from helpers, read
+   [references/orchestration.md](references/orchestration.md) before delegating.
+   Reuse the initial exploration; revisit findings only when answers or new
+   evidence change their assumptions. If the existing evidence is sufficient,
+   synthesize directly without another research pass.
 6. Collect helper results, resolve evidence gaps where possible, and synthesize
    the answer. Report limitations in evidence or independence.
 7. Read [references/output-template.md](references/output-template.md) and
@@ -102,7 +100,6 @@ In every case, report `Changes made: None`.
 
 ## Skill Dependencies
 
-Explore requires the installed `$learn` skill for read-only context
-preparation. `$grilling-session` is required only when user decisions need
-refinement; its absence does not block the `not-needed` path. Explore never
-installs or refreshes these dependencies during a run.
+`$grilling-session` is required only when user decisions need refinement; its
+absence does not block the `not-needed` path. Explore never installs or
+refreshes this dependency during a run.

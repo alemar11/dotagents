@@ -78,9 +78,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   Independent evidence work may use subagents with focused research briefs,
   subject to user constraints and host capacity. Workers cannot invoke Explore
   or delegate further. Research helpers prescribe no model or reasoning level.
-- Install `explore` with its `grilling-session` and `learn` dependencies.
-  Explore invokes Learn for a read-only Project Context pass before exploration,
-  then invokes Grilling Session only when user decisions need refinement.
+- Install `explore` with `grilling-session` for material user decisions.
+  Explore reads relevant repository context directly without a knowledge-maintenance
+  pass, then invokes Grilling Session only when user decisions need refinement.
   A required interview asks one question with a recommendation per turn.
   Workers can begin once scope is already established, the interview confirms
   it, or the user stops grilling. Grilling Session is not required for the
