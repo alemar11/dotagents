@@ -1,0 +1,6 @@
+interface:
+  display_name: "Test Audit"
+  short_description: "Prevent test bloat and prune low-value coverage."
+  default_prompt: "Use $test-audit to review tests in the selected scope for redundant or implementation-coupled coverage and identify the contracts that must remain protected."
+policy:
+  allow_implicit_invocation: true
