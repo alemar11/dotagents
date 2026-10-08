@@ -121,7 +121,9 @@ names appear synonymous, resolve whether they are aliases or distinct concepts.
   file's full body there.
 - Add an ADR beneath root `project-context/adr/` for a cross-project decision or
   beneath the selected subproject's `project-context/adr/` for a local decision,
-  only when the accepted load-bearing decision would otherwise be reopened.
+  only when an accepted load-bearing decision would otherwise be reopened:
+  reversing it has meaningful cost, its rationale is not evident from the
+  result, and the choice resolved a real tradeoff between alternatives.
   Create or update the owning `project-context/adr/index.md` in the same change.
 - During an authorized hierarchy update, move existing subproject-only material
   from root surfaces into the local owner. Update root routes, indexes,

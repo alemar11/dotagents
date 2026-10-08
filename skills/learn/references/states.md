@@ -15,7 +15,7 @@ durable, but they do not persist the workflow's current node.
 
 | Node | Kind | Plain description |
 | --- | --- | --- |
-| `scope` | Action | Resolve the durable knowledge request or qualifying user-stated rule or assumption, repository scope, and smallest applicable memory slice. |
+| `scope` | Action | Resolve the knowledge or retrospective request, or qualifying user-stated rule or assumption, repository scope, and smallest applicable memory slice. |
 | `inspect` | Action | Read the applicable context surfaces and only the evidence needed for the selected operation. |
 | `draft` | Decision | Prepare targets, wording, evidence, and links; proceed to apply when authority and material decisions are already resolved, otherwise report or confirm. |
 | `confirm` | Decision | Resolve missing write authority or a material user decision; existing authorization does not require another question. |
@@ -30,7 +30,7 @@ durable, but they do not persist the workflow's current node.
 
 | Owner | Values | Class and lifetime | Meaning |
 | --- | --- | --- | --- |
-| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Selectable run field; transient | Selects the smallest Learn-owned knowledge surface. |
+| `memory_slice` | `domain-memory`, `durable-capture`, `retrospective`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Selectable run field; transient | Selects the smallest Learn-owned knowledge operation or surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | Selectable run field; transient | Selects the domain-memory operation. Non-domain slices use `not-applicable`. |
 | `capture_mode` | `inline`, `defer-to-caller` | Selectable handoff field; transient | Either perform an explicitly authorized composed capture or return the capture decision to the caller. |
 | `execution_context` | `fresh-setup`, `existing-project-bootstrap`, `current-project` | Derived run fact; transient | Distinguishes a missing root or selected subproject context, an existing surface awaiting first accepted population, and established context being read or updated. The caller cannot select it. |
@@ -50,3 +50,7 @@ durable, but they do not persist the workflow's current node.
 before/after blocks, and unresolved questions are run data rather than enum
 states. Never persist them as workflow configuration merely because they are
 reported during a run.
+
+A retrospective's read-only proposal result is `reported`. Accepted durable
+lessons with capture authority use the existing capture states; the
+retrospective adds no workflow checkpoint or persisted report requirement.

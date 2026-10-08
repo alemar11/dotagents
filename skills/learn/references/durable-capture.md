@@ -30,6 +30,7 @@ For an AGENTS.md rule, read [agents-guidance.md](agents-guidance.md); no context
 bootstrap is required. For a topic, ADR, or other context-bearing destination,
 create or repair only the owning context and indexes needed to make the accepted
 knowledge discoverable. Do not expand a single capture into full setup.
+Before selecting an ADR, apply the [ADR selection criteria](domain-modeling.md#3-update-the-smallest-durable-surface).
 
 ## Scope Resolution
 

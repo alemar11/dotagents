@@ -20,6 +20,11 @@ and completion requirements. Remove obsolete workarounds, repeated rules, and
 generic coaching that adds no repository knowledge. Do not convert one failed
 run into a universal restriction without evidence that the constraint persists.
 
+Treat config files, manifests, and command help as the owners of facts cheaply
+found there. Repeat them only when a costly lookup or a non-obvious convention
+justifies it; otherwise record the convention, reason, or gotcha the source
+does not explain.
+
 ## Write for the decision
 
 - Put a condition before a conditional instruction. For example: “For schema

@@ -19,7 +19,7 @@ and result state are data, not selectable configuration.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `domain-memory`, `durable-capture`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the owned context surface. |
+| `memory_slice` | `domain-memory`, `durable-capture`, `retrospective`, `translation-memory`, `agents-guidance`, `agents-pointers`, `agents-compaction`, `code-review-rules`, `full-setup` | Smallest slice implied by the request | Selects the knowledge operation or owned context surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | Required only for `memory_slice=domain-memory`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for an explicitly composed handoff | Applies only to composed durable context/capture workflows. |
 
@@ -70,6 +70,9 @@ Do not let a caller select or override this classification.
   `durable-capture` handoff.
 - `code-review-rules` is selected only for an explicit Code Review Rules
   request; ordinary code review and general AGENTS maintenance do not select it.
+- `retrospective` is selected only for a requested session retrospective, not
+  ordinary task completion or `full-setup`. It returns proposals; an authorized
+  accepted lesson uses `durable-capture` and its existing authority contract.
 - `agents-compaction` is selected only for an explicit chain-size review or
   compaction request. Crossing a threshold alone never selects it.
 - `agents-guidance` covers general AGENTS.md creation, rule edits, review, and

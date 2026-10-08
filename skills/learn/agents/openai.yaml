@@ -1,7 +1,7 @@
 interface:
   display_name: "🗂️ Learn Project Context"
-  short_description: "Maintain AGENTS.md and durable repository knowledge."
+  short_description: "Maintain repo knowledge and assess session lessons."
   brand_color: "#C2410C"
-  default_prompt: "Use $learn to create, update, or refactor AGENTS.md, or save the requested durable repository knowledge."
+  default_prompt: "Use $learn to maintain the requested repository knowledge or assess this session for improvements to the agent's working environment."
 policy:
   allow_implicit_invocation: true

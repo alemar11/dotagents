@@ -1,6 +1,6 @@
 ---
 name: learn
-description: "Maintain AGENTS.md and durable repository knowledge when requested or when the user states hard repository rules or important assumptions intended to guide future work."
+description: "Maintain AGENTS.md and durable repository knowledge, or assess a coding session for environment improvements when requested. Also use for hard repository rules or important assumptions intended to guide future work."
 ---
 
 # Learn Project Context
@@ -11,6 +11,9 @@ Use `$learn` for durable, local repository knowledge: always-active rules in
 `AGENTS.md`, root-first `CONTEXT.md` routing, conditional topic files, accepted
 ADRs, localization guidance, and Code Review Rules. Create, update, review, or
 refactor `AGENTS.md` within the requested scope.
+
+For a requested session retrospective, diagnose improvements to the agent's
+working environment and propose them without expanding into implementation.
 
 Learn never owns tracker content, delivery state, branches, pull requests,
 provider transport, task graphs, or worker configuration. It may inspect local
@@ -44,6 +47,7 @@ or a pointer change is part of the selected work.
 | Domain setup/bootstrap | [domain.md](references/domain.md), [domain-modeling.md](references/domain-modeling.md), [context-seed.md](references/context-seed.md), and [setup-workflow.md](references/setup-workflow.md) |
 | Domain inline update, implementation closeout, or periodic review | [domain-modeling.md](references/domain-modeling.md); add domain.md only for layout ambiguity and [documentation-shapes.md](references/documentation-shapes.md) only when no stronger local shape exists |
 | Durable capture | [durable-capture.md](references/durable-capture.md); add only the destination-specific domain, documentation-shape, or translation reference it routes to |
+| Requested session retrospective | [retrospective.md](references/retrospective.md); load capture guidance only for an authorized durable lesson |
 | AGENTS.md creation, rule updates, review, or refactoring | [agents-guidance.md](references/agents-guidance.md) |
 | Translation memory | [translation.md](references/translation.md) and [setup-workflow.md](references/setup-workflow.md) |
 | AGENTS.md pointers | [setup-workflow.md](references/setup-workflow.md) |
@@ -86,7 +90,7 @@ below owns entry conditions and edges for this entrypoint.
 
 | node_id | kind | entry condition | transitions | terminal state |
 | --- | --- | --- | --- | --- |
-| scope | action | repository-knowledge request or qualifying user-stated rule or assumption | inspect, blocked | none |
+| scope | action | repository-knowledge or retrospective request, or qualifying user-stated rule or assumption | inspect, blocked | none |
 | inspect | action | repository scope and memory slice resolved | draft, blocked | none |
 | draft | decision | evidence and intended target are known | reported, apply, confirm | none |
 | confirm | decision | a material decision or write authority remains unresolved | apply, deferred, blocked | none |
