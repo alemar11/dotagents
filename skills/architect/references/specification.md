@@ -21,7 +21,7 @@ A complete spec records:
 - ownership, domain invariants, and boundary contracts where the change affects
   them, with rationale and material tradeoffs rather than an exhaustive code plan;
 - observable feature acceptance criteria covered by task verification checks;
-- an ordered task index and each task's embedded or linked detailed contract;
+- an ordered task plan with each task's embedded or linked detailed contract;
 - prerequisites outside the selected spec when relevant, with exact source
   references and the evidence required to satisfy them.
 
@@ -100,9 +100,11 @@ prerequisites, and completion checks without the drafting conversation.
 | `blocked_by` | Other task IDs in this spec that supply real prerequisites, each with the required outcome or evidence. |
 | `external_prerequisites` | Prerequisites outside this spec but within its repository, with exact artifact references and required evidence, or none. The established field name is retained; it does not permit cross-repository issue links or expand selection. |
 
-The ordered index owns task membership and recommended order, listing only IDs,
-titles matching their details, and detail links. Task details own other fields;
-read every task to establish coverage and the full dependency graph.
+The ordered task sections define active membership and recommended order;
+legacy specs with separate task issues use their ordered task links. Task details
+own the field values. An optional navigation index mirrors the plan with IDs,
+matching titles and detail links; it introduces no separate membership or
+dependencies. Read every task to establish coverage and the full dependency graph.
 
 A task is identified by its containing spec reference plus `task_id`; within
 one spec, `task_id` is sufficient. Display position may change independently.
@@ -150,15 +152,20 @@ feature works.
 
 ## Rendering
 
-Templates are presentation guides, not text to publish verbatim. Omit empty
-optional sections and authoring instructions. Keep required task metadata and
-explicit `none` prerequisites so missing information is distinguishable from
-no dependency. Lead with the problem and observable behavior; put compact identity
-metadata at the end. Use concrete WHEN / THEN scenarios only where they clarify
-a criterion, not as a second mandatory requirements list. Keep the task index
-free of progress checkboxes and do not seed an execution progress section during
-planning. New or consolidated issue bodies embed tasks under `## Task details`;
-legacy indexes retain links to existing task artifacts until consolidation.
+Templates are presentation guides, not text to publish verbatim. Use four main
+sections: problem and expected behavior, design and decisions when needed,
+acceptance criteria, and tasks and verification. Put interfaces, risks,
+exclusions, related references and prerequisites beside the behavior, design or
+task they affect. Feature-wide verification may introduce the task plan; it does
+not require a separate readiness section. Keep identity metadata in a compact footer.
+
+Omit empty optional sections and authoring instructions. Keep required task
+metadata and explicit `none` task prerequisites so absence is unambiguous.
+Use WHEN / THEN scenarios only to clarify criteria. Add a navigation index only
+when useful; omit it for a single embedded task. Do not seed progress checkboxes
+or execution sections. New or consolidated specs embed tasks under
+`## Tasks and verification`; legacy plans retain existing task links until
+consolidation. Preserve existing anchors and unrelated structure in targeted revisions.
 For embedded tasks, use `<a id="task-<task_id>"></a>`, H3 task titles and H4
 subsections, with a fixed `spec` anchor for back-links; the index links to these
 task anchors. GitHub output owns transport and metadata.

@@ -4,55 +4,27 @@
 
 <a id="spec"></a>
 
-## Why
+## Problem and expected behavior
 
-<Who is affected, what problem they have, and what success looks like. Cite current behavior when it matters to the change.>
+<Who is affected, what problem they have, and how behavior changes. Show a realistic user journey or caller example and its expected result. Include relevant failure cases, compatibility obligations and scope boundaries; cite current behavior where it matters.>
 
-## What changes
+## Design and decisions
 
-<Describe observable behavior, interfaces, or invariants. Include important failure cases and compatibility obligations.>
+<Include only when needed. Describe accepted responsibilities, state ownership, invariants and interfaces, with rationale and material tradeoffs. Separate binding decisions from assumptions and optional suggestions. For a simple change, fold the necessary detail into the behavior section and omit this section.>
 
-<Include a realistic user journey or caller example and the expected result. Keep it inline for a small change; use a compact example when the contract needs precision.>
-
-**Out of scope:** <Explicit boundaries that could otherwise be mistaken for included work.>
+<!-- Put relevant risks, exclusions, source links and prerequisites beside the design or task they affect. A prerequisite names its exact same-repository artifact, required evidence and gated activity. Resolve blocking decisions before calling the plan ready. -->
 
 ## Acceptance criteria
 
 - <Observable success condition.>
 
-<!-- Add WHEN / THEN scenarios beneath a criterion when they clarify distinct triggers, edge cases, or failure behavior. Do not repeat the same requirement in several formats. -->
+<!-- Add concrete scenarios only when they clarify the criterion. -->
 
-## Design
+## Tasks and verification
 
-<Where the change needs it, describe responsibilities, state ownership, domain invariants, and data flow. Explain the decisions that constrain implementation and their rationale and evidence. Keep precise boundary contracts in Interfaces below rather than repeating them.>
+<!-- Order tasks by the recommended implementation sequence. Add a linked index only when it improves navigation; omit it for a single task. Repeat the task section below for each task. -->
 
-<When a consequential choice required comparison, record the credible alternative, why it was rejected, and the accepted tradeoff. Label safe assumptions and optional suggestions separately. For simple changes, fold the design into What changes and omit this section.>
-
-## Related specs
-
-<Ordinary links to related specs in this repository only. Omit when none.>
-
-## Interfaces
-
-<Accepted interfaces, data/failure semantics and compatibility assumptions for this repository. Cite API/schema documentation when useful; do not link other repositories' issues or plan their work. Omit when unnecessary.>
-
-## PR readiness
-
-<State which checks make this repository's PR ready. For shared contracts, distinguish local contract tests from required real-candidate integration; name the verification owner and required input. Keep later deployment conditions separate.>
-
-## Dependencies
-
-- <Exact prerequisite spec link> — **Required:** <Implementation outcome or evidence>. **Gates:** <Implementation, integration, publication, merge, or deployment of the affected work>.
-
-<!-- Write "None" when no spec-level prerequisites exist. Task-specific prerequisites belong in task details. Use ordinary issue links; an open prerequisite issue does not imply all work must wait. A usable PR candidate may satisfy the stated condition. -->
-
-## Implementation plan
-
-1. [<task_id> — <Task title>](#task-<task_id>)
-
-## Task details
-
-<!-- Repeat the following task section for each indexed task. Keep all tasks in this document. -->
+<When feature-wide verification needs coordination, state the shared checks, required inputs and verification owner here. Distinguish local tests from real integration evidence and later rollout conditions. Omit when task checks suffice.>
 
 <a id="task-<task_id>"></a>
 
@@ -75,11 +47,7 @@
 
 - <Observable completion condition> — **Verify:** <Test or observation, including integration evidence when needed>.
 
-## Risks and open questions
-
-<Material risks, mitigations, and non-blocking unknowns. Resolve decisions that prevent implementation before marking the plan ready. Omit this section when empty.>
-
-## Spec metadata
+---
 
 - spec_revision: <positive integer>
 - owner_repository: <verified repository identity>

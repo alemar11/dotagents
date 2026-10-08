@@ -23,9 +23,9 @@ acceptance obligations, and impact on existing work. Retain retired IDs so later
 runs cannot reuse them. Do not silently remove implemented obligations or reshape
 active work; surface material conflicts with observed execution for user direction.
 
-Update the spec index and affected task details together, preserving
+Update the task plan, any navigation index and affected task details together, preserving
 unaffected fields. Verify that no task, criterion, or dependency is orphaned.
-Retiring a task removes it from the active index with an explicit historical
+Retiring a task removes it from the active plan with an explicit historical
 reference; preserve its identity and attributable execution history.
 Retirement invalidates any prior delivery evidence relying on it.
 
