@@ -29,7 +29,7 @@ claim every intermediate stage can land independently.
 For fan-in, keep independent predecessors independent. A dependent task names
 all prerequisites; it must not invent an ordering edge between its predecessors
 to force a linear Git stack. Review whether the prerequisite outcomes can be
-combined and verified. Spec resolves semantic incompatibilities; the executor
+combined and verified. Architect resolves semantic incompatibilities; the executor
 chooses and verifies the concrete integration strategy before starting the
 dependent work.
 

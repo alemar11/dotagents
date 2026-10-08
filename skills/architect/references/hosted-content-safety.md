@@ -1,9 +1,9 @@
 # Hosted Content Safety
 
-Spec owns portable specification content, single-line issue titles, pre-write
+Architect owns portable specification content, single-line issue titles, pre-write
 correction and bounded post-write repair. Apply these rules to each specification
 issue and maintenance changelog. Use authenticated `gh` for transport and
-readback. Spec computes corrections and updates the same hosted artifact.
+readback. Architect computes corrections and updates the same hosted artifact.
 
 ## Internal records and hosted content
 

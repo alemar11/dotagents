@@ -1,0 +1,7 @@
+interface:
+  display_name: "📚 Architect"
+  short_description: "Design a feature and its verifiable implementation plan."
+  brand_color: "#BE185D"
+  default_prompt: "Use $architect to design this feature and its verifiable task plan in conversation, without implementing it; publish to GitHub only when explicitly requested."
+policy:
+  allow_implicit_invocation: false

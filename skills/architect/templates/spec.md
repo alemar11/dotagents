@@ -1,6 +1,6 @@
 # <Feature title>
 
-<a id="spec-<spec_id>"></a>
+<a id="spec"></a>
 
 ## Why
 
@@ -10,6 +10,8 @@
 
 <Describe observable behavior, interfaces, or invariants. Include important failure cases and compatibility obligations.>
 
+<Include a realistic user journey or caller example and the expected result. Keep it inline for a small change; use a compact example when the contract needs precision.>
+
 **Out of scope:** <Explicit boundaries that could otherwise be mistaken for included work.>
 
 ## Acceptance criteria
@@ -18,9 +20,11 @@
 
 <!-- Add WHEN / THEN scenarios beneath a criterion when they clarify distinct triggers, edge cases, or failure behavior. Do not repeat the same requirement in several formats. -->
 
-## Design decisions
+## Design
 
-<Only accepted choices that constrain implementation, with rationale and evidence. Label safe assumptions and optional suggestions separately. Omit this section when unnecessary.>
+<Where the change needs it, describe responsibilities, state ownership, domain invariants, and data flow. Explain the decisions that constrain implementation and their rationale and evidence. Keep precise boundary contracts in Interfaces below rather than repeating them.>
+
+<When a consequential choice required comparison, record the credible alternative, why it was rejected, and the accepted tradeoff. Label safe assumptions and optional suggestions separately. For simple changes, fold the design into What changes and omit this section.>
 
 ## Related specs
 
@@ -52,7 +56,7 @@
 
 ### <Task title>
 
-- spec: [<qualified spec identity>](#spec-<spec_id>)
+- spec: [<spec title>](#spec)
 - task_id: <stable lower-kebab identity>
 - acceptance_refs: <Exact acceptance-criterion text to which this task contributes>
 
@@ -75,6 +79,5 @@
 
 ## Spec metadata
 
-- spec_id: <stable lower-kebab identity>
 - spec_revision: <positive integer>
 - owner_repository: <verified repository identity>

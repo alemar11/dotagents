@@ -25,7 +25,7 @@ A request to build a prototype authorizes the local experiment and its isolated
 workspace. Automatic selection does not turn discussion or read-only planning
 into permission to write. A read-only caller may recommend an experiment and
 return its question and scope; building begins only with established authority.
-Prototype is optional and adds no mandatory stage to Explore, Spec, or Implement.
+Prototype is optional and adds no mandatory stage to Explore, Architect, or Implement.
 
 ## Choose the execution surface
 

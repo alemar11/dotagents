@@ -1,6 +1,6 @@
-# Feature Specification Operations and Results
+# Architect Operations and Results
 
-The `spec` namespace describes transient caller choices and operation results,
+The `architect` namespace describes transient caller choices and operation results,
 not a workflow graph. The saved identity and revision contract belongs to
 [specification.md](specification.md). A request resolves to refinement or
 explicit publication; review findings return to drafting or clarification. Each
@@ -26,9 +26,9 @@ additional source access or implementation authority.
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `source_route` | `new-source`, `existing-source` | Derived from whether the request creates a spec or revises an existing authoritative artifact. |
-| `planning_readiness` | `ready`, `clarification-required`, `blocked` | Whether evidence supports drafting, a material choice remains, or essential evidence is unavailable. |
+| `planning_readiness` | `ready`, `clarification-required`, `blocked` | Whether evidence supports the affected design and task plan, a material user choice remains, or essential evidence is unavailable. Missing empirical proof blocks only dependent decisions and tasks. |
 | `grilling_outcome` | `refined`, `user-stopped`, `blocked` | Composed interview result; a stopped handoff is usable only when remaining assumptions are safe. |
-| `review_result` | `clean`, `revision-required`, `clarification-required`, `blocked` | Assessment of the complete spec and task contract. |
+| `review_result` | `clean`, `revision-required`, `clarification-required`, `blocked` | Assessment of usage, design consistency, the complete spec, and task contracts. |
 | `refinement_result` | `refined`, `clarification-required`, `blocked` | Complete in-conversation spec, unresolved material choice, or unavailable essential evidence. |
 | `publication_result` | `not-requested`, `published`, `no-op`, `failed`, `unavailable`, `ambiguous` | Verified GitHub publication or its exact unresolved outcome. |
 | `readback` | `not-applicable`, `verified`, `no-op`, `ambiguous` | Exact GitHub artifact observation when publication is requested. |
@@ -37,7 +37,7 @@ A saved spec may contain its semantic revision, explicit assumptions, acceptance
 baselines, and a record of retired identities. It does not persist a current
 workflow node, worker assignment, execution status, review receipt, or operation
 journal. Task progress and GitHub issue state belong to their execution/provider
-owners; Spec preserves them during revision.
+owners; Architect preserves them during revision.
 
 Keep refinement and publication results separate. A refined spec remains in the
 conversation until explicit publication is requested. No result proves that a

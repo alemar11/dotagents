@@ -4,7 +4,7 @@ Apply [hosted-content-safety.md](../references/hosted-content-safety.md)
 when this note becomes hosted content. Use only for a material saved revision;
 keep operation receipts in the run report.
 
-- spec: <qualified spec identity>
+- spec: <exact issue URL or repository-relative source path>
 - spec_revision: <new revision>
 - change: <requested semantic change and supporting evidence>
 - preserved: <identities, accepted obligations, and executor progress>

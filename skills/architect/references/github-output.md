@@ -1,7 +1,7 @@
 # GitHub Output
 
 Read only for optional GitHub publication. The content contract is
-[specification.md](specification.md). Use authenticated `gh` directly; Spec owns
+[specification.md](specification.md). Use authenticated `gh` directly; Architect owns
 the semantic projections. Pass bodies through files and API payloads through
 structured JSON input, preserving literal text without shell interpolation.
 
@@ -16,7 +16,7 @@ The issue body contains the complete spec, ordered task index, and every detaile
 task contract for that repository. Use the single [spec template](../templates/spec.md)
 with the shared [embedded task rendering](specification.md#rendering). Task links
 point to sections in this issue. Do not create, apply, remove or update GitHub
-labels as part of Spec publication.
+labels as part of Architect publication.
 
 For `operation=refine`, render the complete spec in conversation without hosted
 writes. `operation=publish` creates or updates the complete issue after explicit
@@ -32,15 +32,15 @@ merge, or deployment. Task-specific prerequisites stay in their task contracts;
 internal `blocked_by` references stay in the body. Shared scope or recommended
 order alone does not establish a dependency.
 
-Spec never creates, updates, or removes native GitHub blocked-by relationships.
+Architect never creates, updates, or removes native GitHub blocked-by relationships.
 A usable candidate can satisfy a prerequisite while its
 issue remains open. An agreed interface can permit parallel implementation;
 integration may require a consumable candidate, and release may require deployed
 behavior. Specify the actual condition without choosing the executor's PR topology.
 
 Preserve existing native relationships. If the user explicitly asks to add or
-remove blockers, use `gh` directly outside the Spec workflow;
-keep its result separate from the spec publication. Spec must not infer such a request
+remove blockers, use `gh` directly outside the Architect workflow;
+keep its result separate from the spec publication. Architect must not infer such a request
 from semantic prerequisites. Verify exact linked spec identities and reject
 self-dependencies or cycles in hard prerequisites without creating placeholder
 issues. Issue closure remains distinct from implementation or availability evidence.
@@ -52,8 +52,11 @@ Before hosted reads or writes, apply the
 Before each write, apply [hosted-content safety](hosted-content-safety.md)
 to the exact final content, including worker- or provider-originated content.
 
-Resolve the owning repository and inspect for the intended spec identity. Reuse
-a verified match; reconcile a materially different collision before creation.
+Resolve the owning repository and any supplied issue URL. For an existing spec,
+verify the exact issue and its content before updating it. Before creating a new
+issue, inspect plausible existing matches against the selected requirements and
+source references; a matching title alone is insufficient. Reuse a verified
+match and resolve material ambiguity before creation.
 Create or update the single complete issue and read it back under
 [existing-specs.md](existing-specs.md). Verify identity, title, revision, every
 task and anchor, acceptance coverage, prerequisites, and preserved foreign or

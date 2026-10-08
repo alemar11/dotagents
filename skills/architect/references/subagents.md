@@ -1,7 +1,8 @@
-# Specification Helpers
+# Architect Helpers
 
-Delegate only when a separate context will help resolve a concrete unknown or
-review the complete draft. Use host defaults and explicit user choices; no model
+Delegate only when a separate context will help resolve a concrete unknown,
+compare a consequential design alternative, or review the complete draft.
+Use host defaults and explicit user choices; no model
 or reasoning level is prescribed. Helpers inspect read-only, return to the
 planner, and do not delegate further or interview the user.
 
@@ -18,9 +19,14 @@ independent research questions; draft review needs the complete current draft.
 > conflicting evidence, and remaining unknowns. Do not edit, expand product
 > requirements, delegate, or contact the user.
 
+For alternative designs, include the same representative usage and constraints
+for each helper. Ask for ownership, interfaces, tradeoffs, and unproven
+assumptions; do not request runnable scaffolding. The caller chooses and
+reconciles the design before deriving tasks.
+
 ## Draft review
 
-Read the [spec-reviewer role](spec-reviewer.md) and adapt its brief to the
+Read the [design-reviewer role](design-reviewer.md) and adapt its brief to the
 complete draft and accepted requirements. Keep review findings distinct from
 research evidence; assess both before revising the spec.
 

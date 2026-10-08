@@ -28,7 +28,7 @@ as skills.
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
-| `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
+| `architect` | Design feature behavior, ownership and interfaces, then a verifiable task plan; publish the specification to GitHub when requested. |
 | `prototype` | Build an isolated runnable experiment in the project's real stack to resolve a UI, interaction, logic, or state-model question. |
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
@@ -84,7 +84,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   Workers can begin once scope is already established, the interview confirms
   it, or the user stops grilling. Grilling Session is not required for the
   direct investigation path.
-- Install `spec` with its `grilling-session` dependency.
+- Install `architect` with its `grilling-session` dependency.
   Skill dependencies must be reachable in the current session; the invoking skills
   never install or substitute them automatically.
 - `review-pr` obtains one hosted Codex review result for a PR through
@@ -93,7 +93,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   `$adversarial-review` for local independent change
   review; use `$crusty` only when explicitly asked for Crusty.
 - `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
-- Spec uses installed `$grilling-session` for material clarification and
+- Architect uses installed `$grilling-session` for material clarification and
   authenticated `gh` for hosted reads and publication when saving to GitHub.
 - `prototype` can be invoked directly or selected for a requested experiment.
   It uses temporary directories for standalone examples and isolated project
@@ -108,8 +108,11 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
   context and relevant evidence without requiring Learn or a repository, returns
   a transient refined handoff, and
   never creates tasks or captures durable knowledge automatically.
-- `spec` targets one repository per invocation, with no cross-repository issue
-  references or companion specs. It saves coherent specs with stable task identities, recommended
+- `architect` targets one repository per invocation, with no cross-repository issue
+  references or companion specs. It starts from realistic usage, settles changed
+  ownership and contracts, and compares alternatives when a consequential choice
+  needs them. It produces a design and task plan without implementation or runnable
+  prototypes. It saves coherent specs with stable task identities, recommended
   order, real prerequisites, and completion checks. GitHub is the only saved destination;
   no-write previews stay in the conversation and require no GitHub skill access when using
   only supplied or local sources. GitHub is the sole saved-spec authority.
@@ -149,7 +152,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop skills/test-audit skills/prototype
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/test-audit skills/prototype
 ```
 
 Install one reusable skill by passing only its path:
@@ -201,7 +204,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill explore \
   --skill adversarial-review \
   --skill review-pr \
-  --skill spec \
+  --skill architect \
   --skill prototype \
   --skill implement \
   --skill deslop \
