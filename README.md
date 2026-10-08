@@ -29,6 +29,7 @@ as skills.
 | `adversarial-review` | Pressure-test a software change with an independent read-only review and evidence-backed findings. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `spec` | Refine a feature spec and actionable task plan in conversation; publish to GitHub when requested. |
+| `prototype` | Build an isolated runnable experiment in the project's real stack to resolve a UI, interaction, logic, or state-model question. |
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
@@ -94,6 +95,11 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `maintainer` uses its local health and validation workflows for diagnosis; it requires `$skill-creator` or `$plugin-creator` for substantial public reshapes and native `codex review` for non-trivial implementation closeout.
 - Spec uses installed `$grilling-session` for material clarification and
   authenticated `gh` for hosted reads and publication when saving to GitHub.
+- `prototype` can be invoked directly or selected for a requested experiment.
+  It uses temporary directories for standalone examples and isolated project
+  worktrees for app integration, then verifies the relevant native or browser
+  behavior. It adds no mandatory dependency to planning or implementation and
+  does not turn a read-only caller into authority to build or publish.
 - `learn` runs in the invoking task and performs only authorized local-repository context changes; it has no external dependency preflight, task profile, GitHub transport, publication, or worker delegation contract.
 - A requested Learn retrospective proposes environment improvements from
   observed session evidence. Accepted lessons use existing capture authority;
@@ -143,7 +149,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop skills/test-audit
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/adversarial-review skills/review-pr skills/spec skills/implement skills/deslop skills/test-audit skills/prototype
 ```
 
 Install one reusable skill by passing only its path:
@@ -196,6 +202,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill adversarial-review \
   --skill review-pr \
   --skill spec \
+  --skill prototype \
   --skill implement \
   --skill deslop \
   --skill test-audit
