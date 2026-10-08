@@ -17,11 +17,11 @@ assignments and the user's granted scope. Marker-only edits are nonsemantic.
 
 Reordering or renaming preserves task identity. New tasks receive unused IDs.
 If a task's outcome is replaced rather than refined, retire its old identity
-explicitly and allocate another. Keep a compact record of retired task IDs so later runs cannot reuse them,
-and describe materially replaced or removed acceptance obligations; use the
-[revision note](../templates/maintenance-changelog.md) when useful. Do not silently remove already
-implemented obligations or reshape active work; surface material conflicts
-with observed execution for user direction.
+explicitly and allocate another. For material revisions, keep a brief note of
+the change, retired task IDs with historical references, replaced or removed
+acceptance obligations, and impact on existing work. Retain retired IDs so later
+runs cannot reuse them. Do not silently remove implemented obligations or reshape
+active work; surface material conflicts with observed execution for user direction.
 
 Update the spec index and affected task details together, preserving
 unaffected fields. Verify that no task, criterion, or dependency is orphaned.
