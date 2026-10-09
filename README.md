@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `project-tools` | Detect the project stack, install missing relevant skills, and update installed ones. Supports Android, Apple plus personal Swift, Vercel React, and TanStack; explicit setup/update narrows the work, and Xcode or Discourse MCP configuration is project-local and on request. |
+| `project-tools` | Detect the project stack, install missing relevant skills, and update installed ones. Supports Android, Apple plus personal Swift, Vercel React, and TanStack; explicit setup/update narrows the work, and Xcode, Hopper, or Discourse MCP configuration is project-local and on request. |
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
@@ -51,7 +51,6 @@ as skills.
 | `youtube` | Search YouTube videos and playlists or answer from timestamped transcripts. Use for YouTube links and spoken-content research. |
 | `ghostty` | Inspect or arrange Ghostty terminals and edit configuration or keybindings when explicitly requested. |
 | `herdr` | Inspect or control Herdr terminal workspaces, panes, and agents when the user explicitly asks to use Herdr. |
-| `hopper` | Configure and verify Hopper Disassembler MCP for Codex or Cursor globally or per project. |
 | `xcode-whats-new` | Explicitly read official release notes for the active, latest, or requested stable or beta Xcode. |
 
 For repository-installed skill files, `project-tools` uses `.agents/skills/`
@@ -162,7 +161,7 @@ those skills owned by this checkout. Install them per project with `project-tool
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
 ```
 
 Install one reusable skill by passing only its path:
@@ -201,7 +200,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill swift-api-design \
   --skill swift-docc \
   --skill youtube \
-  --skill hopper \
   --skill xcode-whats-new \
   --skill ghostty \
   --skill herdr \

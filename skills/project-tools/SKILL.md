@@ -161,6 +161,13 @@ For official TanStack skills, read [references/tanstack.md](references/tanstack.
 Use project-local TanStack Intent to discover and load skills shipped with the
 installed library versions.
 
+## Hopper MCP
+
+For explicitly requested Hopper Disassembler MCP setup, repair, or inspection,
+read [references/hopper-mcp.md](references/hopper-mcp.md). Configure its bundled
+server in the requested clients' project files. Do not infer this MCP from
+environment detection or the presence of Hopper on the host.
+
 ## Discourse MCP
 
 For explicitly requested Discourse MCP setup, read
