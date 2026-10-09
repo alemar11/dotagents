@@ -7,9 +7,12 @@ references; this file governs package maintenance.
 
 ## Owned surfaces
 
-- `SKILL.md` owns request routing and the manual-only boundary.
+- `SKILL.md` owns the manual-only boundary; `references/maintenance-router.md`
+  owns route selection, and `references/release-checklist.md` owns shared
+  validation and closeout. Branch playbooks return evidence without repeating
+  the caller's completed checks.
 - `references/` owns maintenance playbooks, validation matrices, metadata
-  checks, lifecycle rules, and refresh runbooks.
+  checks, conditional package-change checks, and refresh runbooks.
 - `scripts/` contains maintenance-only inspection and refresh helpers. They are
   not reusable runtime artifacts and must not be added to install lists.
 

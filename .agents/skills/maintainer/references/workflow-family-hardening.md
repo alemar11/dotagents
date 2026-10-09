@@ -40,7 +40,8 @@ connected skills or plugins.
    when they appear in the same session.
 5. If the fix changes public package identity, removes/merges a package, or
    substantially redistributes responsibility, route through `$skill-creator`
-   or `$plugin-creator` first, then use `package-lifecycle.md`.
+   or `$plugin-creator` first, then use targeted maintenance in
+   [skill-upgrade.md](skill-upgrade.md).
 6. Update the owning contracts. Use affected behavioral regression tests for
    executable changes; validate prose contracts statically and add a bounded
    scenario only when static inspection leaves a meaningful uncertainty.

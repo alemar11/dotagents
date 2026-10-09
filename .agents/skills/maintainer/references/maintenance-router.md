@@ -1,84 +1,48 @@
 # Maintenance Router
 
-Open this reference first. This router runs only after the user explicitly
-invokes `$maintainer`, asks to run Maintainer, or an explicitly invoked parent
-workflow routes here. Ordinary skill, plugin, metadata, docs, or repository
-requests must not auto-select this skill.
+Use only under the explicit invocation boundary in `SKILL.md`. Select the route
+from the request; a package name narrows scope but never turns a review into an
+edit. Route identifiers and result values are owned by [states.md](states.md).
 
-Load [states.md](states.md) before route selection. The first column below is a
-projection of its canonical route modes; this file owns matching, ordering, and
-playbook dispatch rather than a second value registry.
+## Routes
 
-## Route Table
-
-| Request type | Match | Playbook |
+| Mode | Request | Read |
 | --- | --- | --- |
-| `maintain` | Bare run, named package upgrade, or explicit metadata alignment | `run-maintenance.md`, `skill-upgrade.md`, or `metadata-sync.md` according to scope |
-| `audit` | Skill/repo health, policy compliance, structure, or pre-release validation | `skill-health.md` |
-| `instruction-density` | Behavior-preserving compaction review | `instruction-density-review.md` |
-| `description-review` | Description compactness, selection value, or metadata wording | `metadata-sync.md`; run instruction-density first when behavior-sensitive |
-| `workflow-hardening` | Sessions, logs, tests, live failures, or repeated corrections expose connected drift | `workflow-family-hardening.md` |
-| `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package | `package-lifecycle.md` |
-| `codex-deps` | Codex-dependency or portability-boundary audit | `codex-dependency-audit.md` |
-| `refresh` | Explicit Swift-DocC or Swift API Design refresh | Matching refresh playbook named in `SKILL.md` |
-| `okf-spec` | Explicit OKF official-spec comparison or refresh | `okf-spec-refresh.md` |
+| `maintain` | Bare run or unnamed maintenance pass | [run-maintenance.md](run-maintenance.md) |
+| `maintain` | Improve, rename, move, merge, replace, or remove named existing packages as requested | [skill-upgrade.md](skill-upgrade.md) |
+| `maintain` / `description-review` | Metadata alignment or description review | [metadata-sync.md](metadata-sync.md) |
+| `audit` | Read-only health, structure, policy, or pre-release review | [skill-health.md](skill-health.md) |
+| `instruction-density` | Review or refactor instruction density | [instruction-density-review.md](instruction-density-review.md) |
+| `workflow-hardening` | Explicitly investigate or fix a connected defect evidenced by runtime behavior | [workflow-family-hardening.md](workflow-family-hardening.md) |
+| `refresh` | Explicit Swift-DocC refresh or freshness review | [swift-docc-refresh.md](swift-docc-refresh.md), [swift-docc-runbook.md](swift-docc-runbook.md) |
+| `refresh` | Explicit Swift API Design refresh or freshness review | [swift-api-design-refresh.md](swift-api-design-refresh.md), [swift-api-design-runbook.md](swift-api-design-runbook.md) |
+| `okf-spec` | Explicit OKF spec comparison or refresh | [okf-spec-refresh.md](okf-spec-refresh.md), [okf-spec-runbook.md](okf-spec-runbook.md) |
 
-## Routing Rules
+For capability questions, read [task-menu.md](task-menu.md) without starting a
+maintenance run. Brand-new skills or plugins start with their creator workflow;
+substantial reshapes do too, followed by targeted maintenance here.
 
-1. A bare `run`, `run your tasks`, or maintenance pass resolves to
-   `maintain` with `run-maintenance.md`. Inspect the default inventory in
-   `task-menu.md` (skills, optional plugins when present, coupled
-   `projects/*`), shortlist concrete low-ambiguity drift, apply safe upgrades,
-   sync touched docs, audit health, and close out. Do not infer refresh,
-   new-skill creation, workflow hardening, package lifecycle work, or a
-   substantial reshape.
-2. Named existing packages resolve to targeted `maintain` with
-   `skill-upgrade.md`; explicit metadata/docs wording resolves to
-   `metadata-sync.md`.
-   TanStack setup guidance belongs to `project-tools`; maintain that provider
-   reference against official Intent consumer docs, not a local API skill catalog.
-3. Runtime or cross-skill evidence resolves to `workflow-hardening`. Inspect
-   first, then repair evidenced defects within the user's authorized scope.
-4. Public identity, ownership, or package-removal changes resolve to
-   `package-lifecycle`, with `$skill-creator` or `$plugin-creator` first for a
-   substantial reshape.
-5. Instruction-density review establishes which behavior must survive a
-   refactor. Apply requested edits directly; ask only about material unresolved
-   changes to scope or behavior.
-6. Health audits resolve to read-only `audit`. An audit-and-fix request or a
-   generic maintenance run consumes authorized findings through `skill-upgrade.md`.
-7. Codex dependency, domain refresh, and OKF routes run only when explicitly
-   requested. Targeted `maintain okf` may run the stale check but must not
-   refresh the bundled spec without explicit refresh authority.
-8. Brand-new skills and plugins start with their creator workflow; Maintainer
-   returns only for integration or later maintenance.
+An audit-and-fix request gathers evidence through its review playbook, then
+applies authorized findings through targeted maintenance. Bare maintenance must
+not expand into explicit-only routes. Targeted `maintain okf` may check freshness
+but must not refresh the spec without refresh authority. TanStack maintenance
+belongs to `project-tools` and its official Intent consumer guidance.
 
-## Mixed Requests
+## Mixed work and delegation
 
-Select only the categories needed by the request. Establish behavior and
-ownership before restructuring, resolve lifecycle changes before syncing
-metadata, and validate the resulting artifact after edits. Reuse evidence
-across routes instead of rerunning a full audit for each playbook. A request to
-review and make needed updates supplies edit authority for that scope.
+Select only necessary routes. Establish behavior and ownership before
+restructuring, resolve package changes before metadata alignment, and validate
+the resulting artifact. For behavior-sensitive description changes, use the
+instruction-density criteria first. Reuse evidence across routes.
 
-## Task Isolation
+When runtime policy permits and delegation helps, delegate independent read-only
+slices or disjoint edits. Keep routing, integration, finding severity, and final
+Git verification in the main agent. Visible user-owned Codex App tasks still
+require applicable explicit permission.
 
-Run only the routed playbooks. Do not silently expand generic maintenance into
-refresh, workflow hardening, package lifecycle, a substantial reshape, or new
-package creation. Do not expand metadata-only work into repo-wide audit, and do
-not convert a read-only instruction-density or health audit into edits without
-the authority defined by its caller.
+## Shared completion
 
-## Delegation
-
-When runtime policy permits and delegation materially improves the work, use
-explorers for independent read-only slices and workers only for disjoint write
-ownership. Keep routing, final wording, edit integration, severity synthesis,
-and final git verification in the main agent. Creating visible user-owned Codex
-App tasks still requires the applicable explicit permission.
-
-## Common Closeout
-
-Load `states.md`, select every applicable lane from `validation-matrix.md`, and
-finish with `release-checklist.md`. Branch playbooks add only their unique
-evidence; the release checklist owns common reporting and publication authority.
+Branch playbooks return their evidence to one
+[release-checklist.md](release-checklist.md) pass. Nested playbooks do not repeat
+metadata alignment, health checks, validation, or closeout already owned by the
+caller. Repeat a check only after relevant changes or new evidence invalidate it.

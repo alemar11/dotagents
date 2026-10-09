@@ -1,62 +1,19 @@
-# Run Maintenance Playbook
+# Repository Maintenance
 
-Use this playbook for the repo-wide pass of the unified `maintain skills`
-task, including bare maintainer imperatives such as `run`, `run your tasks`,
-or other default maintenance requests.
+Use for a bare `run` or unnamed maintenance request. The default inventory in
+[task-menu.md](task-menu.md) includes reusable and project-local skills, optional
+plugins, and coupled maintenance sources. An empty plugin marketplace is valid.
 
-## Purpose
-- Keep existing skills, optional plugins, and coupled maintenance projects
-  healthy with proactive, low-ambiguity improvements.
-- Treat `run` as the default entrypoint for this maintainer skill.
-- Apply concrete maintenance work automatically when the rationale is clear.
+1. Inspect the inventory and directly coupled repository docs. Use
+   [skill-health.md](skill-health.md) to identify concrete drift.
+2. Shortlist safe, low-ambiguity improvements: stale paths, aligned metadata,
+   duplicated description detail, or clearer wording that preserves behavior.
+   Report strategic or behavior-sensitive candidates instead of applying them.
+3. Apply shortlisted edits using [skill-upgrade.md](skill-upgrade.md).
+4. Return package coverage, rationale, changed surfaces, and existing proof to
+   the shared release checklist. It owns one alignment and validation pass for
+   the batch; do not run a full closeout for every package.
 
-## Task Boundary
-- If the user does not name targets, inspect the default inventory in
-  `task-menu.md`: reusable skills, project-local skills, optional plugins when
-  present, and coupled `projects/*` maintenance trees when relevant.
-- An empty `.agents/plugins/marketplace.json` and absent `plugins/*` packages
-  are valid. Do not treat missing plugins as drift.
-- `run` may update multiple packages when each change has a concrete rationale
-  and low ambiguity.
-- Auto-apply only safe maintenance items such as:
-  - metadata and docs alignment
-  - compacting long descriptions that duplicate trigger or workflow detail already present in `SKILL.md`
-  - clearer triggers, workflow, guardrails, examples, or references navigation
-  - stale path or wording fixes
-  - Codex-dependency labeling and optional-tool fallback clarity
-  - directly coupled `README.md` or `AGENTS.md` wording drift
-- Do not infer domain `refresh` or brand-new skill creation from bare `run`.
-- Do not infer workflow-family hardening, package migration/retirement, or substantial reshapes from bare `run`.
-- If a candidate change is strategic, high-ambiguity, or likely to alter intent, report it as follow-up instead of auto-applying it here.
-
-## Workflow
-1. Enumerate local packages and directly coupled repo docs:
-   - reusable skills under `skills/*`
-   - project-local maintainer skills under `.agents/skills/*`
-   - optional repo-local plugins under `plugins/*` when present and listed in
-     `.agents/plugins/marketplace.json`
-   - coupled maintenance projects under repo-root `projects/*` and skill-local
-     `skills/*/projects/*` when those packages own editable source or validators
-   - related `README.md` and `AGENTS.md` entries
-2. Run `skill-health.md` read-only, then shortlist packages with clear,
-   maintainable improvements from its findings.
-   - Include stale Codex-dependency inventory or ambiguous Codex-tool wording in this inspection.
-   - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners when they are too long, duplicated, or misaligned.
-3. For each shortlisted target, apply a targeted upgrade using the rules from `skill-upgrade.md`.
-4. Run `metadata-sync.md` for the touched skills, plugins, maintenance projects, and coupled repo docs.
-5. Rerun `skill-health.md` across touched areas and repo-level reference drift.
-6. Finish with `release-checklist.md` and report canonical `result` and
-   `change_state` values.
-
-## Quality Gates
-- Every changed skill, plugin, or maintenance project has a concrete rationale.
-- Multi-target runs stay easy to explain target by target.
-- Touched Codex-dependent skills name their required Codex tools/contracts clearly, and touched portable skills keep Codex-only helpers optional.
-- `run` ends with no unresolved metadata drift or broken references in the touched scope.
-- Return `result=pass` and `change_state=no-change` when no low-ambiguity
-  improvements are found.
-
-## Branch Report Additions
-
-Add the packages inspected, packages changed, and target-by-target rationale to
-the common final report owned by `release-checklist.md`.
+Do not infer domain refresh, workflow hardening, package renames/moves/removals,
+substantial reshapes, or new-package creation from a bare run. If inspection
+finds no meaningful maintenance, finish as a verified no-op.

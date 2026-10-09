@@ -1,52 +1,43 @@
-# Metadata Sync Playbook
+# Metadata Alignment
 
-Use this playbook as the metadata-only mode of the unified `maintain skills`
-task to keep one or more targeted skills' `SKILL.md`, `agents/openai.yaml`,
-plugin manifests, and repo-level docs aligned.
+Use for metadata/docs-only maintenance or description review. Inspect only the
+selected packages and their catalog/install mentions. A review reports proposed
+corrections; an authorized edit aligns them. Do not expand this route into a
+structural audit, domain refresh, or a new skill scaffold.
 
-## Task Boundary (Sync Only)
-- `sync` aligns metadata and docs only.
-- Do not run structure/policy compliance checks here (those belong to `audit`).
-- Do not run bundled-reference refresh workflows here (those belong to their specific `refresh` tasks).
+## Sources and boundaries
 
-## Canonical Source Order
-When fields drift, resolve in this order:
-1. `SKILL.md` frontmatter (`name`, `description`) is canonical for skill identity/purpose.
-2. `agents/openai.yaml` should stay semantically aligned for UI text (`display_name`, `short_description`, `default_prompt`).
-3. `README.md` one-liners should mirror the same user-facing purpose as metadata.
+`SKILL.md` frontmatter owns the name, purpose, and trigger intent. Keep
+`agents/openai.yaml` and README one-liners semantically aligned with it. Keep
+workflow detail in the skill body or its conditional references. Preserve
+invocation policy and unrelated dependency fields.
 
-Use `references/skill_openai_metadata.md` only for the expected UI field shape
-and metadata-editing checks. Do not use it as a replacement for `$skill-creator`
-when a brand-new skill scaffold is needed.
+For behavior-sensitive trigger changes, first apply the criteria in
+[instruction-density-review.md](instruction-density-review.md); do not assume
+that a shorter description preserves selection behavior.
 
-## What to Align
-- Skill identity and purpose (`name`, `description`, display labels)
-- Trigger intent in `SKILL.md` vs UI-facing `short_description`
-- Description compactness and selection value across `SKILL.md` frontmatter, `agents/openai.yaml` short descriptions, and README one-liners
-- README skill list and one-line descriptions
-- Any install prompts or usage snippets that list skill names
-- Plugin names, descriptions, marketplace entries, and usage snippets when
-  plugins are in scope. An empty marketplace needs no fabricated plugin
-  entries.
+## UI fields
 
-## Workflow
-1. Enumerate skill manifests:
-   - `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
-   - `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
-2. For each targeted skill, compare:
-   - `SKILL.md` frontmatter `name` and `description`
-   - `agents/openai.yaml` interface fields (`display_name`, `short_description`, `default_prompt`)
-   - README entry wording for that skill
-   - description length and duplication against trigger rules, workflow details, and guardrails already present in the skill body
-3. Update mismatches with minimal wording drift.
-4. Reconcile README lists so added, removed, or renamed skills are reflected.
-5. Confirm descriptions remain one-line and user-facing in README/openai metadata.
+Use the canonical skill metadata validator and the current skill-creator
+metadata reference when an unfamiliar field needs clarification. Existing UI
+fields follow these constraints:
 
-## Quality Gates
-- Every listed skill has both `SKILL.md` and `agents/openai.yaml`.
-- No stale skill names remain in README/install prompts.
-- Description changes preserve original intent while improving consistency.
-- Descriptions are compact enough for prompt-budget inventory and do not carry detailed workflow contracts that belong in the skill body.
-- `result=pass`: no metadata/doc drift remains.
-- `result=fail`: unresolved drift in any of `SKILL.md`, `agents/openai.yaml`,
-  or README mapping.
+- `display_name` and `short_description` describe the public capability;
+  the short description is 25–64 characters.
+- `default_prompt` is a short example mentioning `$<skill-name>`.
+- Icon paths resolve under the skill's `assets/` directory.
+- Preserve explicit-only policy and unrelated dependencies. A new `brand_color`
+  must be unused in the repository.
+
+## Alignment pass
+
+Compare the targeted frontmatter, UI fields, and README descriptions. For
+plugins, also compare manifests and marketplace entries. Fix only authorized
+mismatches, preserving purpose and scope. Reconcile changed identities in
+catalogs, install prompts, and usage examples; do not invent entries for an
+empty marketplace. New skills belong to their creator workflow, not this pass.
+
+Return changed paths, preserved invocation policy, unresolved drift, and any
+metadata validation already performed to the shared release checklist. It owns
+final parsing and reference checks; metadata-only work does not require a
+separate health audit.

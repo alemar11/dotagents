@@ -31,8 +31,9 @@ for structural, discovery, instruction, reference-path, and validation health.
    - existing scripts and references for every active pointer;
    - coupled `projects/*` maintenance sources still resolve for skills that
      document them;
-   - aligned repo guidance, Codex-dependency classification, and portable
-     fallbacks.
+   - aligned repo guidance and accurate prerequisites: distinguish required
+     tools, services, and capabilities from optional helpers, and verify any
+     documented fallback preserves the requested outcome.
 3. For instruction quality, use the decision criteria in
    [instruction-density-review.md](instruction-density-review.md). Run only
    structural commands and package validators relevant to the audited scope.
@@ -66,7 +67,6 @@ for structural, discovery, instruction, reference-path, and validation health.
 rg --files -g 'SKILL.md' -g 'agents/openai.yaml'
 rg --files -g 'references/*.md'
 rg -n "scripts/|agents/openai.yaml|SKILL.md|\.agents/skills/|projects/" -S
-rg -n "request_user_input|subagent|\$CODEX_HOME|~/.codex|Codex CLI|Codex App" -S
 ```
 
 Use focused package roots and exclude generated caches or installed plugin

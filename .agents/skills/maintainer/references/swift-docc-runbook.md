@@ -20,7 +20,8 @@ asset tree and maintaining the local fast-path reference layer from within the
 
 ## Temporary Data Policy
 - Use the refresh script's temporary directory handling for upstream downloads.
-- Use `.cache/` only for ad hoc scratch work or investigation notes.
+- Use `~/.cache/dotagents/skills/maintainer/` for rebuildable investigation data;
+  use a disposable temporary directory for one-off scratch work.
 - Do not leave ad hoc temporary files in `skills/swift-docc/`.
 
 ## Content Rules
@@ -53,7 +54,7 @@ asset tree and maintaining the local fast-path reference layer from within the
 4. Review fast-path coverage manually:
    - `skills/swift-docc/references/README.md`
    - `skills/swift-docc/references/source-map.md`
-   - workflow pages such as `document-a-swift-package.md`, `document-public-symbols.md`, `document-async-and-stateful-apis.md`, `add-a-docc-catalog.md`, `preview-and-publish.md`, and `tutorial-workflow.md`
+   - workflow pages such as `document-a-swift-package.md`, `document-public-symbols.md`, `document-api-lifecycle-and-behavior.md`, `add-a-docc-catalog.md`, `preview-and-publish.md`, and `tutorial-workflow.md`
 5. If fast-path edits are needed, update those markdown files and rerun:
    - `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py`
    - `python3 .agents/skills/maintainer/scripts/swift_docc_check.py`

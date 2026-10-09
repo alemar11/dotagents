@@ -1,71 +1,36 @@
-# Skill Upgrade Playbook
+# Targeted Maintenance
 
-Use this playbook as the targeted-maintenance mode of the unified `maintain
-skills` task when a user asks to upgrade, modernize, tighten, or improve one
-or more existing skills or plugins.
+Use for requested maintenance of existing skills, plugins, or coupled projects,
+including explicit renames, moves, merges, replacements, and removals. Preserve
+intent and invocation policy except where the requested change alters them.
+Make only changes with a concrete rationale. Review-only requests produce findings
+without edits.
 
-## Purpose
-- Improve one or more existing skills or plugins with meaningful, scoped documentation or metadata updates.
-- Preserve each target's intent while making triggers, workflow, guardrails, or supporting docs easier to use and maintain.
-- Avoid silently expanding a targeted upgrade into repo-wide refresh work.
+Inspect the target's entrypoint, metadata, relevant references, and nearest
+`AGENTS.md`. Follow scripts, editable `projects/*` sources, tests, assets, and
+callers only where they own affected behavior. Include directly coupled README,
+install, manifest, and marketplace entries; absent plugins are not drift.
 
-## Task Boundary
-- `upgrade` is for one or more existing target skills, plugins, or coupled
-  maintenance projects.
-- Default scope per target skill:
-  - the skill's `SKILL.md`
-  - the skill's `agents/openai.yaml`
-  - the skill's `references/*.md`
-  - skill-local `projects/<tool>/` when the skill documents that maintenance
-    source
-  - directly coupled mentions in `README.md` or `AGENTS.md` when wording or durable repo guidance changes
-- Default scope per target plugin:
-  - `.codex-plugin/plugin.json`
-  - bundled `skills/*`, shared `scripts/*`, `projects/*`, and `assets/*` when directly coupled to the requested change
-  - `.agents/plugins/marketplace.json`
-  - directly coupled mentions in `README.md` or `AGENTS.md`
-- Default scope per repo-root maintenance project under `projects/<tool>/`:
-  - project `AGENTS.md`, scripts, tests, and synced consumers named by that
-    project
-  - do not treat absence of plugins as related drift
-- Do not refresh domain best-practices content unless the user explicitly asks for `refresh`.
-- If the requested change merges/removes public packages, changes public invocation, redistributes major responsibilities, moves standalone skills into a plugin, or breaks a handoff schema, stop this playbook and route through `$skill-creator` or `$plugin-creator` first. Resume with `package-lifecycle.md` for integration and cleanup.
+Define the intended improvement, then apply the smallest coherent change.
+Typical targets are trigger clarity, instruction ownership, reference routing,
+metadata alignment, and dependency or portability wording. Keep detailed
+procedures out of discovery descriptions. Update `AGENTS.md` only for durable
+maintenance rules, not runtime behavior.
 
-## Workflow
-1. Identify the target skill, plugin, maintenance project, or mixed target set and inspect each current package:
-   - for skills: `SKILL.md`, `agents/openai.yaml`, any referenced `references/*.md`, `scripts/*`, and skill-local `projects/*` when present
-   - for plugins: `.codex-plugin/plugin.json`, bundled `skills/*`, shared `scripts/*`, `projects/*`, and `assets/*` as needed
-   - for repo-root `projects/<tool>/`: project docs, scripts, tests, and documented skill consumers
-   - related mentions in `README.md`, `AGENTS.md`, and `.agents/plugins/marketplace.json` when a plugin is involved
-2. Define the concrete upgrade goals for each target before editing:
-   - trigger clarity
-   - workflow structure
-   - guardrail precision
-   - Codex dependency labeling or portability-boundary clarity when relevant
-   - description compactness, selection value, and alignment across metadata surfaces
-   - metadata/doc sync
-   - moving dense guidance into `references/` when that improves maintainability
-3. Apply minimal, meaningful edits that preserve each target's current intent.
-4. Run a focused sync pass using `references/metadata-sync.md` for the touched skills, plugins, and any directly coupled docs.
-5. Run a focused health pass using `references/skill-health.md`:
-   - required files still exist
-   - referenced scripts/docs exist
-   - no contradictory instructions were introduced
-   - `references/` markdown naming still follows repo policy
-6. Select the applicable lanes from `references/validation-matrix.md`, finish
-   with `references/release-checklist.md`, and report canonical `result` and
-   `change_state` values.
+Do not refresh bundled domain sources without refresh authority. For package
+changes that substantially reshape public behavior or responsibility, use the
+appropriate creator workflow first, then resume targeted maintenance here.
 
-## Quality Gates
-- Each upgraded target has a concrete rationale; avoid cosmetic rewrites with no practical gain.
-- Touched docs stay aligned across `SKILL.md`, `agents/openai.yaml`, `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, and `README.md` when those files are in scope.
-- Touched descriptions stay concise and preserve trigger family without duplicating detailed workflow or guardrail text.
-- `AGENTS.md` changes happen only when the upgrade introduces durable repository guidance.
-- If a touched skill is Codex-dependent, its required Codex tools/runtime contracts are named plainly; if it is portable, Codex-only helpers remain optional.
-- Return `result=pass` and `change_state=no-change` when no meaningful
-  improvement is needed after inspection.
+When the request changes a package's identity, location, or existence, identify
+the old and new owners and any intentionally removed capability. Update source,
+metadata, callers, README, install prompts, registries, and repository-owned
+symlinks together; include plugin manifests and marketplace entries when present.
+Remove retired surfaces without aliases, preserving unrelated installations.
+Before deleting an old surface, establish its verified replacement or confirm
+that removing the capability is the requested outcome. Do not infer these
+changes from a generic maintenance run.
 
-## Branch Report Additions
-
-Add the target packages, concrete upgrade goals, and target-by-target rationale
-to the common final report owned by `references/release-checklist.md`.
+Return changed surfaces, rationale, and any focused proof to the shared release
+checklist. The caller owns batch alignment and validation; do not repeat those
+passes inside each target upgrade. A standalone upgrade uses the same shared
+closeout once.

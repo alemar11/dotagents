@@ -1,89 +1,55 @@
-# Release Checklist
+# Shared Validation and Closeout
 
-Run this checklist before finalizing maintainer updates.
+This is the single closeout owner for standalone and mixed Maintainer routes.
+Use branch evidence already collected; do not recursively run a full closeout
+for each package or nested playbook. Load [states.md](states.md) for the canonical
+result fields.
 
-## 1. Resolve Scope And Lanes
+## Alignment and verification
 
-- Confirm the requested packages and directly coupled repo docs.
-- Select every applicable lane from `validation-matrix.md`.
-- Confirm substantial reshapes used `$skill-creator` or `$plugin-creator` first.
-- Confirm unrelated dirty worktree changes are preserved and excluded.
+1. Confirm requested scope, preserved unrelated changes, and creator-first
+   handling for substantial reshapes. In a review, report findings without
+   changing files, staging, or publishing.
+2. For authorized changes to public descriptions, identities, or catalog entries,
+   run [metadata-sync.md](metadata-sync.md) once across affected packages unless
+   that alignment is already complete. Do not reopen a completed metadata route.
+3. Select applicable lanes from [validation-matrix.md](validation-matrix.md).
+   For audits, use only non-mutating proof. Verify affected metadata, reference
+   paths, ownership, invocation, and authorization boundaries in proportion to
+   the change. Include manifests, versioning, artifacts, and installation state
+   only for applicable package changes. Use health criteria for unresolved
+   structural questions, not a second whole-repository audit.
+4. Run checks not already satisfied by evidence for the final state. A relevant
+   edit invalidates its affected checks; unchanged results can be reused. Run
+   native `codex review` for non-trivial implementations and resolve or
+   explicitly disposition findings. A missing required lane is `result=fail`
+   unless the user accepts a narrower result.
+5. Read the scoped diff, scan for retired references where applicable, and run
+   `git diff --check`. Distinguish failed required gates from non-blocking
+   warnings; size alone is never a failing gate.
 
-## 2. Package And Policy Consistency
+When a package was renamed, moved, merged, replaced, or removed, select the
+migration/removal lane. Verify updated callers and discovery, absence of retired
+names and owned links, and the intended replacement or removal of capability.
+For affected plugins, verify version/artifact alignment and installed/cache
+parity; any reinstall must preserve unrelated work and introduce no checkout
+changes. Unresolved callers, duplicate discovery, or a mismatched replacement
+remain failed verification, not completed maintenance.
 
-- Align skill names/descriptions across `SKILL.md`, `agents/openai.yaml`, README,
-  and any in-scope plugin manifests or marketplace entries.
-- Verify required files, lowercase `references/*.md` names, and referenced
-  scripts/docs, including coupled `projects/*` paths skills document.
-- Scan for stale names, paths, invocations, dependencies, install prompts, and
-  retired discovery surfaces.
-- Reconcile Codex-dependency classification and runtime/maintenance boundaries.
-- For plugin changes, verify the semantic version bump, embedded CLI alignment,
-  deterministic artifact, install/cache parity, and clean reinstall. Skip plugin
-  gates when no plugins ship.
+## Delivery
 
-## 3. Execute Validation
+Maintenance authority does not imply commit, push, PR, or publication authority.
+Use `$git-commit` for authorized commits/pushes and `$yeet` for authorized
+single-PR publication when available; scoped Git is the commit/push fallback.
+A push-only request never authorizes staging or committing. Scope staging,
+inspect the staged diff, and split distinct package or migration responsibilities.
+After delivery, verify the exact commit range, branch divergence, and requested
+remote result while preserving unrelated pre-existing changes.
 
-- Run every selected validation lane and record its commands and results.
-- Run native `codex review` for non-trivial implementations and resolve or explicitly
-  disposition accepted findings.
-- Treat a missing required lane as `result=fail` unless the user explicitly accepts a
-  narrower result.
+## Report
 
-## 4. Review Evidence Efficiently
-
-During iteration use:
-
-- `git status --short --branch`
-- `git diff --stat`
-- `git diff --name-only`
-- `git diff --check`
-- focused `git diff -- <paths>`
-
-Read the complete relevant diff once before final review and publication. Carry
-artifact paths/refs, fingerprints, changed sections, proof results, and failed
-gate excerpts instead of repeatedly reproducing complete unchanged artifacts.
-
-## 5. Commit And Publication
-
-Resolve commit, push, PR, and other publication authority independently.
-Otherwise stop after validation and report the dirty diff without staging or
-changing Git history.
-
-- With explicit commit authority, stage only explicit paths, inspect the staged
-  diff, and split multiple skills/plugins or distinct migration intents into
-  meaningful commits.
-- With push-only authority, do not stage or commit. Verify the existing commit
-  range and push only those commits.
-- With PR or other publication authority, use the matching publication workflow
-  and its own scope rules, including necessary commits authorized by that
-  workflow. Commit or push authority alone does not authorize PR publication.
-- Prefer `$git-commit` for authorized local commits and `$yeet` for
-  authorized single-PR publication when those skills are installed. Direct
-  scoped `git` is the fallback for explicitly authorized commit/push operations
-  when they are unavailable.
-- After an authorized commit or push, verify the exact commit range, branch
-  divergence, and that authorized paths plus the staged set are clean. Confirm
-  unrelated pre-existing changes remain unchanged; global worktree cleanliness
-  is not required. Do not claim an external mutation from a suggestion or
-  attempted command; verify resulting state.
-
-## Final Report
-
-Keep human reports concise and omit inapplicable detail. Preserve `result` and
-`change_state` for callers; include the remaining fields only when relevant.
-
-- `result`: `<canonical value from states.md>`
-- `change_state`: `<canonical value from states.md>`
-- Scope: `<packages and workflow covered>`
-- Validation lanes: `<selected lanes>`
-- Commands run: `<key commands in order>`
-- Files changed: `<paths>` or `none`
-- Why changed: `<rationale per target>`; use `not applicable` when
-  `change_state=no-change`
-- Runtime evidence: `<sessions/logs/tests used>` or `not applicable`
-- Health evidence: `<size band, representative path, escalation, and applicable validation>`
-  or `not applicable`
-- Artifacts/install state: `<versions, fingerprints, cache/reinstall proof>` or `not applicable`
-- Findings: `<blocking and warning items>`
-- Follow-ups: `<deferred work>`
+Emit `result` and `change_state`. Briefly state coverage, findings or changes,
+verification and its limits, remaining work, and delivery state when relevant.
+Include runtime evidence, artifact/cache parity, or size estimates only when they
+support a claim. Omit unused fields rather than producing a template of
+`not applicable` entries. A valid no-op requires no persistent edit.

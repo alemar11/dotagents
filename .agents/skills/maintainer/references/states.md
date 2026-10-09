@@ -10,13 +10,11 @@ evidence.
 
 | Value | Meaning |
 | --- | --- |
-| `maintain` | Run conservative general maintenance, a targeted package upgrade, or metadata alignment according to the matched scope. |
+| `maintain` | Run conservative general maintenance, targeted package changes, or metadata alignment according to the request; renames, moves, merges, replacements, and removals require explicit scope. |
 | `audit` | Inspect skill or repository health, policy, structure, or pre-release evidence read-only. |
 | `instruction-density` | Identify behavior-preserving instruction improvements; apply only when the request authorizes refactoring. |
 | `description-review` | Review discovery descriptions or metadata wording. |
 | `workflow-hardening` | Repair a connected workflow defect established by runtime or cross-skill evidence. |
-| `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package. |
-| `codex-deps` | Audit Codex dependency and portability boundaries. |
 | `refresh` | Run one explicitly selected domain refresh workflow. |
 | `okf-spec` | Compare or explicitly refresh the bundled OKF specification. |
 
