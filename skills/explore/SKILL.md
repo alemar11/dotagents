@@ -1,6 +1,6 @@
 ---
 name: explore
-description: "Run an explicitly requested read-only exploration in the current task or session with optional bounded delegation."
+description: "Investigate how a system works, assess possible approaches, and resolve factual unknowns using cited evidence. Read-only; use when explicitly requested, with clarification only for unresolved user decisions."
 ---
 
 # Explore
