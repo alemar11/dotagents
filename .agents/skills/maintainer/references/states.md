@@ -10,13 +10,13 @@ evidence.
 
 | Value | Meaning |
 | --- | --- |
-| `maintain` | Run conservative general maintenance, targeted package changes, or metadata alignment according to the request; renames, moves, merges, replacements, and removals require explicit scope. |
-| `audit` | Inspect skill or repository health, policy, structure, or pre-release evidence read-only. |
+| `maintain` | Run all applicable routine maintenance, including managed source updates, or targeted changes according to the request; renames, moves, merges, replacements, and removals require explicit scope. |
+| `audit` | Assess all applicable routine maintenance or a specifically requested review read-only. |
 | `instruction-density` | Identify behavior-preserving instruction improvements; apply only when the request authorizes refactoring. |
 | `description-review` | Review discovery descriptions or metadata wording. |
 | `workflow-hardening` | Repair a connected workflow defect established by runtime or cross-skill evidence. |
-| `refresh` | Run one explicitly selected domain refresh workflow. |
-| `okf-spec` | Compare or explicitly refresh the bundled OKF specification. |
+| `refresh` | Run a domain refresh selected directly or by routine maintenance; honor read-only requests. |
+| `okf-spec` | Compare or refresh the bundled OKF specification as selected directly or by routine maintenance; honor read-only requests. |
 
 Select one or more route modes from the request using
 `maintenance-router.md`. Mixed requests follow the dependencies between their

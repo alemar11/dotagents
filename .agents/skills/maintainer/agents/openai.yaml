@@ -1,7 +1,7 @@
 interface:
   display_name: "Maintainer"
-  short_description: "Audit and maintain repository skills and plugins."
+  short_description: "Run all routine skill and plugin maintenance."
   brand_color: "#B85C00"
-  default_prompt: "Use $maintainer to inspect the requested packages, apply authorized improvements, and verify the result."
+  default_prompt: "Use $maintainer to run all applicable routine maintenance, refresh stale managed sources, fix concrete issues, and verify the results."
 policy:
   allow_implicit_invocation: false

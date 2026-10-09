@@ -9,8 +9,10 @@ review the `swift-api-design` manifest and local fast-path layer.
   maintainer mechanics.
 - Use `references/swift-api-design-runbook.md` as the canonical refresh and
   review procedure.
-- This task is a skill-specific refresh workflow; do not silently combine it
-  with unrelated maintainer workflows or skill upgrades.
+- Run when directly requested or selected by routine maintenance for this
+  package. Routine maintenance authorizes refreshing stale managed sources;
+  review-only requests remain read-only. Do not expand a direct refresh request
+  into unrelated maintenance.
 
 ## Execution Flow (Mandatory Order)
 

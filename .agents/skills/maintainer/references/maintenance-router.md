@@ -8,25 +8,28 @@ edit. Route identifiers and result values are owned by [states.md](states.md).
 
 | Mode | Request | Read |
 | --- | --- | --- |
-| `maintain` | Bare run or unnamed maintenance pass | [run-maintenance.md](run-maintenance.md) |
+| `maintain` | Bare invocation, run, or maintenance of named packages | [run-maintenance.md](run-maintenance.md), restricted to named packages when supplied |
 | `maintain` | Improve, rename, move, merge, replace, or remove named existing packages as requested | [skill-upgrade.md](skill-upgrade.md) |
 | `maintain` / `description-review` | Metadata alignment or description review | [metadata-sync.md](metadata-sync.md) |
-| `audit` | Read-only health, structure, policy, or pre-release review | [skill-health.md](skill-health.md) |
+| `audit` | Audit or dry-run of routine maintenance | [run-maintenance.md](run-maintenance.md), read-only |
+| `audit` | Specifically requested health, structure, policy, or pre-release review | [skill-health.md](skill-health.md) |
 | `instruction-density` | Review or refactor instruction density | [instruction-density-review.md](instruction-density-review.md) |
-| `workflow-hardening` | Explicitly investigate or fix a connected defect evidenced by runtime behavior | [workflow-family-hardening.md](workflow-family-hardening.md) |
-| `refresh` | Explicit Swift-DocC refresh or freshness review | [swift-docc-refresh.md](swift-docc-refresh.md), [swift-docc-runbook.md](swift-docc-runbook.md) |
-| `refresh` | Explicit Swift API Design refresh or freshness review | [swift-api-design-refresh.md](swift-api-design-refresh.md), [swift-api-design-runbook.md](swift-api-design-runbook.md) |
-| `okf-spec` | Explicit OKF spec comparison or refresh | [okf-spec-refresh.md](okf-spec-refresh.md), [okf-spec-runbook.md](okf-spec-runbook.md) |
+| `workflow-hardening` | Explicit request or connected defect found during routine maintenance | [workflow-family-hardening.md](workflow-family-hardening.md) |
+| `refresh` | Swift-DocC refresh/freshness request or routine maintenance | [swift-docc-refresh.md](swift-docc-refresh.md), [swift-docc-runbook.md](swift-docc-runbook.md) |
+| `refresh` | Swift API Design refresh/freshness request or routine maintenance | [swift-api-design-refresh.md](swift-api-design-refresh.md), [swift-api-design-runbook.md](swift-api-design-runbook.md) |
+| `okf-spec` | OKF spec comparison/refresh request or routine maintenance | [okf-spec-refresh.md](okf-spec-refresh.md), [okf-spec-runbook.md](okf-spec-runbook.md) |
 
 For capability questions, read [task-menu.md](task-menu.md) without starting a
 maintenance run. Brand-new skills or plugins start with their creator workflow;
 substantial reshapes do too, followed by targeted maintenance here.
 
 An audit-and-fix request gathers evidence through its review playbook, then
-applies authorized findings through targeted maintenance. Bare maintenance must
-not expand into explicit-only routes. Targeted `maintain okf` may check freshness
-but must not refresh the spec without refresh authority. TanStack maintenance
-belongs to `project-tools` and its official Intent consumer guidance.
+applies authorized findings through targeted maintenance. Routine maintenance
+includes all applicable source refresh routes; a named package limits them to
+that package. A named operation limits work to that operation. Preserve any
+read-only constraint across every branch. For TanStack, maintain the
+`project-tools` reference against official Intent consumer guidance, not a
+local API skill catalog; this does not invoke its installation workflow.
 
 ## Mixed work and delegation
 

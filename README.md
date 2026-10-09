@@ -138,7 +138,7 @@ installed library versions. Setup details live in
 
 | Skill | Path | Purpose |
 | --- | --- | --- |
-| maintainer | `.agents/skills/maintainer/` | Audit or maintain repository skills, optional plugins, and coupled tools when explicitly invoked. |
+| maintainer | `.agents/skills/maintainer/` | Explicitly invoke to run all routine maintenance, including managed source updates. Arguments narrow scope; audit is read-only. |
 
 Project-local skills are repository-specific and are not included in reusable install commands.
 

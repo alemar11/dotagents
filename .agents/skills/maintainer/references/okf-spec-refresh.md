@@ -9,8 +9,10 @@ or review whether the local OKF skill is aligned with the official spec.
   OKF bundles.
 - Keep official spec refresh scripts, checks, and network mechanics in this
   `Maintainer` skill.
-- This is an explicit skill-specific refresh workflow. Do not fold it into
-  generic repo-wide maintenance.
+- Run when directly requested or selected by routine maintenance for this
+  package. Routine maintenance authorizes refreshing stale managed sources;
+  review-only requests remain read-only. Do not expand a direct refresh request
+  into unrelated maintenance.
 
 ## Execution Flow
 
@@ -27,13 +29,11 @@ or review whether the local OKF skill is aligned with the official spec.
    with `change_state=no-change`
    if the spec was already current and no persistent edits were needed.
 
-## Targeted Maintenance Mode
+## Read-only Evaluation Mode
 
-When the user asks to `maintain okf` rather than explicitly refresh the spec:
-
-- Run the staleness check and report whether the official spec changed.
-- Do not refresh the bundled spec unless the user asked for refresh or approved
-  the targeted update.
+For audit, review, or dry-run, check freshness and integrity without refreshing
+or editing references. Report whether the official spec changed. A targeted
+`maintain okf` follows routine maintenance, including refresh when stale.
 
 ## Guardrails
 

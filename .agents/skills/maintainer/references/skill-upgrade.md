@@ -17,7 +17,8 @@ metadata alignment, and dependency or portability wording. Keep detailed
 procedures out of discovery descriptions. Update `AGENTS.md` only for durable
 maintenance rules, not runtime behavior.
 
-Do not refresh bundled domain sources without refresh authority. For package
+Routine maintenance supplies refresh authority for managed sources in scope;
+read-only and operation-specific requests retain their narrower boundaries. For package
 changes that substantially reshape public behavior or responsibility, use the
 appropriate creator workflow first, then resume targeted maintenance here.
 
