@@ -3,7 +3,7 @@
 # Evidence Mining
 
 Read this reference when discovering Code Review Rule candidates from a new or
-existing repository, especially when previous Codex sessions are in scope.
+existing repository, especially when previous coding sessions are in scope.
 
 ## Source Priority
 
@@ -13,7 +13,7 @@ Use evidence in this order:
    and existing `AGENTS.md` guidance.
 2. Accepted review findings, verified fixes, incident notes, and current pull
    request or commit history when those surfaces are available.
-3. Explicit durable user corrections and repository-scoped Codex session,
+3. Explicit durable user corrections and repository-scoped session,
    memory, or task evidence.
 
 Historical evidence proposes candidates. Current repository evidence confirms
@@ -24,9 +24,10 @@ session, prefer current behavior and report the historical rule as stale.
 
 Scope history to the canonical current repository and affected paths. Start
 with the current session plus at most the 20 most recently updated
-repository-scoped sessions discoverable from available Codex memory or session
-indexes. Follow only the one or two strongest referenced rollouts when the
-index summary is insufficient. An explicit user-supplied session or task ref
+repository-scoped sessions discoverable from available local logs, memory, or
+session indexes, without assuming an agent-specific path or format. Read only
+the one or two strongest referenced transcripts when summaries are insufficient.
+An explicit user-supplied session or task ref
 may replace or extend that default slice.
 
 Report the examined scope. Do not imply that all historical work was searched

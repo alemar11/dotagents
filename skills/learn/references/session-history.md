@@ -6,13 +6,16 @@ Use this reference only during existing-project bootstrap, when recent local
 agent session history can help seed project context for an already-used
 repository.
 
-## Default window
+## Sources and scope
 
-- When reading Codex history, use local sessions under `~/.codex/sessions`.
-- Search the last 14 days from the current date.
-- Include archived session history only when it is discoverable in that same
-  date window.
-- Keep at most the 10 most recent matching sessions.
+Read the session specified by the user, or the current conversation when none
+is named. This may include searching local session logs available in the
+current environment; do not assume a particular agent, storage path, or format.
+
+When broader history is needed to seed existing-project context, limit the
+default search to the last 14 days and at most the 10 most recent matching
+sessions, including discoverable archives. An explicit session selection
+overrides that default window.
 
 If session history is missing, unreadable, encrypted beyond useful summaries, or
 does not contain matching repo evidence, continue with repo-only evidence and
@@ -24,13 +27,10 @@ a bootstrap blocker.
 
 ## Matching sessions to the repo
 
-Resolve the current repository's git root first. A session matches when any of
-these point at the same git root or a path under it:
-
-- `session_meta.cwd`
-- `turn_context.cwd`
-- tool-call arguments such as `workdir` or `cwd`
-- absolute paths mentioned under the repo root
+Resolve the current repository's git root first. Match sessions using available
+evidence of their working directory, repository identity, or concrete file
+paths under that root. Use the source's actual format rather than requiring
+particular metadata fields.
 
 Ignore broad parent directories such as `~/Developer` unless the session also
 contains a concrete path under the current repo.

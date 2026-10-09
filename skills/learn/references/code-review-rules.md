@@ -25,7 +25,7 @@ explicitly requests Code Review Rules.
 Project Context owns repository resolution, candidate discovery, evidence
 filtering, scope selection, evaluation, exact proposal rendering, and the
 authorized `AGENTS.md` write. Repository files, tests, accepted review
-findings, and current code remain the primary evidence. Historical Codex
+findings, and current code remain the primary evidence. Historical
 session, memory, or task evidence is optional candidate evidence; when it is
 unavailable, continue from repository evidence and report the limitation.
 

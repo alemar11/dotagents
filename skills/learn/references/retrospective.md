@@ -9,7 +9,9 @@ conversation when none is named, within the selected repository.
 
 Ground each candidate in observed friction, a failure, or missing information.
 Read the relevant session evidence and current repository owner before drawing
-a conclusion. When the requested session is unavailable, disclose that limit
+a conclusion. This may include searching available local session logs, without
+assuming a particular agent, storage path, or format. When the requested session
+is unavailable, disclose that limit
 and assess only the evidence actually available. Summarize evidence without
 copying private transcripts, secrets, or raw logs into durable instructions.
 
