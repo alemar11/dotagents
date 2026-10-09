@@ -3,7 +3,9 @@
 Use TanStack's consumer CLI, `@tanstack/intent`, to enable official skills shipped
 inside the project's installed npm packages. Skills stay with those packages;
 setup writes source permissions and loading guidance rather than copying a
-separate catalog into `.agents/skills/` or `.claude/skills/`.
+separate catalog into `.agents/skills/`. The shared
+[Claude directory link](../SKILL.md#claude-code-link) exposes repository-installed
+skill files; it does not replace Intent's dependency discovery or loading guidance.
 
 ## Install and configure
 

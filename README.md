@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `project-tools` | Install or update official Android, Xcode, and TanStack skills and configure project-local MCP entries for Codex, Cursor, Pi, or Claude Code; repository scope only. |
+| `project-tools` | Install or update official Android, Apple, and TanStack skills, personal Swift skills, and project-local MCP configuration for Codex, Cursor, Pi, or Claude Code; repository scope only. |
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
@@ -55,6 +55,12 @@ as skills.
 | `hopper` | Configure and verify Hopper Disassembler MCP for Codex or Cursor globally or per project. |
 | `discourse-mcp` | Set up, troubleshoot, and verify the Discourse MCP connection in Codex or Cursor, including configuration and authentication. |
 | `xcode-whats-new` | Explicitly read official release notes for the active, latest, or requested stable or beta Xcode. |
+
+For repository-installed skill files, `project-tools` uses `.agents/skills/`
+for every client. Claude Code shares that collection through the relative
+symlink `.claude/skills -> ../.agents/skills`; enabling Claude for an existing
+installation requires only the link. Intent-managed skills remain in their
+library packages and use project loading guidance.
 
 ### Official TanStack Skills
 

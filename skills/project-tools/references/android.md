@@ -13,11 +13,12 @@ Check that `npx` is available. Missing Node.js/npm is a host prerequisite to
 report, not install here. Run from the target repository root. Installation is
 project-local by default; never pass `--global` or `-g`.
 
-Select only the requested clients using `--agent`: `codex`, `cursor`, `pi`, or
-`claude-code`. For multiple clients, pass their identifiers after `--agent`.
-Use the [client destinations](../SKILL.md#clients) and inspect the installer's
-actual paths. Keep any generated links inside the repository and preserve
-existing custom skills and unrelated configuration.
+Use `--agent codex` as the installer's destination selector for every requested
+client: it writes to the canonical `.agents/skills/` directory. This does not
+require Codex to be installed. Add Claude Code support through the shared
+[client link workflow](../SKILL.md#claude-code-link), never by selecting
+`claude-code` in the installer. Inspect actual paths and preserve existing
+custom skills and unrelated configuration.
 
 ## Discover and install
 
@@ -27,17 +28,11 @@ List the upstream collection without installing it:
 npx --yes skills add android/skills --list
 ```
 
-Use `--skill '*'` for the complete collection and an explicit agent selection.
-This example installs for Pi; substitute the requested client:
+Use `--skill '*'` for the complete collection and the canonical destination
+selector, even when only Pi, Cursor, or Claude Code is requested:
 
 ```sh
-npx --yes skills add android/skills --skill '*' --agent pi --yes
-```
-
-Only when all four clients are requested:
-
-```sh
-npx --yes skills add android/skills --skill '*' --agent codex cursor pi claude-code --yes
+npx --yes skills add android/skills --skill '*' --agent codex --yes
 ```
 
 Do not use `skills add --all`: that selects all agents as well as all skills.
@@ -53,7 +48,10 @@ on `android skills add` or maintaining a hardcoded upstream skill catalog.
 ## Update
 
 Identify installed skills whose source is `android/skills` from project source
-tracking. Update only those names, with explicit project scope. For example:
+tracking. Update only those names in `.agents/skills`, with explicit project
+scope. Reconcile any older client-specific installation using the shared client
+workflow before updating; do not let source tracking recreate separate copies.
+For example:
 
 ```sh
 npx --yes skills update android-cli --project --yes
@@ -72,10 +70,10 @@ requested.
 
 ## Verification
 
-List the project installation for the requested clients:
+List the canonical project installation, then verify the Claude link if requested:
 
 ```sh
-npx --yes skills list --agent pi
+npx --yes skills list --agent codex
 ```
 
 Inspect the skill files, source tracking, actual destinations, and scoped Git

@@ -1,6 +1,6 @@
 ---
 name: project-tools
-description: "Install or update official Android, Xcode, and TanStack skills and configure MCP entries at repository scope. Excludes global installation and host setup."
+description: "Install or update Android, Apple, TanStack, and personal Swift skills and configure MCP entries at repository scope. Excludes global installation and host setup."
 ---
 
 # Project Tools
@@ -29,20 +29,50 @@ discovery; it must not expand into host setup or permission repair.
 ## Clients
 
 Support Codex, Cursor, Pi, and Claude Code. Configure only the requested
-clients. Use these project-local skill destinations for exported or copied
-skills; provider installers may use another documented discovery directory.
+clients. All repository-installed skill files MUST live in `.agents/skills/`,
+regardless of the client or provider. Install and update each skill there once;
+never create a separate copy in a client-specific directory. Configure provider
+installers to use this canonical destination rather than their client defaults.
 
-| Client | Skill directory relative to the repository root |
+| Client | Discovery path relative to the repository root |
 | --- | --- |
 | Codex | `.agents/skills/` |
 | Cursor | `.agents/skills/` |
 | Pi | `.agents/skills/` |
-| Claude Code | `.claude/skills/` |
+| Claude Code | `.claude/skills` symlink to `../.agents/skills` |
 
-Clients sharing a destination need only one copy. Do not create duplicate
-same-name skills across a client's discovery directories. Shared directories
-can also be discovered by other compatible clients; they are not an isolation
-boundary. Preserve existing custom skills and project-local layouts.
+For Claude Code, linking the shared directory is an additional step, not another
+installation. If the requested skills are already installed and no update is
+requested, only create or verify the link; do not re-download or export them.
+The link exposes the whole shared collection to Claude Code. Client selection
+is not an isolation boundary.
+
+### Claude Code link
+
+Inspect `.agents`, `.agents/skills`, `.claude`, and `.claude/skills` before
+writing. Resolve their paths and reject links outside the repository. If the
+destination is absent (neither a file nor a symlink), run from the repository root:
+
+```sh
+mkdir -p .agents/skills .claude
+ln -s ../.agents/skills .claude/skills
+```
+
+If the existing link already resolves to the canonical directory, keep it.
+Never use force-link replacement over an existing path. For an existing real
+`.claude/skills` directory, reconcile its entries into `.agents/skills`:
+move non-conflicting entries, preserve their full contents, and consolidate
+identical duplicates only after comparison. For differing same-name entries or
+an unexpected link, preserve both and resolve ownership before replacing
+anything. Remove only the emptied old directory, then create the link. Report
+unresolved collisions while completing unaffected requested work.
+
+Verify that `.claude/skills` is a symlink resolving to this repository's
+`.agents/skills`, with the same readable skill trees. Re-running setup must
+reuse that link and the installed skills. MCP configuration remains in each
+client's own configuration files. Dependency-loaded skills such as TanStack
+Intent stay with their packages; do not copy them into a second catalog merely
+to create the link.
 
 ## Android
 
@@ -50,10 +80,17 @@ For Android skill installation or updates, read
 [references/android.md](references/android.md) and use its repository-local
 `npx skills` workflow. Android CLI is not required to install the skills.
 
-## Xcode
+## Apple
 
-For Xcode's embedded skill export or project-local native MCP configuration, read
-[references/xcode.md](references/xcode.md) and select the requested workflow.
+For official Apple skill installation or updates, read
+[references/apple-skills.md](references/apple-skills.md); Xcode provides the
+embedded skill export. For the personal `swift-docc` and `swift-api-design`
+skills from `alemar11/dotagents`, read
+[references/apple-custom-skills.md](references/apple-custom-skills.md).
+For project-local native Xcode MCP configuration, read
+[references/xcode-mcp.md](references/xcode-mcp.md).
+Run only the requested workflows; a failure in one does not
+prevent independent work in the other.
 
 ## TanStack
 

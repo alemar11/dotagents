@@ -1,15 +1,12 @@
-# Xcode
+# Official Apple Skills
 
 For requested skill installation or updates, export the selected Xcode
-installation's embedded skills into the target repository. Choose the directory
-from the [client destinations](../SKILL.md#clients): `.agents/skills/` for
-Codex, Cursor, and Pi; `.claude/skills/` for Claude Code. Respect an explicitly
-requested project-local destination; otherwise resolve the current repository
-root. A request for MCP setup alone does not authorize skill export.
-
-For requested project-local MCP configuration, read
-[xcode-configuration.md](xcode-configuration.md). Follow both workflows when both are requested;
-a failure in one does not prevent independent work in the other.
+installation's embedded skills into the target repository's `.agents/skills/`
+for every client. Add Claude Code support through the shared
+[client link workflow](../SKILL.md#claude-code-link). If the skills are already
+installed and only Claude support is requested, create or verify the link
+without exporting again. A request for MCP setup alone does not authorize skill
+export.
 
 ## Export and update
 
@@ -23,20 +20,16 @@ selected Xcode and the failure rather than substituting downloaded skills.
 The commands are:
 
 ```sh
-# Codex, Cursor, or Pi; replace /absolute/path/to/repo.
+# All clients; replace /absolute/path/to/repo.
 xcrun agent skills export --output-dir /absolute/path/to/repo/.agents/skills
-
-# Claude Code.
-xcrun agent skills export --output-dir /absolute/path/to/repo/.claude/skills
 
 # Refresh existing exported skill directories.
 xcrun agent skills export --replace-existing --output-dir /absolute/path/to/repo/.agents/skills
 ```
 
-Run only the commands for the requested destinations. Apply `--replace-existing`
-to either destination only after the collision checks below. For multiple
-clients, reuse one temporary export and reconcile each distinct destination;
-do not export three copies for clients sharing `.agents/skills/`.
+Apply `--replace-existing` only after the collision checks below. Reuse one
+temporary export and reconcile it into the canonical directory once, regardless
+of how many clients are requested.
 
 Quote paths containing spaces. The destination requires `--output-dir`, not a
 positional argument. The export command may launch Xcode internally; a launch
