@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Tools"
+  short_description: "Install skills and configure MCPs only in the repository."
+  default_prompt: "Use $project-tools to install the requested skills or configure MCP entries for this repository and coding agent, keeping all setup at repository scope."

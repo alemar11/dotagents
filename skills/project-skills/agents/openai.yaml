@@ -1,4 +1,0 @@
-interface:
-  display_name: "Project Skills"
-  short_description: "Project-specific skill setup (skeleton)."
-  default_prompt: "Use $project-skills to explain its intended project-specific setup scope and current implementation status."
