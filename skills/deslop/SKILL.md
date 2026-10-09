@@ -38,6 +38,18 @@ assertions, scenarios and regression coverage. Passing tests alone do not prove
 that deleting a test was safe. For comments, verify the statement is stale or
 redundant and preserve rationale and non-obvious constraints.
 
+When comments or documentation are within the requested scope:
+
+- Replace vague claims with concrete behavior supported by the code or cited
+  evidence. Do not invent mechanisms, measurements, or guarantees to sound precise.
+- Remove filler and jargon that adds no meaning, preserving established domain
+  terms, rationale, qualifications, and the intended tone.
+- Keep sentences complete and easy to read. Shorten or split dense prose without
+  turning it into fragments, unexplained abbreviations, or symbol shorthand.
+
+Apply these criteria to relevant text only; do not expand a code cleanup into
+a repository-wide editorial pass or impose blanket punctuation or vocabulary bans.
+
 Make the smallest change for each verified finding, preserving observable
 behavior and unrelated work. Run the affected tests and lint using repository
 commands; include type or build checks when the changed boundary needs them.
