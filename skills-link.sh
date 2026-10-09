@@ -13,6 +13,13 @@ SKILLS_DEST_DIR="$HOME/.agents/skills"
 
 mkdir -p "$SKILLS_DEST_DIR"
 
+is_global_skill() {
+  case "$1" in
+    swift-api-design|swift-docc) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 link_path() {
   source_path="$1"
   target_path="$2"
@@ -36,7 +43,10 @@ prune_stale_repo_skill_links() {
     resolved_path="$(readlink "$target_path" || true)"
     case "$resolved_path" in
       "$SKILLS_SOURCE_DIR"/*)
-        if [ ! -d "$resolved_path" ] || [ ! -f "$resolved_path/SKILL.md" ]; then
+        if ! is_global_skill "$(basename "$resolved_path")"; then
+          rm -f "$target_path"
+          echo "REMOVE project-only repo skill link -> $target_path"
+        elif [ ! -d "$resolved_path" ] || [ ! -f "$resolved_path/SKILL.md" ]; then
           rm -f "$target_path"
           echo "REMOVE stale repo skill link -> $target_path"
         fi
@@ -63,6 +73,12 @@ for skill_dir in "$SKILLS_SOURCE_DIR"/*; do
   skill_name="$(basename "$skill_dir")"
   target_path="$SKILLS_DEST_DIR/$skill_name"
   skill_count=$((skill_count + 1))
+
+  if ! is_global_skill "$skill_name"; then
+    echo "SKIP $skill_name -> project-only skill"
+    skill_skip_count=$((skill_skip_count + 1))
+    continue
+  fi
 
   if link_path "$skill_dir" "$target_path" "$skill_name"; then
     skill_linked_count=$((skill_linked_count + 1))

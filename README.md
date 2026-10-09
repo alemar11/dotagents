@@ -155,6 +155,8 @@ Run this from the repository root to link `skills/` into `~/.agents/skills`:
 ```
 
 This helper only links reusable skills. It does not install, mirror, or rewrite plugin marketplace entries.
+It excludes `swift-api-design` and `swift-docc` and removes existing links to
+those skills owned by this checkout. Install them per project with `project-tools`.
 
 ### Install Reusable Skills With `skill-installer` (Codex-only)
 
