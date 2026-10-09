@@ -1,6 +1,6 @@
 ---
 name: project-tools
-description: "Install and update repository skills for the detected project stack, or configure project MCP entries when requested. Excludes global installation and host setup."
+description: "Only when explicitly invoked, install or update repository skills, or configure requested project MCP entries. Excludes global installation and host setup."
 ---
 
 # Project Tools
@@ -27,6 +27,11 @@ Verification covers the repository artifacts and, when available, client
 discovery; it must not expand into host setup or permission repair.
 
 ## Invocation
+
+Use only when the user explicitly invokes `$project-tools` or asks to use
+Project Tools. Do not auto-select this skill from the detected stack, missing
+skills, MCP availability, or an ordinary development request. Discussing or
+editing this skill does not invoke its installation workflow.
 
 A bare `$project-tools` MUST start work in the current repository, using any
 scope already established in the conversation. Detect its environments, install

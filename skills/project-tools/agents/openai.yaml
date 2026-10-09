@@ -1,4 +1,6 @@
 interface:
   display_name: "Project Tools"
-  short_description: "Detect the project stack and install or update its skills."
+  short_description: "Explicit setup of repository skills and MCP entries."
   default_prompt: "Use $project-tools to detect this repository's environments, install missing relevant skills, and update matching installed skills at repository scope."
+policy:
+  allow_implicit_invocation: false
