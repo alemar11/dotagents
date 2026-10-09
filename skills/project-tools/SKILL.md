@@ -161,6 +161,14 @@ For official TanStack skills, read [references/tanstack.md](references/tanstack.
 Use project-local TanStack Intent to discover and load skills shipped with the
 installed library versions.
 
+## Discourse MCP
+
+For explicitly requested Discourse MCP setup, read
+[references/discourse.md](references/discourse.md). Require one or more explicitly
+selected forum URLs, verify each site, and configure one fixed-site entry per
+distinct verified forum in the requested clients' project files.
+Do not infer this MCP from environment detection or install it globally.
+
 Other language, framework, and tooling installation workflows are not yet
 implemented. State that limitation when requested rather than claiming setup
 has completed.
