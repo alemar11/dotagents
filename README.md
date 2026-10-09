@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `project-tools` | Install or update official Android, Apple, and TanStack skills, personal Swift skills, and project-local MCP configuration for Codex, Cursor, Pi, or Claude Code; repository scope only. |
+| `project-tools` | Detect the project stack, install missing relevant skills, and update installed ones. Supports Android, Apple plus personal Swift, Vercel React, and TanStack; explicit setup, update, or MCP requests narrow the work to repository scope. |
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |

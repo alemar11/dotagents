@@ -1,6 +1,6 @@
 ---
 name: project-tools
-description: "Install or update Android, Apple, TanStack, and personal Swift skills and configure MCP entries at repository scope. Excludes global installation and host setup."
+description: "Install and update repository skills for the detected project stack, or configure project MCP entries when requested. Excludes global installation and host setup."
 ---
 
 # Project Tools
@@ -25,6 +25,64 @@ An explanation or preview request does not authorize installation. Keep skill
 installation and MCP configuration separate unless both are requested.
 Verification covers the repository artifacts and, when available, client
 discovery; it must not expand into host setup or permission repair.
+
+## Invocation
+
+A bare `$project-tools` MUST start work in the current repository, using any
+scope already established in the conversation. Detect its environments, install
+the relevant missing skills, and update matching installed skills through their
+provider workflows. Do not ask the user to choose an operation or confirm this
+default. Ask only if the repository cannot be identified or a material conflict
+cannot be resolved from the request and project evidence.
+
+Explicit instructions narrow or override that default:
+
+| Request | Action |
+| --- | --- |
+| No additional instructions | Detect the stack; install missing relevant skills and update those already installed. |
+| `setup` | Install missing relevant skills and verify existing ones; do not refresh existing content unless also requested. |
+| `update` | Update relevant installed skills only; do not add missing skills or new provider collections. |
+| Named environment, skill, client, or package | Restrict work to that selection; apply the requested operation, or install-and-update if none is specified. |
+| MCP setup or update | Configure only the named MCP/client entries; do not infer skill installation. |
+| Explain, inspect, preview, or dry run | Report findings and proposed actions without writing. |
+
+For `setup` or `update` without a named environment, detect it from the current
+repository. A skill-only invocation never implies MCP setup, even for Apple.
+Apply the selected operation to every provider reference below; its examples
+do not widen that operation's scope.
+Reuse the current coding agent unless clients are explicitly selected; an
+unspecified client does not block installing into the shared directory. Apply
+the Claude link step when Claude is the current or requested client.
+
+## Detect environments
+
+Inspect project manifests, declared workspaces, build targets, and relevant
+first-party source. Exclude installed skills, dependency trees, generated
+artifacts, documentation examples, and fixtures from detection. Installed host
+tools and stale lockfile entries alone do not establish a project environment.
+
+| Project evidence | Default skill selection |
+| --- | --- |
+| Apple targets in Xcode projects/workspaces, Swift package platforms, or native build/source configuration | Official Apple skills exported by the selected Xcode, plus personal `swift-docc` and `swift-api-design`. |
+| Android modules using Android Gradle plugins or equivalent native Android build/source configuration | Official Android collection. |
+| React web frontend, evidenced by direct React dependencies plus a web renderer/framework or actual web entry points | Vercel `react-best-practices` and `composition-patterns`; add View Transitions only for evidenced compatible usage. |
+| Application dependencies on `@tanstack/*` libraries | Official skills shipped with those installed dependencies, enabled through Intent. `@tanstack/intent` alone is tooling, not evidence of an application library. |
+
+Select every matching environment in mixed repositories; do not stop at the
+first match. A React web app with TanStack needs both routes. React Native's
+`react` dependency alone does not justify React web skills; use evidenced Apple
+and Android targets for those routes. Respect a user-selected subproject and
+deduplicate shared skill installation at the repository root. Intent policy
+still belongs to the relevant owning workspace package.
+
+Inventory existing skills by identity and provider provenance before deciding
+what is missing or updatable. In default mode, include already-installed skills
+from the selected provider collections even when optional for a fresh setup.
+Preserve local modifications, explicit exclusions, and pins; do not uninstall
+unrelated or apparently obsolete skills. If no supported environment is found,
+report the evidence and coverage gap instead of installing a generic bundle.
+Continue independent routes when one lacks prerequisites, then report detected
+environments and installed, updated, unchanged, or blocked results.
 
 ## Clients
 
@@ -91,6 +149,11 @@ For project-local native Xcode MCP configuration, read
 [references/xcode-mcp.md](references/xcode-mcp.md).
 Run only the requested workflows; a failure in one does not
 prevent independent work in the other.
+
+## React
+
+For Vercel's React skills, read [references/react.md](references/react.md).
+Use `gh skill` to install only the relevant skills into the shared directory.
 
 ## TanStack
 

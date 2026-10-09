@@ -40,6 +40,11 @@ Before installation, compare the discovered names against existing project
 skills. Preserve custom or locally modified collisions unless replacement is
 already authorized; install unaffected names explicitly when needed. Skip
 already-current copies rather than overwriting them routinely.
+For `setup`, install only absent names, leaving existing content untouched.
+In default install-and-update mode, install the missing names and run the
+selective update workflow for existing ones. Use `--skill '*'` only when the
+entire discovered collection is eligible for installation; otherwise enumerate
+the missing names. Update-only mode must skip this installation step.
 
 `gh skill install android/skills --all` did not discover Google's nested layout
 when checked with gh 2.102.0. Use `npx skills` here rather than adding a dependency

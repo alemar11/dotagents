@@ -48,6 +48,8 @@ even where it bundles official documentation.
 
 If the destination already contains a skill, inspect its provenance and local
 changes. Use the update workflow for matching GitHub-managed installations.
+In default mode, install missing selected names and update existing ones.
+For `setup`, keep existing content; for `update`, do not install missing names.
 Do not overwrite custom or manually installed copies, or replace symlinks, with
 `--force`; reconcile them within the user's authorized scope first.
 

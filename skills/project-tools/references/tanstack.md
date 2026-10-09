@@ -17,6 +17,11 @@ the project's package manager are host prerequisites.
 
 Add `@tanstack/intent` as a development dependency using that package manager,
 or reuse its installed version. Keep the manifest and lockfile changes together.
+Default mode installs missing consumer setup and refreshes existing setup.
+For `setup`, reuse existing configuration and CLI content, adding only what is
+missing. For `update`, require an existing Intent consumer setup; report missing
+setup rather than installing it. Select the relevant installed TanStack packages
+from project evidence, not the entire npm or workspace catalog.
 For npm, from the intended package directory:
 
 ```sh
@@ -67,7 +72,11 @@ and never enable global scanning or user-scoped configuration.
 
 Library releases own the packaged skills. Re-running `install` refreshes loading
 guidance; it does not update library code or skills. Updating `@tanstack/intent`
-updates the CLI only. If newer skills require a library upgrade, report the
+updates the CLI only. In default or update mode, check/update the existing local
+CLI through the project's package manager within its declared version constraints,
+preserving explicit pins, then refresh loading guidance. In setup-only mode,
+do not update that CLI or regenerate already-valid guidance. If newer skills
+require a library upgrade, report the
 required dependency change for the project's normal update workflow rather than
 performing an application migration as skill setup.
 

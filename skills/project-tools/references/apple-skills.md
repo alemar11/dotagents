@@ -39,7 +39,10 @@ onboarding prevent export, report the prerequisite and leave host setup unchange
 First export into a fresh temporary directory to discover the current skill
 names and inspect the payload before replacing repository content. Do not
 hardcode the bundled skill list. Compare those names with the destination:
-install absent entries and update identifiable prior Xcode exports. Preserve
+install absent entries only when installation is in scope, and refresh
+identifiable prior Xcode exports only when updating is in scope. A `setup`
+request keeps existing content; an `update` request leaves missing entries absent.
+Preserve
 unrelated skills, and ask about same-name custom skills or locally modified
 exports whose replacement is not already authorized. Do not follow destination
 symlinks outside the target repository. Where some entries conflict, install
