@@ -1,6 +1,6 @@
 ---
 name: gh
-description: "Route GitHub reads and writes through the authenticated gh CLI. Use whenever a task accesses GitHub; suggest macOS or Linux installation when gh is missing."
+description: "Use the authenticated gh CLI for GitHub tasks, including stacked pull requests through the gh-stack extension."
 ---
 
 # GitHub CLI
@@ -50,6 +50,14 @@ For local image or video uploads to issues, pull requests, or comments, read
 
 For Actions job logs, including completed jobs in an active workflow, read
 [Actions log guidance](references/actions-logs.md).
+
+## Extensions
+
+For stacked branches, dependent PRs, or `github/gh-stack` installation, read
+[stacked PR guidance](references/stacked-pr.md) for installation and direct
+use of `gh stack`.
+Use `$yeet` for single-PR publication; stack-wide operations and explicit
+parent/child linking belong to this extension workflow.
 
 ## Availability
 

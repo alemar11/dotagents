@@ -36,11 +36,10 @@ as skills.
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `unslop` | Write or revise prose to remove filler, vague claims, and formulaic phrasing while preserving meaning, tone, and technical precision. |
 | `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
-| `gh` | Route GitHub reads and writes through the authenticated CLI; suggest macOS or Linux installation when it is missing. |
+| `gh` | Route GitHub reads and writes through the authenticated CLI, including stacked-PR workflows through the `github/gh-stack` extension. Suggest installation when needed. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
 | `yeet` | Confirm scope and caller-provided resolved issues, commit, push, add automatic issue-closing references, and open or update one pull request. Stack linking and review requests are separate. |
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
-| `gh-stacked-pr` | Manage stacked branches and dependent pull requests, including inspection, linking, rebase, sync, navigation, and explicit stack-wide publication or merge. |
 | `crusty` | Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty. |
 | `ms-roberts` | Use when medium or long user-authored English prompts contain grammar errors; append corrections and learning tips after the main answer. |
 | `socrates` | Offer opt-in exercises about meaningful recent engineering work, or quiz the user when explicitly requested. |
@@ -163,7 +162,7 @@ those skills owned by this checkout. Install them per project with `project-tool
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
 ```
 
 Install one reusable skill by passing only its path:
@@ -193,7 +192,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill git-commit \
   --skill yeet \
   --skill versioning \
-  --skill gh-stacked-pr \
   --skill crusty \
   --skill ms-roberts \
   --skill socrates \

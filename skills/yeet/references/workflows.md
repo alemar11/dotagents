@@ -62,7 +62,7 @@ silently fall back to the default branch. Preserve its `isDraft` value.
 
 Yeet does not infer, verify, link, or manage a stack. A composing workflow that
 has already established a parent/child relationship invokes the separate
-`$gh-stacked-pr` flow after Yeet's publication readback. Do not make
+stacked-PR workflow in `$gh` after Yeet's publication readback. Do not make
 `gh stack submit` the fallback: it publishes every local stack branch and
 bypasses Yeet's one-branch push, body, and draft-state contracts.
 
@@ -189,7 +189,7 @@ successful create response alone is not verified publication. Follow Safe Retry
 below for errors or uncertain effects.
 
 Yeet stops after publication and requested attachments. A composing caller may
-invoke `$review-pr` or `$gh-stacked-pr` separately with the exact
+invoke `$review-pr` or `$gh`'s stacked-PR workflow separately with the exact
 repository, PR, and published SHA; Yeet does not request or wait for review.
 
 ## No Publishable Local Work
@@ -237,8 +237,8 @@ body, and read back every expected line exactly once. Preserve every previously
 valid closing reference. If `isDraft=false`, keep the PR ready; if `isDraft=true`,
 keep it draft. After the normal push updates this PR, verify its full head SHA,
 unchanged draft state, unchanged base, and complete issue linkage. If the caller
-also needs a stack relationship, invoke `$gh-stacked-pr` separately after this
-publication readback.
+also needs a stack relationship, invoke `$gh`'s stacked-PR workflow separately
+after this publication readback.
 
 ## PR Attachments
 

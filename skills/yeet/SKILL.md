@@ -38,7 +38,7 @@ For caller-selected images or videos, read the attachment section in
 For issue-only work or no publishable changes, use the relevant owning skill
 instead of running publication. Single-PR publication does not imply stack
 management. Yeet does not infer, verify, link, or manage a stack; a caller that
-needs a parent/child relationship invokes `$gh-stacked-pr` separately after
+needs a parent/child relationship invokes `$gh`'s stacked-PR workflow separately after
 Yeet's publication receipt. Do not use `stack submit` as a Yeet fallback.
 
 ## Invocation fields
