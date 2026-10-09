@@ -34,6 +34,7 @@ as skills.
 | `prototype` | Build and run an isolated experiment in the project's stack or as a standalone example to resolve a UI, interaction, logic, or state-model question. |
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
+| `unslop` | Write or revise prose to remove filler, vague claims, and formulaic phrasing while preserving meaning, tone, and technical precision. |
 | `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
 | `gh` | Route GitHub reads and writes through the authenticated CLI; suggest macOS or Linux installation when it is missing. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
@@ -162,7 +163,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/test-audit skills/prototype skills/project-skills
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-mcp skills/xcode-skills skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-skills
 ```
 
 Install one reusable skill by passing only its path:
@@ -220,6 +221,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill prototype \
   --skill implement \
   --skill deslop \
+  --skill unslop \
   --skill test-audit
 ```
 

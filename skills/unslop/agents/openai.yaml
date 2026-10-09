@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unslop"
+  short_description: "Make prose clear, concrete, and faithful to its meaning."
+  default_prompt: "Use $unslop to revise this text for clarity and remove filler or formulaic phrasing while preserving its meaning, tone, and technical precision."
