@@ -14,8 +14,10 @@ requested. A push-only request never stages files or creates commits. Use
 Inspect the branch, worktree, and pre-existing staged paths before staging.
 Review the intended diff; stage explicit paths or selected hunks, then verify
 that the staged content matches the requested commit. Split independent
-responsibilities into separate commits. Do not sweep unrelated edits into a
-commit or reset the user's index to make it convenient.
+responsibilities into separate commits. Separate behavior-preserving refactoring
+from new functionality so reviewers can distinguish structural changes from
+behavior changes. Keep each commit coherent and independently valid. Do not
+sweep unrelated edits into a commit or reset the user's index to make it convenient.
 
 For unrelated staged work, use the full-file isolation path in
 [workflows.md](references/workflows.md#unrelated-staged-work) only when the
