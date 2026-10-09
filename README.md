@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `project-tools` | Install or update official Android and Xcode skills and configure project-local Xcode MCP entries for Codex, Cursor, Pi, or Claude Code; repository scope only. |
+| `project-tools` | Install or update official Android, Xcode, and TanStack skills and configure project-local MCP entries for Codex, Cursor, Pi, or Claude Code; repository scope only. |
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |
@@ -46,7 +46,6 @@ as skills.
 | `socrates` | Offer opt-in exercises about meaningful recent engineering work, or quiz the user when explicitly requested. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format Markdown bundles with the shipped CLI. |
 | `skill-cli-creator` | Create or refactor CLIs shipped inside a skill or plugin bundle. |
-| `tanstack` | Build, debug, review, or migrate TanStack integrations and package APIs. |
 | `postgres` | Inspect Postgres databases, design or run SQL, and diagnose PostgreSQL through the shipped CLI. |
 | `swift-api-design` | Design, rename, or review Swift API surfaces using the bundled official API Design Guidelines. |
 | `swift-docc` | Author, review, preview, or publish Swift-DocC symbol documentation, articles, and tutorials. |
@@ -57,16 +56,12 @@ as skills.
 | `discourse-mcp` | Set up, troubleshoot, and verify the Discourse MCP connection in Codex or Cursor, including configuration and authentication. |
 | `xcode-whats-new` | Explicitly read official release notes for the active, latest, or requested stable or beta Xcode. |
 
-### TanStack References
+### Official TanStack Skills
 
-The reusable `tanstack` skill covers TanStack AI, Charts, CLI, Config, DB, Devtools, Form, Highlight, Hotkeys, Intent, Markdown, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, Workflow, and cross-stack integration from one `$tanstack` invocation surface. Workflow has public source guidance but remains early Alpha and hidden from the public library catalog.
-
-- Product references live under `skills/tanstack/references/`: `ai.md`, `charts.md`, `cli.md`, `config.md`, `db.md`, `devtools.md`, `form.md`, `highlight.md`, `hotkeys.md`, `integration.md`, `intent.md`, `markdown.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`, `store.md`, `table.md`, `virtual.md`, `workflow.md`.
-- Router references include `router-routing-structure.md`, `router-navigation-and-search.md`, `router-data-loading-and-ssr.md`, `router-auth-and-failures.md`, and `router-plugin-and-splitting.md`.
-- Start references include `start-framework-and-execution.md`, `start-server-functions-and-routes.md`, `start-middlewares-and-server-core.md`, `start-server-components-and-migrations.md`, and `start-deployments.md`.
-- CLI references include `cli-scaffolding.md`, `cli-addons-existing-app.md`, `cli-ecosystem-integrations.md`, `cli-custom-addons-dev-watch.md`, and `cli-docs-and-library-metadata.md`.
-
-This repository ships one broad reusable `tanstack` skill rather than separate upstream-style product plugins, narrow focused skills, or bundle aliases such as `tanstack-all`. For TanStack application work, install the reusable TanStack skill instead of copying advice from mixed community sources.
+Use `$project-tools` to configure [TanStack Intent](https://tanstack.com/intent/latest/docs/getting-started/quick-start-consumers)
+as a repository development dependency and enable skills shipped with the
+installed library versions. Setup details live in
+[the TanStack reference](skills/project-tools/references/tanstack.md).
 
 ## Skill Dependencies
 
@@ -161,7 +156,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/tanstack skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/gh-stacked-pr skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/hopper skills/discourse-mcp skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
 ```
 
 Install one reusable skill by passing only its path:
@@ -197,7 +192,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill socrates \
   --skill okf \
   --skill skill-cli-creator \
-  --skill tanstack \
   --skill postgres \
   --skill swift-api-design \
   --skill swift-docc \

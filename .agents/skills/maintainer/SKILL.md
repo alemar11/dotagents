@@ -54,8 +54,6 @@ only the branch references whose conditions match the routed request:
 | Codex-dependency or portability-boundary audit | [codex-dependency-audit.md](references/codex-dependency-audit.md) |
 | Swift-DocC asset refresh | [swift-docc-refresh.md](references/swift-docc-refresh.md) and [swift-docc-runbook.md](references/swift-docc-runbook.md) |
 | Swift API Design source refresh | [swift-api-design-refresh.md](references/swift-api-design-refresh.md) and [swift-api-design-runbook.md](references/swift-api-design-runbook.md) |
-| TanStack Intent coverage refresh | [tanstack-intent-refresh.md](references/tanstack-intent-refresh.md) |
-| TanStack skills coverage alignment | [tanstack-skills-alignment.md](references/tanstack-skills-alignment.md) |
 | OKF official-spec refresh | [okf-spec-refresh.md](references/okf-spec-refresh.md) and [okf-spec-runbook.md](references/okf-spec-runbook.md) |
 
 Before closeout, load [states.md](references/states.md), select every

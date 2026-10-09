@@ -1,6 +1,6 @@
 ---
 name: project-tools
-description: "Install or update skills and configure MCP entries only at repository scope. Supports official Android and Xcode skills and Apple's native Xcode MCP; excludes global installation and host setup."
+description: "Install or update official Android, Xcode, and TanStack skills and configure MCP entries at repository scope. Excludes global installation and host setup."
 ---
 
 # Project Tools
@@ -8,7 +8,9 @@ description: "Install or update skills and configure MCP entries only at reposit
 ## Scope
 
 This skill MUST stay focused on two repository-level operations: installing or
-updating skill files, and configuring MCP entries for the requested clients.
+updating skills (including dependency-packaged skill loading), and configuring
+MCP entries for the requested clients. A provider's skill CLI may be added as a
+repository development dependency when needed for the requested setup.
 Infer the target repository, coding agent, and requested action from the
 conversation and current project; ask only when these remain ambiguous. Resolve
 destination paths before writing and reject links that escape the repository.
@@ -16,7 +18,7 @@ Temporary staging for inspecting installation payloads is allowed.
 
 Do not install or update global skills, clients, SDKs, CLIs, or IDEs; change
 global configuration or host permissions; manage MCP server lifecycles; or run
-application development workflows. Missing tools, access grants, and host
+application development workflows. Missing host tools, access grants, and host
 enablement are prerequisites to report, not setup branches to execute here.
 
 An explanation or preview request does not authorize installation. Keep skill
@@ -52,6 +54,12 @@ For Android skill installation or updates, read
 
 For Xcode's embedded skill export or project-local native MCP configuration, read
 [references/xcode.md](references/xcode.md) and select the requested workflow.
+
+## TanStack
+
+For official TanStack skills, read [references/tanstack.md](references/tanstack.md).
+Use project-local TanStack Intent to discover and load skills shipped with the
+installed library versions.
 
 Other language, framework, and tooling installation workflows are not yet
 implemented. State that limitation when requested rather than claiming setup

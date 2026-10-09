@@ -88,21 +88,7 @@ Default package inventory for unnamed repo-wide work:
      `references/*.md`.
    - **Mutation:** Explicit refresh only; never from bare `run`.
    - **Playbooks:** `swift-api-design-refresh.md`, `swift-api-design-runbook.md`.
-10. `refresh tanstack intent coverage`
-   - **Purpose:** Update `$tanstack` routing and references when newly shipped
-     first-party TanStack Intent coverage changes local guidance.
-   - **Scope:** `skills/tanstack/` metadata and Intent-related references.
-   - **Mutation:** Explicit refresh only; never from bare `run`.
-   - **Playbook:** `tanstack-intent-refresh.md`.
-11. `refresh tanstack skills coverage`
-   - **Purpose:** Align local TanStack product references with upstream
-     `tanstack-skills` coverage and TanStack-owned product docs.
-   - **Scope:** `skills/tanstack/` product references. Ignore upstream bundle
-     aliases (`tanstack-all`, `tanstack-core`, `tanstack-data`, `tanstack-ui`)
-     unless local packaging intentionally changes.
-   - **Mutation:** Explicit refresh only; never from bare `run`.
-   - **Playbook:** `tanstack-skills-alignment.md`.
-12. `refresh okf spec`
+10. `refresh okf spec`
    - **Purpose:** Refresh the bundled Open Knowledge Format official spec copy
      and manifest when upstream `SPEC.md` is newer.
    - **Scope:** `skills/okf/assets/`, related references, CLI, and tests.

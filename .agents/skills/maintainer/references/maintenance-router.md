@@ -20,7 +20,7 @@ playbook dispatch rather than a second value registry.
 | `workflow-hardening` | Sessions, logs, tests, live failures, or repeated corrections expose connected drift | `workflow-family-hardening.md` |
 | `package-lifecycle` | Merge, rename, move, bundle, replace, or retire a package | `package-lifecycle.md` |
 | `codex-deps` | Codex-dependency or portability-boundary audit | `codex-dependency-audit.md` |
-| `refresh` | Explicit Swift-DocC, Swift API Design, or TanStack refresh | Matching refresh playbook named in `SKILL.md` |
+| `refresh` | Explicit Swift-DocC or Swift API Design refresh | Matching refresh playbook named in `SKILL.md` |
 | `okf-spec` | Explicit OKF official-spec comparison or refresh | `okf-spec-refresh.md` |
 
 ## Routing Rules
@@ -35,6 +35,8 @@ playbook dispatch rather than a second value registry.
 2. Named existing packages resolve to targeted `maintain` with
    `skill-upgrade.md`; explicit metadata/docs wording resolves to
    `metadata-sync.md`.
+   TanStack setup guidance belongs to `project-tools`; maintain that provider
+   reference against official Intent consumer docs, not a local API skill catalog.
 3. Runtime or cross-skill evidence resolves to `workflow-hardening`. Inspect
    first, then repair evidenced defects within the user's authorized scope.
 4. Public identity, ownership, or package-removal changes resolve to
