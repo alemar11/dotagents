@@ -4,5 +4,6 @@
   "resolved_commit": "507e9cd267c8e133256640479599bc88596a88c7",
   "source_subpath": "documentation/api-design-guidelines/index.md",
   "downloaded_at": "2026-08-30T10:51:02.891971+00:00",
-  "official_base_url": "https://www.swift.org/documentation/api-design-guidelines/"
+  "official_base_url": "https://www.swift.org/documentation/api-design-guidelines/",
+  "content_sha256": "71f3853c08ac1a8e9df4a071bd6e819aee70e4e8cc7f4ab5901d380154308389"
 }

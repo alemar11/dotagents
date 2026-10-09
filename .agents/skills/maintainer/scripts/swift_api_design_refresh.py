@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import sys
 import tempfile
 import urllib.parse
 import urllib.request
@@ -108,6 +110,13 @@ def asset_stale_reasons(manifest: dict | None, repo: str, ref: str, latest_commi
         reasons.append("Manifest is missing.")
         return reasons
 
+    if ASSET_SOURCE_PATH.exists():
+        content = ASSET_SOURCE_PATH.read_bytes()
+        if not content.strip():
+            reasons.append("Bundled guideline source file is empty.")
+        if manifest.get("content_sha256") != hashlib.sha256(content).hexdigest():
+            reasons.append("Bundled guideline content does not match the manifest hash.")
+
     expected = {
         "repo": repo,
         "ref": ref,
@@ -133,6 +142,7 @@ def write_manifest(repo: str, ref: str, commit: str) -> None:
         "repo": repo,
         "ref": ref,
         "resolved_commit": commit,
+        "content_sha256": hashlib.sha256(ASSET_SOURCE_PATH.read_bytes()).hexdigest(),
         "source_subpath": SOURCE_SUBPATH.as_posix(),
         "downloaded_at": datetime.now(timezone.utc).isoformat(),
         "official_base_url": OFFICIAL_BASE_URL,
@@ -159,11 +169,12 @@ def main() -> int:
         return stale_exit_code(reasons, args.fail_if_stale)
 
     if args.force or reasons:
+        content = download_text(raw_source_url(args.repo, latest_commit))
+        if not content.strip():
+            print("Upstream guideline source is empty; existing bundle preserved.", file=sys.stderr)
+            return 1
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(
-            ASSET_SOURCE_PATH,
-            download_text(raw_source_url(args.repo, latest_commit)),
-        )
+        atomic_write_text(ASSET_SOURCE_PATH, content)
         write_manifest(args.repo, args.ref, latest_commit)
         print("Bundled Swift API Design source refreshed.")
         print(f"- Asset file: {ASSET_SOURCE_PATH}")

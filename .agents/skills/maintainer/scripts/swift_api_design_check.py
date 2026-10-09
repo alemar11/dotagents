@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import urllib.parse
@@ -51,6 +52,11 @@ def main() -> int:
             return 1
 
     manifest = load_json(ASSET_MANIFEST_PATH)
+    content = ASSET_SOURCE_PATH.read_bytes()
+    if not content.strip():
+        errors.append("Bundled guideline source file is empty.")
+    if manifest.get("content_sha256") != hashlib.sha256(content).hexdigest():
+        errors.append("Bundled guideline content does not match the manifest hash.")
 
     if RUNTIME_SCRIPTS_DIR.exists():
         errors.append(f"Runtime skill should not keep a scripts directory: {RUNTIME_SCRIPTS_DIR}")
@@ -99,6 +105,7 @@ def main() -> int:
         "repo",
         "ref",
         "resolved_commit",
+        "content_sha256",
         "source_subpath",
         "downloaded_at",
         "official_base_url",

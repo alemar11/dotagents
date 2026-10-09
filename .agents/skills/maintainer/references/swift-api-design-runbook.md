@@ -33,6 +33,12 @@ from within the `Maintainer` project skill.
 ## Content Rules
 
 - `assets/api-design-guidelines.md` is the bundled source of truth.
+- `assets/manifest.json` records its `content_sha256`. Freshness and integrity
+  checks reject empty content, a missing hash, or a hash mismatch. A refresh
+  rejects an empty download before replacing the existing bundle.
+- For a legacy manifest without a hash, refresh from the recorded revision or
+  verify the local bytes against that revision before recording its hash. Do
+  not bless an unverified local file by hashing it alone.
 - `references/*.md` are fast paths into that source of truth, not a second
   full copy of the guidelines.
 - Prefer short workflow summaries and local asset links over duplicated prose.

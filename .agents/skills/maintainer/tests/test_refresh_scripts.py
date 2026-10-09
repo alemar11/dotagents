@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import contextlib
+import hashlib
+import json
+import shutil
 import stat
 import sys
 import tarfile
@@ -29,6 +33,7 @@ class MaintainerRefreshScriptTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.api = load_script("swift_api_design_refresh")
+        cls.api_check = load_script("swift_api_design_check")
         cls.docc = load_script("swift_docc_refresh")
         cls.okf = load_script("okf_spec_refresh")
 
@@ -122,7 +127,6 @@ class MaintainerRefreshScriptTests(unittest.TestCase):
                 patch.object(self.api, "resolve_commit", return_value="resolved-commit"),
                 patch.object(self.api, "load_manifest", return_value={}),
                 patch.object(self.api, "download_text", return_value="source") as download,
-                patch.object(self.api, "write_manifest"),
                 patch.object(sys, "argv", ["swift_api_design_refresh.py", "--force"]),
             ):
                 self.assertEqual(self.api.main(), 0)
@@ -131,6 +135,79 @@ class MaintainerRefreshScriptTests(unittest.TestCase):
                 "/resolved-commit/",
                 download.call_args.args[0],
             )
+            self.assertEqual(source.read_text(), "source")
+            self.assertEqual(
+                json.loads(manifest.read_text())["content_sha256"],
+                hashlib.sha256(b"source").hexdigest(),
+            )
+
+    def test_api_bundle_integrity_controls_check_and_refresh(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            skill = Path(temporary_dir) / "swift-api-design"
+            shutil.copytree(REPO_ROOT / "skills/swift-api-design", skill)
+            source = skill / "assets/api-design-guidelines.md"
+            manifest_path = skill / "assets/manifest.json"
+            original = source.read_bytes()
+            manifest = json.loads(manifest_path.read_text())
+            manifest["content_sha256"] = hashlib.sha256(original).hexdigest()
+            paths = {
+                "SKILL_DIR": skill,
+                "ASSETS_DIR": skill / "assets",
+                "ASSET_SOURCE_PATH": source,
+                "ASSET_MANIFEST_PATH": manifest_path,
+            }
+            cases = (
+                ("intact", original, manifest, 0),
+                ("empty", b"", manifest, 1),
+                ("modified", original + b"\nmodified\n", manifest, 1),
+                ("missing hash", original, {k: v for k, v in manifest.items() if k != "content_sha256"}, 1),
+                ("empty with matching hash", b"", {**manifest, "content_sha256": hashlib.sha256(b"").hexdigest()}, 1),
+            )
+            for name, content, metadata, expected in cases:
+                with self.subTest(name=name):
+                    source.write_bytes(content)
+                    manifest_path.write_text(json.dumps(metadata))
+                    before_manifest = manifest_path.read_bytes()
+                    with (
+                        patch.multiple(self.api, **paths),
+                        patch.object(self.api, "resolve_commit", return_value=manifest["resolved_commit"]),
+                        patch.object(self.api, "download_text") as download,
+                        patch.object(sys, "argv", ["refresh", "--check-stale", "--fail-if-stale"]),
+                        contextlib.redirect_stdout(io.StringIO()),
+                    ):
+                        self.assertEqual(self.api.main(), expected)
+                        download.assert_not_called()
+                    with (
+                        patch.multiple(self.api_check, **paths,
+                            SKILL_PATH=skill / "SKILL.md",
+                            REFERENCES_DIR=skill / "references",
+                            RUNTIME_SCRIPTS_DIR=skill / "scripts"),
+                        contextlib.redirect_stdout(io.StringIO()),
+                    ):
+                        self.assertEqual(self.api_check.main(), expected)
+                    self.assertEqual(source.read_bytes(), content)
+                    self.assertEqual(manifest_path.read_bytes(), before_manifest)
+
+    def test_api_empty_download_preserves_existing_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            assets = Path(temporary_dir)
+            source = assets / "api-design-guidelines.md"
+            manifest = assets / "manifest.json"
+            source.write_text("previous source")
+            manifest.write_text("{}")
+            with (
+                patch.object(self.api, "ASSETS_DIR", assets),
+                patch.object(self.api, "ASSET_SOURCE_PATH", source),
+                patch.object(self.api, "ASSET_MANIFEST_PATH", manifest),
+                patch.object(self.api, "resolve_commit", return_value="resolved-commit"),
+                patch.object(self.api, "download_text", return_value=" \n"),
+                patch.object(sys, "argv", ["refresh", "--force"]),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(self.api.main(), 1)
+            self.assertEqual(source.read_text(), "previous source")
+            self.assertEqual(manifest.read_text(), "{}")
 
     def test_docc_refresh_passes_the_resolved_commit_to_archive_download(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_dir:
