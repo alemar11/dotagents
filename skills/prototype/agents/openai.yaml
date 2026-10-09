@@ -1,6 +1,6 @@
 interface:
   display_name: "🛫 Prototype"
-  short_description: "Test a design question in the project's real stack."
-  default_prompt: "Use $prototype to build and run the smallest isolated experiment that resolves the current design question in the project's real stack, then report the evidence and how to try it."
+  short_description: "Build and run an isolated experiment to test an idea."
+  default_prompt: "Use $prototype to build and run the smallest isolated experiment that resolves the current question, using the project's stack when available or a standalone example, then report the evidence and how to try it."
 policy:
   allow_implicit_invocation: true

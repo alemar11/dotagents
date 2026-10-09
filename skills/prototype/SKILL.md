@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: "Build a small runnable experiment to answer a concrete UI, interaction, logic, or state-model question in the project's real stack. Use for prototypes, spikes, or comparing design alternatives; not routine production implementation or read-only exploration."
+description: "Build and run isolated prototypes, spikes, or proofs of concept to test UI, interaction, logic, or state behavior. Use when a runnable experiment is requested, in the project's stack or as a standalone example; not for production implementation or read-only comparisons."
 ---
 
 # Prototype

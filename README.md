@@ -30,7 +30,7 @@ as skills.
 | `adversarial-review` | Pressure-test a software change read-only, with optional blast-radius analysis of indirect effects and safety assumptions. |
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `architect` | Design feature behavior, ownership and interfaces, then a verifiable task plan; publish the specification to GitHub when requested. |
-| `prototype` | Build an isolated runnable experiment in the project's real stack to resolve a UI, interaction, logic, or state-model question. |
+| `prototype` | Build and run an isolated experiment in the project's stack or as a standalone example to resolve a UI, interaction, logic, or state-model question. |
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
