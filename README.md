@@ -35,6 +35,7 @@ as skills.
 | `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `unslop` | Write or revise prose to remove filler, vague claims, and formulaic phrasing while preserving meaning, tone, and technical precision. |
+| `technical-writing` | Explicit invocation only: write or review docs, RFCs, READMEs, PR descriptions, and commit messages using Diátaxis, Google developer style, STE, and Global English. Applies `unslop` to each document. |
 | `test-audit` | Gate new tests on behavioral value and audit or prune redundant coverage. A bare invocation starts a read-only audit of the current repository unless a task or scope is already established. |
 | `gh` | Route GitHub reads and writes through the authenticated CLI, including stacked-PR workflows through the `github/gh-stack` extension. Suggest installation when needed. |
 | `git-commit` | Create or push explicit regular, fixup, or amend-fixup commits without publishing a PR. |
@@ -68,6 +69,7 @@ installed library versions. Setup details live in
 
 ## Skill Dependencies
 
+- Install `technical-writing` with `unslop`, which it applies to every document it touches.
 - `explore` explores relevant evidence in the current task or session, clarifies
   material user decisions when needed, then investigates remaining questions.
   Clear requests proceed without an interview or final confirmation. The
@@ -161,7 +163,7 @@ those skills owned by this checkout. Install them per project with `project-tool
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/test-audit skills/prototype skills/project-tools
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/technical-writing skills/test-audit skills/prototype skills/project-tools
 ```
 
 Install one reusable skill by passing only its path:
@@ -214,6 +216,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill implement \
   --skill deslop \
   --skill unslop \
+  --skill technical-writing \
   --skill test-audit
 ```
 

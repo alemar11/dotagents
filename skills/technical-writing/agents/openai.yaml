@@ -1,0 +1,6 @@
+interface:
+  display_name: "Technical Writing"
+  short_description: "Write technical docs with clear structure and sentences."
+  default_prompt: "Use $technical-writing to write or review this technical document for structure, clarity, and precise language."
+policy:
+  allow_implicit_invocation: false
