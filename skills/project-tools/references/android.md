@@ -16,7 +16,7 @@ project-local by default; never pass `--global` or `-g`.
 Use `--agent codex` as the installer's destination selector for every requested
 client: it writes to the canonical `.agents/skills/` directory. This does not
 require Codex to be installed. Add Claude Code support through the shared
-[client link workflow](../SKILL.md#claude-code-link), never by selecting
+[client link workflow](claude-code.md), never by selecting
 `claude-code` in the installer. Inspect actual paths and preserve existing
 custom skills and unrelated configuration.
 

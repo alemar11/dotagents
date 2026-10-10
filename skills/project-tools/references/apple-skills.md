@@ -3,7 +3,7 @@
 For requested skill installation or updates, export the selected Xcode
 installation's embedded skills into the target repository's `.agents/skills/`
 for every client. Add Claude Code support through the shared
-[client link workflow](../SKILL.md#claude-code-link). If the skills are already
+[client link workflow](claude-code.md). If the skills are already
 installed and only Claude support is requested, create or verify the link
 without exporting again. A request for MCP setup alone does not authorize skill
 export.

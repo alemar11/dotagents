@@ -53,7 +53,7 @@ Explicit instructions narrow or override that default:
 
 For `setup` or `update` without a named environment, detect it from the current
 repository. A skill-only invocation never implies MCP setup, even for Apple.
-Apply the selected operation to every provider reference below; its examples
+Apply the selected operation to each relevant reference below; its examples
 do not widen that operation's scope.
 Reuse the current coding agent unless clients are explicitly selected; an
 unspecified client does not block installing into the shared directory. Apply
@@ -66,12 +66,15 @@ first-party source. Exclude installed skills, dependency trees, generated
 artifacts, documentation examples, and fixtures from detection. Installed host
 tools and stale lockfile entries alone do not establish a project environment.
 
-| Project evidence | Default skill selection |
+| Project evidence | Default selection and procedure |
 | --- | --- |
-| Apple targets in Xcode projects/workspaces, Swift package platforms, or native build/source configuration | Official Apple skills exported by the selected Xcode, plus personal `swift-docc` and `swift-api-design`. |
-| Android modules using Android Gradle plugins or equivalent native Android build/source configuration | Official Android collection. |
-| React web frontend, evidenced by direct React dependencies plus a web renderer/framework or actual web entry points | Vercel `react-best-practices` and `composition-patterns`; add View Transitions only for evidenced compatible usage. |
-| Application dependencies on `@tanstack/*` libraries | Official skills shipped with those installed dependencies, enabled through Intent. `@tanstack/intent` alone is tooling, not evidence of an application library. |
+| Apple targets in Xcode projects/workspaces, Swift package platforms, or native build/source configuration | [Official Xcode exports](references/apple-skills.md), plus [personal Swift skills through GitHub](references/github-skills.md). |
+| Android modules using Android Gradle plugins or equivalent native Android build/source configuration | [Official Android collection](references/android.md) through repository-local `npx skills`. Android CLI is not required to install the skills. |
+| React web frontend, evidenced by direct React dependencies plus a web renderer/framework or actual web entry points | [Vercel React skills through GitHub](references/github-skills.md). |
+| Application dependencies on `@tanstack/*` libraries | [Official dependency-packaged skills through Intent](references/tanstack.md). `@tanstack/intent` alone is tooling, not evidence of an application library. |
+
+Read only the procedures for selected routes. The GitHub reference owns their
+source paths, skill identities, and provider-specific selection details.
 
 Select every matching environment in mixed repositories; do not stop at the
 first match. A React web app with TanStack needs both routes. React Native's
@@ -81,8 +84,10 @@ deduplicate shared skill installation at the repository root. Intent policy
 still belongs to the relevant owning workspace package.
 
 Inventory existing skills by identity and provider provenance before deciding
-what is missing or updatable. In default mode, include already-installed skills
-from the selected provider collections even when optional for a fresh setup.
+what is missing or updatable. For environment-based selection in default mode,
+include already-installed skills from the selected provider collections even
+when optional for a fresh setup. A named skill selection remains restricted to
+those names.
 Preserve local modifications, explicit exclusions, and pins; do not uninstall
 unrelated or apparently obsolete skills. If no supported environment is found,
 report the evidence and coverage gap instead of installing a generic bundle.
@@ -104,82 +109,24 @@ installers to use this canonical destination rather than their client defaults.
 | Pi | `.agents/skills/` |
 | Claude Code | `.claude/skills` symlink to `../.agents/skills` |
 
-For Claude Code, linking the shared directory is an additional step, not another
-installation. If the requested skills are already installed and no update is
-requested, only create or verify the link; do not re-download or export them.
-The link exposes the whole shared collection to Claude Code. Client selection
-is not an isolation boundary.
+When Claude Code is the current or requested client, read the
+[shared directory link procedure](references/claude-code.md). Linking is an
+additional step, not another installation. If the requested skills are already
+installed and no update is requested, only create or verify the link; do not
+re-download or export them. The link exposes the whole shared collection;
+client selection is not an isolation boundary.
 
-### Claude Code link
+## Requested MCP configuration
 
-Inspect `.agents`, `.agents/skills`, `.claude`, and `.claude/skills` before
-writing. Resolve their paths and reject links outside the repository. If the
-destination is absent (neither a file nor a symlink), run from the repository root:
+MCP selection requires an explicit request; do not infer it from environment
+detection or installed host tools. Read only the selected provider's reference
+and configure the requested clients' project files.
 
-```sh
-mkdir -p .agents/skills .claude
-ln -s ../.agents/skills .claude/skills
-```
-
-If the existing link already resolves to the canonical directory, keep it.
-Never use force-link replacement over an existing path. For an existing real
-`.claude/skills` directory, reconcile its entries into `.agents/skills`:
-move non-conflicting entries, preserve their full contents, and consolidate
-identical duplicates only after comparison. For differing same-name entries or
-an unexpected link, preserve both and resolve ownership before replacing
-anything. Remove only the emptied old directory, then create the link. Report
-unresolved collisions while completing unaffected requested work.
-
-Verify that `.claude/skills` is a symlink resolving to this repository's
-`.agents/skills`, with the same readable skill trees. Re-running setup must
-reuse that link and the installed skills. MCP configuration remains in each
-client's own configuration files. Dependency-loaded skills such as TanStack
-Intent stay with their packages; do not copy them into a second catalog merely
-to create the link.
-
-## Android
-
-For Android skill installation or updates, read
-[references/android.md](references/android.md) and use its repository-local
-`npx skills` workflow. Android CLI is not required to install the skills.
-
-## Apple
-
-For official Apple skill installation or updates, read
-[references/apple-skills.md](references/apple-skills.md); Xcode provides the
-embedded skill export. For the personal `swift-docc` and `swift-api-design`
-skills from `alemar11/dotagents`, read
-[references/apple-custom-skills.md](references/apple-custom-skills.md).
-For project-local native Xcode MCP configuration, read
-[references/xcode-mcp.md](references/xcode-mcp.md).
-Run only the requested workflows; a failure in one does not
-prevent independent work in the other.
-
-## React
-
-For Vercel's React skills, read [references/react.md](references/react.md).
-Use `gh skill` to install only the relevant skills into the shared directory.
-
-## TanStack
-
-For official TanStack skills, read [references/tanstack.md](references/tanstack.md).
-Use project-local TanStack Intent to discover and load skills shipped with the
-installed library versions.
-
-## Hopper MCP
-
-For explicitly requested Hopper Disassembler MCP setup, repair, or inspection,
-read [references/hopper-mcp.md](references/hopper-mcp.md). Configure its bundled
-server in the requested clients' project files. Do not infer this MCP from
-environment detection or the presence of Hopper on the host.
-
-## Discourse MCP
-
-For explicitly requested Discourse MCP setup, read
-[references/discourse.md](references/discourse.md). Require one or more explicitly
-selected forum URLs, verify each site, and configure one fixed-site entry per
-distinct verified forum in the requested clients' project files.
-Do not infer this MCP from environment detection or install it globally.
+| Requested provider | Procedure |
+| --- | --- |
+| Native Xcode MCP | [Xcode MCP](references/xcode-mcp.md). Skill export is a separate route. |
+| Hopper Disassembler MCP setup, repair, or inspection | [Hopper MCP](references/hopper-mcp.md), using its bundled server. |
+| Discourse MCP | [Discourse MCP](references/discourse.md). Require explicitly selected forum URLs, verify each site, and configure one fixed-site entry per distinct forum. |
 
 Other language, framework, and tooling installation workflows are not yet
 implemented. State that limitation when requested rather than claiming setup
