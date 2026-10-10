@@ -70,8 +70,10 @@ tools and stale lockfile entries alone do not establish a project environment.
 | --- | --- |
 | Apple targets in Xcode projects/workspaces, Swift package platforms, or native build/source configuration | [Official Xcode exports](references/apple-skills.md), plus [personal Swift skills through GitHub](references/github-skills.md). |
 | Android modules using Android Gradle plugins or equivalent native Android build/source configuration | [Official Android collection](references/android.md) through repository-local `npx skills`. Android CLI is not required to install the skills. |
-| React web frontend, evidenced by direct React dependencies plus a web renderer/framework or actual web entry points | [Vercel React skills through GitHub](references/github-skills.md). |
+| React web frontend, evidenced by direct React dependencies plus a web renderer/framework or actual web entry points | [Vercel React skills and React Doctor through GitHub](references/github-skills.md). |
+| First-party `components.json` or `registry.json` using a `ui.shadcn.com` schema, or confirmed first-party shadcn/ui component usage | [Official shadcn/ui skill through GitHub](references/github-skills.md). |
 | Application dependencies on `@tanstack/*` libraries | [Official dependency-packaged skills through Intent](references/tanstack.md). `@tanstack/intent` alone is tooling, not evidence of an application library. |
+| Direct `@playwright/test`, `playwright`, or `@playwright/cli` dependencies, or first-party Playwright tests/configuration | [Official Playwright CLI skill through GitHub](references/github-skills.md). |
 
 Read only the procedures for selected routes. The GitHub reference owns their
 source paths, skill identities, and provider-specific selection details.
@@ -79,7 +81,8 @@ source paths, skill identities, and provider-specific selection details.
 Select every matching environment in mixed repositories; do not stop at the
 first match. A React web app with TanStack needs both routes. React Native's
 `react` dependency alone does not justify React web skills; use evidenced Apple
-and Android targets for those routes. Respect a user-selected subproject and
+and Android targets for those routes. React, Tailwind, or Radix dependencies
+alone do not establish shadcn/ui usage. Respect a user-selected subproject and
 deduplicate shared skill installation at the repository root. Intent policy
 still belongs to the relevant owning workspace package.
 

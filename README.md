@@ -23,7 +23,7 @@ as skills.
 
 | Skill | Purpose |
 | --- | --- |
-| `project-tools` | Explicit invocation only: detect the project stack, install missing relevant skills, and update installed ones. Supports Android, Apple plus personal Swift, Vercel React, and TanStack; setup/update narrows the work, and Xcode, Hopper, or Discourse MCP configuration is project-local and on request. |
+| `project-tools` | Explicit invocation only: detect the project stack, install missing relevant skills, and update installed ones. Supports Android, Apple plus personal Swift, Vercel React, React Doctor, shadcn/ui, TanStack, and Playwright CLI; setup/update narrows the work, and Xcode, Hopper, or Discourse MCP configuration is project-local and on request. |
 | `learn` | Maintain AGENTS.md and durable repository knowledge, or assess session lessons when requested; also triggers on user-stated hard repository rules and important durable assumptions. |
 | `grilling-session` | Refine a topic or handoff one question at a time, resolving prerequisite decisions first and giving concrete recommended answers. |
 | `explore` | Investigate read-only with primary-source evidence and optional research subagents; use an interview only for unresolved user decisions. |

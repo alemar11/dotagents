@@ -1,7 +1,8 @@
 # GitHub-managed skills
 
-Use this reference for selected personal Swift or Vercel React skills. Install
-their instruction files with authenticated `gh skill`; do not run the providers' native setup installers.
+Use this reference for selected Swift, Vercel React, shadcn/ui, React Doctor,
+or Playwright CLI skills. Install their instruction files with authenticated
+`gh skill`; do not run the providers' native setup installers.
 
 ## Catalog and selection
 
@@ -15,6 +16,9 @@ installed directory name, which can differ from the skill's frontmatter name.
 | Vercel React | `vercel-labs/agent-skills` | `skills/react-best-practices` | `react-best-practices` | `vercel-react-best-practices` |
 | Vercel React | `vercel-labs/agent-skills` | `skills/composition-patterns` | `composition-patterns` | `vercel-composition-patterns` |
 | Vercel React | `vercel-labs/agent-skills` | `skills/react-view-transitions` | `react-view-transitions` | `vercel-react-view-transitions` |
+| shadcn/ui | `shadcn-ui/ui` | `skills/shadcn` | `shadcn` | `shadcn` |
+| React Doctor | `millionco/react-doctor` | `skills/react-doctor` | `react-doctor` | `react-doctor` |
+| Playwright CLI | `microsoft/playwright-cli` | `skills/playwright-cli` | `playwright-cli` | `playwright-cli` |
 
 - **Personal Swift:** select both for an Apple environment. These personal
   skills cover Swift-DocC and Swift API design; they are separate from official
@@ -26,6 +30,15 @@ installed directory name, which can differ from the skill's frontmatter name.
   usage and the project's React version establish relevance and compatibility.
   Installation does not authorize adopting Next.js, SWR, or experimental APIs
   to match upstream examples.
+- **shadcn/ui:** select `shadcn` for fresh setup. Other skills, such as
+  `migrate-radix-to-base`, require explicit selection to install. Skill setup
+  does not run component commands or authorize migrations.
+- **React Doctor and Playwright CLI:** select the corresponding catalog name.
+  Additional upstream skills require explicit selection to install. Installing
+  files does not require or install their runtime packages, download browsers,
+  add hooks or CI, configure MCP, or run diagnostics and tests. Report existing
+  runtime availability separately; preserve project version pins and runners
+  even when upstream examples use `@latest`.
 
 Apply the entrypoint's operation and selection rules. For explicitly selected
 additional skills from these providers, discover their actual source paths and
@@ -47,10 +60,10 @@ gh skill install vercel-labs/agent-skills </dev/null
 ```
 
 Install each selected missing skill using its exact repository and source path
-from the catalog. For example, a named Swift-DocC installation is:
+from the catalog. For example, a named React Doctor installation is:
 
 ```sh
-gh skill install alemar11/dotagents skills/swift-docc --dir .agents/skills
+gh skill install millionco/react-doctor skills/react-doctor --dir .agents/skills
 ```
 
 Keep `--dir .agents/skills` for every client; it overrides agent and scope
@@ -74,11 +87,11 @@ gh skill list --dir .agents/skills --json skillName,sourceURL,version,pinned,pat
 Copies from other installers or manual copying without `gh` source metadata
 need provenance reconciliation before this updater can manage them. Preview
 and apply only the selected installed names. For a request selecting both
-personal Swift skills:
+React Doctor and Playwright CLI:
 
 ```sh
-gh skill update swift-docc swift-api-design --dir .agents/skills --dry-run
-gh skill update swift-docc swift-api-design --dir .agents/skills --all
+gh skill update react-doctor playwright-cli --dir .agents/skills --dry-run
+gh skill update react-doctor playwright-cli --dir .agents/skills --all
 ```
 
 Replace the name list with the actual selection. Update `--all` confirms the
@@ -99,5 +112,8 @@ in a running client.
 
 - [Personal Swift skills](https://github.com/alemar11/dotagents)
 - [Vercel Agent Skills](https://github.com/vercel-labs/agent-skills)
+- [shadcn/ui skill](https://github.com/shadcn-ui/ui/tree/main/skills/shadcn)
+- [React Doctor skill](https://github.com/millionco/react-doctor/tree/main/skills/react-doctor)
+- [Playwright CLI skill](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli)
 - [GitHub CLI install](https://cli.github.com/manual/gh_skill_install)
 - [GitHub CLI update](https://cli.github.com/manual/gh_skill_update)
