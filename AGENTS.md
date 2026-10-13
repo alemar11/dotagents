@@ -1,7 +1,8 @@
 # Repository Guidelines
 
 Reusable skills and MCP setup skills live in `skills/`; maintainer skills live
-in `.agents/skills/`. Each skill has `SKILL.md`. Optional Codex plugins live in
+in `.agents/skills/`, which `.claude/skills` symlinks for Claude Code; keep it a
+symlink. Each skill has `SKILL.md`. Optional Codex plugins live in
 `plugins/` with `.codex-plugin/plugin.json` and are registered in
 `.agents/plugins/marketplace.json`; the marketplace may be empty when no
 plugins ship.
@@ -74,8 +75,9 @@ retrying a mutation.
   Preserve invocation policy unless its change is requested. Include a Skill
   Dependencies section only for real runtime dependencies.
 - After adding a reusable skill, run `./skills-link.sh` and verify its
-  `~/.agents/skills/<name>` link. This helper links only `skills/`; it does not
-  install maintainer skills or change plugin marketplaces.
+  `~/.agents/skills/<name>` and `~/.claude/skills/<name>` links. This helper
+  links only `skills/`; it does not install maintainer skills or change plugin
+  marketplaces.
 - Remove retired source, metadata, catalog/install entries, registries, and
   repository-owned installation links together, then scan for stale references.
 - Choose an unused repository color when adding `brand_color`.

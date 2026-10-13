@@ -2,16 +2,60 @@
 
 set -eu
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--agent codex|claude|all]
+
+Link reusable skills from skills/ into an agent's user skills directory.
+
+  --agent codex   Link into ~/.agents/skills (Codex)
+  --agent claude  Link into ~/.claude/skills (Claude Code)
+  --agent all     Link into both (default)
+EOF
+}
+
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "This script is intended for macOS only." >&2
   exit 1
 fi
 
+agent="all"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --agent)
+      [ $# -ge 2 ] || { usage >&2; exit 1; }
+      agent="$2"
+      shift 2
+      ;;
+    --agent=*)
+      agent="${1#--agent=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "$agent" in
+  codex) dest_dirs="$HOME/.agents/skills" ;;
+  claude) dest_dirs="$HOME/.claude/skills" ;;
+  all) dest_dirs="$HOME/.agents/skills $HOME/.claude/skills" ;;
+  *)
+    echo "Unknown agent: $agent" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_SOURCE_DIR="$ROOT_DIR/skills"
-SKILLS_DEST_DIR="$HOME/.agents/skills"
-
-mkdir -p "$SKILLS_DEST_DIR"
 
 is_global_skill() {
   case "$1" in
@@ -37,7 +81,9 @@ link_path() {
 }
 
 prune_stale_repo_skill_links() {
-  for target_path in "$SKILLS_DEST_DIR"/*; do
+  dest_dir="$1"
+
+  for target_path in "$dest_dir"/*; do
     [ -L "$target_path" ] || continue
 
     resolved_path="$(readlink "$target_path" || true)"
@@ -55,38 +101,52 @@ prune_stale_repo_skill_links() {
   done
 }
 
+link_skills_into() {
+  dest_dir="$1"
+
+  mkdir -p "$dest_dir"
+
+  echo "Skills target directory: $dest_dir"
+  echo
+
+  prune_stale_repo_skill_links "$dest_dir"
+
+  skill_count=0
+  skill_linked_count=0
+  skill_skip_count=0
+
+  for skill_dir in "$SKILLS_SOURCE_DIR"/*; do
+    [ -d "$skill_dir" ] || continue
+    [ -f "$skill_dir/SKILL.md" ] || continue
+
+    skill_name="$(basename "$skill_dir")"
+    target_path="$dest_dir/$skill_name"
+    skill_count=$((skill_count + 1))
+
+    if ! is_global_skill "$skill_name"; then
+      echo "SKIP $skill_name -> project-only skill"
+      skill_skip_count=$((skill_skip_count + 1))
+      continue
+    fi
+
+    if link_path "$skill_dir" "$target_path" "$skill_name"; then
+      skill_linked_count=$((skill_linked_count + 1))
+    else
+      skill_skip_count=$((skill_skip_count + 1))
+    fi
+  done
+
+  echo
+  echo "Skills processed: $skill_count, linked: $skill_linked_count, skipped: $skill_skip_count"
+  echo
+}
+
 echo "Linking local skills from: $ROOT_DIR"
 echo "Skills source directory: $SKILLS_SOURCE_DIR"
-echo "Skills target directory: $SKILLS_DEST_DIR"
 echo
 
-prune_stale_repo_skill_links
-
-skill_count=0
-skill_linked_count=0
-skill_skip_count=0
-
-for skill_dir in "$SKILLS_SOURCE_DIR"/*; do
-  [ -d "$skill_dir" ] || continue
-  [ -f "$skill_dir/SKILL.md" ] || continue
-
-  skill_name="$(basename "$skill_dir")"
-  target_path="$SKILLS_DEST_DIR/$skill_name"
-  skill_count=$((skill_count + 1))
-
-  if ! is_global_skill "$skill_name"; then
-    echo "SKIP $skill_name -> project-only skill"
-    skill_skip_count=$((skill_skip_count + 1))
-    continue
-  fi
-
-  if link_path "$skill_dir" "$target_path" "$skill_name"; then
-    skill_linked_count=$((skill_linked_count + 1))
-  else
-    skill_skip_count=$((skill_skip_count + 1))
-  fi
+for dest_dir in $dest_dirs; do
+  link_skills_into "$dest_dir"
 done
 
-echo
 echo "Completed."
-echo "Skills processed: $skill_count, linked: $skill_linked_count, skipped: $skill_skip_count"

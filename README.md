@@ -17,7 +17,7 @@ as skills.
 | `skills/` | Reusable skills, each with a `SKILL.md` entrypoint and `agents/openai.yaml` metadata. |
 | `.agents/skills/` | Project-local maintainer skills for working on this repository. |
 | `.agents/plugins/marketplace.json` | Local plugin discovery surface for this checkout. |
-| `skills-link.sh` | Local development helper that links reusable skills into `~/.agents/skills`. |
+| `skills-link.sh` | Local development helper that links reusable skills into `~/.agents/skills` (Codex) and `~/.claude/skills` (Claude Code). |
 
 ## Reusable Skills
 
@@ -148,11 +148,15 @@ Project-local skills are repository-specific and are not included in reusable in
 
 ### Link Reusable Skills For Local Development
 
-Run this from the repository root to link `skills/` into `~/.agents/skills`:
+Run this from the repository root to link `skills/` into `~/.agents/skills`
+(Codex) and `~/.claude/skills` (Claude Code):
 
 ```sh
 ./skills-link.sh
 ```
+
+Pass `--agent codex` or `--agent claude` to link only one target; the default is
+`--agent all`.
 
 This helper only links reusable skills. It does not install, mirror, or rewrite plugin marketplace entries.
 It excludes `swift-api-design` and `swift-docc` and removes existing links to
