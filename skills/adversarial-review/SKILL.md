@@ -1,6 +1,7 @@
 ---
 name: adversarial-review
 description: "Independently review a fixed software change read-only when explicitly requested or composed by another workflow."
+disable-model-invocation: true
 ---
 
 # Adversarial Review

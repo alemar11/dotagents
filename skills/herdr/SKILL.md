@@ -1,6 +1,7 @@
 ---
 name: herdr
 description: Inspect or control Herdr terminal workspaces, panes, and agents when the user explicitly asks to use Herdr.
+disable-model-invocation: true
 ---
 
 # Herdr
