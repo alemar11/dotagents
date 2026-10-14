@@ -46,10 +46,6 @@ package. A narrow edit does not require a repository-wide documentation pass.
   machine merely to describe an ordinary sequence of work.
 - Separate configuration from caller inputs, execution facts, and derived
   results. Observing a value does not make it a persisted option.
-- Keep skill-owned model and reasoning roles indexed in
-  [codex-model-index.md](references/codex-model-index.md), one row per profile,
-  including intentional default inheritance. Update affected rows with the
-  runtime owner; the index must not duplicate its policy.
 - Use lowercase Markdown filenames under `references/`, except `README.md`
   and `AGENTS.md`.
 
