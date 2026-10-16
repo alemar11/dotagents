@@ -20,9 +20,9 @@ or reuse its installed version. Keep the manifest and lockfile changes together.
 Default mode installs missing consumer setup and refreshes existing setup.
 For `setup`, reuse existing configuration and CLI content, adding only what is
 missing. For `update`, require an existing Intent consumer setup; report missing
-setup rather than installing it. Select the relevant installed TanStack packages
-from project evidence, not the entire npm or workspace catalog.
-For npm, from the intended package directory:
+setup rather than installing it. For npm, from the intended package directory,
+write the [source permissions](#source-permissions) between discovery and
+installation:
 
 ```sh
 npm install -D @tanstack/intent
@@ -36,21 +36,41 @@ managers. Prefer this installed CLI over `npx @tanstack/intent@latest`, which
 can differ from the lockfile version. Check generated loading commands too:
 Intent may emit `@latest` runners; adjust them to the project's installed CLI.
 
-First-run `install` requires an interactive terminal. Select the discovered
-official TanStack packages or individual skill IDs needed for the requested
-scope, and inspect the destination and saved rules before confirming. A request
-for all TanStack skills does not authorize the all-sources `"*"` option. Package
-rules include future skills in those packages; `"@tanstack/*"` also admits future
-TanStack packages and should be used only when that scope is intended. Do not
-broaden permissions to bypass a missing terminal; report the remaining
-interactive step if it cannot be completed.
+## Source permissions
 
-Existing effective `intent.skills` permissions are preserved by plain `install`;
-use `install --review` for requested permission changes. Preserve
-`intent.exclude` and workspace inheritance. `install --dry-run` previews policy
-and guidance without saving them, but first-run selection still needs a terminal.
-If installed packages expose no skills, report the coverage gap rather than
-adding or upgrading application libraries solely to obtain skills.
+`intent.skills` is Intent's allowlist of skill sources, and choosing it is a
+trust decision. Intent reads the nearest declaration from the owning package
+and inherited workspace configuration. When none exists, `install` asks
+interactively and fails without a terminal; once one exists, plain `install`
+preserves it and writes guidance without prompting.
+
+When no effective `intent.skills` exists, write it to the owning
+`package.json` before running `install`; do not hand the interactive step to
+the user. The explicit invocation of this workflow authorizes only this narrow
+list:
+
+```json
+{
+  "intent": {
+    "skills": ["@tanstack/react-router", "@tanstack/react-query"]
+  }
+}
+```
+
+Include only exact npm package names that are direct dependencies of the owning
+package and that `intent list --json` reports with skills. Exclude transitive
+and non-TanStack sources. Never write `"*"`; use `"@tanstack/*"` only when the
+user requests future TanStack packages. Package rules still admit future skills
+in those packages. Preserve `intent.exclude` and workspace inheritance, and keep
+this edit with the manifest and lockfile changes. Report the written list, any
+discovered sources it leaves out, and `intent install --review` for later
+changes. For a preview, report the proposed list without writing it;
+`install --dry-run` runs without a terminal only after a list exists.
+
+An existing effective `intent.skills` is the user's decision. Change it only
+for a requested entry, editing that entry alone. If installed packages expose
+no skills, report the coverage gap rather than adding or upgrading application
+libraries solely to obtain skills.
 
 ## Agent guidance
 
