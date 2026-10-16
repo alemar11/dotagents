@@ -32,7 +32,7 @@ as skills.
 | `review-pr` | Request or resume a hosted Codex PR review, wait, and report the provider result to the calling task. |
 | `architect` | Design feature behavior, ownership and interfaces, then a verifiable task plan; publish the specification to GitHub when requested. |
 | `prototype` | Build and run an isolated experiment in the project's stack or as a standalone example to resolve a UI, interaction, logic, or state-model question. |
-| `implement` | Implement software features and fixes with required self-review and behavioral validation; skip automatic selection for trivial edits. Explicit invocation may cover any selected scope. Commit only when authorized, without orchestration or publication. |
+| `implement` | Explicit invocation only: implement software features and fixes with required self-review and behavioral validation. Commit only when authorized, without orchestration or publication. |
 | `deslop` | Explicit-only audit or safe cleanup of low-value code in the requested scope. |
 | `unslop` | Write or revise prose to remove filler, vague claims, and formulaic phrasing while preserving meaning, tone, and technical precision. |
 | `technical-writing` | Explicit invocation only: write or review docs, RFCs, READMEs, PR descriptions, and commit messages using Diátaxis, Google developer style, STE, and Global English. Applies `unslop` to each document. |
