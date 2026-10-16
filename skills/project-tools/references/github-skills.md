@@ -1,8 +1,8 @@
 # GitHub-managed skills
 
 Use this reference for selected Swift, Vercel React, shadcn/ui, React Doctor,
-or Playwright CLI skills. Install their instruction files with authenticated
-`gh skill`; do not run the providers' native setup installers.
+Playwright CLI, or Sketch skills. Install their instruction files with
+authenticated `gh skill`; do not run the providers' native setup installers.
 
 ## Catalog and selection
 
@@ -19,6 +19,8 @@ installed directory name, which can differ from the skill's frontmatter name.
 | shadcn/ui | `shadcn-ui/ui` | `skills/shadcn` | `shadcn` | `shadcn` |
 | React Doctor | `millionco/react-doctor` | `skills/react-doctor` | `react-doctor` | `react-doctor` |
 | Playwright CLI | `microsoft/playwright-cli` | `skills/playwright-cli` | `playwright-cli` | `playwright-cli` |
+| Sketch | `sketch-hq/agents` | `skills/sketch-design-to-code` | `sketch-design-to-code` | `sketch-design-to-code` |
+| Sketch | `sketch-hq/agents` | `skills/sketch-design-from-reference` | `sketch-design-from-reference` | `sketch-design-from-reference` |
 
 - **Personal Swift:** select both for an Apple environment. These personal
   skills cover Swift-DocC and Swift API design; they are separate from official
@@ -39,6 +41,13 @@ installed directory name, which can differ from the skill's frontmatter name.
   add hooks or CI, configure MCP, or run diagnostics and tests. Report existing
   runtime availability separately; preserve project version pins and runners
   even when upstream examples use `@latest`.
+- **Sketch:** select both catalog skills when Sketch skills are requested;
+  a request naming one skill selects only that skill. Follow the selected
+  setup/update operation. These cover Sketch-to-code and design creation from
+  references. Installing them does not install a client plugin, configure MCP,
+  start Sketch, or execute their design workflows. Their runtime requires
+  Sketch MCP; report its availability separately and use the
+  [Sketch MCP procedure](sketch-mcp.md) only when configuration is also requested.
 
 Apply the entrypoint's operation and selection rules. For explicitly selected
 additional skills from these providers, discover their actual source paths and
@@ -115,5 +124,6 @@ in a running client.
 - [shadcn/ui skill](https://github.com/shadcn-ui/ui/tree/main/skills/shadcn)
 - [React Doctor skill](https://github.com/millionco/react-doctor/tree/main/skills/react-doctor)
 - [Playwright CLI skill](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli)
+- [Official Sketch skills](https://github.com/sketch-hq/agents)
 - [GitHub CLI install](https://cli.github.com/manual/gh_skill_install)
 - [GitHub CLI update](https://cli.github.com/manual/gh_skill_update)

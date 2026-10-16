@@ -97,6 +97,14 @@ report the evidence and coverage gap instead of installing a generic bundle.
 Continue independent routes when one lacks prerequisites, then report detected
 environments and installed, updated, unchanged, or blocked results.
 
+## Requested Sketch skills
+
+When Sketch skills are explicitly selected, use the
+[GitHub skill procedure](references/github-skills.md) for its official skills.
+Do not infer Sketch from a frontend or native app
+environment, or from an installed Sketch app. Configure its MCP only when
+also requested, using the provider route below.
+
 ## Clients
 
 Support Codex, Cursor, Pi, and Claude Code. Configure only the requested
@@ -130,6 +138,7 @@ and configure the requested clients' project files.
 | Native Xcode MCP | [Xcode MCP](references/xcode-mcp.md). Skill export is a separate route. |
 | Hopper Disassembler MCP setup, repair, or inspection | [Hopper MCP](references/hopper-mcp.md), using its bundled server. |
 | Discourse MCP | [Discourse MCP](references/discourse.md). Require explicitly selected forum URLs, verify each site, and configure one fixed-site entry per distinct forum. |
+| Sketch MCP | [Sketch MCP](references/sketch-mcp.md), using Sketch's built-in HTTP server. Skill installation is a separate route. |
 
 Other language, framework, and tooling installation workflows are not yet
 implemented. State that limitation when requested rather than claiming setup
