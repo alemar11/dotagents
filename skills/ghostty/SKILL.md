@@ -1,6 +1,7 @@
 ---
 name: ghostty
 description: Inspect or arrange Ghostty terminals and edit configuration or keybindings when explicitly requested.
+disable-model-invocation: true
 ---
 
 # Ghostty

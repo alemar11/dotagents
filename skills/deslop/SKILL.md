@@ -1,6 +1,7 @@
 ---
 name: deslop
 description: Audit and safely remove low-value repository code. Use only when explicitly invoked by the user.
+disable-model-invocation: true
 ---
 
 # Deslop

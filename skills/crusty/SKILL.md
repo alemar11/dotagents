@@ -1,6 +1,7 @@
 ---
 name: crusty
 description: Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty.
+disable-model-invocation: true
 ---
 
 # Crusty

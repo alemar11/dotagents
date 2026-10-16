@@ -1,6 +1,7 @@
 ---
 name: architect
 description: "Design features and substantial changes in one repository, from user behavior to responsibilities, interfaces, and a verifiable task plan. Ends at a specification, without implementation."
+disable-model-invocation: true
 ---
 
 # Architect

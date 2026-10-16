@@ -1,6 +1,7 @@
 ---
 name: maintainer
 description: Run complete routine maintenance of this repository's skills, plugins, and coupled tools when explicitly invoked; arguments narrow the scope or select read-only audits.
+disable-model-invocation: true
 ---
 
 # Maintainer

@@ -1,6 +1,7 @@
 ---
 name: project-tools
 description: "Only when explicitly invoked, install or update repository skills, or configure requested project MCP entries. Excludes global installation and host setup."
+disable-model-invocation: true
 ---
 
 # Project Tools

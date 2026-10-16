@@ -1,6 +1,7 @@
 ---
 name: xcode-whats-new
 description: "Read official release notes for the active, latest, or requested stable or beta Xcode."
+disable-model-invocation: true
 ---
 
 # Xcode What's New

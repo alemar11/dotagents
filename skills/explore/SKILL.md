@@ -1,6 +1,7 @@
 ---
 name: explore
 description: "Investigate how a system works, assess possible approaches, and resolve factual unknowns using cited evidence. Read-only; use when explicitly requested, with clarification only for unresolved user decisions."
+disable-model-invocation: true
 ---
 
 # Explore
