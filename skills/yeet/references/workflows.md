@@ -13,7 +13,7 @@ git remote get-url origin
 git config --get branch.<branch>.remote
 git config --get branch.<branch>.merge
 gh repo view --json nameWithOwner,defaultBranchRef
-gh pr list --repo <owner/repo> --head <owner>:<branch> --state open --limit 2 \
+gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
  --json number,url,isDraft,headRefName,headRepositoryOwner,headRepository,baseRefName
 ```
 
@@ -38,9 +38,10 @@ Apply all of these gates before continuing:
 - Require successful `gh auth status` in a network-enabled context
  before any push. A result from a restricted sandbox is inconclusive and must
  not be used to diagnose or change credentials.
-- Record whether the PR lookup returns zero or one open PR. Stop if it returns
- more than one or if its head branch/repository does not match the verified
- push target.
+- Pass the branch alone to `--head`; `OWNER:BRANCH` syntax is unsupported by
+ `gh pr list`. Record whether the lookup returns zero or one open PR. Stop if
+ it returns more than one or if its head branch, repository, or owner does not
+ match the verified push target.
 - When one PR exists, record its `isDraft` value. Updating its branch, title, or
  body must preserve that exact value; Yeet never changes an existing PR
  between draft and ready.
