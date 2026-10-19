@@ -41,9 +41,11 @@ requests. If `gh` cannot complete an operation, explain the concrete limitation
 instead of silently changing access methods. Public installation documentation
 and package downloads may be accessed without `gh` when needed for setup.
 
-Use `git` for repository operations such as clone, fetch, pull, and push. Apply
-this access policy alongside existing workflow skills; it does not replace
-their publication, review, or authorization rules.
+Use `git` for repository operations such as clone, fetch, pull, and push.
+Preserve the task's publication, review, and authorization requirements.
+
+If `gh issue create` fails, read
+[issue creation recovery](references/issue-creation.md) before retrying.
 
 For local image or video uploads to issues, pull requests, or comments, read
 [attachment guidance](references/attachments.md).
@@ -56,8 +58,6 @@ For Actions job logs, including completed jobs in an active workflow, read
 For stacked branches, dependent PRs, or `github/gh-stack` installation, read
 [stacked PR guidance](references/stacked-pr.md) for installation and direct
 use of `gh stack`.
-Use `$yeet` for single-PR publication; stack-wide operations and explicit
-parent/child linking belong to this extension workflow.
 
 ## Availability
 

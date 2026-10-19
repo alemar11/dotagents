@@ -5,9 +5,9 @@ directly for stacked branches and dependent PRs. Stack tracking, ordering,
 rebasing, and merge behavior belong to the extension. Consult
 `gh stack <command> --help` for the installed version's arguments and behavior.
 
-Use `$yeet` for publishing or updating one PR. An explicit parent/child link
-or stack-wide publication is a separate operation; never infer a stack or
-substitute `gh stack submit` for single-PR publication.
+Use native `gh pr` commands for publishing or updating one PR. An explicit
+parent/child link or stack-wide publication is a separate operation; never
+infer a stack or substitute `gh stack submit` for single-PR publication.
 
 ## Install and verify
 
@@ -78,8 +78,7 @@ adopt a remote stack locally unless that is needed for the requested work.
 
 `submit --auto` pushes branches and creates or updates multiple PRs. New PRs
 default to drafts; add `--open` only when marking PRs ready is requested.
-Stack publication does not inherit Yeet's issue-linkage, body, or draft-state
-verification. Preserve those requirements separately when applicable.
+Verify each PR's intended issue links, body, and draft state after publication.
 
 `sync` can fetch, rebase, push, and update the remote stack. It is not read-only
 inspection. Use `--prune` only when deleting merged local branches is intended.
@@ -110,6 +109,21 @@ local tracking and authenticated `gh` reads for remote state. A remote-only link
 may not appear in the current branch's local view; do not repeat it on that basis.
 If the installed CLI cannot expose the required relationship, report that
 verification limit rather than claiming success from the mutation receipt alone.
+
+For remote grouping readback, obtain the repository-scoped `stack.number` from
+a member PR, then read that stack:
+
+```sh
+gh api 'repos/OWNER/REPO/pulls/PR_NUMBER' --jq '.stack'
+gh api 'repos/OWNER/REPO/stacks/STACK_NUMBER'
+```
+
+A standalone PR has a null stack. The stack response lists `pull_requests`
+from bottom to top; verify membership and order, and read individual PRs for
+required head, base, draft, or merge fields absent from that response. These
+endpoints require stacked PRs to be enabled for the repository; a 404 alone
+does not establish an authentication failure or missing local tracking.
+See the [official stack REST API reference](https://github.com/github/gh-stack/blob/v0.2.1/docs/src/content/docs/reference/rest-api.md).
 
 Commands can fail after partial effects. Inspect exit status and diagnostics,
 reconcile local and remote state, and only then decide whether to retry. Do not
