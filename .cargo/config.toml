@@ -1,0 +1,3 @@
+[build]
+# Keep Cargo build output outside skills/, which skill loaders scan recursively.
+target-dir = ".cache/cargo-target/postgres"

@@ -5,6 +5,10 @@ script_dir=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 project_dir=$(CDPATH='' cd "$script_dir/.." && pwd)
 skill_dir=$(CDPATH='' cd "$project_dir/../.." && pwd)
 manifest="$project_dir/Cargo.toml"
+repo_root=$(CDPATH='' cd "$skill_dir/../.." && pwd)
+# Build outside skills/ so skill loaders do not scan Cargo output.
+target_dir="${CARGO_TARGET_DIR:-$repo_root/.cache/cargo-target/postgres}"
+export CARGO_TARGET_DIR="$target_dir"
 
 target="${1:-}"
 
@@ -37,10 +41,10 @@ if [ -n "$target" ]; then
   esac
 
   cargo build --release --manifest-path "$manifest" --target "$target"
-  built="$project_dir/target/$target/release/postgres"
+  built="$target_dir/$target/release/postgres"
 else
   cargo build --release --manifest-path "$manifest"
-  built="$project_dir/target/release/postgres"
+  built="$target_dir/release/postgres"
 
   os=$(uname -s | tr '[:upper:]' '[:lower:]')
   arch=$(uname -m)
