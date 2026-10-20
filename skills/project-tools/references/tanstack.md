@@ -57,15 +57,27 @@ list:
 }
 ```
 
-Include only exact npm package names that are direct dependencies of the owning
-package and that `intent list --json` reports with skills. Exclude transitive
-and non-TanStack sources. Never write `"*"`; use `"@tanstack/*"` only when the
-user requests future TanStack packages. Package rules still admit future skills
-in those packages. Preserve `intent.exclude` and workspace inheritance, and keep
-this edit with the manifest and lockfile changes. Report the written list, any
-discovered sources it leaves out, and `intent install --review` for later
-changes. For a preview, report the proposed list without writing it;
-`install --dry-run` runs without a terminal only after a list exists.
+Include exact npm package names that `intent list --json` reports with skills
+and that pass one of these project-based tests:
+
+- Direct `@tanstack/*` dependencies of the owning package (its `dependencies`
+  or `devDependencies`), excluding `@tanstack/intent`.
+- Transitive `@tanstack/*` packages pulled in by one of those direct
+  dependencies, established through the lockfile or the package manager's
+  dependency listing (for npm, `npm ls <package> --all` from the owning
+  directory). These are the internals of a library the project already trusts,
+  such as `@tanstack/router-core` under `@tanstack/react-router`.
+
+Exclude non-TanStack sources and any `@tanstack/*` package whose only path into
+the tree runs through a non-TanStack or tooling-only dependency. Never write
+`"*"`; use `"@tanstack/*"` only when the user requests future TanStack packages.
+Package rules still admit future skills in those packages. Preserve
+`intent.exclude` and workspace inheritance, and keep this edit with the manifest
+and lockfile changes. Report the written list, grouped as direct and transitive
+with the direct dependency each transitive entry derives from, any discovered
+sources it leaves out, and `intent install --review` for later changes. For a
+preview, report the proposed list without writing it; `install --dry-run` runs
+without a terminal only after a list exists.
 
 An existing effective `intent.skills` is the user's decision. Change it only
 for a requested entry, editing that entry alone. If installed packages expose
