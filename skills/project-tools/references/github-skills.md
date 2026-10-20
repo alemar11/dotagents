@@ -1,8 +1,9 @@
 # GitHub-managed skills
 
 Use this reference for selected Swift, Vercel React, shadcn/ui, React Doctor,
-Playwright CLI, or Sketch skills. Install their instruction files with
-authenticated `gh skill`; do not run the providers' native setup installers.
+Playwright CLI, LiveKit Agents, or Sketch skills. Install their instruction
+files with authenticated `gh skill`; do not run the providers' native setup
+installers.
 
 ## Catalog and selection
 
@@ -19,6 +20,13 @@ installed directory name, which can differ from the skill's frontmatter name.
 | shadcn/ui | `shadcn-ui/ui` | `skills/shadcn` | `shadcn` | `shadcn` |
 | React Doctor | `millionco/react-doctor` | `skills/react-doctor` | `react-doctor` | `react-doctor` |
 | Playwright CLI | `microsoft/playwright-cli` | `skills/playwright-cli` | `playwright-cli` | `playwright-cli` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/reading-livekit-docs` | `reading-livekit-docs` | `reading-livekit-docs` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/building-livekit-agents` | `building-livekit-agents` | `building-livekit-agents` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/debugging-livekit-agents` | `debugging-livekit-agents` | `debugging-livekit-agents` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/testing-livekit-agents` | `testing-livekit-agents` | `testing-livekit-agents` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/writing-livekit-scenarios` | `writing-livekit-scenarios` | `writing-livekit-scenarios` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/running-livekit-simulations` | `running-livekit-simulations` | `running-livekit-simulations` |
+| LiveKit Agents | `livekit/agent-skills` | `skills/operating-livekit-agents` | `operating-livekit-agents` | `operating-livekit-agents` |
 | Sketch | `sketch-hq/agents` | `skills/sketch-design-to-code` | `sketch-design-to-code` | `sketch-design-to-code` |
 | Sketch | `sketch-hq/agents` | `skills/sketch-design-from-reference` | `sketch-design-from-reference` | `sketch-design-from-reference` |
 
@@ -41,6 +49,17 @@ installed directory name, which can differ from the skill's frontmatter name.
   add hooks or CI, configure MCP, or run diagnostics and tests. Report existing
   runtime availability separately; preserve project version pins and runners
   even when upstream examples use `@latest`.
+- **LiveKit Agents:** select all seven catalog skills for a LiveKit Agents
+  environment or a LiveKit-wide request; they hand off to each other by name
+  and load `reading-livekit-docs` first. A request naming specific skills
+  selects only those; report referenced siblings that remain missing. If the
+  LiveKit Claude Code plugin is enabled for a selected Claude client, project
+  copies would duplicate its skills and compete for routing; report this and
+  ask before installing them. Upstream replaced `livekit-agents` and
+  `livekit-simulations` with this set; report installed copies as stale and
+  remove them only on request. Installing files does not install or
+  authenticate the `lk` CLI, create a LiveKit Cloud project, or configure the
+  LiveKit Docs MCP; report their availability separately.
 - **Sketch:** select both catalog skills when Sketch skills are requested;
   a request naming one skill selects only that skill. Follow the selected
   setup/update operation. These cover Sketch-to-code and design creation from
@@ -124,6 +143,7 @@ in a running client.
 - [shadcn/ui skill](https://github.com/shadcn-ui/ui/tree/main/skills/shadcn)
 - [React Doctor skill](https://github.com/millionco/react-doctor/tree/main/skills/react-doctor)
 - [Playwright CLI skill](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli)
+- [LiveKit Agent Skills](https://github.com/livekit/agent-skills)
 - [Official Sketch skills](https://github.com/sketch-hq/agents)
 - [GitHub CLI install](https://cli.github.com/manual/gh_skill_install)
 - [GitHub CLI update](https://cli.github.com/manual/gh_skill_update)

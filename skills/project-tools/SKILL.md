@@ -75,6 +75,7 @@ tools and stale lockfile entries alone do not establish a project environment.
 | First-party `components.json` or `registry.json` using a `ui.shadcn.com` schema, or confirmed first-party shadcn/ui component usage | [Official shadcn/ui skill through GitHub](references/github-skills.md). |
 | Application dependencies on `@tanstack/*` libraries | [Official dependency-packaged skills through Intent](references/tanstack.md). `@tanstack/intent` alone is tooling, not evidence of an application library. |
 | Direct `@playwright/test`, `playwright`, or `@playwright/cli` dependencies, or first-party Playwright tests/configuration | [Official Playwright CLI skill through GitHub](references/github-skills.md). |
+| Direct `livekit-agents` (Python) or `@livekit/agents` (Node.js) dependencies | [Official LiveKit Agents skills through GitHub](references/github-skills.md). |
 
 Read only the procedures for selected routes. The GitHub reference owns their
 source paths, skill identities, and provider-specific selection details.
@@ -83,9 +84,11 @@ Select every matching environment in mixed repositories; do not stop at the
 first match. A React web app with TanStack needs both routes. React Native's
 `react` dependency alone does not justify React web skills; use evidenced Apple
 and Android targets for those routes. React, Tailwind, or Radix dependencies
-alone do not establish shadcn/ui usage. Respect a user-selected subproject and
-deduplicate shared skill installation at the repository root. Intent policy
-still belongs to the relevant owning workspace package.
+alone do not establish shadcn/ui usage. LiveKit client, server, or UI SDKs
+without the Agents SDK do not establish a LiveKit Agents environment. Respect a
+user-selected subproject and deduplicate shared skill installation at the
+repository root. Intent policy still belongs to the relevant owning workspace
+package.
 
 Inventory existing skills by identity and provider provenance before deciding
 what is missing or updatable. For environment-based selection in default mode,
