@@ -56,8 +56,8 @@ installed directory name, which can differ from the skill's frontmatter name.
   LiveKit Claude Code plugin is enabled for a selected Claude client, project
   copies would duplicate its skills and compete for routing; report this and
   ask before installing them. Upstream replaced `livekit-agents` and
-  `livekit-simulations` with this set; report installed copies as stale and
-  remove them only on request. Installing files does not install or
+  `livekit-simulations` with this set; installed copies are retired
+  [removal candidates](removal.md). Installing files does not install or
   authenticate the `lk` CLI, create a LiveKit Cloud project, or configure the
   LiveKit Docs MCP; report their availability separately.
 - **Sketch:** select both catalog skills when Sketch skills are requested;
@@ -128,13 +128,24 @@ can include user installations. A dry run compares upstream versions rather
 than detecting local edits. Preserve local modifications and pins; do not add
 `--force` or `--unpin` implicitly.
 
+## Remove
+
+`gh skill` has no removal command (checked with gh 2.102.0). Confirm that the
+target's `SKILL.md` metadata names the provider repository, then delete only
+that skill directory from `.agents/skills/`. Retired skills keep their old
+source metadata, so match the repository rather than the current catalog.
+
+A dry-run update reported a skill as up to date after its upstream path was
+removed. To detect retired skills, compare each `github-path` with the
+collection listing from the discovery command above.
+
 ## Verify
 
 Verify complete skill trees, including linked references, rules, assets, and
 installer-managed source metadata. Keep that metadata for future updates.
 Inspect the scoped repository diff and the shared Claude link when applicable.
-Report installed, updated, unchanged, or blocked names separately from discovery
-in a running client.
+Report installed, updated, removed, unchanged, or blocked names separately from
+discovery in a running client.
 
 ## Sources
 

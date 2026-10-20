@@ -73,6 +73,23 @@ Updating installed names does not install newly published skills; use the
 installation workflow when expanding or refreshing the full collection is
 requested.
 
+## Remove
+
+Confirm in `skills-lock.json` that each target's source is `android/skills`,
+then remove the names from the repository root, where project scope is the
+default:
+
+```sh
+npx --yes skills remove android-cli --yes
+```
+
+Pass the other selected names as additional positional arguments. Never use
+`--all`, `--skill '*'`, or `--global`. Omit `--agent`: with skills 1.7.4,
+`--agent codex` reported success but left the directory and lock entry.
+Without it, removal deletes both and keeps the `.claude/skills` link and
+unrelated skills. To detect retired skills, compare installed names with the
+current `--list` output.
+
 ## Verification
 
 List the canonical project installation, then verify the Claude link if requested:

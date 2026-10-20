@@ -91,6 +91,13 @@ when requested.
 Use the external client selected by the user. Do not launch another client or
 change the host environment to make this repository configuration work.
 
+## Update and remove
+
+Identify existing entries by their `xcrun mcpbridge` command, under any name.
+Update reconciles them with the forms above and the bridge's live help,
+keeping their names. Change a persisted `DEVELOPER_DIR` only for a selected
+Xcode. Remove entries through the [shared procedure](removal.md#mcp-entries).
+
 ## Verification
 
 Parse the resulting JSON or TOML, inspect the scoped repository diff, and

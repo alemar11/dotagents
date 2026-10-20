@@ -1,6 +1,6 @@
 ---
 name: project-tools
-description: "Only when explicitly invoked, install or update repository skills, or configure requested project MCP entries. Excludes global installation and host setup."
+description: "Only when explicitly invoked, recommend, install, update, or remove repository skills and project MCP entries. Excludes global installation and host setup."
 disable-model-invocation: true
 ---
 
@@ -8,19 +8,21 @@ disable-model-invocation: true
 
 ## Scope
 
-This skill MUST stay focused on two repository-level operations: installing or
-updating skills (including dependency-packaged skill loading), and configuring
-MCP entries for the requested clients. A provider's skill CLI may be added as a
-repository development dependency when needed for the requested setup.
-Infer the target repository, coding agent, and requested action from the
-conversation and current project; ask only when these remain ambiguous. Resolve
-destination paths before writing and reject links that escape the repository.
-Temporary staging for inspecting installation payloads is allowed.
+This skill MUST stay focused on two repository-level subjects: skills,
+including dependency-packaged skill loading, and MCP entries for the requested
+clients. For each, it sets up, updates, recommends, and removes. A provider's
+skill CLI may be added as a repository development dependency when needed for
+the requested setup. Infer the target repository, coding agent, and requested
+action from the conversation and current project; ask only when these remain
+ambiguous. Resolve destination paths before writing and reject links that
+escape the repository. Temporary staging for inspecting installation payloads
+is allowed.
 
-Do not install or update global skills, clients, SDKs, CLIs, or IDEs; change
-global configuration or host permissions; manage MCP server lifecycles; or run
-application development workflows. Missing host tools, access grants, and host
-enablement are prerequisites to report, not setup branches to execute here.
+Do not install, update, or remove global skills, clients, SDKs, CLIs, or IDEs;
+change global configuration or host permissions; manage MCP server lifecycles;
+or run application development workflows. Missing host tools, access grants,
+and host enablement are prerequisites to report, not setup branches to execute
+here.
 
 An explanation or preview request does not authorize installation. Keep skill
 installation and MCP configuration separate unless both are requested.
@@ -37,23 +39,26 @@ editing this skill does not invoke its installation workflow.
 A bare `$project-tools` MUST start work in the current repository, using any
 scope already established in the conversation. Detect its environments, install
 the relevant missing skills, and update matching installed skills through their
-provider workflows. Do not ask the user to choose an operation or confirm this
-default. Ask only if the repository cannot be identified or a material conflict
-cannot be resolved from the request and project evidence.
+provider workflows; then report MCP and removal recommendations. Do not ask
+the user to choose an operation or confirm this default. Ask only if the
+repository cannot be identified or a material conflict cannot be resolved from
+the request and project evidence.
 
 Explicit instructions narrow or override that default:
 
 | Request | Action |
 | --- | --- |
-| No additional instructions | Detect the stack; install missing relevant skills and update those already installed. |
+| No additional instructions | Detect the stack; install missing relevant skills and update those already installed. Report MCP and removal recommendations without writing them. |
 | `setup` | Install missing relevant skills and verify existing ones; do not refresh existing content unless also requested. |
 | `update` | Update relevant installed skills only; do not add missing skills or new provider collections. |
 | Named environment, skill, client, or package | Restrict work to that selection; apply the requested operation, or install-and-update if none is specified. |
-| MCP setup or update | Configure only the named MCP/client entries; do not infer skill installation. |
+| `remove`, cleanup, or removal advice | Follow [removal](references/removal.md) for skills, MCP entries, or both as requested; do not install or update. Advice never writes. |
+| MCP setup or update | Apply it only to the named MCP providers and clients; do not infer skill changes. |
 | Explain, inspect, preview, or dry run | Report findings and proposed actions without writing. |
 
 For `setup` or `update` without a named environment, detect it from the current
-repository. A skill-only invocation never implies MCP setup, even for Apple.
+repository. A skill-only invocation never writes MCP configuration, even for
+Apple.
 Apply the selected operation to each relevant reference below; its examples
 do not widen that operation's scope.
 Reuse the current coding agent unless clients are explicitly selected; an
@@ -95,11 +100,13 @@ what is missing or updatable. For environment-based selection in default mode,
 include already-installed skills from the selected provider collections even
 when optional for a fresh setup. A named skill selection remains restricted to
 those names.
-Preserve local modifications, explicit exclusions, and pins; do not uninstall
-unrelated or apparently obsolete skills. If no supported environment is found,
-report the evidence and coverage gap instead of installing a generic bundle.
-Continue independent routes when one lacks prerequisites, then report detected
-environments and installed, updated, unchanged, or blocked results.
+Preserve local modifications, explicit exclusions, and pins. Remove skills
+only for a removal request; otherwise report installed provider-managed skills
+whose route no longer matches the project as removal candidates. If no
+supported environment is found, report the evidence and coverage gap instead of
+installing a generic bundle. Continue independent routes when one lacks
+prerequisites, then report detected environments and installed, updated,
+unchanged, or blocked results.
 
 ## Requested Sketch skills
 
@@ -131,18 +138,23 @@ installed and no update is requested, only create or verify the link; do not
 re-download or export them. The link exposes the whole shared collection;
 client selection is not an isolation boundary.
 
-## Requested MCP configuration
+## MCP entries
 
-MCP selection requires an explicit request; do not infer it from environment
-detection or installed host tools. Read only the selected provider's reference
-and configure the requested clients' project files.
+MCP entries follow the same operations as skills, per client project file:
+setup adds missing entries, update reconciles existing ones without adding
+any, and removal follows the [removal procedure](references/removal.md).
+Writing MCP configuration requires a request naming MCP or one of the providers
+below, or a generic cleanup. Project evidence only recommends: default mode and advice report missing
+recommended entries and configured entries whose evidence is gone. Installed
+host tools are not evidence. Read only the relevant providers' references and
+change only the requested clients' project files.
 
-| Requested provider | Procedure |
-| --- | --- |
-| Native Xcode MCP | [Xcode MCP](references/xcode-mcp.md). Skill export is a separate route. |
-| Hopper Disassembler MCP setup, repair, or inspection | [Hopper MCP](references/hopper-mcp.md), using its bundled server. |
-| Discourse MCP | [Discourse MCP](references/discourse.md). Require explicitly selected forum URLs, verify each site, and configure one fixed-site entry per distinct forum. |
-| Sketch MCP | [Sketch MCP](references/sketch-mcp.md), using Sketch's built-in HTTP server. Skill installation is a separate route. |
+| Provider | Recommend when | Procedure |
+| --- | --- | --- |
+| Native Xcode MCP | An Apple environment is detected | [Xcode MCP](references/xcode-mcp.md). Skill export is a separate route. |
+| Sketch MCP | Sketch skills are installed in the repository | [Sketch MCP](references/sketch-mcp.md), using Sketch's built-in HTTP server. Skill installation is a separate route. |
+| Discourse MCP | The project matches a [known community destination](references/discourse.md#known-community-destinations) | [Discourse MCP](references/discourse.md). Configure one fixed-site entry per explicitly selected, verified forum. |
+| Hopper Disassembler MCP | Never from project evidence; analysis targets usually live outside the repository | [Hopper MCP](references/hopper-mcp.md), using its bundled server. Repair is an update; inspection is read-only. |
 
 Other language, framework, and tooling installation workflows are not yet
 implemented. State that limitation when requested rather than claiming setup

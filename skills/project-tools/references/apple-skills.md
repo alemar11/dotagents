@@ -50,10 +50,20 @@ or update the unaffected entries from the temporary export and report the
 remaining conflicts; do not run blanket replacement over them.
 
 Use `--replace-existing` against the target only after checking all colliding
-entries. Do not delete skills missing from a newer export without a separate
-removal request. Keep Apple's exported names and content intact; do not add
-Codex metadata to or rewrite the exported skills. This operation does not
-configure MCP, enable headless access, install user-global skills, or commit.
+entries. Do not delete skills missing from a newer export; report identifiable
+prior exports among them as [removal candidates](removal.md). Keep Apple's
+exported names and content intact; do not add Codex metadata to or rewrite the
+exported skills. This operation does not configure MCP, enable headless access,
+install user-global skills, or commit.
+
+## Remove
+
+Xcode has no export removal command. Identify exported skills by comparing
+names and content with a fresh temporary export from the selected Xcode, then
+delete only those directories. A name missing from that export needs other
+provenance, such as the commit that added it with other Xcode exports. Absence
+from one Xcode's export does not prove that another Xcode retired it; report
+the version compared.
 
 ## Verify
 

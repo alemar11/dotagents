@@ -80,6 +80,14 @@ configuration. Project loading requires trust; `/reload` picks up external
 configuration changes in a running session. If native MCP support is unavailable,
 report the version and limitation rather than installing an extension.
 
+## Update and remove
+
+Identify existing project entries by their `HopperMCPServer` executable, under
+any name. Update, including repair, re-resolves the bundled server and rewrites
+an existing entry's path when the app moved, keeping its name. Remove project
+entries through the [shared procedure](removal.md#mcp-entries); never remove
+the global entry.
+
 ## Verification
 
 Parse the resulting TOML or JSON and inspect the scoped diff. Report the target

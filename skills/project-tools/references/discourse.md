@@ -3,7 +3,8 @@
 Configure the official `@discourse/mcp` server only on an explicit user request
 for Discourse MCP setup and only for specific, verified sites. A bare invocation,
 environment detection, or finding forum links in project documentation does not
-authorize this setup. It runs locally over stdio and connects to a Discourse
+authorize this setup; a project matching a known destination only recommends
+it. It runs locally over stdio and connects to a Discourse
 site's API. This workflow always writes repository configuration.
 
 ## Select and verify sites
@@ -25,6 +26,9 @@ site's API before writing configuration.
 | --- | --- | --- |
 | Swift | [Swift Forums](https://forums.swift.org) — designated the official discussion channel by [Swift.org](https://www.swift.org/community/). | `discourse-swift` |
 | LiveKit | [LiveKit Community](https://community.livekit.io) — linked as LiveKit's managed technical forum in its [community documentation](https://docs.livekit.io/intro/community/). | `discourse-livekit` |
+
+Recommend the Swift entry for first-party Swift packages or sources, and the
+LiveKit entry for a LiveKit Agents environment.
 
 Use the actual Discourse base URL, including a deployment subpath if needed,
 not a topic URL or an invented `/mcp` endpoint on the forum. Before creating or
@@ -104,6 +108,15 @@ Never embed credentials in committed client config or command arguments.
 Check whether the profile enables writes before attaching it to a read-only
 setup. Missing credentials or authorization are prerequisites to report; do not
 generate keys, start a login, or change forum permissions as incidental setup.
+
+## Update and remove
+
+Identify existing entries by their effective site. Update re-verifies each site
+and reconciles its entry with the fixed-site form above, keeping its name,
+profile, and write settings; change a package version pin only when requested.
+Report entries whose site fails verification instead of removing them. Remove
+entries through the [shared procedure](removal.md#mcp-entries); remove a generic
+entry without `--site` only when named.
 
 ## Verify
 

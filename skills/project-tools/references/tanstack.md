@@ -127,6 +127,24 @@ from whether a live agent has consumed the guidance. If guidance generation
 fails after permissions were saved, inspect both files before retrying; the
 permission change is not automatically rolled back.
 
+## Remove
+
+Packaged skills leave with their libraries; removing a library is an
+application change, not skill removal. To stop loading skills from a package
+that remains installed, remove its `intent.skills` entry, or exclude individual
+skills with the installed CLI:
+
+```sh
+npx intent exclude add '<package>#<skill>'
+```
+
+An `intent.skills` entry for a package no longer in the owning package's tree
+is a removal candidate; keep a requested `"@tanstack/*"` pattern. After any
+change, rerun `install` and check that the managed block no longer offers the
+removed skills. When no TanStack application library remains, full removal
+deletes the `intent` configuration, the managed `intent-skills` block, and the
+`@tanstack/intent` development dependency with its lockfile change.
+
 ## Official sources
 
 - [Consumer setup](https://tanstack.com/intent/latest/docs/getting-started/quick-start-consumers)

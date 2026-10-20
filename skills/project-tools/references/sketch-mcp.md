@@ -62,6 +62,14 @@ Do not copy the upstream Codex home-directory example or use client commands
 that default to user scope. Existing project trust is a prerequisite; for Pi,
 require native MCP support rather than installing an extension.
 
+## Update and remove
+
+Identify existing entries by their Sketch endpoint, under any name. Update
+reconciles them with the direct HTTP form above, keeping a verified custom
+endpoint. Ask before converting an npm server or stdio proxy entry, since the
+user may depend on it. Remove entries through the
+[shared procedure](removal.md#mcp-entries).
+
 ## Verify
 
 Parse the changed TOML/JSON and inspect the scoped diff. Report each file,
