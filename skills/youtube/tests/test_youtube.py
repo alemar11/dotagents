@@ -223,6 +223,14 @@ class YoutubeCliTests(unittest.TestCase):
             cli.select_caption_track(tracks, ["auto"])["language"], "en-orig"
         )
 
+    def test_search_matches_whole_words_and_plurals(self) -> None:
+        self.assertTrue(cli.text_matches("Two Pi agents", "pi agent", "all"))
+        self.assertTrue(cli.text_matches("the Claude, code base", "claude code", "phrase"))
+        for text in ("the architecture topics", "anthropic api", "a pie chart"):
+            with self.subTest(text=text):
+                self.assertFalse(cli.text_matches(text, "pi", "all"))
+        self.assertTrue(cli.text_matches("東京タワーに行く", "タワー", "all"))
+
     def test_playlist_transcript_search_matches_across_segment_boundaries(self) -> None:
         segments = [
             {"start_seconds": 0.0, "duration_seconds": 2.0, "text": "Agent"},

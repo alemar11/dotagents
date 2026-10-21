@@ -55,9 +55,13 @@ transient.
 | `cache_state` | `miss` | No compatible cache entry existed; the retrieved transcript was cached. |
 | `cache_state` | `refreshed` | The caller bypassed existing cache data and replaced the normalized entry. |
 | `cache_state` | `disabled` | The caller selected `--no-cache`; no cache was read or written. |
-| `match_mode` | `all` | Every normalized query term must appear in a transcript window. |
-| `match_mode` | `any` | At least one normalized query term must appear in a transcript window. |
-| `match_mode` | `phrase` | The normalized query phrase must appear contiguously in a transcript window. |
+| `match_mode` | `all` | Every normalized query term must appear as a whole word in a transcript window. |
+| `match_mode` | `any` | At least one normalized query term must appear as a whole word in a transcript window. |
+| `match_mode` | `phrase` | The normalized query terms must appear contiguously as whole words in a transcript window. |
+
+Whole-word matching tolerates `s`/`es` plurals and ignores punctuation between
+phrase terms. Scripts written without spaces (CJK, Thai, Lao, Khmer, Burmese)
+match as substrings.
 
 ## Persistence boundary
 

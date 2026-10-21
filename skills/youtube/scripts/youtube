@@ -333,17 +333,46 @@ def query_tokens(query: str) -> list[str]:
     return re.findall(r"\w+", normalize_for_search(query), flags=re.UNICODE)
 
 
+# Scripts written without spaces between words, where whole-word boundaries
+# cannot be detected and terms must match as substrings.
+UNSPACED_SCRIPT_RE = re.compile(
+    "[฀-໿က-႟ក-៿぀-ヿ㐀-䶿"
+    "一-鿿豈-﫿]"
+)
+
+
+def token_pattern(token: str) -> str:
+    if UNSPACED_SCRIPT_RE.search(token):
+        return re.escape(token)
+    # Whole words only, tolerating plural forms so "agent" finds "agents".
+    return rf"(?<!\w){re.escape(token)}(?:s|es)?(?!\w)"
+
+
+def phrase_pattern(query: str) -> re.Pattern[str] | None:
+    tokens = query_tokens(query)
+    if not tokens:
+        return None
+    if any(UNSPACED_SCRIPT_RE.search(token) for token in tokens):
+        return re.compile(r"\W*".join(re.escape(token) for token in tokens))
+    body = r"\W+".join(re.escape(token) for token in tokens)
+    return re.compile(rf"(?<!\w){body}(?:s|es)?(?!\w)")
+
+
+def token_count(normalized: str, token: str) -> int:
+    return len(re.findall(token_pattern(token), normalized))
+
+
 def text_matches(text: str, query: str, match_mode: str) -> bool:
     normalized = normalize_for_search(text)
-    phrase = normalize_for_search(query)
     tokens = query_tokens(query)
     if match_mode == "phrase":
-        return bool(phrase) and phrase in normalized
+        pattern = phrase_pattern(query)
+        return bool(pattern and pattern.search(normalized))
     if not tokens:
         return False
     if match_mode == "any":
-        return any(token in normalized for token in tokens)
-    return all(token in normalized for token in tokens)
+        return any(token_count(normalized, token) for token in tokens)
+    return all(token_count(normalized, token) for token in tokens)
 
 
 def normalize_segment_text(value: str) -> str:
@@ -916,7 +945,7 @@ def search_segments(
     video_id: str,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
-    phrase = normalize_for_search(query)
+    phrase = phrase_pattern(query)
     tokens = query_tokens(query)
     for index, segment in enumerate(segments):
         start = float(segment["start_seconds"])
@@ -929,10 +958,11 @@ def search_segments(
         if not text_matches(text, query, match_mode):
             continue
         normalized = normalize_for_search(text)
-        if phrase and phrase in normalized:
-            score = 100 + normalized.count(phrase)
+        phrase_count = len(phrase.findall(normalized)) if phrase else 0
+        if phrase_count:
+            score = 100 + phrase_count
         else:
-            score = sum(normalized.count(token) for token in tokens)
+            score = sum(token_count(normalized, token) for token in tokens)
         end = max(
             float(item["start_seconds"]) + float(item["duration_seconds"])
             for item in window
