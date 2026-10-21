@@ -231,6 +231,12 @@ class YoutubeCliTests(unittest.TestCase):
                 self.assertFalse(cli.text_matches(text, "pi", "all"))
         self.assertTrue(cli.text_matches("東京タワーに行く", "タワー", "all"))
 
+    def test_video_search_drops_channel_and_playlist_entries(self) -> None:
+        self.assertTrue(cli.is_video_entry({"id": "x7X9w_GIm1s", "ie_key": "Youtube"}))
+        self.assertFalse(
+            cli.is_video_entry({"id": "UCx7EWheHmjCW3vX8K2d09vg", "ie_key": "YoutubeTab"})
+        )
+
     def test_playlist_transcript_search_matches_across_segment_boundaries(self) -> None:
         segments = [
             {"start_seconds": 0.0, "duration_seconds": 2.0, "text": "Agent"},

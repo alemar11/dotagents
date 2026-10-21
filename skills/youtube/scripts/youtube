@@ -321,6 +321,13 @@ def normalize_video(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def is_video_entry(entry: dict[str, Any]) -> bool:
+    return bool(
+        VIDEO_ID_RE.fullmatch(str(entry.get("id") or ""))
+        and entry.get("ie_key") in (None, "Youtube")
+    )
+
+
 def normalize_for_search(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value.casefold())
     without_marks = "".join(
@@ -1038,23 +1045,26 @@ def preflight_result(probe: dict[str, Any]) -> CliResult:
 
 def videos_search_result(args: argparse.Namespace, executable: str) -> CliResult:
     prefix = "ytsearchdate" if args.order == "date" else "ytsearch"
+    # Search pages mix in channels and playlists; over-fetch so dropping them
+    # still fills the requested limit with videos.
+    fetch_count = args.limit + 10
     payload = run_ytdlp_json(
         executable,
         [
             "--flat-playlist",
             "--playlist-end",
-            str(args.limit),
+            str(fetch_count),
             "--dump-single-json",
             "--",
-            f"{prefix}{args.limit}:{args.query}",
+            f"{prefix}{fetch_count}:{args.query}",
         ],
         cookies_from_browser=args.cookies_from_browser,
     )
     results = [
         normalize_video(entry)
         for entry in payload.get("entries", [])
-        if isinstance(entry, dict)
-    ]
+        if isinstance(entry, dict) and is_video_entry(entry)
+    ][: args.limit]
     return CliResult(
         {
             "ok": True,

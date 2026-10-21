@@ -23,7 +23,8 @@ scripts/youtube --json videos search "swift concurrency" --order date --limit 10
 ```
 
 The success payload includes `query`, `order`, `result_state`, and normalized
-`results` containing stable video IDs and canonical watch URLs.
+`results` containing stable video IDs and canonical watch URLs. Channel and
+playlist results are dropped, so `results` holds videos only.
 
 ## Inspect a playlist
 
