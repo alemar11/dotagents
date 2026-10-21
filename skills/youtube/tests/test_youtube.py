@@ -192,6 +192,37 @@ class YoutubeCliTests(unittest.TestCase):
         self.assertEqual(selected["language"], "en-orig")
         self.assertTrue(selected["is_original"])
 
+    def test_auto_dubbed_video_selects_original_audio_language(self) -> None:
+        def asr(name: str, lang: str) -> list[dict[str, str]]:
+            return [
+                {
+                    "ext": "srv1",
+                    "name": name,
+                    "url": f"https://example.test/caption?lang={lang}&kind=asr",
+                }
+            ]
+
+        metadata = {
+            "language": "en-US",
+            "formats": [
+                {"language": "bn", "format_note": "Bangla, medium"},
+                {"language": "en-US", "format_note": "English (US) original (default)"},
+            ],
+            "automatic_captions": {
+                "bn-orig": asr("Bangla (Original)", "bn"),
+                "en-orig": asr("English (Original)", "en"),
+                "it-orig": asr("Italian (Original)", "it"),
+            },
+        }
+        tracks = cli.available_caption_tracks(metadata)
+        self.assertEqual(
+            [track["language"] for track in tracks if track["is_original"]],
+            ["en-orig"],
+        )
+        self.assertEqual(
+            cli.select_caption_track(tracks, ["auto"])["language"], "en-orig"
+        )
+
     def test_playlist_transcript_search_matches_across_segment_boundaries(self) -> None:
         segments = [
             {"start_seconds": 0.0, "duration_seconds": 2.0, "text": "Agent"},

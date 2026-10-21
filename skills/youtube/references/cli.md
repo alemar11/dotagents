@@ -46,7 +46,9 @@ scripts/youtube transcripts get "VIDEO_URL_OR_ID" --timestamps
 ```
 
 `--languages` is a descending preference list. The default `auto` prefers an
-available manual track, then the original automatic track. JSON always retains
+available manual track, then the original automatic track. On auto-dubbed
+videos every dubbed audio track has its own `-orig` caption track; only the one
+in the original audio language counts as original. JSON always retains
 `start_seconds` and `duration_seconds`; `--timestamps` changes only human text
 output. Use `--refresh` to bypass a compatible cache entry or `--no-cache` to
 avoid cache reads and writes.

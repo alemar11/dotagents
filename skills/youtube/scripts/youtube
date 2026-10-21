@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "0.1.0"
-CACHE_SCHEMA_VERSION = "1.0.0"
+VERSION = "0.2.0"
+CACHE_SCHEMA_VERSION = "1.1.0"
 CACHE_ROOT = Path.home() / ".cache" / "dotagents" / "skills" / "youtube"
 DEFAULT_TIMEOUT_SECONDS = 180
 PREFLIGHT_TIMEOUT_SECONDS = 15
@@ -441,19 +441,43 @@ def parse_json3(path: Path) -> list[dict[str, Any]]:
     return deduplicate_segments(segments)
 
 
+def base_language(value: str) -> str:
+    return value.replace("_", "-").casefold().split("-", 1)[0]
+
+
+def original_audio_language(metadata: dict[str, Any]) -> str | None:
+    # Auto-dubbed videos carry one audio track per language; YouTube marks the
+    # source one as original, and only its captions transcribe the real speech.
+    for item in metadata.get("formats") or []:
+        if (
+            isinstance(item, dict)
+            and item.get("language")
+            and "original" in str(item.get("format_note") or "").casefold()
+        ):
+            return str(item["language"])
+    return str(metadata.get("language") or "") or None
+
+
 def available_caption_tracks(metadata: dict[str, Any]) -> list[dict[str, Any]]:
     tracks: list[dict[str, Any]] = []
-    original_language = str(metadata.get("language") or "") or None
+    original_language = original_audio_language(metadata)
+    original_base = base_language(original_language) if original_language else None
     for source, field in (("manual", "subtitles"), ("automatic", "automatic_captions")):
         collection = metadata.get(field) or {}
         if not isinstance(collection, dict):
             continue
         has_explicit_original = any(
-            str(candidate_language).casefold().endswith("-orig")
-            or any(
-                isinstance(item, dict)
-                and "original" in str(item.get("name") or "").casefold()
-                for item in candidate_formats
+            (
+                str(candidate_language).casefold().endswith("-orig")
+                or any(
+                    isinstance(item, dict)
+                    and "original" in str(item.get("name") or "").casefold()
+                    for item in candidate_formats
+                )
+            )
+            and (
+                original_base is None
+                or base_language(str(candidate_language)) == original_base
             )
             for candidate_language, candidate_formats in collection.items()
             if isinstance(candidate_formats, list)
@@ -481,21 +505,23 @@ def available_caption_tracks(metadata: dict[str, Any]) -> list[dict[str, Any]]:
                 str(language).casefold().endswith("-orig")
                 or "original" in name.casefold()
             )
+            in_original_language = (
+                original_base is None or base_language(str(language)) == original_base
+            )
             tracks.append(
                 {
                     "language": str(language),
                     "name": name,
                     "caption_source": source,
                     "is_generated": source == "automatic",
-                    "is_original": explicitly_original
-                    or (
-                        not has_explicit_original
-                        and (
-                            original_automatic
-                            or bool(
-                                original_language
-                                and str(language).casefold()
-                                == original_language.casefold()
+                    "is_original": in_original_language
+                    and (
+                        explicitly_original
+                        or (
+                            not has_explicit_original
+                            and (
+                                original_automatic
+                                or (source == "manual" and original_base is not None)
                             )
                         )
                     ),
@@ -518,7 +544,7 @@ def language_matches(actual: str, requested: str) -> bool:
     requested_normalized = requested.replace("_", "-").casefold()
     if actual_normalized == requested_normalized:
         return True
-    return actual_normalized.split("-", 1)[0] == requested_normalized.split("-", 1)[0]
+    return base_language(actual_normalized) == base_language(requested_normalized)
 
 
 def parse_languages(value: str) -> list[str]:
