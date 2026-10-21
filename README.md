@@ -43,7 +43,6 @@ as skills.
 | `versioning` | Distinguish versions, tags, and GitHub Releases; suggest SemVer and operate approval-gated release-tag workflows. |
 | `crusty` | Skeptical, evidence-backed critique of work decisions and implementations. Use only when explicitly asked for Crusty. |
 | `ms-roberts` | Use when medium or long user-authored English prompts contain grammar errors; append corrections and learning tips after the main answer. |
-| `socrates` | Offer opt-in exercises about meaningful recent engineering work, or quiz the user when explicitly requested. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format Markdown bundles with the shipped CLI. |
 | `skill-cli-creator` | Create or refactor CLIs shipped inside a skill or plugin bundle. |
 | `postgres` | Inspect Postgres databases, design or run SQL, and diagnose PostgreSQL through the shipped CLI. |
@@ -167,7 +166,7 @@ those skills owned by this checkout. Install them per project with `project-tool
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/socrates skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/technical-writing skills/test-audit skills/prototype skills/project-tools
+Use $skill-installer to install skills from alemar11/dotagents --path skills/gh skills/git-commit skills/yeet skills/versioning skills/crusty skills/ms-roberts skills/okf skills/skill-cli-creator skills/postgres skills/swift-api-design skills/swift-docc skills/youtube skills/xcode-whats-new skills/ghostty skills/herdr skills/learn skills/grilling-session skills/explore skills/why skills/adversarial-review skills/review-pr skills/architect skills/implement skills/deslop skills/unslop skills/technical-writing skills/test-audit skills/prototype skills/project-tools
 ```
 
 Install one reusable skill by passing only its path:
@@ -199,7 +198,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill versioning \
   --skill crusty \
   --skill ms-roberts \
-  --skill socrates \
   --skill okf \
   --skill skill-cli-creator \
   --skill postgres \
