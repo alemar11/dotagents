@@ -24,7 +24,7 @@ instructions; do not infer a prerelease/changelog convention from this skill.
 
 ## Routes
 
-- Commands, connection setup, JSON: [runtime usage](references/runtime/usage.md).
+- Commands, connection setup, JSON: [CLI reference](references/cli.md).
 - Config choices: [options](references/runtime/options.md) and
   [config schema](references/runtime/config-schema.md).
 - Environment variables: [environment](references/runtime/environment.md).

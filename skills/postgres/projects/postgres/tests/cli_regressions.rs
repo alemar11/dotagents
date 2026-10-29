@@ -75,7 +75,7 @@ fn invalid_environment_connection_does_not_fall_back_to_saved_profile() {
 }
 
 #[test]
-fn doctor_fails_when_config_cannot_be_resolved() {
+fn doctor_reports_config_that_cannot_be_resolved() {
     let root = fixture();
     fs::write(
         root.path().join(".skills/postgres/config.toml"),
@@ -83,7 +83,11 @@ fn doctor_fails_when_config_cannot_be_resolved() {
     )
     .unwrap();
     let output = cli(&root).arg("doctor").output().unwrap();
-    let message = error_message(&output);
+    assert!(output.status.success(), "{output:?}");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
+    let message = json["setup_error"].as_str().unwrap().to_string();
     assert!(
         message.to_ascii_lowercase().contains("toml")
             || message.to_ascii_lowercase().contains("parse"),
@@ -159,16 +163,12 @@ fn query_find_rejects_malformed_types_before_connecting() {
             .args(["query", "find", "demo", "--types", types])
             .output()
             .unwrap();
-        assert!(!output.status.success(), "{types}: {output:?}");
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains("invalid value") || stderr.contains("possible values"),
-            "{types}: {stderr}"
-        );
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            !stdout.contains("Failed to execute SQL query"),
-            "{types}: {stdout}"
-        );
+        assert_eq!(output.status.code(), Some(2), "{types}: {output:?}");
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(json["ok"], false, "{types}: {json}");
+        assert_eq!(json["command"], "parse", "{types}: {json}");
+        assert_eq!(json["error"]["code"], "invalid-arguments", "{types}: {json}");
+        let message = json["error"]["message"].as_str().unwrap();
+        assert!(message.contains("invalid value"), "{types}: {message}");
     }
 }

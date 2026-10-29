@@ -16,7 +16,9 @@ references; this file records the shipped-package maintenance boundary.
   the Postgres option surface, while `references/states.md` owns the derived
   config-migration outcome. Keep both aligned with help, config, and JSON
   output.
-- Keep shipped references grouped by concern under `runtime/`, `workflows/`,
+- `references/cli.md` owns the command surface and JSON contract, at the path
+  the skill CLI standard (`skills/skill-cli-creator/references/standard.md`)
+  fixes. Keep the other shipped references grouped by concern under `runtime/`, `workflows/`,
   `sql/`, `design/`, and `extensions/`. Put extension-specific guidance only in
   `extensions/`.
 - Keep all PostgreSQL-major catalogs as sibling files under `references/sql/`;
@@ -35,5 +37,6 @@ references; this file records the shipped-package maintenance boundary.
 ## Validation
 
 - Run shell syntax checks and the project-scoped build/tests for binary changes.
-- Verify the shipped launcher with `--help`, `--version`, `--json doctor`, and a
-  safe local or offline fixture without touching a remote database.
+- Verify the shipped launcher with `--help`, `--version`, `--json doctor`,
+  `skills/skill-cli-creator/scripts/skill-cli-creator --json check skills/postgres`,
+  and a safe local or offline fixture without touching a remote database.

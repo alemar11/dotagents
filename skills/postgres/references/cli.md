@@ -120,7 +120,7 @@ DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
 
 ## JSON mode
 
-Use `--json` whenever Codex will parse or chain the output.
+Use `--json` whenever an agent will parse or chain the output.
 
 Examples:
 
@@ -140,9 +140,12 @@ Rules:
 
 Contract:
 
-- `doctor` returns `application_name` and `runtime` when config resolves.
-  Invalid or missing config is a non-zero failure with the standard error
-  object; doctor does not succeed with `runtime: null`.
+- Every success object starts with `ok: true` and `command`, the subcommand
+  as typed (`query run`, `schema table-sizes`), followed by the fields below.
+- `doctor` returns `version`, `application_name`, and `runtime` when config
+  resolves. When config is missing or invalid it still exits 0, with
+  `ok: false`, `version`, and `setup_error` naming the problem, and no
+  `runtime`.
 - `query run` JSON objects key rows by column name. Duplicate column names
   are rejected instead of silently overwriting keys. Human table output is
   unchanged.
@@ -160,8 +163,10 @@ Contract:
   `{ "matches": { "columns": [...], "rows": [...] } }`.
 - `schema` commands return schema-specific objects keyed by the inspected
   result, such as `{ "table_sizes": { "columns": [...], "rows": [...] } }`.
-- Under `--json`, failures return `{ "error": { "message": "..." } }` on
-  stdout and exit non-zero.
+- Under `--json`, failures return
+  `{ "ok": false, "command": "...", "error": { "code": "...", "message": "..." } }`
+  on stdout. Codes: `invalid-arguments` (exit 2, `command` is `parse`) when the
+  arguments do not parse, and `command-failed` (exit 1) for any other failure.
 
 Examples:
 
@@ -169,6 +174,9 @@ Doctor success:
 
 ```json
 {
+  "ok": true,
+  "command": "doctor",
+  "version": "5.0.0",
   "application_name": "codex-postgres-skill",
   "runtime": {
     "profile_name": "local",
@@ -187,6 +195,8 @@ Profile success:
 
 ```json
 {
+  "ok": true,
+  "command": "profile resolve",
   "project_root": "/path/to/project",
   "config_path": "/path/to/project/.skills/postgres/config.toml",
   "toml_path": "/path/to/project/.skills/postgres/config.toml",
@@ -203,6 +213,8 @@ Query success:
 
 ```json
 {
+  "ok": true,
+  "command": "query run",
   "query": "select 1 as ok;",
   "statements": [
     {
@@ -221,7 +233,10 @@ Error example:
 
 ```json
 {
+  "ok": false,
+  "command": "query run",
   "error": {
+    "code": "command-failed",
     "message": "Profile 'missing' not found in config.toml."
   }
 }
@@ -378,7 +393,7 @@ before touching the real target DB.
 
 ## References
 
-- Env vars: `environment.md`
-- Config schema: `config-schema.md`
-- Schema-change guardrails: `../workflows/schema-change-guardrails.md`
-- Design guidance: `../design/README.md`
+- Env vars: `runtime/environment.md`
+- Config schema: `runtime/config-schema.md`
+- Schema-change guardrails: `workflows/schema-change-guardrails.md`
+- Design guidance: `design/README.md`

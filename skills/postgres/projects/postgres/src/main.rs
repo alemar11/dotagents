@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow, bail};
-use clap::Parser;
+use clap::error::ErrorKind;
+use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use postgres_skill_cli::cli::*;
 use postgres_skill_cli::config::{
     AccessMode, RuntimeOptions, bootstrap_profile, canonical_config_path, migrate_config_file,
@@ -12,7 +13,7 @@ use postgres_skill_cli::db::{
 };
 use postgres_skill_cli::docs;
 use postgres_skill_cli::find::build_find_sql;
-use postgres_skill_cli::output::{print_json, render_table};
+use postgres_skill_cli::output::{command_name, print_json, render_table, set_command};
 use postgres_skill_cli::tools::{self, ToolSection};
 use serde_json::{Value, json};
 use sqlparser::dialect::{Dialect, PostgreSqlDialect};
@@ -24,11 +25,35 @@ use std::path::{Path, PathBuf};
 
 #[tokio::main]
 async fn main() {
-    let cli = Cli::parse_from(std::iter::once("postgres".to_string()).chain(env::args().skip(1)));
+    let args: Vec<String> = std::iter::once("postgres".to_string()).chain(env::args().skip(1)).collect();
+    let cli = match Cli::command().try_get_matches_from(&args).and_then(|matches| {
+        set_command(subcommand_path(&matches));
+        Cli::from_arg_matches(&matches)
+    }) {
+        Ok(cli) => cli,
+        Err(error) if matches!(error.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion)
+            || !args.iter().any(|arg| arg == "--json") => error.exit(),
+        Err(error) => {
+            let rendered = error.to_string();
+            let message = rendered.lines().next().unwrap_or_default().trim_start_matches("error: ");
+            let payload = json!({
+                "ok": false,
+                "command": "parse",
+                "error": { "code": "invalid-arguments", "message": message },
+            });
+            if let Err(json_error) = print_json(&payload) {
+                eprintln!("{json_error:#}");
+            }
+            std::process::exit(2);
+        }
+    };
     if let Err(error) = run(&cli).await {
         if cli.json {
             let payload = json!({
+                "ok": false,
+                "command": command_name(),
                 "error": {
+                    "code": "command-failed",
                     "message": sanitize_error_message(&format!("{error:#}")),
                 }
             });
@@ -40,6 +65,17 @@ async fn main() {
         }
         std::process::exit(1);
     }
+}
+
+/// The subcommand chain as typed, such as `query run`.
+fn subcommand_path(matches: &ArgMatches) -> String {
+    let mut names = Vec::new();
+    let mut current = matches;
+    while let Some((name, sub)) = current.subcommand() {
+        names.push(name.to_string());
+        current = sub;
+    }
+    names.join(" ")
 }
 
 async fn run(cli: &Cli) -> Result<()> {
@@ -322,12 +358,22 @@ fn lock_strength_starts_at(tokens: &[Token]) -> bool {
             .is_some_and(|token| is_unquoted_keyword(token, "share"))
 }
 
+/// Reports readiness. Config that cannot be resolved is missing setup, not a
+/// failure: doctor still exits 0, with `ok: false` and the reason.
 async fn doctor(cli: &Cli, skill_root: &Path) -> Result<()> {
-    let runtime = runtime_context(&runtime_options(cli)?, skill_root)?;
-    let output = json!({
-        "application_name": runtime.application_name,
-        "runtime": runtime,
-    });
+    let output = match runtime_context(&runtime_options(cli)?, skill_root) {
+        Ok(runtime) => json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "application_name": runtime.application_name,
+            "runtime": runtime,
+        }),
+        Err(error) => json!({
+            "ok": false,
+            "command": "doctor",
+            "version": env!("CARGO_PKG_VERSION"),
+            "setup_error": sanitize_error_message(&format!("{error:#}")),
+        }),
+    };
     if cli.json {
         print_json(&output)
     } else {

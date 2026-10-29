@@ -34,6 +34,6 @@ update. Do not route this file from the runtime skill.
 - Prefer one focused helper over a large “do everything” script.
 - Prefer extending an existing script only when the new behavior is a natural fit.
 - Keep runtime scripts side-effect-light unless the side effect is the explicit purpose of the command.
-- Document every promoted script in `references/runtime/usage.md`.
+- Document every promoted script in `references/cli.md`.
 - Document any new env inputs in `references/runtime/environment.md`.
 - Update `SKILL.md` only when the promoted learning changes the runtime decision flow.
