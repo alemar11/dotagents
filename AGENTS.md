@@ -70,10 +70,6 @@ retrying a mutation.
   installation prompts, and actual dependencies aligned with public behavior.
   Preserve invocation policy unless its change is requested. Include a Skill
   Dependencies section only for real runtime dependencies.
-- After adding a reusable skill, run `./skills-link.sh` and verify its
-  `~/.agents/skills/<name>` and `~/.claude/skills/<name>` links. This helper
-  links only `skills/`; it does not install maintainer skills or change plugin
-  marketplaces.
 - Remove retired source, metadata, catalog/install entries, registries, and
   repository-owned installation links together, then scan for stale references.
 - Choose an unused repository color when adding `brand_color`.
