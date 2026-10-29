@@ -1,5 +1,0 @@
-interface:
-  display_name: "Git Commit"
-  short_description: "Create or push explicit Git commits"
-  brand_color: "#64748B"
-  default_prompt: "Use $git-commit for the requested local commit or push, preserving unrelated staged work."

@@ -39,8 +39,8 @@ remain failed verification, not completed maintenance.
 ## Delivery
 
 Maintenance authority does not imply commit, push, PR, or publication authority.
-Use `$git-commit` for authorized commits/pushes and `$yeet` for authorized
-single-PR publication when available; scoped Git is the commit/push fallback.
+Use scoped Git for authorized commits and pushes, and `gh` for authorized
+single-PR publication.
 A push-only request never authorizes staging or committing. Scope staging,
 inspect the staged diff, and split distinct package or migration responsibilities.
 After delivery, verify the exact commit range, branch divergence, and requested

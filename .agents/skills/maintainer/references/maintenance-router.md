@@ -27,9 +27,7 @@ An audit-and-fix request gathers evidence through its review playbook, then
 applies authorized findings through targeted maintenance. Routine maintenance
 includes all applicable source refresh routes; a named package limits them to
 that package. A named operation limits work to that operation. Preserve any
-read-only constraint across every branch. For TanStack, maintain the
-`project-tools` reference against official Intent consumer guidance, not a
-local API skill catalog; this does not invoke its installation workflow.
+read-only constraint across every branch.
 
 ## Mixed work and delegation
 
