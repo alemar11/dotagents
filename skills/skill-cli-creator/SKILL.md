@@ -1,31 +1,29 @@
 ---
 name: skill-cli-creator
-description: Create or refactor CLIs shipped inside a skill or plugin bundle.
+description: Create a skill that ships a CLI, refactor a skill's CLI, or check one against the shared skill CLI standard. Use when a skill or plugin needs a command-line tool, or when its CLI is added, changed, or reviewed.
 ---
 
 # Skill CLI Creator
 
-Resolve the host, command name, shipped artifact path, and requested behavior
-from the existing package. Evolve an existing command rather than creating a
-duplicate. If the host is missing, use skill-creator or plugin-creator to create
-it within the requested scope.
+Every skill that ships a CLI follows one [standard](references/standard.md):
+the same layout, `scripts/<skill>` as the only artifact, and the same
+`--version`, `--json`, `doctor`, error, and exit-code contract. Read it before
+writing or changing a skill CLI.
 
-Read only the relevant contracts:
+Run the tool from this skill's root; [CLI reference](references/cli.md) has
+every option.
 
-- Host ownership: [states](references/states.md).
-- Paths, config, caches, or platform packaging: [layout](references/embedded-cli-layout.md).
-- Runtime, build, auth, or validation changes: [implementation](references/implementation-workflow.md).
-- Commands, JSON, pagination, files, or writes: [CLI patterns](references/agent-cli-patterns.md).
+- New skill: `scripts/skill-cli-creator --json new <name> --into <skills-dir> --description "<what and when>"`,
+  then replace the template's placeholder command with the real ones and fill
+  `SKILL.md`, `references/cli.md`, and `agents/openai.yaml`. For the parts of a
+  skill unrelated to its CLI (description, splitting references), follow the
+  skill-creator skill when it is available.
+- Existing skill: evolve its current artifact rather than adding a second one.
+  Move a differently named script to `scripts/<skill>` and keep the flags its
+  callers rely on.
+- Before handing off: `scripts/skill-cli-creator --json check <skill-dir>` must
+  pass, plus the skill's own tests.
 
-Keep simple scripts under `scripts/`. Introduce `projects/<tool>/` only for a
-multi-file or build-backed implementation; it is maintenance source, never the
-normal runtime entrypoint. Keep artifact, config, examples, and docs under one
-owner. Reads and diagnostics must not write config.
-
-Verify executable changes through the shipped artifact: affected tests,
-`--help`, `--version`, `--json doctor`, and a safe fixture or end-to-end check.
-Select the relevant validation lane from the implementation reference. For
-prose-only changes, check the changed paths and examples instead.
-
-Synchronize affected runtime docs and version metadata. A maintenance project
-needs its own build/rebuild and validation contract in `AGENTS.md`.
+Read [command design](references/command-design.md) when choosing commands,
+and [compiled](references/compiled.md) only for a build project, multi-platform
+binaries, persisted config, a cache, or a CLI inside a plugin.

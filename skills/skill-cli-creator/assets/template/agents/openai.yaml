@@ -1,0 +1,4 @@
+interface:
+  display_name: "__TITLE__"
+  short_description: "__DESCRIPTION__"
+  default_prompt: "Use $__SKILL__ to ..."

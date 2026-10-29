@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""__DESCRIPTION__"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import platform
+import sys
+
+VERSION = "0.1.0"
+PROG = "__SKILL__"
+
+EXIT_FAILED = 1
+EXIT_INVALID_ARGUMENTS = 2
+
+
+class CliError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int = EXIT_FAILED):
+        super().__init__(message)
+        self.code = code
+        self.exit_code = exit_code
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise CliError("invalid-arguments", message, EXIT_INVALID_ARGUMENTS)
+
+
+def doctor(args: argparse.Namespace) -> dict:
+    return {
+        "version": VERSION,
+        "python_version": platform.python_version(),
+    }
+
+
+def build_parser() -> Parser:
+    parser = Parser(prog=PROG, description=__doc__)
+    parser.add_argument("--version", action="version", version=f"{PROG} {VERSION}")
+    parser.add_argument("--json", action="store_true", help="print one JSON object on stdout")
+    commands = parser.add_subparsers(dest="command", metavar="<command>", parser_class=Parser)
+    commands.required = True
+    commands.add_parser("doctor", help="report readiness without writing anything").set_defaults(run=doctor)
+    return parser
+
+
+def command_name(args: argparse.Namespace) -> str:
+    return " ".join(v for k, v in vars(args).items() if k in ("command", "verb") and v)
+
+
+def emit(payload: dict, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, indent=2))
+    elif payload.get("ok"):
+        for key, value in payload.items():
+            if key not in ("ok", "command"):
+                print(f"{key}: {value}")
+    else:
+        print(f"{PROG}: {payload['error']['message']}", file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    as_json = "--json" in argv
+    command = "parse"
+    try:
+        args = build_parser().parse_args(argv)
+        command = command_name(args)
+        result = args.run(args)
+    except CliError as e:
+        emit({"ok": False, "command": command, "error": {"code": e.code, "message": str(e)}}, as_json)
+        return e.exit_code
+    emit({"ok": True, "command": command, **result}, as_json)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

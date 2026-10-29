@@ -1,5 +1,5 @@
 interface:
   display_name: "Skill CLI Creator"
-  short_description: "Create or refactor embedded skill or plugin CLIs"
-  default_prompt: "Use $skill-cli-creator to create or refactor an embedded CLI, keep normal execution on its shipped `scripts/<tool>` artifact, and validate the finished command through that artifact."
+  short_description: "Create, refactor, or check skill CLIs against one standard"
+  default_prompt: "Use $skill-cli-creator to create or change a skill's CLI so it follows the skill CLI standard, and check it with the shipped scripts/skill-cli-creator."
   brand_color: "#2563EB"

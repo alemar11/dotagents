@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Create a skill that ships a CLI, or check one against the skill CLI standard."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+VERSION = "1.0.0"
+PROG = "skill-cli-creator"
+ROOT = Path(__file__).resolve().parents[1]
+TEMPLATE = ROOT / "assets" / "template"
+
+EXIT_FAILED = 1
+EXIT_INVALID_ARGUMENTS = 2
+
+NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
+CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
+TIMEOUT_SECONDS = 30
+
+
+class CliError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int = EXIT_FAILED, **extra):
+        super().__init__(message)
+        self.code = code
+        self.exit_code = exit_code
+        self.extra = extra
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise CliError("invalid-arguments", message, EXIT_INVALID_ARGUMENTS)
+
+
+def doctor(args: argparse.Namespace) -> dict:
+    return {
+        "version": VERSION,
+        "python_version": platform.python_version(),
+        "template": {"path": str(TEMPLATE), "exists": TEMPLATE.is_dir()},
+    }
+
+
+def new(args: argparse.Namespace) -> dict:
+    if not NAME.match(args.name):
+        raise CliError("invalid-name", f"{args.name!r} is not lower-kebab-case", EXIT_INVALID_ARGUMENTS)
+    target = Path(args.into).resolve() / args.name
+    if target.exists():
+        raise CliError("target-exists", f"{target} already exists")
+    values = {
+        "__SKILL__": args.name,
+        "__MODULE__": args.name.replace("-", "_"),
+        "__TITLE__": args.title or args.name.replace("-", " ").title(),
+        "__DESCRIPTION__": args.description.replace('"', "'"),
+    }
+
+    def fill(text: str) -> str:
+        for key, value in values.items():
+            text = text.replace(key, value)
+        return text
+
+    files = []
+    for source in sorted(p for p in TEMPLATE.rglob("*") if p.is_file() and "__pycache__" not in p.parts):
+        dest = target / fill(str(source.relative_to(TEMPLATE)))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(fill(source.read_text()))
+        dest.chmod(source.stat().st_mode)
+        files.append(str(dest.relative_to(target)))
+    return {"path": str(target), "files": files, "next": f"{PROG} --json check {target}"}
+
+
+def frontmatter(text: str) -> dict:
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---", 4)
+    fields = {}
+    for line in text[4:end].splitlines():
+        key, sep, value = line.partition(":")
+        if sep and not line.startswith(" "):
+            fields[key.strip()] = value.strip().strip('"')
+    return fields
+
+
+def run_cli(artifact: Path, *args: str) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run([str(artifact), *args], capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return subprocess.CompletedProcess([str(artifact), *args], -1, "", str(e))
+
+
+def json_of(out: subprocess.CompletedProcess):
+    try:
+        return json.loads(out.stdout)
+    except ValueError:
+        return None
+
+
+def check(args: argparse.Namespace) -> dict:
+    skill = Path(args.path).resolve()
+    if not (skill / "SKILL.md").is_file():
+        raise CliError("not-a-skill", f"{skill} has no SKILL.md")
+    name = skill.name
+    results = []
+
+    def add(check_id: str, ok: bool, message: str) -> bool:
+        results.append({"id": check_id, "ok": ok, "message": message})
+        return ok
+
+    meta = frontmatter((skill / "SKILL.md").read_text())
+    add("skill-name", meta.get("name") == name, f"frontmatter name is {meta.get('name')!r}, directory is {name!r}")
+    description = meta.get("description", "")
+    add("skill-description", 0 < len(description) <= 1024, f"description has {len(description)} characters (1-1024)")
+    for path in ("AGENTS.md", "agents/openai.yaml", "references/cli.md"):
+        add(f"file:{path}", (skill / path).is_file(), f"{path} is present" if (skill / path).is_file() else f"{path} is missing")
+    tests = sorted((skill / "tests").glob("test_*.py")) if (skill / "tests").is_dir() else []
+    project_tests = skill / "projects" / name / "tests"
+    if project_tests.is_dir():
+        add("tests", True, f"tests live in projects/{name}/tests")
+    else:
+        add("tests", bool(tests), f"{len(tests)} test file(s) under tests/")
+
+    broken = []
+    for md in sorted(skill.rglob("*.md")):
+        if "assets" in md.relative_to(skill).parts:
+            continue
+        for target in LINK.findall(CODE.sub("", md.read_text())):
+            if re.match(r"^[a-z]+:", target) or target.startswith("#"):
+                continue
+            if not (md.parent / target.split("#")[0]).exists():
+                broken.append(f"{md.relative_to(skill)} -> {target}")
+    add("links", not broken, "every relative link resolves" if not broken else "broken: " + ", ".join(broken))
+
+    artifact = skill / "scripts" / name
+    runnable = artifact.is_file() and os.access(artifact, os.X_OK)
+    if add("artifact", runnable, f"scripts/{name} is executable" if runnable else f"scripts/{name} is missing or not executable"):
+        if not artifact.read_text(errors="replace").startswith("#!"):
+            add("artifact-shebang", False, f"scripts/{name} has no shebang")
+        out = run_cli(artifact, "--help")
+        add("help", out.returncode == 0, f"--help exits {out.returncode}")
+        out = run_cli(artifact, "--version")
+        parts = out.stdout.split()
+        version = parts[1] if len(parts) == 2 and parts[0] == name and SEMVER.match(parts[1]) else None
+        add("version", out.returncode == 0 and version is not None,
+            f"--version prints {out.stdout.strip()!r}, want '{name} x.y.z'")
+        out = run_cli(artifact, "--json", "doctor")
+        payload = json_of(out)
+        doctor_ok = (out.returncode == 0 and isinstance(payload, dict) and isinstance(payload.get("ok"), bool)
+                     and payload.get("command") == "doctor" and payload.get("version") == version)
+        add("doctor", doctor_ok, "--json doctor exits 0 with ok, command 'doctor', and the --version number"
+            if doctor_ok else f"--json doctor exits {out.returncode} with {out.stdout.strip()[:200]!r}")
+        out = run_cli(artifact, "--json", "skill-cli-check-unknown-command")
+        payload = json_of(out)
+        error = payload.get("error") if isinstance(payload, dict) else None
+        error_ok = (out.returncode != 0 and payload.get("ok") is False and isinstance(error, dict)
+                    and bool(error.get("code")) and bool(error.get("message"))) if isinstance(payload, dict) else False
+        add("error-shape", error_ok, "an unknown command fails with ok false and error code and message"
+            if error_ok else f"an unknown command exits {out.returncode} with {out.stdout.strip()[:200]!r}")
+
+    failed = [r["id"] for r in results if not r["ok"]]
+    if failed:
+        raise CliError("standard-violations", f"{len(failed)} check(s) failed: {', '.join(failed)}",
+                       skill=name, path=str(skill), checks=results)
+    return {"skill": name, "path": str(skill), "checks": results}
+
+
+def build_parser() -> Parser:
+    parser = Parser(prog=PROG, description=__doc__)
+    parser.add_argument("--version", action="version", version=f"{PROG} {VERSION}")
+    parser.add_argument("--json", action="store_true", help="print one JSON object on stdout")
+    commands = parser.add_subparsers(dest="command", metavar="<command>", parser_class=Parser)
+    commands.required = True
+    commands.add_parser("doctor", help="report readiness without writing anything").set_defaults(run=doctor)
+    p = commands.add_parser("new", help="create a skill with a CLI from the template")
+    p.add_argument("name", help="lower-kebab skill name, also the CLI name")
+    p.add_argument("--into", required=True, help="directory that will hold the new skill directory")
+    p.add_argument("--description", required=True, help="SKILL.md description: what it does and when to use it")
+    p.add_argument("--title", help="display title; defaults to the name in title case")
+    p.set_defaults(run=new)
+    p = commands.add_parser("check", help="check a skill directory against the standard")
+    p.add_argument("path", help="the skill directory")
+    p.set_defaults(run=check)
+    return parser
+
+
+def emit(payload: dict, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, indent=2))
+        return
+    for item in payload.get("checks", []):
+        print(f"{'ok  ' if item['ok'] else 'FAIL'} {item['id']}: {item['message']}")
+    if payload.get("ok"):
+        for key, value in payload.items():
+            if key not in ("ok", "command", "checks"):
+                print(f"{key}: {value}")
+    else:
+        print(f"{PROG}: {payload['error']['message']}", file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    as_json = "--json" in argv
+    command = "parse"
+    try:
+        args = build_parser().parse_args(argv)
+        command = args.command
+        result = args.run(args)
+    except CliError as e:
+        emit({"ok": False, "command": command, "error": {"code": e.code, "message": str(e)}, **e.extra}, as_json)
+        return e.exit_code
+    emit({"ok": True, "command": command, **result}, as_json)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
