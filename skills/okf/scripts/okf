@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.0.0"
+VERSION = "4.0.0"
 SPEC_VERSION = "0.2"
 SPEC_REQUIRED = ("type",)
 RECOMMENDED = ("title", "description", "resource", "tags")
@@ -92,8 +92,13 @@ class ValidationResult:
         self.warnings.append(Message("warning", str(path), message))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "ok": self.ok,
+        payload: dict[str, Any] = {"ok": self.ok, "command": "validate"}
+        if not self.ok:
+            payload["error"] = {
+                "code": "validation-failed",
+                "message": f"{len(self.errors)} conformance error(s)",
+            }
+        return payload | {
             "pyyaml": self.pyyaml,
             "files_checked": self.files_checked,
             "concepts_checked": self.concepts_checked,
@@ -120,7 +125,7 @@ class OkfArgumentParser(argparse.ArgumentParser):
                     {
                         "ok": False,
                         "command": "parse",
-                        "error": {"code": "invalid_arguments", "message": message},
+                        "error": {"code": "invalid-arguments", "message": message},
                     },
                     indent=2,
                 )
@@ -752,6 +757,7 @@ def command_doctor(args: argparse.Namespace) -> int:
     anchored_io = supports_anchored_io()
     payload = {
         "ok": anchored_io,
+        "command": "doctor",
         "version": VERSION,
         "spec_version": SPEC_VERSION,
         "checks": {
@@ -770,7 +776,7 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"- Anchored file access: {'yes' if anchored_io else 'no'}")
         if yaml is None:
             print("- YAML parser: limited stdlib fallback")
-    return 0 if anchored_io else 69
+    return 0
 
 
 def command_validate(args: argparse.Namespace) -> int:
@@ -813,7 +819,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             "Bundle root must not be a symlink.",
             64,
-            "unsafe_path",
+            "unsafe-path",
         )
     try:
         path = concept_path(bundle, args.concept_id)
@@ -823,7 +829,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             str(exc),
             64,
-            "unsafe_path",
+            "unsafe-path",
         )
     if path.exists() and not args.force:
         return print_command_error(
@@ -831,7 +837,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             f"Refusing to overwrite existing concept: {path}",
             73,
-            "overwrite_refused",
+            "overwrite-refused",
         )
 
     if bool(args.generated_by) != bool(args.generated_at):
@@ -840,7 +846,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             "--generated-by and --generated-at must be supplied together.",
             64,
-            "invalid_generation",
+            "invalid-generation",
         )
 
     try:
@@ -855,7 +861,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             str(exc),
             64,
-            "invalid_generation",
+            "invalid-generation",
         )
 
     frontmatter: dict[str, Any] = {
@@ -875,7 +881,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             f"Missing required scaffold fields: {', '.join(missing)}",
             64,
-            "missing_required_field",
+            "missing-required-field",
         )
 
     if args.body_file:
@@ -887,7 +893,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
                 "scaffold",
                 f"Body file is not valid UTF-8: {exc}",
                 65,
-                "invalid_utf8",
+                "invalid-utf8",
             )
     else:
         body = f"# {args.title or args.concept_id}\n\n"
@@ -905,7 +911,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             f"Refusing to overwrite existing concept: {path}",
             73,
-            "overwrite_refused",
+            "overwrite-refused",
         )
     except UnsafePathError as exc:
         return print_command_error(
@@ -913,7 +919,7 @@ def command_scaffold(args: argparse.Namespace) -> int:
             "scaffold",
             str(exc),
             64,
-            "unsafe_path",
+            "unsafe-path",
         )
     if args.json:
         print(
@@ -938,7 +944,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="okf",
         description=f"Work with Open Knowledge Format v{SPEC_VERSION} bundles.",
     )
-    parser.add_argument("--version", action="version", version=VERSION)
+    parser.add_argument("--version", action="version", version=f"okf {VERSION}")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -977,11 +983,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except UnsafePathError as exc:
-        return print_command_error(args, args.command, str(exc), 64, "unsafe_path")
+        return print_command_error(args, args.command, str(exc), 64, "unsafe-path")
     except OkfError as exc:
-        return print_command_error(args, args.command, str(exc), 64, "invalid_input")
+        return print_command_error(args, args.command, str(exc), 64, "invalid-input")
     except OSError as exc:
-        return print_command_error(args, args.command, str(exc), 74, "io_error")
+        return print_command_error(args, args.command, str(exc), 74, "io-error")
 
 
 if __name__ == "__main__":

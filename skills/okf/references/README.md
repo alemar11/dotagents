@@ -12,8 +12,8 @@ Use this page first after the `okf` skill loads.
 
 - `writing-okf.md`: authoring concept documents, indexes, logs, links, and
   frontmatter.
-- `validation.md`: OKF v0.2 conformance, parser limits, strict-link checks, and
-  machine-readable CLI output.
+- `validation.md`: OKF v0.2 conformance, parser limits, and strict-link checks.
+- `cli.md`: CLI commands, JSON shapes, error codes, and exit codes.
 - `examples.md`: compact concept, provenance/trust, computation, index, and log
   examples.
 

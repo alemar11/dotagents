@@ -16,7 +16,8 @@ for conformance. Read [the specification](assets/spec.md) for exact field
 semantics or Attested Computation.
 
 Run `<skill-root>/scripts/okf validate <bundle>` after writing; add `--json`
-before `validate` for machine-readable results. Read
+before `validate` for machine-readable results. Read the
+[CLI reference](references/cli.md) for commands and JSON,
 [validation](references/validation.md) for conformance options or warnings,
 and [examples](references/examples.md) when a concrete format is needed.
 Use `--json doctor` for runtime problems. Without PyYAML, the CLI uses a limited

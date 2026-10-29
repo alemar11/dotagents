@@ -42,7 +42,7 @@ class OkfCliTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 self.okf.main(["--version"])
         self.assertEqual(raised.exception.code, 0)
-        self.assertEqual(stdout.getvalue().strip(), self.okf.VERSION)
+        self.assertEqual(stdout.getvalue().strip(), f"okf {self.okf.VERSION}")
 
     def test_doctor_json_shape(self) -> None:
         stdout = io.StringIO()
@@ -62,7 +62,7 @@ class OkfCliTests(unittest.TestCase):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = self.okf.main(["--json", "doctor"])
-            self.assertEqual(code, 69)
+            self.assertEqual(code, 0)
             payload = json.loads(stdout.getvalue())
             self.assertFalse(payload["ok"])
             self.assertFalse(payload["checks"]["anchored_io"])
@@ -288,6 +288,7 @@ class OkfCliTests(unittest.TestCase):
                 self.assertEqual(code, 65)
                 payload = json.loads(stdout.getvalue())
                 self.assertFalse(payload["ok"])
+                self.assertEqual(payload["error"]["code"], "validation-failed")
                 self.assertIn("nested YAML", payload["errors"][0]["message"])
         finally:
             self.okf.yaml = original_yaml
@@ -615,7 +616,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "unsafe_path")
+            self.assertEqual(payload["error"]["code"], "unsafe-path")
             self.assertFalse((outside / "concept.md").exists())
 
     def test_scaffold_force_rejects_existing_leaf_symlink(self) -> None:
@@ -644,7 +645,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "unsafe_path")
+            self.assertEqual(payload["error"]["code"], "unsafe-path")
             self.assertEqual(outside.read_text(encoding="utf-8"), "preserve\n")
 
     def test_scaffold_rejects_dangling_leaf_symlink(self) -> None:
@@ -671,7 +672,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "unsafe_path")
+            self.assertEqual(payload["error"]["code"], "unsafe-path")
             self.assertFalse(outside.exists())
 
     def test_scaffold_write_stays_anchored_during_parent_swap(self) -> None:
@@ -733,7 +734,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "invalid_generation")
+            self.assertEqual(payload["error"]["code"], "invalid-generation")
             self.assertEqual(payload["error"]["exit_code"], 64)
             self.assertEqual(stderr.getvalue(), "")
 
@@ -757,7 +758,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "invalid_generation")
+            self.assertEqual(payload["error"]["code"], "invalid-generation")
             self.assertFalse((Path(tmp) / "refs" / "example.md").exists())
 
     def test_scaffold_rejects_generated_at_without_offset(self) -> None:
@@ -780,7 +781,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 64)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "invalid_generation")
+            self.assertEqual(payload["error"]["code"], "invalid-generation")
             self.assertIn("explicit UTC offset", payload["error"]["message"])
             self.assertFalse((Path(tmp) / "refs" / "example.md").exists())
 
@@ -807,7 +808,7 @@ class OkfCliTests(unittest.TestCase):
                 )
             self.assertEqual(code, 65)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["error"]["code"], "invalid_utf8")
+            self.assertEqual(payload["error"]["code"], "invalid-utf8")
             self.assertEqual(stderr.getvalue(), "")
             self.assertFalse((bundle / "refs" / "example.md").exists())
 
@@ -833,7 +834,7 @@ class OkfCliTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
         payload = json.loads(stdout.getvalue())
         self.assertFalse(payload["ok"])
-        self.assertEqual(payload["error"]["code"], "invalid_arguments")
+        self.assertEqual(payload["error"]["code"], "invalid-arguments")
         self.assertEqual(stderr.getvalue(), "")
 
 

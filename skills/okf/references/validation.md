@@ -45,20 +45,8 @@ another YAML-aware tool when block-form nested mappings are required.
 
 ## Machine-Readable Output
 
-Put global `--json` before the command:
-
-```sh
-<okf-skill-root>/scripts/okf --json doctor
-<okf-skill-root>/scripts/okf --json validate <bundle>
-<okf-skill-root>/scripts/okf --json scaffold <bundle> <concept-id> --type Reference
-```
-
-With `--json`, success and error envelopes go to stdout. Human diagnostics use
-stderr.
-
-`doctor` reports the `anchored_io` platform capability. It returns exit code 69
-and `ok: false` when the operating system cannot provide the directory-relative
-file access required for safe validation and scaffolding.
+The commands, JSON shapes, error codes, and exit codes are in the
+[CLI reference](cli.md).
 
 Scaffolding creates and opens bundle-relative paths through anchored directory
 descriptors. It refuses symlinked path components and does not follow a path
