@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 CACHE_SCHEMA_VERSION = "1.1.0"
 CACHE_ROOT = Path.home() / ".cache" / "dotagents" / "skills" / "youtube"
 DEFAULT_TIMEOUT_SECONDS = 180
@@ -1009,7 +1009,7 @@ def doctor_result(args: argparse.Namespace) -> CliResult:
         {
             "ok": probe["preflight_state"] == "ready",
             "command": "doctor",
-            "cli_version": VERSION,
+            "version": VERSION,
             "python_version": platform.python_version(),
             "preflight_state": probe["preflight_state"],
             "yt_dlp": {
@@ -1264,7 +1264,7 @@ def playlists_search_transcripts_result(
 def render_human(payload: dict[str, Any], args: argparse.Namespace) -> None:
     command = payload.get("command")
     if command == "doctor":
-        print(f"youtube {payload['cli_version']}")
+        print(f"youtube {payload['version']}")
         print(f"yt-dlp: {payload['preflight_state']}")
         if payload["yt_dlp"].get("version"):
             print(f"version: {payload['yt_dlp']['version']}")
